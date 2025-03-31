@@ -1,0 +1,6 @@
+<svg width="1600" height="900" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="900" fill="#0F0F0F"/>
+  <rect x="50" y="50" width="1500" height="800" fill="#1A1A1A"/>
+  <text x="800" y="400" font-family="Arial" font-size="72" text-anchor="middle" fill="#800020">Hacienda San Carlos</text>
+  <text x="800" y="500" font-family="Arial" font-size="36" text-anchor="middle" fill="#FFFAF0">Habitaciones de Lujo</text>
+</svg> 

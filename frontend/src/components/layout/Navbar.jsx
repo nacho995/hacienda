@@ -26,12 +26,13 @@ export default function Navbar() {
     { href: 'intro', label: 'Inicio' },
     { href: 'events', label: 'Eventos' },
     { href: 'gallery', label: 'Galería' },
-    { href: 'lodging', label: 'Habitaciones' },
+    { href: '/habitaciones', label: 'Habitaciones', isPage: true },
     { href: 'contact', label: 'Contacto' }
   ];
 
   // Función para generar el enlace correcto dependiendo de si estamos en la página de inicio o no
-  const getNavHref = (href) => {
+  const getNavHref = (href, isPage) => {
+    if (isPage) return href;
     return isHome ? `#${href}` : `/#${href}`;
   };
 
@@ -85,7 +86,7 @@ export default function Navbar() {
                 {navLinks.slice(0, 2).map((link) => (
                   <Link
                     key={link.href}
-                    href={getNavHref(link.href)}
+                    href={getNavHref(link.href, link.isPage)}
                     className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
                       isScrolled 
                         ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
@@ -118,7 +119,7 @@ export default function Navbar() {
                 {navLinks.slice(2).map((link) => (
                   <Link
                     key={link.href}
-                    href={getNavHref(link.href)}
+                    href={getNavHref(link.href, link.isPage)}
                     className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
                       isScrolled 
                         ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
@@ -208,7 +209,7 @@ export default function Navbar() {
             {navLinks.map((link) => (
               <Link
                 key={link.href}
-                href={getNavHref(link.href)}
+                href={getNavHref(link.href, link.isPage)}
                 className="text-white text-xl uppercase tracking-[0.2em] hover:text-[var(--color-primary)] transition-colors py-2 border-b border-[var(--color-primary)]/20"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
