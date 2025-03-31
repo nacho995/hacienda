@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #800020;     /* Vino tinto más profundo */
+  --color-primary-light: #A30025;
+  --color-primary-dark: #600010;
+  --color-accent: #0F0F0F;      /* Negro elegante más oscuro */
+  --color-accent-dark: #000000;
+  --color-cream-light: #FFFAF0; /* Blanco crema elegante */
+  --font-display: 'Playfair Display', serif;
+  --color-primary-5: rgba(128, 0, 32, 0.05); /* Vino tinto con 5% de opacidad */
+  --color-primary-10: rgba(128, 0, 32, 0.1); /* Vino tinto con 10% de opacidad */
+  --color-primary-20: rgba(128, 0, 32, 0.2); /* Vino tinto con 20% de opacidad */
+  --color-primary-30: rgba(128, 0, 32, 0.3); /* Vino tinto con 30% de opacidad */
+  --color-primary-50: rgba(128, 0, 32, 0.5); /* Vino tinto con 50% de opacidad */
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-gray-800;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  /* Selección de texto elegante */
+  ::selection {
+    @apply bg-[var(--color-primary)] text-white;
+  }
+}
+
+@layer components {
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .section-padding {
+    @apply py-24 md:py-32;
+  }
+
+  .elegant-title {
+    @apply text-4xl md:text-5xl lg:text-6xl font-light tracking-wide;
+  }
+
+  .elegant-title.centered {
+    @apply text-center;
+  }
+
+  .gold-divider {
+    @apply w-32 h-[1px] bg-[var(--color-primary)] mx-auto;
+  }
+
+  .elegant-card {
+    @apply bg-white rounded-none shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl border border-gray-100;
+  }
+
+  .shadow-text {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  .shadow-text-strong {
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+  }
+  
+  .btn-primary {
+    @apply px-6 py-3 bg-[var(--color-primary)] text-white rounded-none font-medium hover:bg-[var(--color-primary-dark)] transition-colors duration-300 inline-block;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 border border-[var(--color-accent)] text-[var(--color-accent)] rounded-none font-medium hover:bg-[var(--color-accent)] hover:text-white transition-colors duration-300 inline-block;
+  }
+  
+  /* Mejora para secciones elegantes */
+  .section-elegant {
+    @apply relative;
+  }
+  
+  .section-elegant::before {
+    content: '';
+    @apply absolute top-0 left-1/2 w-1 h-10 bg-[var(--color-primary)] transform -translate-x-1/2;
+  }
+  
+  /* Bordes decorativos */
+  .border-decorative {
+    @apply relative border p-8;
+    border-color: var(--color-primary-10);
+  }
+  
+  .border-decorative::before {
+    content: '';
+    @apply absolute top-[-2px] left-[-2px] w-1/4 h-1/4 border-t-2 border-l-2 border-[var(--color-primary)];
+  }
+  
+  .border-decorative::after {
+    content: '';
+    @apply absolute bottom-[-2px] right-[-2px] w-1/4 h-1/4 border-b-2 border-r-2 border-[var(--color-primary)];
+  }
+  
+  /* Patrones de fondo elegantes */
+  .bg-pattern-subtle {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23800020' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+}
+
+@layer utilities {
+  .animate-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animate-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animate-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animate-delay-400 {
+    animation-delay: 400ms;
+  }
+  
+  .elegant-hover {
+    @apply relative overflow-hidden after:absolute after:bottom-0 after:left-0 after:h-[1px] after:w-0 after:bg-[var(--color-primary)] after:transition-all after:duration-300 hover:after:w-full;
+  }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+@keyframes zoomBg {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.05);
+  }
+}
+
+.image-zoom {
+  animation: zoomBg 15s ease-in-out infinite alternate;
+}
+
+@keyframes fadeInSimple {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeInSimple 0.3s ease-out forwards;
+}
+
+/* Animación para títulos elegantes */
+@keyframes elegantReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  30% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.elegant-reveal {
+  animation: elegantReveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Efecto viñeta para imágenes */
+.vignette {
+  position: relative;
+}
+
+.vignette::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+} 

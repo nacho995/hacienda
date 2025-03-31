@@ -1,0 +1,55 @@
+<svg width="200" height="80" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .serif { font-family: 'Times New Roman', serif; }
+    .script { font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif; }
+  </style>
+  
+  <!-- Castillo/Hacienda elegante -->
+  <g fill="#8B0000">
+    <!-- Base del castillo -->
+    <path d="M40,60 H160 V70 H40 Z" />
+    
+    <!-- Torres y estructura central -->
+    <path d="M45,60 V35 H55 V60 Z" />
+    <path d="M70,60 V30 H90 V60 Z" />
+    <path d="M110,60 V30 H130 V60 Z" />
+    <path d="M145,60 V35 H155 V60 Z" />
+    
+    <!-- Detalles de las torres -->
+    <path d="M43,35 H57 V38 H43 Z" />
+    <path d="M45,30 V35 H50 V30 L47.5,25 Z" />
+    <path d="M50,30 V35 H55 V30 L52.5,25 Z" />
+    
+    <path d="M143,35 H157 V38 H143 Z" />
+    <path d="M145,30 V35 H150 V30 L147.5,25 Z" />
+    <path d="M150,30 V35 H155 V30 L152.5,25 Z" />
+    
+    <!-- Detalles torre central izquierda -->
+    <path d="M68,30 H92 V33 H68 Z" />
+    <path d="M70,25 V30 H75 V25 L72.5,20 Z" />
+    <path d="M77,25 V30 H82 V25 L79.5,20 Z" />
+    <path d="M85,25 V30 H90 V25 L87.5,20 Z" />
+    
+    <!-- Detalles torre central derecha -->
+    <path d="M108,30 H132 V33 H108 Z" />
+    <path d="M110,25 V30 H115 V25 L112.5,20 Z" />
+    <path d="M117,25 V30 H122 V25 L119.5,20 Z" />
+    <path d="M125,25 V30 H130 V25 L127.5,20 Z" />
+    
+    <!-- Ventanas -->
+    <path d="M75,40 H85 V50 H75 Z" fill="#FFFFFF" />
+    <path d="M77,42 H83 V48 H77 Z" fill="#8B0000" />
+    
+    <path d="M115,40 H125 V50 H115 Z" fill="#FFFFFF" />
+    <path d="M117,42 H123 V48 H117 Z" fill="#8B0000" />
+    
+    <!-- Puerta central -->
+    <path d="M95,60 V40 H105 V60 Z" fill="#1A1A1A" />
+    <path d="M95,40 H105 V43 H95 Z" />
+    <path d="M99,50 A2,2 0 1 0 101,50 A2,2 0 1 0 99,50" fill="#8B0000" />
+  </g>
+  
+  <!-- Textos -->
+  <text x="100" y="15" class="serif" font-size="12" fill="#8B0000" text-anchor="middle" letter-spacing="2">HACIENDA</text>
+  <text x="100" y="75" class="script" font-size="18" font-style="italic" fill="#1A1A1A" text-anchor="middle">San Carlos</text>
+</svg> 
