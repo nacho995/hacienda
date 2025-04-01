@@ -1,15 +1,69 @@
 'use client';
 
-import { useState } from 'react';
-import { FaSearch, FaPlus, FaEdit, FaTrash, FaKey, FaUserShield, FaEllipsisV, FaChevronDown, FaCheck, FaTimes } from 'react-icons/fa';
+import { useState, useEffect } from 'react';
+import { FaSearch, FaPlus, FaEdit, FaTrash, FaKey, FaUserShield, FaEllipsisV, FaChevronDown, FaCheck, FaTimes, FaExclamationCircle, FaLock } from 'react-icons/fa';
+import { useRouter } from 'next/navigation';
 
 export default function AdminUsuarios() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+  
+  useEffect(() => {
+    // Verificar si el usuario tiene permisos de administrador
+    const checkAdminPermission = () => {
+      try {
+        // Obtener la cookie de sesión
+        const cookies = document.cookie.split(';');
+        const sessionCookie = cookies.find(cookie => cookie.trim().startsWith('adminSession='));
+        
+        if (!sessionCookie) {
+          router.push('/admin/login');
+          return;
+        }
+        
+        // Extraer el valor de la cookie
+        const sessionValue = sessionCookie.split('=')[1];
+        // Intentar decodificar la cookie (puede estar codificada en URI)
+        let sessionData;
+        try {
+          sessionData = JSON.parse(decodeURIComponent(sessionValue));
+        } catch (e) {
+          // Si falla el decodeURIComponent, intentar sin decodificar
+          sessionData = JSON.parse(sessionValue);
+        }
+        
+        // Verificar que la sesión sea válida y tenga rol de administrador
+        if (!sessionData || !sessionData.authenticated) {
+          router.push('/admin/login');
+          return;
+        }
+        
+        // Guardar datos del usuario actual
+        setCurrentUser(sessionData);
+        
+        // Verificar si es administrador
+        if (sessionData.role !== 'Administrador') {
+          setAccessDenied(true);
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error('Error verificando permisos:', error);
+        router.push('/admin/login');
+      }
+    };
+    
+    checkAdminPermission();
+  }, [router]);
+
   const [usuarios, setUsuarios] = useState([
     {
       id: 1,
       nombre: 'Admin Principal',
       email: 'admin@haciendasancarlos.com',
-      rol: 'Administrador',
+      role: 'Administrador',
       fechaCreacion: '2023-10-15',
       activo: true
     },
@@ -17,7 +71,7 @@ export default function AdminUsuarios() {
       id: 2,
       nombre: 'Juan García',
       email: 'juan@haciendasancarlos.com',
-      rol: 'Editor',
+      role: 'Editor',
       fechaCreacion: '2024-01-20',
       activo: true
     },
@@ -25,7 +79,7 @@ export default function AdminUsuarios() {
       id: 3,
       nombre: 'María López',
       email: 'maria@haciendasancarlos.com',
-      rol: 'Gestor',
+      role: 'Gestor',
       fechaCreacion: '2024-02-10',
       activo: true
     },
@@ -33,7 +87,7 @@ export default function AdminUsuarios() {
       id: 4,
       nombre: 'Carlos Rodríguez',
       email: 'carlos@haciendasancarlos.com',
-      rol: 'Visualizador',
+      role: 'Visualizador',
       fechaCreacion: '2024-03-05',
       activo: false
     }
@@ -52,7 +106,7 @@ export default function AdminUsuarios() {
     nombre: '',
     email: '',
     password: '',
-    rol: 'Visualizador',
+    role: 'Visualizador',
     activo: true
   });
   
@@ -65,29 +119,39 @@ export default function AdminUsuarios() {
     return (
       usuario.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       usuario.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      usuario.rol.toLowerCase().includes(searchTerm.toLowerCase())
+      usuario.role.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
   
   const handleNewUser = () => {
+    if (currentUser?.role !== 'Administrador') {
+      alert('Solo los administradores pueden crear nuevos usuarios');
+      return;
+    }
+    
     setEditUser(null);
     setNewUser({
       nombre: '',
       email: '',
       password: '',
-      rol: 'Visualizador',
+      role: 'Visualizador',
       activo: true
     });
     setShowUserForm(true);
   };
   
   const handleEditUser = (user) => {
+    if (currentUser?.role !== 'Administrador') {
+      alert('Solo los administradores pueden editar usuarios');
+      return;
+    }
+    
     setEditUser(user);
     setNewUser({
       nombre: user.nombre,
       email: user.email,
       password: '',
-      rol: user.rol,
+      role: user.role,
       activo: user.activo
     });
     setShowUserForm(true);
@@ -95,6 +159,17 @@ export default function AdminUsuarios() {
   };
   
   const handleDeleteUser = (user) => {
+    if (currentUser?.role !== 'Administrador') {
+      alert('Solo los administradores pueden eliminar usuarios');
+      return;
+    }
+    
+    // No permitir eliminar al admin principal
+    if (user.role === 'Administrador' && user.email === 'admin@haciendasancarlos.com') {
+      alert('No se puede eliminar al administrador principal del sistema');
+      return;
+    }
+    
     setUserToDelete(user);
     setShowDeleteConfirm(true);
     setShowDropdown(null);
@@ -107,6 +182,11 @@ export default function AdminUsuarios() {
   };
   
   const handleChangePassword = (user) => {
+    if (currentUser?.role !== 'Administrador' && currentUser?.email !== user.email) {
+      alert('Solo puedes cambiar tu propia contraseña o ser administrador');
+      return;
+    }
+    
     setUserToChangePassword(user);
     setNewPassword({
       password: '',
@@ -133,6 +213,12 @@ export default function AdminUsuarios() {
   };
   
   const saveUser = () => {
+    // Verificar que el usuario sea administrador
+    if (currentUser?.role !== 'Administrador') {
+      alert('No tienes permisos para realizar esta acción');
+      return;
+    }
+    
     if (editUser) {
       // Actualizar usuario existente
       setUsuarios(
@@ -159,13 +245,33 @@ export default function AdminUsuarios() {
   };
   
   const savePassword = () => {
+    // Verificar que las contraseñas coincidan
+    if (newPassword.password !== newPassword.confirmPassword) {
+      alert('Las contraseñas no coinciden');
+      return;
+    }
+    
     // En una aplicación real, aquí enviarías a tu API
     // Por ahora solo cerramos el formulario
     setShowChangePasswordForm(false);
     setUserToChangePassword(null);
+    
+    alert('Contraseña actualizada correctamente');
   };
   
   const toggleUserStatus = (userId) => {
+    if (currentUser?.role !== 'Administrador') {
+      alert('Solo los administradores pueden cambiar el estado de los usuarios');
+      return;
+    }
+    
+    // No permitir desactivar al admin principal
+    const targetUser = usuarios.find(u => u.id === userId);
+    if (targetUser.role === 'Administrador' && targetUser.email === 'admin@haciendasancarlos.com' && targetUser.activo) {
+      alert('No se puede desactivar al administrador principal del sistema');
+      return;
+    }
+    
     setUsuarios(
       usuarios.map(user => 
         user.id === userId 
@@ -175,6 +281,37 @@ export default function AdminUsuarios() {
     );
     setShowDropdown(null);
   };
+  
+  // Si está cargando, mostrar indicador
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  // Si no tiene acceso, mostrar mensaje
+  if (accessDenied) {
+    return (
+      <div className="bg-red-50 border-l-4 border-red-500 p-8 rounded-lg shadow-md">
+        <div className="flex items-start">
+          <FaLock className="text-red-500 w-8 h-8 mr-4 flex-shrink-0" />
+          <div>
+            <h1 className="text-2xl font-[var(--font-display)] text-red-700 mb-4">
+              Acceso Restringido
+            </h1>
+            <p className="text-red-600 mb-2">
+              No tienes los permisos necesarios para acceder a la gestión de usuarios.
+            </p>
+            <p className="text-gray-700">
+              Esta sección está reservada exclusivamente para administradores del sistema. Si necesitas realizar cambios en los usuarios, contacta al administrador.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-8">
@@ -187,13 +324,29 @@ export default function AdminUsuarios() {
             Gestiona los usuarios del sistema y sus permisos
           </p>
         </div>
-        <button
-          onClick={handleNewUser}
-          className="px-4 py-2 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-        >
-          <FaPlus />
-          <span>Nuevo Usuario</span>
-        </button>
+        {currentUser?.role === 'Administrador' && (
+          <button
+            onClick={handleNewUser}
+            className="px-4 py-2 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+          >
+            <FaPlus />
+            <span>Nuevo Usuario</span>
+          </button>
+        )}
+      </div>
+      
+      {/* Advertencia de seguridad */}
+      <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <FaExclamationCircle className="h-5 w-5 text-yellow-500" />
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-yellow-700">
+              La gestión de usuarios está restringida a administradores. Todas las acciones realizadas aquí quedan registradas por motivos de seguridad.
+            </p>
+          </div>
+        </div>
       </div>
       
       {/* Barra de búsqueda */}
@@ -252,7 +405,7 @@ export default function AdminUsuarios() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <FaUserShield className="text-[var(--color-primary)] mr-2" />
-                      <span className="text-sm text-gray-900">{usuario.rol}</span>
+                      <span className="text-sm text-gray-900">{usuario.role}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -399,8 +552,8 @@ export default function AdminUsuarios() {
                 </label>
                 <div className="relative">
                   <select
-                    name="rol"
-                    value={newUser.rol}
+                    name="role"
+                    value={newUser.role}
                     onChange={handleInputChange}
                     className="w-full appearance-none px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
                   >

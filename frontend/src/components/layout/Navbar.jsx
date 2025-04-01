@@ -108,26 +108,24 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
             {/* Logo y navegación izquierda */}
-            <div className="flex-1 flex items-center justify-start space-x-8">
-              <div className="hidden lg:flex items-center space-x-8">
-                {navLinks.slice(0, 2).map((link) => (
-                  <Link
-                    key={link.href}
-                    href={getNavHref(link.href, link.isPage)}
-                    className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
-                      isScrolled 
-                        ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
-                        : 'text-white hover:text-[var(--color-primary)]'
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
+            <div className="hidden lg:flex flex-1 items-center justify-end space-x-8">
+              {navLinks.slice(0, 3).map((link) => (
+                <Link
+                  key={link.href}
+                  href={getNavHref(link.href, link.isPage)}
+                  className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
+                    isScrolled 
+                      ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
+                      : 'text-white hover:text-[var(--color-primary)]'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
             </div>
 
             {/* Logo y sello (centrado) */}
-            <div className="flex-shrink-0 relative">
+            <div className="flex-shrink-0 relative mx-4">
               {/* Sello decorativo en lugar del logo */}
               <div className="relative h-20 w-44 flex items-center justify-center">
                 {/* Dos capas - externa rotativa e interna estática */}
@@ -293,49 +291,49 @@ export default function Navbar() {
             </div>
 
             {/* Navegación derecha y botones */}
-            <div className="flex-1 flex items-center justify-end">
-              <div className="hidden lg:flex items-center space-x-8">
-                {navLinks.slice(2).map((link) => (
-                  <Link
-                    key={link.href}
-                    href={getNavHref(link.href, link.isPage)}
-                    className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
-                      isScrolled 
-                        ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
-                        : 'text-white hover:text-[var(--color-primary)]'
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-                
-                {/* Botón de búsqueda */}
-                <button 
-                  onClick={() => setIsSearchOpen(!isSearchOpen)}
-                  className={`transition-colors duration-300 ${
-                    isScrolled 
-                      ? 'text-[var(--color-accent)]' 
-                      : 'text-white'
-                  }`}
-                >
-                  <FaSearch />
-                </button>
-                
-                {/* Botón de reserva destacado en navbar */}
+            <div className="hidden lg:flex flex-1 items-center justify-start space-x-8">
+              {navLinks.slice(3).map((link) => (
                 <Link
-                  href="/reservar"
-                  className={`flex items-center space-x-2 bg-[var(--color-primary)] text-white px-6 py-3 transition-all duration-300 hover:bg-[var(--color-primary-dark)] shadow-lg transform hover:scale-105 ${
-                    isScrolled ? 'opacity-100' : 'opacity-95'
+                  key={link.href}
+                  href={getNavHref(link.href, link.isPage)}
+                  className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
+                    isScrolled 
+                      ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
+                      : 'text-white hover:text-[var(--color-primary)]'
                   }`}
                 >
-                  <FaCalendarAlt className="mr-1" />
-                  <span className="font-medium uppercase tracking-wider text-sm">Reservar</span>
+                  {link.label}
                 </Link>
-              </div>
+              ))}
+              
+              {/* Botón de búsqueda */}
+              <button 
+                onClick={() => setIsSearchOpen(!isSearchOpen)}
+                className={`transition-colors duration-300 ${
+                  isScrolled 
+                    ? 'text-[var(--color-accent)]' 
+                    : 'text-white'
+                }`}
+              >
+                <FaSearch />
+              </button>
+              
+              {/* Botón de reserva destacado */}
+              <Link
+                href="/reservar"
+                className={`flex items-center space-x-2 bg-[var(--color-primary)] text-white px-6 py-3 transition-all duration-300 hover:bg-[var(--color-primary-dark)] shadow-lg transform hover:scale-105 ${
+                  isScrolled ? 'opacity-100' : 'opacity-95'
+                }`}
+              >
+                <FaCalendarAlt className="mr-1" />
+                <span className="font-medium uppercase tracking-wider text-sm">Reservar</span>
+              </Link>
+            </div>
 
-              {/* Botón de menú móvil */}
+            {/* Botón de menú móvil (visible solo en móvil) */}
+            <div className="lg:hidden flex justify-end flex-1">
               <button
-                className="lg:hidden text-2xl relative z-50"
+                className="text-2xl relative z-50"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
               >
