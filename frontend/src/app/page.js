@@ -5,10 +5,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { FaArrowRight } from 'react-icons/fa';
 
-// Layout components
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
-
 // Section components
 import HeroSection from '@/components/sections/HeroSection';
 import IntroSection from '@/components/sections/IntroSection';
@@ -22,8 +18,6 @@ import CTASection from '@/components/sections/CTASection';
 export default function Home() {
   return (
     <main className="min-h-screen overflow-hidden">
-      <Navbar />
-      
       {/* Hero Section - Impactante slider inicial */}
       <HeroSection />
       
@@ -47,9 +41,6 @@ export default function Home() {
       
       {/* CTA Section - Llamada a la acción */}
       <CTASection />
-      
-      {/* Footer - Pie de página elegante */}
-      <Footer />
     </main>
   );
 } 

@@ -47,7 +47,7 @@ export default function AdminLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100" style={{ zIndex: 50, position: 'relative' }}>
       {/* Sidebar para móvil */}
       <div className="lg:hidden">
         <button

@@ -1,6 +1,6 @@
 "use client";
 
-export default function HabitacionesLayout({ children }) {
+export default function MasajesLayout({ children }) {
   return (
     <>
       {children}

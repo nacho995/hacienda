@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -12,14 +12,51 @@ export default function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const pathname = usePathname();
   const isHome = pathname === '/';
+  const decorativeElementRef = useRef(null);
+  const invitationPagesRef = useRef([]);
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      const scrollY = window.scrollY;
+      setIsScrolled(scrollY > 50);
+      
+      // Aplicar solo efecto de rotación al borde del sello
+      if (decorativeElementRef.current) {
+        const rotation = scrollY * 0.1; // Rotación más notable
+        decorativeElementRef.current.style.transform = `rotate(${rotation}deg)`;
+      }
+      
+      // Efecto de pasar hojas en invitación sin rotación 
+      if (invitationPagesRef.current && invitationPagesRef.current.length) {
+        // Calcular qué página mostrar según posición de scroll
+        const totalPages = invitationPagesRef.current.length;
+        const scrollPerPage = 400; // Cambiar de página con menos frecuencia
+        const currentPage = Math.min(Math.floor(scrollY / scrollPerPage) % totalPages, totalPages - 1);
+        
+        invitationPagesRef.current.forEach((page, index) => {
+          if (!page) return;
+          
+          // Solo mostrar la página actual - sin rotación
+          if (index === currentPage) {
+            page.style.opacity = '1';
+            page.style.transform = 'translateZ(0)';
+          } else {
+            // Páginas ocultas - sin rotación
+            page.style.opacity = '0';
+            page.style.transform = 'translateZ(-10px)';
+          }
+        });
+      }
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, [isScrolled]);
+  
+  // Inicializar las referencias de las páginas de la invitación
+  useEffect(() => {
+    // Inicializar referencias para las páginas
+    invitationPagesRef.current = Array(4).fill(null);
   }, []);
 
   const navLinks = [
@@ -27,7 +64,8 @@ export default function Navbar() {
     { href: 'events', label: 'Eventos' },
     { href: 'gallery', label: 'Galería' },
     { href: '/habitaciones', label: 'Habitaciones', isPage: true },
-    { href: 'contact', label: 'Contacto' }
+    { href: '/masajes', label: 'Bienestar', isPage: true },
+    { href: '/contact', label: 'Contacto', isPage: true }
   ];
 
   // Función para generar el enlace correcto dependiendo de si estamos en la página de inicio o no
@@ -39,7 +77,7 @@ export default function Navbar() {
   return (
     <>
       {/* Barra superior con información de contacto */}
-      <div className={`w-full transition-all duration-500 hidden lg:block z-50 ${
+      <div className={`w-full fixed top-0 transition-all duration-500 hidden lg:block z-50 ${
         isScrolled ? 'h-0 opacity-0 overflow-hidden' : 'h-10 bg-[var(--color-accent)]'
       }`}>
         <div className="max-w-6xl mx-auto h-full px-6 flex items-center justify-between">
@@ -61,22 +99,11 @@ export default function Navbar() {
         </div>
       </div>
       
-      {/* Botón destacado de reservas - Fijo en la esquina */}
-      <div className="fixed top-24 right-0 z-50 transform rotate-90 origin-right">
-        <Link 
-          href="/reservar"
-          className={`flex items-center space-x-2 px-6 py-3 bg-[var(--color-primary)] text-white font-semibold shadow-lg hover:bg-[var(--color-primary-dark)] transition-all duration-300 ${
-            isScrolled ? 'translate-y-[-10px]' : ''
-          }`}
-        >
-          <FaCalendarAlt className="mr-2 text-white" />
-          <span className="uppercase tracking-wider text-sm">Reserva Tu Evento</span>
-        </Link>
-      </div>
-      
       {/* Barra de navegación principal */}
-      <nav className={`fixed w-full z-50 transition-all duration-500 ${
-        isScrolled ? 'py-3 bg-white/95 backdrop-blur-sm shadow-lg' : 'py-5 bg-transparent'
+      <nav className={`fixed top-0 w-full transition-all duration-500 z-50 ${
+        isScrolled 
+          ? 'py-3 bg-white/95 backdrop-blur-sm shadow-lg' 
+          : 'py-5 bg-transparent mt-10'
       }`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
@@ -99,18 +126,170 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Logo (centrado) */}
+            {/* Logo y sello (centrado) */}
             <div className="flex-shrink-0 relative">
-              <Link href="/" className="block">
-                <div className={`transition-all duration-500 ${isScrolled ? 'opacity-100 scale-75' : 'opacity-90'}`}>
-                  <Image 
-                    src="/images/logo.svg"
-                    alt="Hacienda San Carlos"
-                    width={180}
-                    height={80}
-                  />
+              {/* Sello decorativo en lugar del logo */}
+              <div className="relative h-20 w-44 flex items-center justify-center">
+                {/* Dos capas - externa rotativa e interna estática */}
+                <div className="relative w-44 h-44">
+                  {/* Capa externa rotativa - solo el sello circular */}
+                  <div 
+                    ref={decorativeElementRef}
+                    className="absolute inset-0 transition-transform duration-700"
+                  >
+                    <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full filter drop-shadow-lg">
+                      {/* Sello circular base */}
+                      <defs>
+                        <radialGradient id="selloBg" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                          <stop offset="0%" stopColor="#800020" stopOpacity="0.05" />
+                          <stop offset="70%" stopColor="#800020" stopOpacity="0.1" />
+                          <stop offset="100%" stopColor="#800020" stopOpacity="0.15" />
+                        </radialGradient>
+                        <filter id="paperTexture" x="-50%" y="-50%" width="200%" height="200%">
+                          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise" />
+                          <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" />
+                        </filter>
+                      </defs>
+                      
+                      {/* Círculo base del sello */}
+                      <circle cx="250" cy="250" r="240" fill="url(#selloBg)" filter="url(#paperTexture)" />
+                      <circle cx="250" cy="250" r="240" fill="none" stroke="#800020" strokeWidth="5" strokeDasharray="5,10" opacity="0.5" />
+                      <circle cx="250" cy="250" r="220" fill="none" stroke="#800020" strokeWidth="2" opacity="0.4" />
+                      
+                      {/* Bordes del sello dentados */}
+                      {Array.from({ length: 40 }).map((_, i) => {
+                        const angle = (i * 9) * Math.PI / 180;
+                        const r1 = 240;
+                        const r2 = 260;
+                        const x1 = 250 + r1 * Math.cos(angle);
+                        const y1 = 250 + r1 * Math.sin(angle);
+                        const x2 = 250 + r2 * Math.cos(angle);
+                        const y2 = 250 + r2 * Math.sin(angle);
+                        return (
+                          <line 
+                            key={i} 
+                            x1={x1} 
+                            y1={y1} 
+                            x2={x2} 
+                            y2={y2} 
+                            stroke="#800020" 
+                            strokeWidth="2" 
+                            opacity="0.3" 
+                          />
+                        );
+                      })}
+                      
+                      {/* Texto circular alrededor del sello */}
+                      <path id="textCircle" d="M 250,100 A 150,150 0 0 1 250,400 A 150,150 0 0 1 250,100" fill="none" />
+                      <text>
+                        <textPath xlinkHref="#textCircle" startOffset="0%" textAnchor="middle" className="text-xs tracking-widest font-serif" fill="#800020" opacity="0.7">
+                          • HACIENDA SAN CARLOS • BODAS • EVENTOS •
+                        </textPath>
+                      </text>
+                    </svg>
+                  </div>
+                  
+                  {/* Capa interna estática - rectángulo y contenido */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    {/* Texto central estático */}
+                    <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                      <text x="250" y="240" textAnchor="middle" fontFamily="serif" fontSize="24" fill="#800020" fontWeight="normal" letterSpacing="2" opacity="0.8">
+                        HACIENDA
+                      </text>
+                      <text x="250" y="270" textAnchor="middle" fontFamily="serif" fontSize="18" fill="#800020" fontWeight="normal" letterSpacing="3" opacity="0.7">
+                        SAN CARLOS
+                      </text>
+                    </svg>
+                    
+                    {/* Páginas de invitación estáticas */}
+                    <div className="absolute inset-0 overflow-hidden">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <div 
+                          key={index} 
+                          ref={el => invitationPagesRef.current[index] = el}
+                          className="absolute inset-0 transition-all duration-700 ease-in-out"
+                          style={{ 
+                            opacity: index === 0 ? 1 : 0,
+                            backfaceVisibility: 'hidden',
+                            transform: index === 0 ? 'translateZ(0)' : 'translateZ(-10px)'
+                          }}
+                        >
+                          <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                            {/* Diseño de página de invitación */}
+                            <rect x="160" y="160" width="180" height="180" rx="5" fill="#FFFAF0" stroke="#800020" strokeWidth="2" opacity="0.85" />
+                            
+                            {/* Contenido simplificado para cada página */}
+                            {index === 0 && (
+                              <>
+                                <text x="250" y="200" textAnchor="middle" fontFamily="serif" fontSize="16" fill="#800020" opacity="0.9">
+                                  INVITACIÓN
+                                </text>
+                                <rect x="190" y="215" width="120" height="1" fill="#800020" opacity="0.5" />
+                                <text x="250" y="240" textAnchor="middle" fontFamily="serif" fontSize="14" fill="#800020" opacity="0.8">
+                                  Bodas y Eventos
+                                </text>
+                                <text x="250" y="270" textAnchor="middle" fontFamily="serif" fontSize="12" fill="#800020" opacity="0.7">
+                                  Hacienda San Carlos
+                                </text>
+                              </>
+                            )}
+                            
+                            {index === 1 && (
+                              <>
+                                <text x="250" y="200" textAnchor="middle" fontFamily="serif" fontSize="16" fill="#800020" opacity="0.9">
+                                  EVENTOS
+                                </text>
+                                <rect x="190" y="215" width="120" height="1" fill="#800020" opacity="0.5" />
+                                <text x="250" y="240" textAnchor="middle" fontFamily="serif" fontSize="14" fill="#800020" opacity="0.8">
+                                  Celebraciones
+                                </text>
+                                <text x="250" y="270" textAnchor="middle" fontFamily="serif" fontSize="12" fill="#800020" opacity="0.7">
+                                  Momentos Inolvidables
+                                </text>
+                              </>
+                            )}
+                            
+                            {index === 2 && (
+                              <>
+                                <text x="250" y="200" textAnchor="middle" fontFamily="serif" fontSize="16" fill="#800020" opacity="0.9">
+                                  BODAS
+                                </text>
+                                <rect x="190" y="215" width="120" height="1" fill="#800020" opacity="0.5" />
+                                <text x="250" y="240" textAnchor="middle" fontFamily="serif" fontSize="14" fill="#800020" opacity="0.8">
+                                  Elegancia y Tradición
+                                </text>
+                                <text x="250" y="270" textAnchor="middle" fontFamily="serif" fontSize="12" fill="#800020" opacity="0.7">
+                                  En un entorno mágico
+                                </text>
+                              </>
+                            )}
+                            
+                            {index === 3 && (
+                              <>
+                                <text x="250" y="200" textAnchor="middle" fontFamily="serif" fontSize="16" fill="#800020" opacity="0.9">
+                                  HACIENDA
+                                </text>
+                                <rect x="190" y="215" width="120" height="1" fill="#800020" opacity="0.5" />
+                                <text x="250" y="240" textAnchor="middle" fontFamily="serif" fontSize="14" fill="#800020" opacity="0.8">
+                                  Historia y Belleza
+                                </text>
+                                <text x="250" y="270" textAnchor="middle" fontFamily="serif" fontSize="12" fill="#800020" opacity="0.7">
+                                  Cuernavaca, Morelos
+                                </text>
+                              </>
+                            )}
+                          </svg>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </Link>
+                
+                {/* Link para la página de inicio */}
+                <Link href="/" className="block absolute inset-0 z-10">
+                  <span className="sr-only">Hacienda San Carlos - Inicio</span>
+                </Link>
+              </div>
             </div>
 
             {/* Navegación derecha y botones */}
@@ -134,7 +313,9 @@ export default function Navbar() {
                 <button 
                   onClick={() => setIsSearchOpen(!isSearchOpen)}
                   className={`transition-colors duration-300 ${
-                    isScrolled ? 'text-[var(--color-accent)]' : 'text-white'
+                    isScrolled 
+                      ? 'text-[var(--color-accent)]' 
+                      : 'text-white'
                   }`}
                 >
                   <FaSearch />

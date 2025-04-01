@@ -137,7 +137,7 @@ export default function ReservarPage() {
             fill
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--color-accent)]/70 to-[var(--color-accent)]/40 z-0"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-[var(--color-accent)]/40 z-0"></div>
         </div>
         
         <div className="relative z-10 container-custom text-center text-white">

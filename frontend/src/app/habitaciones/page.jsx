@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { FaCalendarAlt, FaCheck, FaBed, FaUserFriends, FaWifi, FaCoffee, FaTv, FaSnowflake } from 'react-icons/fa';
 
@@ -66,6 +66,8 @@ export default function HabitacionesPage() {
   });
   const [isFormValid, setIsFormValid] = useState(false);
   const [showReservationSuccess, setShowReservationSuccess] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const decorativeElementRef = useRef(null);
 
   useEffect(() => {
     // Validar formulario
@@ -79,6 +81,33 @@ export default function HabitacionesPage() {
       habitacion !== ''
     );
   }, [formData]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+      
+      // Aplicar efecto parallax al elemento decorativo
+      if (decorativeElementRef.current) {
+        const movement = window.scrollY * 0.15; // Controla la velocidad del movimiento
+        const rotation = window.scrollY * 0.02; // Rotación suave al hacer scroll
+        const scale = 1 + (window.scrollY * 0.0005); // Ligero cambio de escala
+        
+        decorativeElementRef.current.style.transform = `
+          translate(-50%, -50%) 
+          translateY(${movement}px) 
+          rotate(${rotation}deg)
+          scale(${Math.min(scale, 1.15)})
+        `;
+        
+        // Cambio de opacidad al hacer scroll
+        const opacity = Math.max(1 - (window.scrollY * 0.002), 0);
+        decorativeElementRef.current.style.opacity = opacity;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -138,9 +167,81 @@ export default function HabitacionesPage() {
   return (
     <main>
       {/* Sección Hero */}
-      <section className="relative h-[60vh]">
-        <div className="absolute inset-0 bg-black/60 z-10"></div>
+      <section className="relative h-[60vh] overflow-hidden">
         <div className="absolute inset-0 bg-[url('/images/placeholder/room-hero.jpg.svg')] bg-cover bg-center"></div>
+        {/* Actualizamos el overlay con un degradado de arriba hacia abajo para mejorar visibilidad del navbar */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/60 z-10"></div>
+        
+        {/* Elemento decorativo central con efecto de parallax */}
+        <div 
+          ref={decorativeElementRef}
+          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none"
+          style={{ 
+            width: '380px', 
+            height: '380px',
+            transition: 'transform 0.3s ease-out, opacity 0.3s ease-out'
+          }}
+        >
+          <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            {/* Círculo base decorativo */}
+            <circle cx="250" cy="250" r="240" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="4,4" opacity="0.4" />
+            <circle cx="250" cy="250" r="220" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="4,4" opacity="0.3" />
+            
+            {/* Forma decorativa de viñeta de vino */}
+            <path d="M250,30 
+                     C350,30 430,130 430,250 
+                     C430,370 350,470 250,470 
+                     C150,470 70,370 70,250 
+                     C70,130 150,30 250,30 Z" 
+                  fill="none" stroke="#800020" strokeWidth="2" opacity="0.7" />
+            
+            {/* Elementos decorativos - copas */}
+            <g opacity="0.8">
+              <path d="M170,100 C190,120 190,150 180,170 L160,200 L200,200 L180,170 C170,150 170,120 190,100 Z" 
+                    fill="none" stroke="#800020" strokeWidth="2" />
+              <path d="M330,100 C350,120 350,150 340,170 L320,200 L360,200 L340,170 C330,150 330,120 350,100 Z" 
+                    fill="none" stroke="#800020" strokeWidth="2" />
+              <line x1="180" y1="200" x2="180" y2="220" stroke="#800020" strokeWidth="2" />
+              <line x1="340" y1="200" x2="340" y2="220" stroke="#800020" strokeWidth="2" />
+            </g>
+            
+            {/* Elementos decorativos - flores y adornos */}
+            <g opacity="0.8">
+              <circle cx="250" cy="120" r="20" fill="none" stroke="#800020" strokeWidth="2" />
+              <circle cx="250" cy="120" r="10" fill="none" stroke="#800020" strokeWidth="1" />
+              <circle cx="140" cy="250" r="15" fill="none" stroke="#800020" strokeWidth="2" />
+              <circle cx="360" cy="250" r="15" fill="none" stroke="#800020" strokeWidth="2" />
+              <circle cx="250" cy="380" r="20" fill="none" stroke="#800020" strokeWidth="2" />
+            </g>
+            
+            {/* Elementos de enlace */}
+            <path d="M250,140 C250,140 200,200 140,265 M250,140 C250,140 300,200 360,265" 
+                  stroke="#800020" strokeWidth="1" fill="none" strokeDasharray="3,3" opacity="0.7" />
+            <path d="M250,140 L250,380" stroke="#800020" strokeWidth="1" fill="none" 
+                  strokeDasharray="5,5" opacity="0.7" />
+            
+            {/* Texto elegante - "EVENTOS" */}
+            <g transform="translate(250, 250)" className="events-text">
+              <text textAnchor="middle" fontFamily="serif" fontSize="26" fill="#FFFAF0" fontWeight="light" opacity="0.9" letterSpacing="5">
+                EVENTOS
+              </text>
+              <text textAnchor="middle" fontFamily="serif" fontSize="18" fill="#FFFAF0" fontWeight="light" opacity="0.8" letterSpacing="2" y="30">
+                MEMORABLES
+              </text>
+            </g>
+            
+            {/* Pequeños adornos decorativos */}
+            <circle cx="190" cy="320" r="5" fill="none" stroke="#800020" strokeWidth="1" />
+            <circle cx="310" cy="320" r="5" fill="none" stroke="#800020" strokeWidth="1" />
+            <path d="M120,200 C140,220 140,230 120,250" fill="none" stroke="#800020" strokeWidth="1" opacity="0.8" />
+            <path d="M380,200 C360,220 360,230 380,250" fill="none" stroke="#800020" strokeWidth="1" opacity="0.8" />
+            
+            {/* Anillos de boda estilizados */}
+            <circle cx="220" cy="300" r="15" fill="none" stroke="#FFFAF0" strokeWidth="2" opacity="0.7" />
+            <circle cx="280" cy="300" r="15" fill="none" stroke="#FFFAF0" strokeWidth="2" opacity="0.7" />
+          </svg>
+        </div>
+        
         <div className="relative z-20 container-custom h-full flex flex-col justify-center items-center text-center text-white">
           <h1 className="font-[var(--font-display)] text-5xl md:text-6xl mb-6 elegant-reveal">
             Nuestras Habitaciones

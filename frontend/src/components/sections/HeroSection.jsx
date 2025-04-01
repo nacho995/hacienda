@@ -48,6 +48,7 @@ export default function HeroSection() {
   const [animationDirection, setAnimationDirection] = useState('next');
   const [loadedSlides, setLoadedSlides] = useState([0]);
   const sliderRef = useRef(null);
+  const medallionRef = useRef(null);
   const slideInterval = 7000; // 7 segundos
   
   // Precarga de imágenes para transiciones suaves
@@ -157,6 +158,11 @@ export default function HeroSection() {
       slides.forEach((slide) => {
         slide.style.transform = `translate(${moveX}px, ${moveY}px)`;
       });
+      
+      // Mover el medallón en dirección opuesta para efecto de parallax
+      if (medallionRef.current) {
+        medallionRef.current.style.transform = `translate(${-moveX * 1.2}px, ${-moveY * 1.2}px) rotate(${moveX * 0.05}deg)`;
+      }
     };
     
     window.addEventListener('mousemove', handleMouseMove);
@@ -164,6 +170,29 @@ export default function HeroSection() {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
     };
+  }, []);
+  
+  // Efecto de parallax al hacer scroll para el medallón
+  useEffect(() => {
+    const handleScroll = () => {
+      if (medallionRef.current) {
+        const scrollY = window.scrollY;
+        const rotation = scrollY * 0.02; // Rotación suave al hacer scroll
+        const scale = 1 - (scrollY * 0.0005); // Reducción de escala al hacer scroll
+        const opacity = Math.max(1 - (scrollY * 0.003), 0);
+        
+        medallionRef.current.style.transform = `
+          translate(-50%, -50%) 
+          translateY(${scrollY * 0.3}px)
+          rotate(${rotation}deg)
+          scale(${Math.max(scale, 0.6)})
+        `;
+        medallionRef.current.style.opacity = opacity;
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
   const current = carouselData[currentSlide];
@@ -226,6 +255,111 @@ export default function HeroSection() {
         ))}
       </div>
       
+      {/* Medallón decorativo central con efecto de parallax */}
+      <div 
+        ref={medallionRef}
+        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none"
+        style={{ 
+          width: '500px', 
+          height: '500px',
+          transition: 'transform 0.4s ease-out, opacity 0.4s ease-out'
+        }}
+      >
+        <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+          {/* Círculos decorativos externos */}
+          <circle cx="250" cy="250" r="245" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="8,8" opacity="0.3" />
+          <circle cx="250" cy="250" r="230" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="5,5" opacity="0.4" />
+          
+          {/* Forma de medallón radiante */}
+          <path d="M250,30 
+                   C330,30 400,90 430,170
+                   C460,250 440,350 370,410
+                   C300,470 200,470 130,410
+                   C60,350 40,250 70,170
+                   C100,90 170,30 250,30 Z" 
+                fill="none" stroke="#800020" strokeWidth="2" opacity="0.5" />
+          
+          {/* Adorno medallón interno */}
+          <circle cx="250" cy="250" r="150" fill="none" stroke="#800020" strokeWidth="1" opacity="0.3" />
+          <circle cx="250" cy="250" r="120" fill="none" stroke="#800020" strokeWidth="1" strokeDasharray="3,3" opacity="0.4" />
+          
+          {/* Rayos decorativos */}
+          {Array.from({ length: 12 }).map((_, index) => {
+            const angle = (index * 30) * Math.PI / 180;
+            const x1 = 250 + 150 * Math.cos(angle);
+            const y1 = 250 + 150 * Math.sin(angle);
+            const x2 = 250 + 220 * Math.cos(angle);
+            const y2 = 250 + 220 * Math.sin(angle);
+            return (
+              <line 
+                key={index}
+                x1={x1} 
+                y1={y1} 
+                x2={x2} 
+                y2={y2} 
+                stroke="#800020" 
+                strokeWidth="1" 
+                opacity={0.3 + (index % 3) * 0.2}
+              />
+            );
+          })}
+          
+          {/* Elementos decorativos de celebración */}
+          {/* Copa de champagne izquierda */}
+          <path d="M180,150 C200,170 200,200 190,220 L170,250 L210,250 L190,220 C180,200 180,170 200,150 Z" 
+                fill="none" stroke="#FFFAF0" strokeWidth="1.5" opacity="0.7" />
+          <line x1="190" y1="250" x2="190" y2="270" stroke="#FFFAF0" strokeWidth="1.5" opacity="0.7" />
+          
+          {/* Copa de champagne derecha */}
+          <path d="M320,150 C340,170 340,200 330,220 L310,250 L350,250 L330,220 C320,200 320,170 340,150 Z" 
+                fill="none" stroke="#FFFAF0" strokeWidth="1.5" opacity="0.7" />
+          <line x1="330" y1="250" x2="330" y2="270" stroke="#FFFAF0" strokeWidth="1.5" opacity="0.7" />
+          
+          {/* Anillos de boda entrelazados */}
+          <circle cx="230" cy="320" r="25" fill="none" stroke="#FFFAF0" strokeWidth="2" opacity="0.8" />
+          <circle cx="270" cy="320" r="25" fill="none" stroke="#FFFAF0" strokeWidth="2" opacity="0.8" />
+          
+          {/* Corazón decorativo */}
+          <path d="M250,180 
+                   C270,150 310,150 310,180 
+                   C310,210 250,240 250,240 
+                   C250,240 190,210 190,180 
+                   C190,150 230,150 250,180 Z" 
+                fill="none" stroke="#800020" strokeWidth="2" opacity="0.6" />
+          
+          {/* Líneas decorativas */}
+          <path d="M230,320 C230,270 250,250 290,250 M270,320 C270,270 250,250 210,250" 
+                stroke="#FFFAF0" strokeWidth="1" strokeDasharray="4,4" opacity="0.5" />
+          
+          {/* Texto elegante en el centro - "CELEBRA" */}
+          <g transform="translate(250, 250)" className="events-text">
+            <text textAnchor="middle" fontFamily="serif" fontSize="28" fill="#FFFAF0" fontWeight="light" opacity="0.95" letterSpacing="5">
+              CELEBRA
+            </text>
+            <text textAnchor="middle" fontFamily="serif" fontSize="16" fill="#FFFAF0" fontWeight="light" opacity="0.8" letterSpacing="2" y="25">
+              MOMENTOS ÚNICOS
+            </text>
+          </g>
+          
+          {/* Elementos decorativos - estrellas */}
+          {Array.from({ length: 8 }).map((_, index) => {
+            const angle = (index * 45 + 22.5) * Math.PI / 180;
+            const distance = 180;
+            const x = 250 + distance * Math.cos(angle);
+            const y = 250 + distance * Math.sin(angle);
+            const size = 5 + (index % 3) * 2;
+            
+            return (
+              <g key={`star-${index}`} transform={`translate(${x}, ${y})`}>
+                <circle cx="0" cy="0" r={size / 2} fill="none" stroke="#FFFAF0" strokeWidth="1" opacity="0.6" />
+                <path d={`M0,-${size} L${size/4},-${size/4} L${size},0 L${size/4},${size/4} L0,${size} L-${size/4},${size/4} L-${size},0 L-${size/4},-${size/4} Z`} 
+                      fill="none" stroke="#FFFAF0" strokeWidth="0.5" opacity="0.4" />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      
       {/* Overlay decorativo */}
       <div className="absolute inset-0 pointer-events-none z-10">
         <div className="absolute top-0 left-0 w-32 h-32 border-l-2 border-t-2 opacity-60" style={{ borderColor: 'var(--color-primary-30)' }}></div>
@@ -233,7 +367,7 @@ export default function HeroSection() {
       </div>
       
       {/* Contenido principal */}
-      <div className="absolute inset-0 z-20 flex flex-col justify-center items-center">
+      <div className="absolute inset-0 z-30 flex flex-col justify-center items-center">
         <div className="container mx-auto px-4 lg:px-8 pt-16">
           <div className="max-w-6xl mx-auto text-center">
             {/* Logo centrado con animación */}
