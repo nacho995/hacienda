@@ -520,61 +520,187 @@ export default function ReservarPage() {
           </div>
         </section>
         
-        {/* Paso 4: Confirmación */}
-        <section id="paso-4" className={`container-custom transition-opacity duration-500 ${paso >= 4 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={paso >= 4 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.8 }}
-            className="max-w-2xl mx-auto text-center bg-white p-12 shadow-xl"
-          >
-            <div className="w-20 h-20 rounded-full bg-green-100 mx-auto flex items-center justify-center mb-8">
-              <FaCheck className="text-green-600 text-3xl" />
-            </div>
-            
-            <h2 className="text-4xl font-[var(--font-display)] text-[var(--color-accent)] mb-6">
-              ¡Reserva Enviada!
-            </h2>
-            
-            <p className="text-xl text-gray-700 mb-8">
-              Gracias por su interés en la Hacienda San Carlos. Hemos recibido su solicitud de reserva y nos pondremos en contacto con usted a la brevedad.
-            </p>
-            
-            <div className="bg-gray-50 p-6 mb-8 text-left rounded-lg">
-              <h3 className="text-lg font-medium mb-4 text-[var(--color-primary)]">Detalles de su reserva:</h3>
+        {/* Paso 4: Confirmación - Solo se muestra cuando paso es 4 */}
+        {paso === 4 && (
+          <section id="paso-4" className="container-custom mb-24">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, height: 0 }}
+              animate={{ opacity: 1, scale: 1, height: 'auto' }}
+              transition={{ duration: 0.8 }}
+              className="max-w-2xl mx-auto text-center bg-white p-12 shadow-xl"
+            >
+              <div className="w-20 h-20 rounded-full bg-green-100 mx-auto flex items-center justify-center mb-8">
+                <FaCheck className="text-green-600 text-3xl" />
+              </div>
               
-              <div className="space-y-2 text-gray-700">
-                <p><strong>Tipo de evento:</strong> {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento).titulo}</p>
-                <p><strong>Fecha:</strong> {formData.fecha && formData.fecha.toLocaleDateString()}</p>
-                <p><strong>Invitados:</strong> {formData.invitados}</p>
-                <p><strong>Nombre:</strong> {formData.nombre}</p>
-                <p><strong>Email:</strong> {formData.email}</p>
-                <p><strong>Teléfono:</strong> {formData.telefono}</p>
+              <h2 className="text-4xl font-[var(--font-display)] text-[var(--color-accent)] mb-6">
+                ¡Reserva Enviada!
+              </h2>
+              
+              <p className="text-xl text-gray-700 mb-8">
+                Gracias por su interés en la Hacienda San Carlos. Hemos recibido su solicitud de reserva y nos pondremos en contacto con usted a la brevedad.
+              </p>
+              
+              <div className="bg-gray-50 p-6 mb-8 text-left rounded-lg">
+                <h3 className="text-lg font-medium mb-4 text-[var(--color-primary)]">Detalles de su reserva:</h3>
+                
+                <div className="space-y-2 text-gray-700">
+                  <p><strong>Tipo de evento:</strong> {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento).titulo}</p>
+                  <p><strong>Fecha:</strong> {formData.fecha && formData.fecha.toLocaleDateString()}</p>
+                  <p><strong>Invitados:</strong> {formData.invitados}</p>
+                  <p><strong>Nombre:</strong> {formData.nombre}</p>
+                  <p><strong>Email:</strong> {formData.email}</p>
+                  <p><strong>Teléfono:</strong> {formData.telefono}</p>
+                </div>
+              </div>
+              
+              <p className="text-gray-600 mb-8">
+                Un representante se comunicará con usted en un plazo máximo de 24 horas para confirmar la disponibilidad y proporcionarle más información.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <Link
+                  href="/"
+                  className="px-8 py-3 bg-gray-100 text-gray-800 font-medium hover:bg-gray-200 transition-colors rounded-lg"
+                >
+                  Volver a inicio
+                </Link>
+                
+                <button
+                  onClick={() => window.print()}
+                  className="px-8 py-3 bg-[var(--color-accent)] text-white font-medium hover:bg-[var(--color-accent-dark)] transition-colors rounded-lg"
+                >
+                  Imprimir detalles
+                </button>
+              </div>
+            </motion.div>
+          </section>
+        )}
+      </div>
+      
+      {/* Sección decorativa con flores SVG */}
+      <section className="relative py-16 bg-[var(--color-cream-light)] overflow-hidden">
+        {/* Fondo con gradiente suave */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#F8F4F1] via-[#F5EDE8] to-[#F8F4F1] opacity-90"></div>
+        
+        <div className="relative z-10 container-custom flex flex-col md:flex-row items-center justify-between">
+          {/* SVG Flores Izquierda */}
+          <div className="w-full md:w-4/12 flex-shrink-0">
+            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+                viewBox="0 0 600 600" style={{ transform: 'rotate(90deg)' }} className="w-full h-auto">
+              <g>
+                <g>
+                  <path style={{ fill: '#8B0516' }} d="M538.281,369.396c0.44,1.499,0.856,2.917,1.062,4.382c0.091,0.637,0.556,1.159,1.181,1.324
+                    c0.134,0.034,0.27,0.05,0.403,0.05c0.492,0,0.967-0.228,1.274-0.631c4.145-5.46,7.293-14.29,7.832-21.977
+                    c0.289-4.123-0.492-7.178-2.386-9.336c-0.995-1.143-2.261-1.556-3.401-1.118c-0.679,0.272-1.082,0.778-1.295,1.043
+                    c-5.488,6.831-7.443,16.32-5.102,24.763L538.281,369.396z M545.233,345.308c0.003,0,0.005,0.003,0.006,0.006
+                    c1.287,1.468,1.827,3.823,1.604,7.006c-0.4,5.707-2.433,12.288-5.196,17.198c-0.097-0.344-0.197-0.684-0.297-1.021l-0.419-1.456
+                    C538.887,359.669,540.546,351.398,545.233,345.308z"/>
+                  <path style={{ fill: '#8B0516' }} d="M529.447,366.941c0.07,0.003,0.141,0.006,0.209,0.006c0.851,0,1.634-0.325,2.274-0.946
+                    c1.682-1.637,2.363-5.407,2.143-11.86c-0.225-6.606-2.8-12.397-7.07-15.892c-0.286-0.234-0.95-0.703-1.907-0.771
+                    c-0.754,0.012-1.805,0.372-2.529,1.999c-2.068,4.685-2.246,10.435-0.429,16.42C523.749,361.234,525.878,366.725,529.447,366.941z
+                     M525.395,341.082c3.305,2.945,5.294,7.706,5.48,13.165c0.295,8.643-1.218,9.499-1.234,9.502
+                    c-0.187-0.012-1.901-0.353-4.513-9.011C523.674,349.946,523.726,345.208,525.395,341.082z"/>
+                  <path style={{ fill: '#8B0516' }} d="M683.893,405.378c0.931,0.54,1.723,1.003,2.276,1.359c2.549,1.649,5.546,3.504,8.858,4.648
+                    c0.525,0.181,1.701,0.587,3.031,0.587c0.859,0,1.784-0.169,2.638-0.678c2.41-1.431,2.811-4.588,2.14-7.087
+                    c-1.424-5.307-6.18-8.764-10.162-11.182c-0.002,0-0.002,0-0.002,0c-5.38-3.258-12.197-6.828-17.193-5.544
+                    c-1.802,0.465-3.186,1.521-4.112,3.133C668.149,396.217,678.003,401.952,683.893,405.378z M674.14,392.207
+                    c0.495-0.862,1.174-1.381,2.138-1.627c0.45-0.116,0.937-0.169,1.451-0.169c4.449,0,10.977,3.951,13.284,5.35
+                    c3.472,2.105,7.604,5.066,8.735,9.277c0.356,1.328,0.236,2.961-0.686,3.508c-0.609,0.356-1.587,0.3-2.991-0.184
+                    c-2.974-1.028-5.775-2.764-8.166-4.31c-0.584-0.378-1.42-0.865-2.404-1.437C681.947,400.546,672.506,395.052,674.14,392.207z"/>
+                  <path style={{ fill: '#8B0516' }} d="M629.254,380.031c-0.67,2.196-1.126,14.377,2.988,16.776c0.386,0.225,0.94,0.447,1.632,0.447
+                    c0.984,0,2.246-0.447,3.689-1.965c5.867-6.181,2.11-23.22,0.782-27.443c-0.189-0.603-0.712-1.034-1.337-1.109
+                    c-0.625-0.094-1.234,0.222-1.559,0.762C633.086,371.417,630.642,375.471,629.254,380.031z"/>
+                  <path style={{ fill: '#8B0516' }} d="M654.018,353.107c0.37,0.072,0.751,0.106,1.137,0.106c1.585,0,3.258-0.59,4.737-1.696
+                    c0.954-0.715,1.609-1.477,1.997-2.327c0.829-1.802,0.476-4.089-0.967-6.266c-0.679-1.025-1.402-1.777-2.21-2.302
+                    c-0.002,0-0.002-0.003-0.003-0.003c-2.799-1.812-6.208-0.275-8.463,1.765c-0.395,0.356-0.965,0.918-1.348,1.677
+                    c-0.673,1.334-0.65,2.999,0.065,4.691C649.928,351.027,651.865,352.695,654.018,353.107z"/>
+                </g>
+              </g>
+            </svg>
+          </div>
+          
+          {/* Texto Central */}
+          <div className="w-full md:w-4/12 my-8 md:my-0 flex-shrink-0 text-center">
+            <div className="bg-white/80 px-8 py-6 rounded-xl shadow-md mb-6 backdrop-blur-sm">
+              <h2 className="text-3xl md:text-4xl font-[var(--font-display)] text-[#8B0516] mb-4">
+                Su Evento <span className="font-semibold">Perfecto</span>
+              </h2>
+              <p className="text-lg text-[#3A3330] mb-4">
+                Reserve su fecha especial y déjenos crear una experiencia inolvidable 
+                diseñada exclusivamente para usted
+              </p>
+              
+              <div className="flex flex-wrap justify-center gap-4 mt-6">
+                <div className="flex items-center bg-white/90 px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all">
+                  <div className="w-8 h-8 flex items-center justify-center mr-2">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
+                      <path d="M12,2 C6.48,2 2,6.48 2,12 C2,17.52 6.48,22 12,22 C17.52,22 22,17.52 22,12 C22,6.48 17.52,2 12,2 Z M12,20 C7.59,20 4,16.41 4,12 C4,7.59 7.59,4 12,4 C16.41,4 20,7.59 20,12 C20,16.41 16.41,20 12,20 Z M12.5,7 L11,7 L11,13 L16.25,16.15 L17,14.92 L12.5,12.25 L12.5,7 Z" fill="#8B0516" opacity="0.8" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-medium text-[#3A3330]">Respuesta Rápida</span>
+                </div>
+                
+                <div className="flex items-center bg-white/90 px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all">
+                  <div className="w-8 h-8 flex items-center justify-center mr-2">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
+                      <path d="M21,6 L19,6 L19,15 L6,15 L6,17 C6,17.55 6.45,18 7,18 L18,18 L22,22 L22,7 C22,6.45 21.55,6 21,6 Z M17,12 L17,3 C17,2.45 16.55,2 16,2 L3,2 C2.45,2 2,2.45 2,3 L2,17 L6,13 L16,13 C16.55,13 17,12.55 17,12 Z" fill="#8B0516" opacity="0.8" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-medium text-[#3A3330]">Atención Personalizada</span>
+                </div>
               </div>
             </div>
-            
-            <p className="text-gray-600 mb-8">
-              Un representante se comunicará con usted en un plazo máximo de 24 horas para confirmar la disponibilidad y proporcionarle más información.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <Link
-                href="/"
-                className="px-8 py-3 bg-gray-100 text-gray-800 font-medium hover:bg-gray-200 transition-colors rounded-lg"
-              >
-                Volver a inicio
-              </Link>
-              
-              <button
-                onClick={() => window.print()}
-                className="px-8 py-3 bg-[var(--color-accent)] text-white font-medium hover:bg-[var(--color-accent-dark)] transition-colors rounded-lg"
-              >
-                Imprimir detalles
-              </button>
-            </div>
-          </motion.div>
-        </section>
-      </div>
+          </div>
+          
+          {/* SVG Flores Derecha */}
+          <div className="w-full md:w-4/12 flex-shrink-0">
+            <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+                viewBox="0 0 600 600" style={{ transform: 'rotate(-90deg)' }} className="w-full h-auto">
+              <g>
+                <g>
+                  <path style={{ fill: '#8B0516' }} d="M538.281,369.396c0.44,1.499,0.856,2.917,1.062,4.382c0.091,0.637,0.556,1.159,1.181,1.324
+                    c0.134,0.034,0.27,0.05,0.403,0.05c0.492,0,0.967-0.228,1.274-0.631c4.145-5.46,7.293-14.29,7.832-21.977
+                    c0.289-4.123-0.492-7.178-2.386-9.336c-0.995-1.143-2.261-1.556-3.401-1.118c-0.679,0.272-1.082,0.778-1.295,1.043
+                    c-5.488,6.831-7.443,16.32-5.102,24.763L538.281,369.396z M545.233,345.308c0.003,0,0.005,0.003,0.006,0.006
+                    c1.287,1.468,1.827,3.823,1.604,7.006c-0.4,5.707-2.433,12.288-5.196,17.198c-0.097-0.344-0.197-0.684-0.297-1.021l-0.419-1.456
+                    C538.887,359.669,540.546,351.398,545.233,345.308z"/>
+                  <path style={{ fill: '#8B0516' }} d="M678.834,481.791c0.497,0.325,1.206,0.634,2.101,0.634c0.475,0,1.004-0.087,1.581-0.306
+                    c4.69-1.771,9.2-6.047,12.606-9.573c2.408-2.493,4.204-4.866,5.49-7.262c2.492-4.648,3.347-9.836,4.174-14.855
+                    c0.518-3.158,1.057-6.425,2.001-9.452c0.212-0.681-0.055-1.424-0.653-1.815c-0.601-0.393-1.387-0.331-1.926,0.134
+                    c-2.73,2.383-5.83,4.535-8.83,6.616c-5.683,3.945-11.56,8.024-15.472,13.987c-1.571,2.396-2.827,5.11-3.732,8.071
+                    c-0.404,1.327-0.859,3.089-0.767,4.913C675.489,474.5,675.979,479.923,678.834,481.791z"/>
+                  <path style={{ fill: '#8B0516' }} d="M580.707,420.193c0.597-1.568,0.437-3.258-0.462-4.888c-3.551-6.447-17.974-3.842-22.309-2.892
+                    c-9,1.968-17.301,6.872-23.368,13.809c-0.326,0.372-0.461,0.875-0.365,1.362c0.097,0.487,0.412,0.9,0.854,1.121
+                    c4.192,2.093,9.016,3.139,14.34,3.139c5.781,0,12.149-1.234,18.928-3.695l0.8-0.284
+                    C572.622,426.627,579.135,424.325,580.707,420.193z M568.057,424.85l-0.825,0.294c-6.08,2.207-14.071,4.157-21.802,3.261
+                    c10.176-1.02,20.174-3.283,29.81-6.781C573.006,423.085,569.892,424.2,568.057,424.85z M577.718,419.053
+                    c-0.125,0.326-0.325,0.642-0.572,0.95c-0.564,0.255-1.138,0.5-1.719,0.712c-10.734,3.943-21.931,6.302-33.323,7.137
+                    c-0.418-0.097-0.823-0.266-1.238-0.384c0.209-0.136,0.422-0.27,0.629-0.406c2.875-1.865,5.591-3.626,8.802-4.713
+                    c3.745-1.271,7.745-1.809,11.613-2.33c2.791-0.372,6.141-0.584,9.381-0.784c2.205-0.139,4.418-0.294,6.516-0.487
+                    C577.781,418.858,577.751,418.965,577.718,419.053z M571.242,418.434c-3.255,0.203-6.619,0.415-9.438,0.79
+                    c-3.906,0.525-7.946,1.071-11.763,2.368c-3.306,1.118-6.063,2.908-8.982,4.801c-0.393,0.254-0.801,0.507-1.199,0.762
+                    c-0.465-0.153-0.942-0.253-1.399-0.434c5.454-5.575,12.535-9.517,20.159-11.185h0.001c7.778-1.699,16.986-2.018,18.824,1.312
+                    c0.237,0.433,0.334,0.79,0.38,1.109C575.722,418.152,573.461,418.295,571.242,418.434z"/>
+                  <path style={{ fill: '#8B0516' }} d="M497.768,394.808c0.8,2.243,3.161,3.876,6.016,4.16c0.35,0.037,0.7,0.053,1.048,0.053
+                    c2.789,0,5.433-1.062,7.484-2.027c4.437-2.083,8.549-4.782,12.342-8.121c2.494-2.196,7.685-6.766,6.359-10.795
+                    c-1.259-3.823-6.314-3.408-9.659-3.117c-0.593,0.05-1.132,0.094-1.571,0.106c-2.772,0.072-5.086,0.259-7.37,0.95
+                    c-5.093,1.534-9.542,5.469-13.226,11.694c-0.896,1.513-1.949,3.669-1.691,5.883c-0.008,0.047-0.038,0.086-0.028,0.136
+                    c0.006,0.031,0.033,0.048,0.044,0.075C497.567,394.14,497.648,394.474,497.768,394.808z M527.979,379.079
+                    c0.305,0.924-0.392,2.955-5.554,7.499c-3.448,3.036-7.306,5.566-11.471,7.525c-2.054,0.968-4.476,1.93-6.851,1.687
+                    c-1.337-0.134-2.883-0.821-3.322-2.055c-0.052-0.142-0.031-0.303-0.053-0.454c2.482-0.89,4.798-2.243,7.054-3.572
+                    c0.946-0.556,1.893-1.115,2.849-1.637c1.46-0.793,2.989-1.527,4.467-2.24c1.601-0.768,3.256-1.562,4.84-2.443
+                    c2.628-1.462,5.112-3.188,7.524-4.884C527.708,378.657,527.901,378.838,527.979,379.079z M501.943,389.342
+                    c2.243-3.792,6.041-8.649,11.399-10.264c1.941-0.587,4.014-0.75,6.528-0.812c0,0,0,0,0.002,0c0.489-0.013,1.09-0.063,1.754-0.119
+                    c0.801-0.066,1.872-0.156,2.909-0.156c0.723,0,1.413,0.056,2.001,0.181c-2.252,1.58-4.56,3.169-6.987,4.517
+                    c-1.562,0.868-3.206,1.659-4.798,2.421c-1.487,0.715-3.025,1.456-4.502,2.261c-0.964,0.525-1.918,1.087-2.872,1.649
+                    c-2.144,1.262-4.348,2.536-6.672,3.405C500.851,391.351,501.431,390.207,501.943,389.342z"/>
+                </g>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </section>
     </main>
   );
 } 

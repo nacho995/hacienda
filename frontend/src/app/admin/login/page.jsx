@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaUser, FaLock } from 'react-icons/fa';
 import Image from 'next/image';
+import Link from 'next/link';
 
 export default function AdminLogin() {
   const [credentials, setCredentials] = useState({
@@ -112,6 +113,14 @@ export default function AdminLogin() {
               >
                 ¿Olvidaste tu contraseña?
               </a>
+              <div className="mt-4">
+                <p className="text-gray-600">
+                  ¿No tienes una cuenta?{' '}
+                  <Link href="/admin/registro" className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors">
+                    Regístrate aquí
+                  </Link>
+                </p>
+              </div>
             </div>
           </div>
         </div>

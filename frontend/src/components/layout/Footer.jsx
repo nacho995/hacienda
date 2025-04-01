@@ -61,7 +61,7 @@ export default function Footer() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
           {/* Columna 1: Información de contacto */}
           <div className={`transition-all duration-700 delay-100 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
             <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary)] mb-6 font-medium">Información de Contacto</h3>
@@ -109,56 +109,82 @@ export default function Footer() {
             <div className="w-12 h-[1px] bg-[var(--color-primary)] mb-8"></div>
             
             <ul className="space-y-3">
-              {['Inicio', 'Eventos', 'Galería', 'Habitaciones', 'Contacto'].map((item) => (
-                <li key={item} className="text-white/80 hover:text-white transition-colors">
-                  <Link href={`#${item.toLowerCase()}`} className="flex items-center">
-                    <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                    {item}
-                  </Link>
-                </li>
-              ))}
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Inicio
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/#events" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Eventos
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/#gallery" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Galería
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/habitaciones" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Habitaciones
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/masajes" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Bienestar
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/contact" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Contacto
+                </Link>
+              </li>
             </ul>
           </div>
           
-          {/* Columna 3: Servicios */}
+          {/* Columna 3: Páginas legales */}
           <div className={`transition-all duration-700 delay-300 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary)] mb-6 font-medium">Nuestros Servicios</h3>
+            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary)] mb-6 font-medium">Información Legal</h3>
             <div className="w-12 h-[1px] bg-[var(--color-primary)] mb-8"></div>
             
             <ul className="space-y-3">
-              {['Bodas', 'Eventos Corporativos', 'Eventos Sociales', 'Ceremonias Religiosas', 'Alojamiento'].map((item) => (
-                <li key={item} className="text-white/80 hover:text-white transition-colors">
-                  <Link href="#servicios" className="flex items-center">
-                    <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                    {item}
-                  </Link>
-                </li>
-              ))}
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/aviso-legal" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Aviso Legal
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/cookies" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Política de Cookies
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/privacidad" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Política de Privacidad
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/terminos" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Términos de Uso
+                </Link>
+              </li>
+              <li className="text-white/80 hover:text-white transition-colors">
+                <Link href="/reservar" className="flex items-center">
+                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
+                  Reservar
+                </Link>
+              </li>
             </ul>
-          </div>
-          
-          {/* Columna 4: Newsletter */}
-          <div className={`transition-all duration-700 delay-400 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary)] mb-6 font-medium">Suscríbete</h3>
-            <div className="w-12 h-[1px] bg-[var(--color-primary)] mb-8"></div>
-            
-            <p className="text-white/80 mb-6">Mantente al día con nuestras últimas novedades y ofertas especiales.</p>
-            
-            <form className="space-y-4">
-              <div className="relative">
-                <input 
-                  type="email" 
-                  placeholder="Tu correo electrónico" 
-                  className="w-full bg-white/10 py-3 px-4 text-white placeholder-white/60 focus:outline-none focus:bg-white/20 transition-colors"
-                />
-              </div>
-              <button 
-                type="submit" 
-                className="w-full py-3 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] transition-colors"
-              >
-                Suscribirse
-              </button>
-            </form>
           </div>
         </div>
         
@@ -172,7 +198,7 @@ export default function Footer() {
               ¿Planeas un <span className="text-[var(--color-primary)]">evento inolvidable</span>?
             </div>
             <Link 
-              href="#contacto" 
+              href="/contact" 
               className="px-8 py-3 bg-[var(--color-primary)] text-white uppercase tracking-wider text-sm hover:bg-[var(--color-primary-dark)] transition-colors"
             >
               Contáctanos
@@ -189,11 +215,11 @@ export default function Footer() {
               &copy; {new Date().getFullYear()} Hacienda San Carlos. Todos los derechos reservados.
             </div>
             <div className="mt-4 md:mt-0">
-              Hecho con <FaHeart className="inline-block text-[var(--color-primary)] mx-1" /> por <span className="text-white">tu empresa</span>
+              Hecho con <FaHeart className="inline-block text-[var(--color-primary)] mx-1" /> en México
             </div>
             <div className="mt-4 md:mt-0 flex space-x-4">
-              <Link href="/privacidad" className="hover:text-white transition-colors">Política de Privacidad</Link>
-              <Link href="/terminos" className="hover:text-white transition-colors">Términos de Uso</Link>
+              <Link href="/privacidad" className="hover:text-white transition-colors">Privacidad</Link>
+              <Link href="/cookies" className="hover:text-white transition-colors">Cookies</Link>
             </div>
           </div>
         </div>

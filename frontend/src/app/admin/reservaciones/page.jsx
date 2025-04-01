@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { FaSearch, FaFilter, FaEllipsisV } from 'react-icons/fa';
+import { useRouter } from 'next/navigation';
 
 export default function AdminReservations() {
   const [reservations] = useState([
@@ -34,6 +35,8 @@ export default function AdminReservations() {
     const matchesStatus = filterStatus === 'all' || reservation.estado.toLowerCase() === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  const router = useRouter();
 
   return (
     <div className="space-y-8">
@@ -147,7 +150,11 @@ export default function AdminReservations() {
                     {reservation.total}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]">
+                    <button 
+                      onClick={() => router.push(`/admin/reservaciones/${reservation.id}`)}
+                      className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] flex items-center"
+                    >
+                      <span className="mr-1">Ver detalles</span>
                       <FaEllipsisV />
                     </button>
                   </td>
