@@ -49,89 +49,112 @@ export default function AnimatedBackground() {
     };
   }, []);
   
-  // Configuración de los elementos decorativos
+  // Configuración de los elementos decorativos - AUMENTADOS EN NÚMERO, TAMAÑO Y OPACIDAD
   const decorativeElements = [
     // Sellos decorativos
     {
       type: 'selo',
-      position: { x: '5%', y: '15%' },
-      size: 180,
+      position: { x: '10%', y: '15%' },
+      size: 260,
       rotation: 15,
-      moveFactorX: 0.02,
-      moveFactorY: 0.01,
+      moveFactorX: 0.03,
+      moveFactorY: 0.02,
       rotateOnMove: true,
       color: 'var(--color-primary)',
-      opacity: 0.08
+      opacity: 0.15
     },
     {
       type: 'selo', 
       position: { x: '85%', y: '75%' },
-      size: 160,
+      size: 220,
       rotation: -20,
-      moveFactorX: -0.015,
-      moveFactorY: 0.025,
+      moveFactorX: -0.025,
+      moveFactorY: 0.035,
       rotateOnMove: true,
       color: 'var(--color-primary)',
-      opacity: 0.06
+      opacity: 0.13
     },
     {
       type: 'selo', 
-      position: { x: '92%', y: '25%' },
-      size: 110,
+      position: { x: '90%', y: '25%' },
+      size: 180,
       rotation: 35,
       moveFactorX: -0.03,
       moveFactorY: 0.015,
       rotateOnMove: true,
       color: 'var(--color-primary)',
-      opacity: 0.05
+      opacity: 0.12
     },
     {
       type: 'selo', 
-      position: { x: '20%', y: '90%' },
-      size: 130,
+      position: { x: '20%', y: '80%' },
+      size: 200,
       rotation: -10,
       moveFactorX: 0.025,
-      moveFactorY: -0.01,
+      moveFactorY: -0.02,
       rotateOnMove: true,
       color: 'var(--color-primary)',
-      opacity: 0.07
+      opacity: 0.14
+    },
+    {
+      type: 'selo', 
+      position: { x: '50%', y: '50%' },
+      size: 300,
+      rotation: 25,
+      moveFactorX: -0.01,
+      moveFactorY: 0.01,
+      rotateOnMove: true,
+      color: 'var(--color-primary)',
+      opacity: 0.08
     },
     
     // Rectángulos (invitaciones/sobres)
     {
       type: 'rect',
       position: { x: '75%', y: '15%' },
-      width: 140,
-      height: 100,
+      width: 180,
+      height: 140,
       rotation: 25,
-      moveFactorX: -0.01,
-      moveFactorY: -0.02,
+      moveFactorX: -0.015,
+      moveFactorY: -0.025,
       color: 'var(--color-primary)',
-      opacity: 0.05,
+      opacity: 0.1,
       border: true
     },
     {
       type: 'rect',
       position: { x: '15%', y: '60%' },
-      width: 120,
-      height: 90,
+      width: 160,
+      height: 120,
       rotation: -15,
-      moveFactorX: 0.015,
-      moveFactorY: -0.01,
+      moveFactorX: 0.02,
+      moveFactorY: -0.015,
       color: 'var(--color-primary)',
-      opacity: 0.07,
+      opacity: 0.12,
       border: true
     },
     {
       type: 'rect',
       position: { x: '60%', y: '85%' },
-      width: 110,
-      height: 80,
+      width: 150,
+      height: 120,
       rotation: 8,
-      moveFactorX: -0.018,
-      moveFactorY: 0.022,
+      moveFactorX: -0.02,
+      moveFactorY: 0.025,
       color: 'var(--color-primary)',
-      opacity: 0.045,
+      opacity: 0.09,
+      border: true
+    },
+    {
+      type: 'rect',
+      position: { x: '35%', y: '25%' },
+      width: 170,
+      height: 130,
+      rotation: 12,
+      moveFactorX: 0.018,
+      moveFactorY: 0.012,
+      color: 'var(--color-primary)',
+      opacity: 0.11,
       border: true
     },
     
@@ -139,31 +162,41 @@ export default function AnimatedBackground() {
     {
       type: 'circle',
       position: { x: '50%', y: '30%' },
-      size: 200,
-      moveFactorX: -0.005,
-      moveFactorY: 0.005,
+      size: 250,
+      moveFactorX: -0.01,
+      moveFactorY: 0.01,
       color: 'var(--color-primary)',
-      opacity: 0.04,
+      opacity: 0.09,
       dashed: true
     },
     {
       type: 'circle',
       position: { x: '80%', y: '50%' },
-      size: 150,
-      moveFactorX: 0.007,
-      moveFactorY: -0.008,
+      size: 200,
+      moveFactorX: 0.012,
+      moveFactorY: -0.015,
       color: 'var(--color-primary)',
-      opacity: 0.03,
+      opacity: 0.08,
       dashed: true
     },
     {
       type: 'circle',
       position: { x: '30%', y: '40%' },
-      size: 180,
-      moveFactorX: 0.009,
-      moveFactorY: 0.006,
+      size: 220,
+      moveFactorX: 0.015,
+      moveFactorY: 0.01,
       color: 'var(--color-primary)',
-      opacity: 0.035,
+      opacity: 0.085,
+      dashed: true
+    },
+    {
+      type: 'circle',
+      position: { x: '25%', y: '70%' },
+      size: 180,
+      moveFactorX: -0.008,
+      moveFactorY: -0.01,
+      color: 'var(--color-primary)',
+      opacity: 0.075,
       dashed: true
     },
     
@@ -171,22 +204,32 @@ export default function AnimatedBackground() {
     {
       type: 'diamond',
       position: { x: '40%', y: '70%' },
-      size: 60,
+      size: 100,
       rotation: 0,
-      moveFactorX: 0.012,
-      moveFactorY: -0.009,
+      moveFactorX: 0.018,
+      moveFactorY: -0.012,
       color: 'var(--color-primary)',
-      opacity: 0.06
+      opacity: 0.1
     },
     {
       type: 'diamond',
       position: { x: '70%', y: '30%' },
-      size: 70,
+      size: 120,
       rotation: 45,
-      moveFactorX: -0.01,
-      moveFactorY: 0.014,
+      moveFactorX: -0.015,
+      moveFactorY: 0.02,
       color: 'var(--color-primary)',
-      opacity: 0.05
+      opacity: 0.11
+    },
+    {
+      type: 'diamond',
+      position: { x: '20%', y: '40%' },
+      size: 90,
+      rotation: 22,
+      moveFactorX: 0.01,
+      moveFactorY: 0.015,
+      color: 'var(--color-primary)',
+      opacity: 0.095
     }
   ];
   
@@ -219,7 +262,7 @@ export default function AnimatedBackground() {
   
   // Renderizar elementos decorativos
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-[-1]">
       {decorativeElements.map((element, index) => {
         // Posiciones en píxeles (convertir desde porcentajes)
         const x = (parseFloat(element.position.x) / 100) * windowSize.width;
@@ -306,9 +349,9 @@ export default function AnimatedBackground() {
                 />
                 {element.border && (
                   <>
-                    <line x1="20" y1="30" x2="80" y2="30" stroke={element.color} strokeWidth="1" opacity={element.opacity * 0.8} />
-                    <line x1="20" y1="50" x2="80" y2="50" stroke={element.color} strokeWidth="1" opacity={element.opacity * 0.8} />
-                    <line x1="20" y1="70" x2="80" y2="70" stroke={element.color} strokeWidth="1" opacity={element.opacity * 0.8} />
+                    <line x1="20" y1="30" x2="80" y2="30" stroke={element.color} strokeWidth="1" opacity={element.opacity * 0.9} />
+                    <line x1="20" y1="50" x2="80" y2="50" stroke={element.color} strokeWidth="1" opacity={element.opacity * 0.9} />
+                    <line x1="20" y1="70" x2="80" y2="70" stroke={element.color} strokeWidth="1" opacity={element.opacity * 0.9} />
                   </>
                 )}
               </svg>
@@ -337,7 +380,7 @@ export default function AnimatedBackground() {
                   r="40"
                   fill="none"
                   stroke={element.color}
-                  strokeWidth="1"
+                  strokeWidth="1.5"
                   strokeDasharray={element.dashed ? "4,4" : "none"}
                   opacity={element.opacity}
                 />
@@ -347,9 +390,9 @@ export default function AnimatedBackground() {
                   r="30"
                   fill="none"
                   stroke={element.color}
-                  strokeWidth="0.5"
+                  strokeWidth="1"
                   strokeDasharray={element.dashed ? "3,3" : "none"}
-                  opacity={element.opacity * 0.8}
+                  opacity={element.opacity * 0.9}
                 />
               </svg>
             </div>
@@ -378,7 +421,7 @@ export default function AnimatedBackground() {
                   height="80"
                   fill="none" 
                   stroke={element.color}
-                  strokeWidth="1"
+                  strokeWidth="1.5"
                   opacity={element.opacity}
                   transform="rotate(45, 50, 50)"
                 />
@@ -389,8 +432,8 @@ export default function AnimatedBackground() {
                   height="60"
                   fill="none" 
                   stroke={element.color}
-                  strokeWidth="0.7"
-                  opacity={element.opacity * 0.8}
+                  strokeWidth="1"
+                  opacity={element.opacity * 0.9}
                   transform="rotate(45, 50, 50)"
                 />
               </svg>
