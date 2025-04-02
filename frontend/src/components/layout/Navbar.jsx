@@ -103,7 +103,7 @@ export default function Navbar() {
       <nav className={`fixed top-0 w-full transition-all duration-500 z-50 ${
         isScrolled 
           ? 'py-3 bg-white/95 backdrop-blur-sm shadow-lg' 
-          : 'py-5 bg-black/20 backdrop-blur-sm mt-10'
+          : 'py-5 bg-black/20 backdrop-blur-sm md:pt-8 lg:mt-10'
       }`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
@@ -127,7 +127,7 @@ export default function Navbar() {
             {/* Logo y sello (centrado) */}
             <div className="flex-shrink-0 relative mx-4">
               {/* Sello decorativo en lugar del logo */}
-              <div className="relative h-20 w-40 flex items-center justify-center">
+              <div className="relative h-16 md:h-20 w-32 md:w-40 flex items-center justify-center">
                 {/* Dos capas - externa rotativa e interna estática */}
                 <div className="relative w-48 h-48 scale-[0.55]">
                   {/* Capa externa rotativa - solo el sello circular */}
@@ -467,8 +467,8 @@ export default function Navbar() {
       <div className={`fixed inset-0 z-40 bg-[var(--color-accent)]/95 backdrop-blur-md overflow-y-auto transition-transform duration-500 transform ${
         isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
       }`}>
-        <div className="container mx-auto p-6 pt-20">
-          <div className="mt-8">
+        <div className="container mx-auto p-6 pt-24 md:pt-32 lg:pt-24">
+          <div className="mt-8 md:mt-12">
             <ul className="space-y-6 text-center font-[var(--font-display)]">
               {navLinks.map((link) => (
                 <li key={link.href}>

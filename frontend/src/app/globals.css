@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Importamos las fuentes más elegantes */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
 :root {
   --color-primary: #800020;     /* Vino tinto más profundo */
   --color-primary-light: #A30025;
@@ -10,7 +13,8 @@
   --color-accent: #0F0F0F;      /* Negro elegante más oscuro */
   --color-accent-dark: #000000;
   --color-cream-light: #FFFAF0; /* Blanco crema elegante */
-  --font-display: 'Playfair Display', serif;
+  --font-display: 'Cormorant Garamond', serif;  /* Fuente más elegante para títulos */
+  --font-body: 'Montserrat', sans-serif;  /* Fuente secundaria para texto normal */
   --color-primary-5: rgba(128, 0, 32, 0.05); /* Vino tinto con 5% de opacidad */
   --color-primary-10: rgba(128, 0, 32, 0.1); /* Vino tinto con 10% de opacidad */
   --color-primary-20: rgba(128, 0, 32, 0.2); /* Vino tinto con 20% de opacidad */
@@ -25,7 +29,13 @@
 
   body {
     @apply bg-white text-gray-800;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-body);
+    letter-spacing: 0.02em;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: 0.03em;
   }
   
   /* Selección de texto elegante */
@@ -44,7 +54,9 @@
   }
 
   .elegant-title {
-    @apply text-4xl md:text-5xl lg:text-6xl font-light tracking-wide;
+    @apply text-4xl md:text-5xl lg:text-6xl font-normal tracking-wide;
+    font-family: var(--font-display);
+    letter-spacing: 0.04em;
   }
 
   .elegant-title.centered {
@@ -69,10 +81,14 @@
   
   .btn-primary {
     @apply px-6 py-3 bg-[var(--color-primary)] text-white rounded-none font-medium hover:bg-[var(--color-primary-dark)] transition-colors duration-300 inline-block;
+    font-family: var(--font-body);
+    letter-spacing: 0.05em;
   }
   
   .btn-secondary {
     @apply px-6 py-3 border border-[var(--color-accent)] text-[var(--color-accent)] rounded-none font-medium hover:bg-[var(--color-accent)] hover:text-white transition-colors duration-300 inline-block;
+    font-family: var(--font-body);
+    letter-spacing: 0.05em;
   }
   
   /* Mejora para secciones elegantes */

@@ -12,7 +12,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="es">
       <head>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap" />
       </head>
       <body>
         <AnimatedBackground />
