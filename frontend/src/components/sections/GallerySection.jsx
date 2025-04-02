@@ -2,95 +2,177 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { FaTimes, FaImage, FaVideo, FaAngleLeft, FaAngleRight, FaPlay } from 'react-icons/fa';
+import { FaTimes, FaAngleLeft, FaAngleRight, FaCamera, FaHeart } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const galleryContent = [
+// Datos de las imágenes de bodas, con descripciones elegantes
+const weddingPhotos = [
   {
-    type: 'image',
-    src: '/images/placeholder/gallery1.svg',
-    alt: 'Vista frontal de Hacienda San Carlos Borromeo',
-    category: 'exterior',
-    title: 'Fachada Principal',
-    description: 'Elegante entrada principal con detalles arquitectónicos coloniales y jardines frontales cuidadamente diseñados.'
+    src: '/boda1.JPG',
+    alt: 'Ceremonia de boda en la hacienda',
+    title: 'Votos Eternos',
+    description: 'El momento en que dos almas se comprometen para toda la vida, bajo la luz dorada del atardecer en nuestros jardines centenarios.',
+    category: 'ceremonia'
   },
   {
-    type: 'image',
-    src: '/images/placeholder/gallery2.svg',
-    alt: 'Jardines de la hacienda',
-    category: 'exterior',
-    title: 'Jardines Exteriores',
-    description: 'Extensos jardines con vegetación autóctona, fuentes ornamentales y caminos de piedra natural.'
+    src: '/boda2.JPG',
+    alt: 'Recepción elegante al aire libre',
+    title: 'Celebración Bajo las Estrellas',
+    description: 'Recepciones al aire libre donde la magia de la noche abraza cada momento de su celebración.',
+    category: 'recepcion'
   },
   {
-    type: 'image',
-    src: '/images/placeholder/gallery3.svg',
-    alt: 'Detalles arquitectónicos',
-    category: 'exterior',
-    title: 'Arquitectura Colonial',
-    description: 'Detalles arquitectónicos que preservan la esencia de la época colonial, desde arcos hasta balcones de hierro forjado.'
+    src: '/boda3.JPG',
+    alt: 'Decoración floral de la ceremonia',
+    title: 'Detalles que Enamoran',
+    description: 'Arreglos florales que transforman nuestros espacios en escenarios de ensueño para su día especial.',
+    category: 'decoracion'
   },
   {
-    type: 'image',
-    src: '/images/placeholder/gallery1.svg',
-    alt: 'Salón principal',
-    category: 'interior',
-    title: 'Gran Salón de Eventos',
-    description: 'Amplio salón principal con capacidad para 300 invitados, con iluminación ambiental y exquisita decoración.'
+    src: '/boda4.jpg',
+    alt: 'Primer baile de los novios',
+    title: 'El Primer Baile',
+    description: 'Ese momento íntimo donde el mundo se detiene mientras comparten su primer baile como matrimonio.',
+    category: 'momentos'
   },
   {
-    type: 'video',
-    src: '/images/placeholder/gallery2.svg',
-    alt: 'Recorrido virtual',
-    category: 'interior',
-    title: 'Tour Virtual',
-    description: 'Exploración inmersiva de las instalaciones de nuestra hacienda a través de un recorrido 360°.'
+    src: '/boda5.jpg',
+    alt: 'Mesa principal decorada',
+    title: 'Elegancia en Cada Detalle',
+    description: 'Decoración personalizada que refleja su estilo único y la grandeza del momento.',
+    category: 'decoracion'
   },
   {
-    type: 'image',
-    src: '/images/placeholder/gallery3.svg',
-    alt: 'Patio central',
-    category: 'exterior',
-    title: 'Patio Central',
-    description: 'Patio interior rodeado de columnas y arcadas, ideal para cócteles y ceremonias íntimas.'
+    src: '/boda6.JPG',
+    alt: 'Novios en los jardines',
+    title: 'Jardines de Ensueño',
+    description: 'Rincones mágicos entre vegetación centenaria, perfectos para capturar los primeros recuerdos como matrimonio.',
+    category: 'espacios'
   },
   {
-    type: 'video',
-    src: '/images/placeholder/gallery1.svg',
-    alt: 'Video de eventos',
-    category: 'eventos',
-    title: 'Momentos Especiales',
-    description: 'Testimonios y momentos destacados de bodas y eventos realizados en nuestra hacienda.'
+    src: '/boda7.JPG',
+    alt: 'Ceremonia iluminada con velas',
+    title: 'Luces del Corazón',
+    description: 'Iluminación cálida que crea atmósferas íntimas y memorables para cada momento de su boda.',
+    category: 'decoracion'
   },
   {
-    type: 'image',
-    src: '/images/placeholder/gallery2.svg',
-    alt: 'Ceremonia de boda',
-    category: 'eventos',
-    title: 'Ceremonias',
-    description: 'Espacio consagrado para celebraciones matrimoniales, con detalles religiosos y espirituales.'
+    src: '/boda8.JPG',
+    alt: 'Banquete de boda',
+    title: 'Festín de Celebración',
+    description: 'Experiencias gastronómicas excepcionales que deleitan a sus invitados mientras celebran su amor.',
+    category: 'recepcion'
+  },
+  {
+    src: '/boda9.JPG',
+    alt: 'Momento romántico de los novios',
+    title: 'Instantes de Eternidad',
+    description: 'Pequeños momentos que se convierten en recuerdos atesorados para toda la vida.',
+    category: 'momentos'
+  },
+  {
+    src: '/boda10.JPG',
+    alt: 'Pasillo decorado para ceremonia',
+    title: 'El Camino hacia el Destino',
+    description: 'Pasillos elegantemente decorados que marcan el inicio de una nueva vida compartida.',
+    category: 'espacios'
+  },
+  {
+    src: '/boda11.JPG',
+    alt: 'Brindis de los novios',
+    title: 'Brindis por el Amor',
+    description: 'Celebrando el comienzo de una vida juntos rodeados de sus seres queridos.',
+    category: 'momentos'
+  },
+  {
+    src: '/boda12.JPG',
+    alt: 'Detalle de decoración de mesa',
+    title: 'Arte en Cada Mesa',
+    description: 'Diseños personalizados que transforman cada rincón en un espacio único y memorable.',
+    category: 'decoracion'
+  },
+  {
+    src: '/boda13.JPG',
+    alt: 'Ceremonia en el jardín',
+    title: 'Unión Sagrada',
+    description: 'El momento en que dos familias se unen en un escenario de incomparable belleza natural.',
+    category: 'ceremonia'
+  },
+  {
+    src: '/boda14.JPG',
+    alt: 'Baile en la recepción',
+    title: 'Ritmos de Felicidad',
+    description: 'Pistas de baile donde la alegría y el amor se expresan al compás de la música.',
+    category: 'recepcion'
+  },
+  {
+    src: '/boda15.JPG',
+    alt: 'Intercambio de anillos',
+    title: 'Símbolos de Amor Eterno',
+    description: 'El intercambio de anillos, símbolo del compromiso eterno entre dos personas.',
+    category: 'ceremonia'
+  },
+  {
+    src: '/boda.JPG',
+    alt: 'Vista panorámica de boda',
+    title: 'Panorama de Ensueño',
+    description: 'La majestuosidad de nuestra hacienda transformada en el escenario perfecto para su historia de amor.',
+    category: 'espacios'
+  },
+  {
+    src: '/boda16.JPG',
+    alt: 'Decoración floral del altar',
+    title: 'Altar de Ensueño',
+    description: 'Altares decorados con arreglos florales que simbolizan la pureza y belleza del amor que se celebra.',
+    category: 'decoracion'
+  },
+  {
+    src: '/boda17.JPG',
+    alt: 'Primer beso como esposos',
+    title: 'El Primer Beso',
+    description: 'Ese momento mágico que sella la unión de dos almas destinadas a compartir la vida.',
+    category: 'momentos'
+  },
+  {
+    src: '/boda18.JPG',
+    alt: 'Detalles de la mesa de postres',
+    title: 'Dulces Memorias',
+    description: 'Exquisitas creaciones que deleitan tanto la vista como el paladar, añadiendo un toque de dulzura a su celebración.',
+    category: 'decoracion'
   }
 ];
 
 export default function GallerySection() {
   const [selectedItem, setSelectedItem] = useState(null);
-  const [activeCategory, setActiveCategory] = useState('all');
   const [isAnimating, setIsAnimating] = useState(false);
   const [hoveredItem, setHoveredItem] = useState(null);
   const galleryRef = useRef(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [currentCategory, setCurrentCategory] = useState('todas');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'slider'
+  const [currentSlide, setCurrentSlide] = useState(0);
   
-  const filteredContent = activeCategory === 'all' 
-    ? galleryContent 
-    : galleryContent.filter(item => item.category === activeCategory);
-
+  // Categorías disponibles
+  const categories = [
+    { id: 'todas', label: 'Todas' },
+    { id: 'ceremonia', label: 'Ceremonias' },
+    { id: 'recepcion', label: 'Celebraciones' },
+    { id: 'decoracion', label: 'Decoración' },
+    { id: 'momentos', label: 'Momentos Especiales' },
+    { id: 'espacios', label: 'Espacios' }
+  ];
+  
+  // Filtrar fotos según la categoría seleccionada
+  const filteredPhotos = currentCategory === 'todas' 
+    ? weddingPhotos 
+    : weddingPhotos.filter(photo => photo.category === currentCategory);
+  
   // Manejar navegación en lightbox
   const handlePrevItem = () => {
     if (selectedItem === null) return;
     setIsAnimating(true);
     
-    const currentIndex = filteredContent.findIndex((_, index) => index === selectedItem);
-    const newIndex = (currentIndex - 1 + filteredContent.length) % filteredContent.length;
+    const newIndex = (selectedItem - 1 + weddingPhotos.length) % weddingPhotos.length;
     
     setTimeout(() => {
       setSelectedItem(newIndex);
@@ -102,8 +184,7 @@ export default function GallerySection() {
     if (selectedItem === null) return;
     setIsAnimating(true);
     
-    const currentIndex = filteredContent.findIndex((_, index) => index === selectedItem);
-    const newIndex = (currentIndex + 1) % filteredContent.length;
+    const newIndex = (selectedItem + 1) % weddingPhotos.length;
     
     setTimeout(() => {
       setSelectedItem(newIndex);
@@ -140,9 +221,9 @@ export default function GallerySection() {
   }, [galleryRef]);
 
   return (
-    <section id="gallery" className="section-padding relative overflow-hidden">
-      {/* Fondo con degradado */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[var(--color-cream-light)] to-white z-0"></div>
+    <section id="gallery" className="section-padding relative overflow-hidden bg-[var(--color-cream-light)]">
+      {/* Fondo decorativo */}
+      <div className="absolute inset-0 bg-[url('/flores.svg')] bg-repeat-space opacity-5 z-0"></div>
       
       {/* Elementos decorativos */}
       <div className="absolute top-0 left-0 h-64 w-64 border-l-2 border-t-2 border-[var(--color-primary-20)] opacity-50"></div>
@@ -160,282 +241,357 @@ export default function GallerySection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="text-center mb-24"
+          className="text-center mb-12"
         >
-          <h2 className="text-5xl md:text-6xl font-[var(--font-display)] text-[var(--color-accent)] mb-12 font-light">
-            Nuestra <span className="text-[var(--color-primary)] font-semibold">Galería</span>
+          <div className="inline-block relative mb-3">
+            <FaHeart className="text-[var(--color-primary)] text-2xl absolute -top-3 -left-6 transform -rotate-12 opacity-70" />
+            <FaHeart className="text-[var(--color-primary)] text-lg absolute -top-1 -right-5 transform rotate-12 opacity-60" />
+          </div>
+          
+          <h2 className="text-5xl md:text-6xl font-[var(--font-display)] text-[var(--color-accent)] mb-6 font-light">
+            Bodas de <span className="text-[var(--color-primary)] font-semibold">Ensueño</span>
           </h2>
           
-          <div className="relative gold-divider mx-auto mb-10">
+          <div className="relative gold-divider mx-auto mb-8">
             <div className="absolute -top-1 -left-2 w-4 h-4 border-l-2 border-t-2 border-[var(--color-primary)]"></div>
             <div className="absolute -bottom-1 -right-2 w-4 h-4 border-r-2 border-b-2 border-[var(--color-primary)]"></div>
           </div>
           
-          <p className="text-xl md:text-2xl font-light mt-10 max-w-4xl mx-auto leading-relaxed text-gray-700">
-            Descubra la belleza atemporal de nuestra hacienda a través de nuestra colección exclusiva de imágenes y videos.
+          <p className="text-xl md:text-2xl font-light mt-8 max-w-4xl mx-auto leading-relaxed text-gray-700">
+            Momentos mágicos capturados en nuestra hacienda, donde cada celebración se transforma en un recuerdo eterno.
           </p>
         </motion.div>
 
-        {/* Filtros de categoría */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="relative flex justify-center mb-16 overflow-x-auto pb-2"
-        >
-          <div className="flex space-x-1 sm:space-x-3 px-6">
-            {['all', 'exterior', 'interior', 'eventos'].map((category, index) => (
-              <button
-                key={category}
-                onClick={() => setActiveCategory(category)}
-                className={`px-6 py-4 uppercase tracking-wider text-sm font-medium transition-all duration-500 relative ${
-                  activeCategory === category
-                    ? 'text-[var(--color-primary)]'
-                    : 'text-gray-500 hover:text-[var(--color-primary)]'
+        {/* Controles de categoría y vista */}
+        <div className="mb-10">
+          {/* Filtro de categorías */}
+          <div className="flex flex-wrap justify-center mb-6">
+            {categories.map((category) => (
+              <motion.button
+                key={category.id}
+                onClick={() => {
+                  setCurrentCategory(category.id);
+                  setCurrentSlide(0); // Resetear el slider al cambiar de categoría
+                }}
+                className={`px-4 py-2 mx-2 my-1 rounded-full transition-all duration-300 ${
+                  currentCategory === category.id 
+                    ? 'bg-[var(--color-primary)] text-white' 
+                    : 'bg-white/80 text-[var(--color-accent-dark)] hover:bg-[var(--color-primary-10)]'
                 }`}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.98 }}
               >
-                {category === 'all' ? 'Todos' : category.charAt(0).toUpperCase() + category.slice(1)}
-                
-                {/* Línea animada debajo del botón activo */}
-                {activeCategory === category && (
-                  <motion.div 
-                    layoutId="activeCategoryIndicator"
-                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--color-primary)]"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5 }}
-                  />
-                )}
-              </button>
+                {category.label}
+              </motion.button>
             ))}
           </div>
-        </motion.div>
+          
+          {/* Selector de modo de visualización */}
+          <div className="flex justify-center space-x-3 mb-6">
+            <motion.button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center px-4 py-2 rounded-l-full border ${
+                viewMode === 'grid'
+                  ? 'bg-[var(--color-primary-10)] border-[var(--color-primary)] text-[var(--color-primary)]'
+                  : 'bg-white/80 border-gray-300 text-gray-600 hover:bg-gray-100'
+              }`}
+              whileHover={viewMode !== 'grid' ? { scale: 1.05 } : {}}
+              whileTap={{ scale: 0.98 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+              Cuadrícula
+            </motion.button>
+            <motion.button
+              onClick={() => setViewMode('slider')}
+              className={`flex items-center px-4 py-2 rounded-r-full border ${
+                viewMode === 'slider'
+                  ? 'bg-[var(--color-primary-10)] border-[var(--color-primary)] text-[var(--color-primary)]'
+                  : 'bg-white/80 border-gray-300 text-gray-600 hover:bg-gray-100'
+              }`}
+              whileHover={viewMode !== 'slider' ? { scale: 1.05 } : {}}
+              whileTap={{ scale: 0.98 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+              </svg>
+              Presentación
+            </motion.button>
+          </div>
 
-        {/* Galería de contenido con layout Masonry */}
-        <div ref={galleryRef}>
-          <motion.div 
-            layout
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 auto-rows-[minmax(200px,auto)] gap-6"
-            style={{ 
-              gridTemplateRows: 'masonry',
-              gridAutoFlow: 'dense' 
-            }}
-          >
-            {filteredContent.map((item, index) => {
-              // Ajuste de tamaño para el layout masonry
-              const isLarge = index % 5 === 0 || index % 5 === 3;
-              const spanRows = isLarge ? 'md:row-span-2' : '';
-              const spanCols = index % 5 === 0 ? 'md:col-span-2' : '';
-              
-              return (
-                <motion.div
-                  layout
-                  key={`${item.title}-${index}`}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.5, delay: index * 0.05 }}
-                  className={`group relative overflow-hidden cursor-pointer ${spanRows} ${spanCols} border-decorative`}
-                  onClick={() => setSelectedItem(index)}
-                  onMouseEnter={() => setHoveredItem(index)}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  style={{ 
-                    minHeight: isLarge ? '400px' : '250px'
-                  }}
-                >
-                  <div 
-                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"
-                    style={{ 
-                      backgroundImage: 'radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.8) 140%)' 
-                    }}
-                  />
-                  
-                  <div className="absolute inset-0 z-0 transition-all duration-700">
-                    <Image
-                      src={item.src}
-                      alt={item.alt}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                      className="object-cover transition-transform duration-700 group-hover:scale-110"
-                      style={{ transformOrigin: hoveredItem === index ? 'center center' : '50% 50%' }}
-                    />
-                  </div>
-                  
-                  <div className="absolute top-3 left-3 z-20">
-                    <motion.div 
-                      whileHover={{ scale: 1.1 }}
-                      className={`
-                        w-10 h-10 rounded-full backdrop-blur-sm
-                        ${item.type === 'video' ? 'bg-[var(--color-primary)]/80' : 'bg-[var(--color-accent)]/80'} 
-                        flex items-center justify-center text-white 
-                        transition-opacity transform duration-500
-                        opacity-0 group-hover:opacity-100
-                      `}
-                    >
-                      {item.type === 'video' ? <FaVideo className="w-4 h-4" /> : <FaImage className="w-4 h-4" />}
-                    </motion.div>
-                  </div>
-                  
-                  {item.type === 'video' && (
-                    <motion.div 
-                      whileHover={{ scale: 1.1 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                      className="absolute inset-0 flex items-center justify-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                    >
-                      <div className="w-20 h-20 rounded-full bg-[var(--color-primary)]/80 backdrop-blur-md flex items-center justify-center">
-                        <FaPlay className="w-8 h-8 text-white ml-1" />
-                      </div>
-                    </motion.div>
-                  )}
-                  
-                  <motion.div 
-                    className="absolute bottom-0 left-0 right-0 p-8 z-20 transform translate-y-full group-hover:translate-y-0 transition-transform duration-500"
-                    style={{ 
-                      background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)' 
-                    }}
-                  >
-                    <h3 className="text-2xl font-[var(--font-display)] text-white mb-3 shadow-text-strong">{item.title}</h3>
-                    <p className="text-white/90 line-clamp-3 leading-relaxed shadow-text">{item.description}</p>
-                  </motion.div>
-                  
-                  {hoveredItem === index && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="absolute inset-0 border-[3px] border-white/40 z-30 pointer-events-none"
-                      style={{ 
-                        mixBlendMode: 'overlay',
-                        boxShadow: 'inset 0 0 30px rgba(255,255,255,0.2)'
-                      }}
-                    ></motion.div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </motion.div>
+          {/* Estadísticas de imágenes */}
+          <div className="text-center text-gray-600 mb-6">
+            Mostrando {filteredPhotos.length} {filteredPhotos.length === 1 ? 'imagen' : 'imágenes'}
+            {currentCategory !== 'todas' && ` de ${categories.find(c => c.id === currentCategory)?.label}`}
+          </div>
         </div>
 
-        {/* Lightbox con AnimatePresence para transiciones suaves */}
-        <AnimatePresence>
-          {selectedItem !== null && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-            >
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setSelectedItem(null)}
-                className="absolute top-6 right-6 text-white text-2xl z-50 w-12 h-12 rounded-full bg-[var(--color-primary)]/70 flex items-center justify-center backdrop-blur-sm hover:bg-[var(--color-primary)] transition-colors"
-                aria-label="Cerrar"
-              >
-                <FaTimes className="w-6 h-6" />
-              </motion.button>
-              
-              <motion.button 
-                whileHover={{ scale: 1.1, x: -5 }}
-                whileTap={{ scale: 0.9 }}
-                className="absolute left-6 top-1/2 transform -translate-y-1/2 z-50 w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-[var(--color-primary)]/70 transition-colors"
-                onClick={handlePrevItem}
-                aria-label="Anterior"
-              >
-                <FaAngleLeft className="h-8 w-8" />
-              </motion.button>
-              
-              <motion.button 
-                whileHover={{ scale: 1.1, x: 5 }}
-                whileTap={{ scale: 0.9 }}
-                className="absolute right-6 top-1/2 transform -translate-y-1/2 z-50 w-14 h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-[var(--color-primary)]/70 transition-colors"
-                onClick={handleNextItem}
-                aria-label="Siguiente"
-              >
-                <FaAngleRight className="h-8 w-8" />
-              </motion.button>
-              
-              <div className="relative w-full max-w-6xl mx-auto">
-                <AnimatePresence mode="wait">
-                  <motion.div 
-                    key={selectedItem}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 1.1 }}
-                    transition={{ duration: 0.5 }}
-                    className={`${isAnimating ? 'opacity-0' : 'opacity-100'}`}
-                  >
-                    {filteredContent[selectedItem].type === 'video' ? (
-                      <div className="relative aspect-video">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-[var(--color-primary-dark)]/30 to-transparent opacity-70"></div>
-                        <Image
-                          src={filteredContent[selectedItem].src}
-                          alt={filteredContent[selectedItem].alt}
-                          fill
-                          sizes="100vw"
-                          className="object-contain"
-                        />
-                        <motion.div 
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          className="absolute inset-0 flex items-center justify-center"
-                        >
-                          <div className="w-28 h-28 rounded-full bg-[var(--color-primary)]/60 backdrop-blur-sm flex items-center justify-center group cursor-pointer border border-white/20">
-                            <FaPlay className="h-12 w-12 text-white group-hover:text-[var(--color-cream-light)] transition-colors ml-2" />
-                          </div>
-                        </motion.div>
-                      </div>
-                    ) : (
-                      <div className="relative aspect-[16/9]">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-[var(--color-primary-dark)]/30 to-transparent opacity-70"></div>
-                        <Image
-                          src={filteredContent[selectedItem].src}
-                          alt={filteredContent[selectedItem].alt}
-                          fill
-                          sizes="100vw"
-                          className="object-contain"
-                        />
-                      </div>
-                    )}
-                    
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2, duration: 0.5 }}
-                      className="absolute left-0 right-0 bottom-0 p-8 bg-gradient-to-t from-black/80 to-transparent pt-24"
-                    >
-                      <h3 className="text-3xl font-[var(--font-display)] text-white mb-4 shadow-text-strong">
-                        {filteredContent[selectedItem].title}
-                      </h3>
-                      <p className="text-white/90 text-lg max-w-3xl shadow-text">
-                        {filteredContent[selectedItem].description}
-                      </p>
-                    </motion.div>
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-              
-              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                {filteredContent.map((_, index) => (
-                  <motion.button
+        {/* Galería de fotos con diseño condicional (cuadrícula o slider) */}
+        <div ref={galleryRef} className="relative">
+          {/* Modo cuadrícula */}
+          {viewMode === 'grid' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {filteredPhotos.map((photo, index) => {
+                // Determinamos si la foto debe ocupar espacio doble para efecto visual
+                const isLarge = index === 0 || index === 5 || index === 10;
+                const spanCols = isLarge ? 'sm:col-span-2' : '';
+                const spanRows = isLarge ? 'row-span-2' : '';
+                
+                return (
+                  <motion.div
                     key={index}
-                    onClick={() => setSelectedItem(index)}
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      index === selectedItem ? 'bg-[var(--color-primary)] w-10' : 'bg-white/50 w-2 hover:bg-white/80'
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true, margin: "-10%" }}
+                    transition={{ duration: 0.7, delay: index * 0.1 }}
+                    className={`group relative overflow-hidden rounded-lg shadow-xl cursor-pointer transform transition-all duration-700 hover:scale-[1.02] hover:shadow-2xl ${spanCols} ${spanRows}`}
+                    style={{ height: isLarge ? '600px' : '400px' }}
+                    onClick={() => setSelectedItem(weddingPhotos.findIndex(p => p.src === photo.src))}
+                    onMouseEnter={() => setHoveredItem(index)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                  >
+                    {/* Borde decorativo con efecto hover */}
+                    <div className="absolute inset-0 border-2 border-white/0 group-hover:border-white/30 z-20 rounded-lg transition-all duration-500"></div>
+                    
+                    {/* Imagen con optimización de Next.js */}
+                    <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110">
+                      <Image
+                        src={photo.src}
+                        alt={photo.alt}
+                        fill
+                        sizes={isLarge ? "(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 60vw" : "(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 30vw"}
+                        className="object-cover"
+                        priority={index < 6}
+                      />
+                    </div>
+                    
+                    {/* Categoría tag */}
+                    <div className="absolute top-4 left-4 z-20 bg-[var(--color-primary)]/80 text-white text-xs py-1 px-3 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                      {categories.find(c => c.id === photo.category)?.label}
+                    </div>
+                    
+                    {/* Overlay con efecto de degradado */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
+                    
+                    {/* Contenido de texto con animación */}
+                    <div className="absolute bottom-0 left-0 right-0 p-6 z-20 transform translate-y-10 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+                      <h3 className="text-2xl font-[var(--font-display)] text-white drop-shadow-md mb-2">{photo.title}</h3>
+                      <p className="text-white/90 text-sm line-clamp-2">{photo.description}</p>
+                    </div>
+                    
+                    {/* Icono de cámara con animación */}
+                    <div className="absolute top-5 right-5 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 delay-300">
+                      <FaCamera className="text-white/70 text-xl" />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Modo slider */}
+          {viewMode === 'slider' && (
+            <div className="relative h-[600px] overflow-hidden rounded-xl shadow-2xl">
+              {/* Slider principal */}
+              <div className="relative w-full h-full">
+                {filteredPhotos.map((photo, index) => (
+                  <motion.div
+                    key={index}
+                    className={`absolute inset-0 transition-opacity duration-1000 ${
+                      currentSlide === index ? 'opacity-100 z-10' : 'opacity-0 z-0'
                     }`}
-                    aria-label={`Ver elemento ${index + 1}`}
-                  />
+                  >
+                    <Image
+                      src={photo.src}
+                      alt={photo.alt}
+                      fill
+                      sizes="100vw"
+                      className="object-cover"
+                      priority={index === currentSlide}
+                      onClick={() => setSelectedItem(weddingPhotos.findIndex(p => p.src === photo.src))}
+                    />
+                    
+                    {/* Overlay para texto */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent z-20"></div>
+                    
+                    {/* Información de la imagen */}
+                    <div className="absolute bottom-0 left-0 right-0 p-8 z-30 text-white">
+                      <div className="mb-3">
+                        <span className="bg-[var(--color-primary)]/80 text-white text-sm py-1 px-4 rounded-full backdrop-blur-sm">
+                          {categories.find(c => c.id === photo.category)?.label}
+                        </span>
+                      </div>
+                      <h3 className="text-3xl md:text-4xl font-[var(--font-display)] mb-2 drop-shadow-lg">{photo.title}</h3>
+                      <p className="text-lg md:text-xl max-w-3xl drop-shadow-lg">{photo.description}</p>
+                    </div>
+                  </motion.div>
                 ))}
               </div>
-            </motion.div>
+              
+              {/* Botones de navegación */}
+              <button 
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white w-12 h-12 rounded-full flex items-center justify-center z-30 transition-colors backdrop-blur-sm"
+                onClick={() => setCurrentSlide((currentSlide - 1 + filteredPhotos.length) % filteredPhotos.length)}
+              >
+                <FaAngleLeft className="text-2xl" />
+              </button>
+              
+              <button 
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white w-12 h-12 rounded-full flex items-center justify-center z-30 transition-colors backdrop-blur-sm"
+                onClick={() => setCurrentSlide((currentSlide + 1) % filteredPhotos.length)}
+              >
+                <FaAngleRight className="text-2xl" />
+              </button>
+              
+              {/* Indicadores de posición */}
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2 z-30">
+                {filteredPhotos.map((_, i) => (
+                  <button
+                    key={i}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      currentSlide === i ? 'bg-white w-8' : 'bg-white/50'
+                    }`}
+                    onClick={() => setCurrentSlide(i)}
+                  ></button>
+                ))}
+              </div>
+              
+              {/* Miniaturas de navegación */}
+              <div className="absolute bottom-24 left-0 right-0 flex justify-center z-30">
+                <div className="flex space-x-2 overflow-x-auto max-w-full px-4 py-2 rounded-full bg-black/30 backdrop-blur-sm">
+                  {filteredPhotos.map((photo, i) => (
+                    <button
+                      key={i}
+                      className={`w-16 h-10 flex-shrink-0 rounded-md overflow-hidden transition-all duration-300 ${
+                        currentSlide === i ? 'ring-2 ring-[var(--color-primary)] scale-110' : 'opacity-70 hover:opacity-100'
+                      }`}
+                      onClick={() => setCurrentSlide(i)}
+                    >
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={photo.src}
+                          alt={photo.title}
+                          fill
+                          sizes="64px"
+                          className="object-cover"
+                        />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
+
+      {/* Lightbox para visualización de imágenes */}
+      <AnimatePresence>
+        {selectedItem !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 md:p-10"
+            onClick={() => setSelectedItem(null)}
+          >
+            {/* Botón para cerrar */}
+            <button 
+              className="absolute top-6 right-6 text-white/80 hover:text-white z-50 text-4xl"
+              onClick={() => setSelectedItem(null)}
+            >
+              <FaTimes />
+            </button>
+            
+            {/* Imagen actual */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: isAnimating ? 0 : 1, scale: isAnimating ? 0.9 : 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.3 }}
+              className="relative w-full max-w-5xl mx-auto aspect-video" 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Image
+                src={weddingPhotos[selectedItem].src}
+                alt={weddingPhotos[selectedItem].alt}
+                fill
+                sizes="(max-width: 1024px) 90vw, 80vw"
+                className="object-contain"
+                priority
+              />
+              
+              {/* Categoría tag */}
+              <div className="absolute top-4 left-4 z-30">
+                <span className="bg-[var(--color-primary)]/80 text-white text-sm py-1 px-4 rounded-full backdrop-blur-sm">
+                  {categories.find(c => c.id === weddingPhotos[selectedItem].category)?.label}
+                </span>
+              </div>
+              
+              {/* Información de la imagen */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 text-white text-center">
+                <h3 className="text-2xl md:text-3xl font-[var(--font-display)] mb-2">{weddingPhotos[selectedItem].title}</h3>
+                <p className="md:text-lg opacity-80 max-w-2xl mx-auto">{weddingPhotos[selectedItem].description}</p>
+              </div>
+            </motion.div>
+            
+            {/* Botones de navegación */}
+            <button 
+              className="absolute left-5 top-1/2 transform -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white w-12 h-12 rounded-full flex items-center justify-center z-50 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrevItem();
+              }}
+            >
+              <FaAngleLeft className="text-3xl" />
+            </button>
+            
+            <button 
+              className="absolute right-5 top-1/2 transform -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white w-12 h-12 rounded-full flex items-center justify-center z-50 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNextItem();
+              }}
+            >
+              <FaAngleRight className="text-3xl" />
+            </button>
+            
+            {/* Miniaturas de navegación */}
+            <div className="absolute bottom-24 left-0 right-0 flex justify-center z-50 overflow-x-auto">
+              <div className="flex space-x-2 p-2 bg-black/40 backdrop-blur-sm rounded-full">
+                {weddingPhotos.filter(photo => currentCategory === 'todas' || photo.category === currentCategory)
+                  .map((photo, i) => {
+                    const photoIndex = weddingPhotos.findIndex(p => p.src === photo.src);
+                    return (
+                      <button
+                        key={i}
+                        className={`w-12 h-8 flex-shrink-0 rounded-md overflow-hidden transition-all duration-300 ${
+                          selectedItem === photoIndex ? 'ring-2 ring-[var(--color-primary)] scale-110' : 'opacity-60 hover:opacity-100'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedItem(photoIndex);
+                        }}
+                      >
+                        <div className="relative w-full h-full">
+                          <Image
+                            src={photo.src}
+                            alt={photo.title}
+                            fill
+                            sizes="48px"
+                            className="object-cover"
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 } 

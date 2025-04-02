@@ -291,10 +291,10 @@ export default function AnimatedBackground() {
                   const angle = (i * 9) * Math.PI / 180;
                   const r1 = 240;
                   const r2 = 260;
-                  const x1 = 250 + r1 * Math.cos(angle);
-                  const y1 = 250 + r1 * Math.sin(angle);
-                  const x2 = 250 + r2 * Math.cos(angle);
-                  const y2 = 250 + r2 * Math.sin(angle);
+                  const x1 = Math.round((250 + r1 * Math.cos(angle)) * 100) / 100;
+                  const y1 = Math.round((250 + r1 * Math.sin(angle)) * 100) / 100;
+                  const x2 = Math.round((250 + r2 * Math.cos(angle)) * 100) / 100;
+                  const y2 = Math.round((250 + r2 * Math.sin(angle)) * 100) / 100;
                   return (
                     <line 
                       key={i} 

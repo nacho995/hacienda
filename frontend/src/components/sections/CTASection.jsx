@@ -38,13 +38,13 @@ export default function CTASection() {
         {/* Fondo con overlay */}
         <div className="absolute inset-0 z-0">
           <Image
-            src="/images/placeholder/hero.svg"
-            alt="Hacienda San Carlos - Tu evento soñado"
+            src="/platopresentacion.JPG"
+            alt="Exquisita presentación gastronómica de Hacienda San Carlos"
             fill
             sizes="100vw"
             className="object-cover"
           />
-          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(15, 15, 15, 0.8)' }}></div>
+          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(15, 15, 15, 0.75)' }}></div>
         </div>
         
         {/* Patrón decorativo */}

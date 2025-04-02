@@ -9,35 +9,51 @@ import { FaChevronDown, FaAngleLeft, FaAngleRight, FaPlay } from 'react-icons/fa
 const carouselData = [
   {
     type: 'image',
-    src: '/images/placeholder/hero.svg',
-    alt: 'Hacienda San Carlos - Vista frontal',
+    src: '/imagendron.jpg',
+    alt: 'Hacienda San Carlos - Vista aérea principal',
     title: 'Elegancia & Tradición',
     subtitle: 'Un espacio donde la historia cobra vida',
     cta: 'Descubrir la Hacienda'
   },
   {
     type: 'image',
-    src: '/images/placeholder/gallery1.svg',
-    alt: 'Hacienda San Carlos - Eventos',
+    src: '/imagendron2.jpg',
+    alt: 'Hacienda San Carlos - Vista aérea panorámica',
     title: 'Eventos & Celebraciones',
     subtitle: 'Momentos inolvidables en un entorno único',
     cta: 'Explorar Servicios'
   },
   {
     type: 'image',
-    src: '/images/placeholder/gallery2.svg',
-    alt: 'Hacienda San Carlos - Jardines',
+    src: '/imagendron3.jpg',
+    alt: 'Hacienda San Carlos - Vista aérea de jardines',
     title: 'Naturaleza & Armonía',
     subtitle: 'Jardines exuberantes para su deleite',
     cta: 'Conocer Espacios'
   },
   {
-    type: 'video',
-    src: '/images/placeholder/decorative.svg', // Placeholder hasta tener un video real
-    alt: 'Hacienda San Carlos - Tour virtual',
+    type: 'image',
+    src: '/imagendron4.jpg',
+    alt: 'Hacienda San Carlos - Vista aérea completa',
     title: 'Explora & Descubre',
     subtitle: 'Recorre virtualmente nuestras instalaciones',
     cta: 'Ver Recorrido'
+  },
+  {
+    type: 'image',
+    src: '/imagendron5.jpg',
+    alt: 'Hacienda San Carlos - Vista aérea de piscina y áreas verdes',
+    title: 'Relax & Confort',
+    subtitle: 'Disfruta de nuestras áreas de descanso',
+    cta: 'Ver Instalaciones'
+  },
+  {
+    type: 'image',
+    src: '/imagendron6.JPG',
+    alt: 'Hacienda San Carlos - Vista aérea jardines traseros',
+    title: 'Jardines & Espacios',
+    subtitle: 'Áreas exclusivas para tu celebración',
+    cta: 'Conocer Jardines'
   }
 ];
 
@@ -161,7 +177,7 @@ export default function HeroSection() {
       
       // Mover el medallón en dirección opuesta para efecto de parallax
       if (medallionRef.current) {
-        medallionRef.current.style.transform = `translate(${-moveX * 1.2}px, ${-moveY * 1.2}px) rotate(${moveX * 0.05}deg)`;
+        medallionRef.current.style.transform = `translate(${-moveX * 0.5}px, ${-moveY * 0.5}px) rotate(${moveX * 0.03}deg)`;
       }
     };
     
@@ -182,8 +198,7 @@ export default function HeroSection() {
         const opacity = Math.max(1 - (scrollY * 0.003), 0);
         
         medallionRef.current.style.transform = `
-          translate(-50%, -50%) 
-          translateY(${scrollY * 0.3}px)
+          translateY(${scrollY * 0.15}px)
           rotate(${rotation}deg)
           scale(${Math.max(scale, 0.6)})
         `;
@@ -214,43 +229,21 @@ export default function HeroSection() {
               index === currentSlide ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            {carouselData[index].type === 'image' ? (
-              <div className="relative h-full overflow-hidden">
-                <div className="slide-image absolute inset-0 transition-transform duration-1000 ease-out will-change-transform">
-                  <Image
-                    src={carouselData[index].src}
-                    alt={carouselData[index].alt}
-                    fill
-                    sizes="100vw"
-                    priority={index === 0}
-                    className={`object-cover transition-transform duration-7000 ease-out transform scale-[1.15] ${
-                      index === currentSlide ? 'animate-ken-burns' : ''
-                    }`}
-                  />
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-b from-[var(--color-accent)]/60 via-[var(--color-accent)]/40 to-[var(--color-accent)]/70"></div>
+            <div className="relative h-full overflow-hidden">
+              <div className="slide-image absolute inset-0 transition-transform duration-1000 ease-out will-change-transform">
+                <Image
+                  src={carouselData[index].src}
+                  alt={carouselData[index].alt}
+                  fill
+                  sizes="100vw"
+                  priority={index === 0}
+                  className={`object-cover transition-transform duration-7000 ease-out transform scale-[1.15] ${
+                    index === currentSlide ? 'animate-ken-burns' : ''
+                  }`}
+                />
               </div>
-            ) : (
-              <div className="relative h-full overflow-hidden">
-                <div className="slide-image absolute inset-0 transition-transform duration-1000 ease-out will-change-transform">
-                  <Image
-                    src={carouselData[index].src}
-                    alt={carouselData[index].alt}
-                    fill
-                    sizes="100vw"
-                    className="object-cover"
-                  />
-                </div>
-                <div className="absolute inset-0 bg-[var(--color-accent)]/60 flex items-center justify-center">
-                  <button className="group relative w-24 h-24 flex items-center justify-center">
-                    <div className="absolute inset-0 rounded-full bg-[var(--color-primary)]/30 animate-ping-slow"></div>
-                    <div className="absolute inset-0 rounded-full bg-[var(--color-primary)]/50 flex items-center justify-center">
-                      <FaPlay className="w-8 h-8 text-white ml-2 group-hover:scale-110 transition-transform duration-300" />
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[var(--color-accent)]/60 to-black/50"></div>
+            </div>
           </div>
         ))}
       </div>
@@ -258,14 +251,24 @@ export default function HeroSection() {
       {/* Medallón decorativo central con efecto de parallax */}
       <div 
         ref={medallionRef}
-        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none"
+        className="absolute top-[140px] left-[100px] transform z-20 pointer-events-none"
         style={{ 
-          width: '500px', 
-          height: '500px',
+          width: '300px', 
+          height: '300px',
           transition: 'transform 0.4s ease-out, opacity 0.4s ease-out'
         }}
       >
         <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+          {/* Definiciones para filtros */}
+          <defs>
+            <filter id="textShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="black" floodOpacity="0.8" />
+            </filter>
+          </defs>
+          
+          {/* Fondo semitransparente del medallón */}
+          <circle cx="250" cy="250" r="225" fill="rgba(0,0,0,0.3)" />
+          
           {/* Círculos decorativos externos */}
           <circle cx="250" cy="250" r="245" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="8,8" opacity="0.3" />
           <circle cx="250" cy="250" r="230" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="5,5" opacity="0.4" />
@@ -286,10 +289,10 @@ export default function HeroSection() {
           {/* Rayos decorativos */}
           {Array.from({ length: 12 }).map((_, index) => {
             const angle = (index * 30) * Math.PI / 180;
-            const x1 = 250 + 150 * Math.cos(angle);
-            const y1 = 250 + 150 * Math.sin(angle);
-            const x2 = 250 + 220 * Math.cos(angle);
-            const y2 = 250 + 220 * Math.sin(angle);
+            const x1 = Math.round((250 + 150 * Math.cos(angle)) * 100) / 100;
+            const y1 = Math.round((250 + 150 * Math.sin(angle)) * 100) / 100;
+            const x2 = Math.round((250 + 220 * Math.cos(angle)) * 100) / 100;
+            const y2 = Math.round((250 + 220 * Math.sin(angle)) * 100) / 100;
             return (
               <line 
                 key={index}
@@ -333,10 +336,10 @@ export default function HeroSection() {
           
           {/* Texto elegante en el centro - "CELEBRA" */}
           <g transform="translate(250, 250)" className="events-text">
-            <text textAnchor="middle" fontFamily="serif" fontSize="28" fill="#FFFAF0" fontWeight="light" opacity="0.95" letterSpacing="5">
+            <text textAnchor="middle" fontFamily="serif" fontSize="30" fill="#FFFAF0" fontWeight="light" opacity="0.95" letterSpacing="4" filter="url(#textShadow)">
               CELEBRA
             </text>
-            <text textAnchor="middle" fontFamily="serif" fontSize="16" fill="#FFFAF0" fontWeight="light" opacity="0.8" letterSpacing="2" y="25">
+            <text textAnchor="middle" fontFamily="serif" fontSize="18" fill="#FFFAF0" fontWeight="light" opacity="0.9" letterSpacing="2" y="30">
               MOMENTOS ÚNICOS
             </text>
           </g>
@@ -345,14 +348,14 @@ export default function HeroSection() {
           {Array.from({ length: 8 }).map((_, index) => {
             const angle = (index * 45 + 22.5) * Math.PI / 180;
             const distance = 180;
-            const x = 250 + distance * Math.cos(angle);
-            const y = 250 + distance * Math.sin(angle);
+            const x = Math.round((250 + distance * Math.cos(angle)) * 100) / 100;
+            const y = Math.round((250 + distance * Math.sin(angle)) * 100) / 100;
             const size = 5 + (index % 3) * 2;
             
             return (
               <g key={`star-${index}`} transform={`translate(${x}, ${y})`}>
                 <circle cx="0" cy="0" r={size / 2} fill="none" stroke="#FFFAF0" strokeWidth="1" opacity="0.6" />
-                <path d={`M0,-${size} L${size/4},-${size/4} L${size},0 L${size/4},${size/4} L0,${size} L-${size/4},${size/4} L-${size},0 L-${size/4},-${size/4} Z`} 
+                <path d={`M0,-${size} L${Math.round(size/4 * 100) / 100},-${Math.round(size/4 * 100) / 100} L${size},0 L${Math.round(size/4 * 100) / 100},${Math.round(size/4 * 100) / 100} L0,${size} L-${Math.round(size/4 * 100) / 100},${Math.round(size/4 * 100) / 100} L-${size},0 L-${Math.round(size/4 * 100) / 100},-${Math.round(size/4 * 100) / 100} Z`} 
                       fill="none" stroke="#FFFAF0" strokeWidth="0.5" opacity="0.4" />
               </g>
             );
@@ -403,22 +406,26 @@ export default function HeroSection() {
                   {/* Decorador superior elegante */}
                   <div className="flex flex-col items-center mb-12 animate-delay-100">
                     <div className="w-40 h-[1px] bg-[var(--color-primary)] mx-auto mb-6"></div>
-                    <div className="mb-2 text-base uppercase tracking-[0.4em] text-[var(--color-primary)]">
+                    <div className="relative inline-block mb-2 text-base uppercase tracking-[0.4em] text-[var(--color-primary)] font-semibold z-10">
                       {slide.title}
+                      <div className="absolute inset-0 filter blur-[4px] bg-black/25 -z-10" style={{ clipPath: 'inset(0 -4px -4px -4px round 6px)' }}></div>
                     </div>
-                    <div className="text-lg text-white/90 tracking-wide font-light italic">
+                    <div className="relative inline-block text-lg text-white tracking-wide font-light italic z-10">
                       {slide.subtitle}
+                      <div className="absolute inset-0 filter blur-[4px] bg-black/20 -z-10" style={{ clipPath: 'inset(0 -4px -4px -4px round 6px)' }}></div>
                     </div>
                     <div className="w-40 h-[1px] bg-[var(--color-primary)] mx-auto mt-6"></div>
                   </div>
                   
-                  <h1 className="text-5xl md:text-7xl lg:text-8xl font-[var(--font-display)] font-light mb-12 leading-tight text-white animate-delay-200">
+                  <h1 className="relative inline-block text-5xl md:text-7xl lg:text-8xl font-[var(--font-display)] font-light mb-12 leading-tight text-white z-10">
                     El <span className="font-semibold text-[var(--color-primary)]">Arte de Celebrar</span><br />Momentos Inolvidables
                   </h1>
+                  <div className="absolute inset-0 filter blur-[8px] bg-black/20 -z-10" style={{ clipPath: 'inset(0 -12px -12px -12px round 16px)' }}></div>
                   
-                  <p className="text-xl md:text-2xl font-[var(--font-display)] font-light mb-16 max-w-2xl mx-auto text-gray-100 animate-delay-300">
+                  <p className="relative inline-block text-xl md:text-2xl font-[var(--font-display)] font-light mb-16 max-w-2xl mx-auto text-white z-10">
                     Donde cada evento se convierte en un recuerdo eterno envuelto en la más exquisita elegancia.
                   </p>
+                  <div className="absolute inset-0 filter blur-[6px] bg-black/15 -z-10" style={{ clipPath: 'inset(0 -8px -8px -8px round 10px)' }}></div>
                   
                   <div className="flex justify-center space-x-8 animate-delay-400">
                     <Link 

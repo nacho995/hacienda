@@ -127,7 +127,7 @@ export default function ContactPage() {
       {/* Hero de la página de contacto */}
       <section className="relative h-[100vh] overflow-hidden">
         <Image
-          src="/images/contacto-header.jpg" 
+          src="/imagenintro.JPG" 
           alt="Contáctanos para tu evento especial"
           fill
           className="object-cover image-zoom"

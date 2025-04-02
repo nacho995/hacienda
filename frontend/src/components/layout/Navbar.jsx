@@ -103,7 +103,7 @@ export default function Navbar() {
       <nav className={`fixed top-0 w-full transition-all duration-500 z-50 ${
         isScrolled 
           ? 'py-3 bg-white/95 backdrop-blur-sm shadow-lg' 
-          : 'py-5 bg-transparent mt-10'
+          : 'py-5 bg-black/20 backdrop-blur-sm mt-10'
       }`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
@@ -116,7 +116,7 @@ export default function Navbar() {
                   className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
                     isScrolled 
                       ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
-                      : 'text-white hover:text-[var(--color-primary)]'
+                      : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-[var(--color-primary)]'
                   }`}
                 >
                   {link.label}
@@ -127,61 +127,153 @@ export default function Navbar() {
             {/* Logo y sello (centrado) */}
             <div className="flex-shrink-0 relative mx-4">
               {/* Sello decorativo en lugar del logo */}
-              <div className="relative h-20 w-44 flex items-center justify-center">
+              <div className="relative h-20 w-40 flex items-center justify-center">
                 {/* Dos capas - externa rotativa e interna estática */}
-                <div className="relative w-44 h-44">
+                <div className="relative w-48 h-48 scale-[0.55]">
                   {/* Capa externa rotativa - solo el sello circular */}
                   <div 
                     ref={decorativeElementRef}
                     className="absolute inset-0 transition-transform duration-700"
                   >
                     <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full filter drop-shadow-lg">
-                      {/* Sello circular base */}
+                      {/* Anillo de compromiso con diamante */}
                       <defs>
-                        <radialGradient id="selloBg" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                          <stop offset="0%" stopColor="#800020" stopOpacity="0.05" />
-                          <stop offset="70%" stopColor="#800020" stopOpacity="0.1" />
-                          <stop offset="100%" stopColor="#800020" stopOpacity="0.15" />
+                        <radialGradient id="ringGold" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                          <stop offset="70%" stopColor="#D4AF37" stopOpacity="0.8" />
+                          <stop offset="95%" stopColor="#FFD700" stopOpacity="0.9" />
+                          <stop offset="100%" stopColor="#FFEC8B" stopOpacity="1" />
                         </radialGradient>
-                        <filter id="paperTexture" x="-50%" y="-50%" width="200%" height="200%">
-                          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise" />
-                          <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" />
+                        <radialGradient id="diamond" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+                          <stop offset="50%" stopColor="#F0F8FF" stopOpacity="0.95" />
+                          <stop offset="80%" stopColor="#E6E8FA" stopOpacity="0.9" />
+                          <stop offset="100%" stopColor="#B9D3EE" stopOpacity="0.85" />
+                        </radialGradient>
+                        <linearGradient id="diamondHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+                          <stop offset="100%" stopColor="#F0F8FF" stopOpacity="0.3" />
+                        </linearGradient>
+                        <filter id="diamondSparkle">
+                          <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" result="noise" />
+                          <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" />
+                          <feGaussianBlur stdDeviation="1" />
+                        </filter>
+                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                          <feGaussianBlur stdDeviation="4" result="blur" />
+                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                        <filter id="intense-glow" x="-30%" y="-30%" width="160%" height="160%">
+                          <feGaussianBlur stdDeviation="8" result="blur" />
+                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                          <feComponentTransfer>
+                            <feFuncA type="linear" slope="2" />
+                          </feComponentTransfer>
+                        </filter>
+                        <filter id="super-glow" x="-50%" y="-50%" width="200%" height="200%">
+                          <feGaussianBlur stdDeviation="10" result="blur" />
+                          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                          <feComponentTransfer>
+                            <feFuncA type="linear" slope="2.5" />
+                          </feComponentTransfer>
                         </filter>
                       </defs>
                       
-                      {/* Círculo base del sello */}
-                      <circle cx="250" cy="250" r="240" fill="url(#selloBg)" filter="url(#paperTexture)" />
-                      <circle cx="250" cy="250" r="240" fill="none" stroke="#800020" strokeWidth="5" strokeDasharray="5,10" opacity="0.5" />
-                      <circle cx="250" cy="250" r="220" fill="none" stroke="#800020" strokeWidth="2" opacity="0.4" />
+                      {/* Base circular del anillo */}
+                      <circle cx="250" cy="250" r="220" fill="none" stroke="url(#ringGold)" strokeWidth="24" opacity="0.9" />
+                      <circle cx="250" cy="250" r="240" fill="none" stroke="#D4AF37" strokeWidth="3" strokeDasharray="2,4" opacity="0.5" />
+                      <circle cx="250" cy="250" r="210" fill="none" stroke="#D4AF37" strokeWidth="2" opacity="0.6" />
                       
-                      {/* Bordes del sello dentados */}
-                      {Array.from({ length: 40 }).map((_, i) => {
-                        const angle = (i * 9) * Math.PI / 180;
-                        const r1 = 240;
-                        const r2 = 260;
-                        const x1 = 250 + r1 * Math.cos(angle);
-                        const y1 = 250 + r1 * Math.sin(angle);
-                        const x2 = 250 + r2 * Math.cos(angle);
-                        const y2 = 250 + r2 * Math.sin(angle);
-                        return (
-                          <line 
+                      {/* Detalles del anillo - pequeñas gemas */}
+                      {Array.from({ length: 24 }).map((_, i) => {
+                        if (i === 0) return null; // Espacio para el diamante principal
+                        const angle = (i * 15) * Math.PI / 180;
+                        const r1 = 232; // En el borde exterior del anillo
+                        const x1 = Math.round((250 + r1 * Math.cos(angle)) * 100) / 100;
+                        const y1 = Math.round((250 + r1 * Math.sin(angle)) * 100) / 100;
+                        // Alternar entre gemas doradas y pequeños brillantes
+                        const isGoldGem = i % 3 === 0;
+                        return isGoldGem ? (
+                          <circle 
                             key={i} 
-                            x1={x1} 
-                            y1={y1} 
-                            x2={x2} 
-                            y2={y2} 
-                            stroke="#800020" 
-                            strokeWidth="2" 
-                            opacity="0.3" 
+                            cx={x1} 
+                            cy={y1} 
+                            r="6" 
+                            fill="#FFDF00" 
+                            opacity="0.8" 
+                            filter="url(#glow)"
+                          />
+                        ) : (
+                          <circle 
+                            key={i} 
+                            cx={x1} 
+                            cy={y1} 
+                            r="4" 
+                            fill="white" 
+                            opacity="0.7" 
+                            filter="url(#glow)"
                           />
                         );
                       })}
                       
-                      {/* Texto circular alrededor del sello */}
+                      {/* Diamante principal en el borde superior */}
+                      <g transform="translate(250, 15)">
+                        {/* Base del diamante */}
+                        <circle cx="0" cy="0" r="28" fill="url(#ringGold)" stroke="#D4AF37" strokeWidth="3" />
+                        
+                        {/* Diamante con facetas */}
+                        <g filter="url(#super-glow)">
+                          {/* Forma principal */}
+                          <polygon 
+                            points="0,-48 34,0 0,48 -34,0" 
+                            fill="url(#diamond)" 
+                            stroke="#FFFFFF" 
+                            strokeWidth="1.5"
+                          />
+                          
+                          {/* Facetas - mejoran la apariencia de 3D */}
+                          <polygon 
+                            points="0,-48 15,-20 -15,-20" 
+                            fill="url(#diamondHighlight)" 
+                            opacity="0.9"
+                          />
+                          <polygon 
+                            points="0,48 15,20 -15,20" 
+                            fill="url(#diamondHighlight)" 
+                            opacity="0.7"
+                          />
+                          <polygon 
+                            points="34,0 15,20 15,-20" 
+                            fill="url(#diamondHighlight)" 
+                            opacity="0.8"
+                          />
+                          <polygon 
+                            points="-34,0 -15,20 -15,-20" 
+                            fill="url(#diamondHighlight)" 
+                            opacity="0.8"
+                          />
+                          
+                          {/* Brillo central */}
+                          <polygon 
+                            points="-15,-25 15,-25 0,15" 
+                            fill="white" 
+                            opacity="0.9"
+                          />
+                        </g>
+                        
+                        {/* Destellos adicionales */}
+                        <circle cx="-22" cy="-22" r="4" fill="white" opacity="0.9" filter="url(#intense-glow)" />
+                        <circle cx="22" cy="-22" r="4" fill="white" opacity="0.9" filter="url(#intense-glow)" />
+                        <circle cx="0" cy="-40" r="3" fill="white" opacity="0.9" filter="url(#intense-glow)" />
+                        <circle cx="-18" cy="18" r="3" fill="white" opacity="0.8" filter="url(#glow)" />
+                        <circle cx="18" cy="18" r="3" fill="white" opacity="0.8" filter="url(#glow)" />
+                        <circle cx="0" cy="0" r="6" fill="white" opacity="0.7" filter="url(#glow)" />
+                      </g>
+                      
+                      {/* Texto circular alrededor del anillo */}
                       <path id="textCircle" d="M 250,100 A 150,150 0 0 1 250,400 A 150,150 0 0 1 250,100" fill="none" />
                       <text>
-                        <textPath xlinkHref="#textCircle" startOffset="0%" textAnchor="middle" className="text-xs tracking-widest font-serif" fill="#800020" opacity="0.7">
-                          • HACIENDA SAN CARLOS • BODAS • EVENTOS •
+                        <textPath xlinkHref="#textCircle" startOffset="0%" textAnchor="middle" className="text-xs tracking-widest font-serif" fill="#D4AF37" opacity="0.9">
+                          • HACIENDA SAN CARLOS BORROMEO • BODAS • EVENTOS •
                         </textPath>
                       </text>
                     </svg>
@@ -191,16 +283,19 @@ export default function Navbar() {
                   <div className="absolute inset-0 pointer-events-none">
                     {/* Texto central estático */}
                     <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                      <text x="250" y="240" textAnchor="middle" fontFamily="serif" fontSize="24" fill="#800020" fontWeight="normal" letterSpacing="2" opacity="0.8">
+                      <text x="250" y="250" textAnchor="middle" fontFamily="serif" fontSize="48" fill="#D4AF37" fontWeight="bold" letterSpacing="1" opacity="1" filter="url(#textShadow)">
                         HACIENDA
                       </text>
-                      <text x="250" y="270" textAnchor="middle" fontFamily="serif" fontSize="18" fill="#800020" fontWeight="normal" letterSpacing="3" opacity="0.7">
+                      <text x="250" y="310" textAnchor="middle" fontFamily="serif" fontSize="38" fill="#D4AF37" fontWeight="bold" letterSpacing="1" opacity="1" filter="url(#textShadow)">
                         SAN CARLOS
+                      </text>
+                      <text x="250" y="350" textAnchor="middle" fontFamily="serif" fontSize="30" fill="#D4AF37" fontWeight="bold" letterSpacing="1" opacity="1" filter="url(#textShadow)">
+                        BORROMEO
                       </text>
                     </svg>
                     
-                    {/* Páginas de invitación estáticas */}
-                    <div className="absolute inset-0 overflow-hidden">
+                    {/* Páginas de invitación estáticas - ocultas para el diseño de anillo */}
+                    <div className="absolute inset-0 overflow-hidden opacity-0">
                       {Array.from({ length: 4 }).map((_, index) => (
                         <div 
                           key={index} 
@@ -290,8 +385,8 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Navegación derecha y botones */}
-            <div className="hidden lg:flex flex-1 items-center justify-start space-x-8">
+            {/* Logo y navegación derecha */}
+            <div className="hidden lg:flex flex-1 items-center space-x-8">
               {navLinks.slice(3).map((link) => (
                 <Link
                   key={link.href}
@@ -299,7 +394,7 @@ export default function Navbar() {
                   className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
                     isScrolled 
                       ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
-                      : 'text-white hover:text-[var(--color-primary)]'
+                      : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-[var(--color-primary)]'
                   }`}
                 >
                   {link.label}
@@ -312,7 +407,7 @@ export default function Navbar() {
                 className={`transition-colors duration-300 ${
                   isScrolled 
                     ? 'text-[var(--color-accent)]' 
-                    : 'text-white'
+                    : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
                 }`}
               >
                 <FaSearch />
@@ -322,7 +417,7 @@ export default function Navbar() {
               <Link
                 href="/reservar"
                 className={`flex items-center space-x-2 bg-[var(--color-primary)] text-white px-6 py-3 transition-all duration-300 hover:bg-[var(--color-primary-dark)] shadow-lg transform hover:scale-105 ${
-                  isScrolled ? 'opacity-100' : 'opacity-95'
+                  isScrolled ? 'opacity-100' : 'opacity-95 shadow-[0_4px_8px_rgba(0,0,0,0.3)]'
                 }`}
               >
                 <FaCalendarAlt className="mr-1" />
@@ -338,9 +433,9 @@ export default function Navbar() {
                 aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
               >
                 {isMobileMenuOpen ? (
-                  <FaTimes className="text-white" />
+                  <FaTimes className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
                 ) : (
-                  <FaBars className={isScrolled ? 'text-[var(--color-accent)]' : 'text-white'} />
+                  <FaBars className={isScrolled ? 'text-[var(--color-accent)]' : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'} />
                 )}
               </button>
             </div>
@@ -369,58 +464,46 @@ export default function Navbar() {
       </div>
 
       {/* Menú móvil */}
-      <div 
-        className={`fixed inset-0 bg-[var(--color-accent)] z-40 transition-transform duration-500 lg:hidden ${
-          isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="h-full flex flex-col justify-center items-center px-6">
-          <div className="mb-12">
-            <Image 
-              src="/images/logo.svg"
-              alt="Hacienda San Carlos"
-              width={160}
-              height={60}
-            />
-          </div>
-          
-          <div className="flex flex-col space-y-6 text-center">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={getNavHref(link.href, link.isPage)}
-                className="text-white text-xl uppercase tracking-[0.2em] hover:text-[var(--color-primary)] transition-colors py-2 border-b border-[var(--color-primary)]/20"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
+      <div className={`fixed inset-0 z-40 bg-[var(--color-accent)]/95 backdrop-blur-md overflow-y-auto transition-transform duration-500 transform ${
+        isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        <div className="container mx-auto p-6 pt-20">
+          <div className="mt-8">
+            <ul className="space-y-6 text-center font-[var(--font-display)]">
+              {navLinks.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={getNavHref(link.href, link.isPage)}
+                    className="text-2xl text-white font-light tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] hover:text-[var(--color-primary)] transition-colors duration-300"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
             
             {/* Botón destacado de reservar en el menú móvil */}
-            <Link
-              href="/reservar"
-              className="mt-8 flex items-center justify-center space-x-2 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors px-8 py-4 uppercase tracking-[0.2em] font-semibold"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              <FaCalendarAlt className="mr-2" />
-              <span>Reservar Evento</span>
-            </Link>
-          </div>
-          
-          <div className="mt-16 flex flex-col items-center space-y-4 text-white/70">
-            <div className="flex items-center space-x-2">
-              <FaPhoneAlt className="h-4 w-4 text-[var(--color-primary)]" />
-              <span>+52 (777) 123-4567</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <FaRegEnvelope className="h-4 w-4 text-[var(--color-primary)]" />
-              <span>info@haciendasancarlos.com</span>
+            <div className="mt-12 text-center">
+              <Link
+                href="/reservar"
+                className="inline-flex items-center justify-center space-x-2 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors px-8 py-4 uppercase tracking-wider font-semibold shadow-[0_4px_8px_rgba(0,0,0,0.3)]"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <FaCalendarAlt className="mr-2" />
+                <span>Reservar Evento</span>
+              </Link>
             </div>
             
-            <div className="flex items-center space-x-4 mt-4 pt-4 border-t border-white/20">
-              <a href="#" className="text-sm hover:text-white transition-colors">Facebook</a>
-              <a href="#" className="text-sm hover:text-white transition-colors">Instagram</a>
-              <a href="#" className="text-sm hover:text-white transition-colors">Pinterest</a>
+            <div className="mt-12 flex flex-col items-center space-y-4 text-white">
+              <div className="flex items-center space-x-2">
+                <FaPhoneAlt className="h-4 w-4 text-[var(--color-primary)]" />
+                <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">+52 (777) 123-4567</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <FaRegEnvelope className="h-4 w-4 text-[var(--color-primary)]" />
+                <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">info@haciendasancarlos.com</span>
+              </div>
             </div>
           </div>
         </div>

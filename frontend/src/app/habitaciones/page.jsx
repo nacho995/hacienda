@@ -167,15 +167,23 @@ export default function HabitacionesPage() {
   return (
     <main>
       {/* Sección Hero */}
-      <section className="relative h-[60vh] overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/images/placeholder/room-hero.jpg.svg')] bg-cover bg-center"></div>
-        {/* Actualizamos el overlay con un degradado de arriba hacia abajo para mejorar visibilidad del navbar */}
+      <section className="relative h-[70vh] overflow-hidden">
+        <div 
+          className="absolute inset-0 bg-[url('/habitacion.JPG')] bg-cover bg-center"
+          style={{
+            transform: `translateY(${scrollY * 0.15}px)`,
+            transition: 'transform 0.3s ease-out',
+            height: '120%',
+            top: '-10%'
+          }}
+        ></div>
+        {/* Overlay con degradado para mejorar visibilidad */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/60 z-10"></div>
         
-        {/* Elemento decorativo central con efecto de parallax */}
+        {/* Elemento decorativo desplazado hacia la izquierda con efecto de parallax */}
         <div 
           ref={decorativeElementRef}
-          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none"
+          className="absolute top-[60%] left-[20%] transform -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none"
           style={{ 
             width: '380px', 
             height: '380px',
@@ -220,7 +228,7 @@ export default function HabitacionesPage() {
             <path d="M250,140 L250,380" stroke="#800020" strokeWidth="1" fill="none" 
                   strokeDasharray="5,5" opacity="0.7" />
             
-            {/* Texto elegante - "EVENTOS" */}
+            {/* Texto elegante - "EVENTOS" - Centrado en el elemento */}
             <g transform="translate(250, 250)" className="events-text">
               <text textAnchor="middle" fontFamily="serif" fontSize="26" fill="#FFFAF0" fontWeight="light" opacity="0.9" letterSpacing="5">
                 EVENTOS
@@ -242,7 +250,7 @@ export default function HabitacionesPage() {
           </svg>
         </div>
         
-        <div className="relative z-20 container-custom h-full flex flex-col justify-center items-center text-center text-white">
+        <div className="relative z-20 container-custom h-full flex flex-col justify-end items-center text-center text-white pb-32">
           <h1 className="font-[var(--font-display)] text-5xl md:text-6xl mb-6 elegant-reveal">
             Nuestras Habitaciones
           </h1>
