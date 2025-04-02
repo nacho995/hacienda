@@ -37,4 +37,9 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.tsfrontend/public/ESPACIOS-HACIENDA-SAN-CARLOS.mp4
+next-env.d.ts
+
+# Archivos grandes de video que exceden el límite de GitHub
+frontend/public/ESPACIOS-HACIENDA-SAN-CARLOS.mp4
+backend/uploads/
+backend/video-info.json

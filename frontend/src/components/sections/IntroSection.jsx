@@ -2,10 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { GiCastle } from 'react-icons/gi';
-import { FaHeart, FaGift, FaPlayCircle, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaQuoteLeft } from 'react-icons/fa';
+import { FaHeart, FaGift, FaPlayCircle, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaQuoteLeft, FaChevronDown } from 'react-icons/fa';
 import { MdReplay10, MdForward10 } from 'react-icons/md';
+import CloudinaryVideo from '../utils/CloudinaryVideo';
 
 export default function IntroSection() {
+  const [isVisible, setIsVisible] = useState(false);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const sectionRef = useRef(null);
+  const videoRef = useRef(null);
+  const videoContainerRef = useRef(null);
+  
+  // Estado para video y controles
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isIntersecting, setIsIntersecting] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -13,8 +21,9 @@ export default function IntroSection() {
   const [showControls, setShowControls] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const videoRef = useRef(null);
-  const sectionRef = useRef(null);
+  
+  // Video ID de Cloudinary (se actualizará una vez subido el video)
+  const videoPublicId = 'hacienda-videos/ESPACIOS-HACIENDA-SAN-CARLOS'; // Esto se actualizará con el ID real después de subir
   
   useEffect(() => {
     if (!videoRef.current) return;
@@ -151,16 +160,35 @@ export default function IntroSection() {
         <div className="my-20 fade-in animate-delay-200">
           <div 
             className="relative overflow-hidden rounded-lg shadow-2xl aspect-video"
+            ref={videoContainerRef}
             onMouseEnter={() => setShowControls(true)}
             onMouseLeave={() => !isVideoPlaying && setShowControls(false)}
           >
-            <video 
-              ref={videoRef} 
-              src="/ESPACIOS-HACIENDA-SAN-CARLOS.mp4" 
-              className="w-full h-full object-cover"
-              playsInline
+            <CloudinaryVideo
+              ref={videoRef}
+              publicId={videoPublicId}
+              className="w-full h-full"
               muted={isMuted}
-              loop
+              loop={true}
+              onTimeUpdate={() => {
+                if (videoRef.current) {
+                  setCurrentTime(videoRef.current.currentTime);
+                }
+              }}
+              onLoadedMetadata={() => {
+                if (videoRef.current) {
+                  setDuration(videoRef.current.duration);
+                  setVideoLoaded(true);
+                }
+              }}
+              onPlay={() => setIsVideoPlaying(true)}
+              onPause={() => setIsVideoPlaying(false)}
+              onVolumeChange={() => {
+                if (videoRef.current) {
+                  setVolume(videoRef.current.volume);
+                  setIsMuted(videoRef.current.muted);
+                }
+              }}
             />
             
             {/* Overlay con botón principal de play/pause */}
