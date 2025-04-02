@@ -33,3 +33,6 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Archivos grandes
+frontend/public/ESPACIOS-HACIENDA-SAN-CARLOS.mp4
