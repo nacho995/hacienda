@@ -43,3 +43,42 @@ next-env.d.ts
 frontend/public/ESPACIOS-HACIENDA-SAN-CARLOS.mp4
 backend/uploads/
 backend/video-info.json
+
+# Dependencias y directorios de compilación
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Testing
+/coverage
+
+# Next.js
+/.next/
+/out/
+
+# Producción
+/build
+
+# Misceláneos
+.DS_Store
+*.pem
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variables de entorno locales
+.env*.local
+.env
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Archivos grandes
+frontend/public/ESPACIOS-HACIENDA-SAN-CARLOS.mp4
