@@ -13,8 +13,12 @@ const videoPath = path.join(__dirname, '../frontend/public/ESPACIOS-HACIENDA-SAN
 // Verificar que el archivo existe
 if (!fs.existsSync(videoPath)) {
   console.error('Error: El archivo de video no existe en la ruta especificada.');
+  console.error('Ruta verificada:', videoPath);
   process.exit(1);
 }
+
+console.log('Archivo de video encontrado:', videoPath);
+console.log('Tamaño del archivo:', (fs.statSync(videoPath).size / (1024 * 1024)).toFixed(2), 'MB');
 
 // Crear el FormData
 const formData = new FormData();
@@ -27,6 +31,7 @@ async function uploadVideo() {
   try {
     console.log('Iniciando la subida del video a Cloudinary...');
     console.log('Este proceso puede tardar varios minutos dependiendo del tamaño del archivo y tu conexión a Internet.');
+    console.log('API URL:', apiUrl);
     
     const response = await axios.post(apiUrl, formData, {
       headers: {
@@ -50,7 +55,21 @@ async function uploadVideo() {
     
     return response.data;
   } catch (error) {
-    console.error('Error al subir el video:', error.response?.data || error.message);
+    console.error('Error al subir el video:');
+    console.error(error);
+    
+    if (error.response) {
+      console.error('Respuesta del servidor:', error.response.data);
+      console.error('Código de estado:', error.response.status);
+    } else if (error.request) {
+      console.error('No se recibió respuesta del servidor');
+      console.error('¿Está el servidor en ejecución en el puerto 5000?');
+    } else {
+      console.error('Error de configuración de la solicitud:', error.message);
+    }
+    
+    console.error('URL del API:', apiUrl);
+    console.error('Comprueba que las credenciales de Cloudinary sean correctas en el archivo .env');
     process.exit(1);
   }
 }

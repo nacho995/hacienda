@@ -4,57 +4,24 @@ import { useEffect, useRef, useState } from 'react';
 import { GiCastle } from 'react-icons/gi';
 import { FaHeart, FaGift, FaPlayCircle, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaQuoteLeft, FaChevronDown } from 'react-icons/fa';
 import { MdReplay10, MdForward10 } from 'react-icons/md';
-import CloudinaryVideo from '../utils/CloudinaryVideo';
 
 export default function IntroSection() {
   const [isVisible, setIsVisible] = useState(false);
-  const [videoLoaded, setVideoLoaded] = useState(false);
   const sectionRef = useRef(null);
-  const videoRef = useRef(null);
   const videoContainerRef = useRef(null);
   
+  // ID del video de YouTube
+  const youtubeVideoId = 'bKKyopab1C4';
+  
   // Estado para video y controles
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [isIntersecting, setIsIntersecting] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [volume, setVolume] = useState(0.5);
   const [showControls, setShowControls] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  
-  // Video ID de Cloudinary (se actualizará una vez subido el video)
-  const videoPublicId = 'hacienda-videos/ESPACIOS-HACIENDA-SAN-CARLOS'; // Esto se actualizará con el ID real después de subir
-  
-  useEffect(() => {
-    if (!videoRef.current) return;
-    
-    if (isVideoPlaying) {
-      videoRef.current.play();
-    } else {
-      videoRef.current.pause();
-    }
-  }, [isVideoPlaying]);
-  
-  useEffect(() => {
-    if (!videoRef.current) return;
-    videoRef.current.muted = isMuted;
-    if (!isMuted) {
-      videoRef.current.volume = volume;
-    }
-  }, [isMuted, volume]);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         const [entry] = entries;
-        setIsIntersecting(entry.isIntersecting);
-        
-        // Auto-play video when in view
-        if (entry.isIntersecting && videoRef.current) {
-          setIsVideoPlaying(true);
-        } else {
-          setIsVideoPlaying(false);
-        }
+        setIsVisible(entry.isIntersecting);
       },
       { threshold: 0.3 }
     );
@@ -69,79 +36,6 @@ export default function IntroSection() {
       }
     };
   }, []);
-  
-  // Actualizar tiempo actual del video
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    
-    const updateTime = () => {
-      setCurrentTime(video.currentTime);
-      setDuration(video.duration);
-    };
-    
-    video.addEventListener('timeupdate', updateTime);
-    video.addEventListener('loadedmetadata', updateTime);
-    
-    return () => {
-      video.removeEventListener('timeupdate', updateTime);
-      video.removeEventListener('loadedmetadata', updateTime);
-    };
-  }, []);
-  
-  // Funciones para controlar el video
-  const togglePlay = () => setIsVideoPlaying(!isVideoPlaying);
-  const toggleMute = () => setIsMuted(!isMuted);
-  
-  const handleVolumeChange = (e) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    if (newVolume === 0) {
-      setIsMuted(true);
-    } else if (isMuted) {
-      setIsMuted(false);
-    }
-  };
-  
-  const handleSeek = (e) => {
-    const time = parseFloat(e.target.value);
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
-    }
-  };
-  
-  const forward10Seconds = () => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = Math.min(videoRef.current.currentTime + 10, videoRef.current.duration);
-    }
-  };
-  
-  const rewind10Seconds = () => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = Math.max(videoRef.current.currentTime - 10, 0);
-    }
-  };
-  
-  const handleFullscreen = () => {
-    if (videoRef.current) {
-      if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen();
-      } else if (videoRef.current.webkitRequestFullscreen) {
-        videoRef.current.webkitRequestFullscreen();
-      } else if (videoRef.current.msRequestFullscreen) {
-        videoRef.current.msRequestFullscreen();
-      }
-    }
-  };
-  
-  // Formatear tiempo de video (segundos -> MM:SS)
-  const formatTime = (time) => {
-    if (isNaN(time)) return '00:00';
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
 
   return (
     <section ref={sectionRef} id="intro" className="section-padding bg-[var(--color-cream-light)]">
@@ -156,140 +50,22 @@ export default function IntroSection() {
           </p>
         </div>
         
-        {/* Video presentación mejorado con controles completos */}
+        {/* Video de YouTube */}
         <div className="my-20 fade-in animate-delay-200">
           <div 
             className="relative overflow-hidden rounded-lg shadow-2xl aspect-video"
             ref={videoContainerRef}
-            onMouseEnter={() => setShowControls(true)}
-            onMouseLeave={() => !isVideoPlaying && setShowControls(false)}
           >
-            <CloudinaryVideo
-              ref={videoRef}
-              publicId={videoPublicId}
-              className="w-full h-full"
-              muted={isMuted}
-              loop={true}
-              onTimeUpdate={() => {
-                if (videoRef.current) {
-                  setCurrentTime(videoRef.current.currentTime);
-                }
-              }}
-              onLoadedMetadata={() => {
-                if (videoRef.current) {
-                  setDuration(videoRef.current.duration);
-                  setVideoLoaded(true);
-                }
-              }}
-              onPlay={() => setIsVideoPlaying(true)}
-              onPause={() => setIsVideoPlaying(false)}
-              onVolumeChange={() => {
-                if (videoRef.current) {
-                  setVolume(videoRef.current.volume);
-                  setIsMuted(videoRef.current.muted);
-                }
-              }}
-            />
-            
-            {/* Overlay con botón principal de play/pause */}
-            <button 
-              onClick={togglePlay}
-              className={`absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity duration-300 ${isVideoPlaying && !showControls ? 'opacity-0' : 'opacity-100'}`}
-              aria-label={isVideoPlaying ? 'Pausar video' : 'Reproducir video'}
-            >
-              {isVideoPlaying ? (
-                <FaPause className="text-white text-4xl md:text-6xl drop-shadow-lg" />
-              ) : (
-                <FaPlayCircle className="text-white text-4xl md:text-6xl animate-pulse drop-shadow-lg" />
-              )}
-            </button>
-            
-            {/* Barra de controles avanzados */}
-            <div 
-              className={`absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 flex flex-col gap-2 ${showControls || !isVideoPlaying ? 'opacity-100' : 'opacity-0'}`}
-            >
-              {/* Barra de progreso */}
-              <div className="flex items-center gap-2 text-white">
-                <span className="text-xs font-medium">{formatTime(currentTime)}</span>
-                <input 
-                  type="range"
-                  min="0"
-                  max={duration || 100}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  className="w-full h-1.5 bg-white/30 rounded-full appearance-none cursor-pointer accent-[var(--color-primary)]"
-                />
-                <span className="text-xs font-medium">{formatTime(duration)}</span>
-              </div>
-              
-              {/* Controles de reproducción y volumen */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={rewind10Seconds}
-                    className="text-white hover:text-[var(--color-primary)] transition-colors"
-                    aria-label="Retroceder 10 segundos"
-                  >
-                    <MdReplay10 className="w-6 h-6" />
-                  </button>
-                  
-                  <button 
-                    onClick={togglePlay}
-                    className="text-white hover:text-[var(--color-primary)] transition-colors"
-                    aria-label={isVideoPlaying ? 'Pausar' : 'Reproducir'}
-                  >
-                    {isVideoPlaying ? (
-                      <FaPause className="w-5 h-5" />
-                    ) : (
-                      <FaPlayCircle className="w-5 h-5" />
-                    )}
-                  </button>
-                  
-                  <button 
-                    onClick={forward10Seconds}
-                    className="text-white hover:text-[var(--color-primary)] transition-colors"
-                    aria-label="Avanzar 10 segundos"
-                  >
-                    <MdForward10 className="w-6 h-6" />
-                  </button>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={toggleMute}
-                    className="text-white hover:text-[var(--color-primary)] transition-colors"
-                    aria-label={isMuted ? 'Activar sonido' : 'Silenciar'}
-                  >
-                    {isMuted ? (
-                      <FaVolumeMute className="w-5 h-5" />
-                    ) : (
-                      <FaVolumeUp className="w-5 h-5" />
-                    )}
-                  </button>
-                  
-                  <div className="w-20 md:w-24">
-                    <input 
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={volume}
-                      onChange={handleVolumeChange}
-                      className="w-full h-1.5 bg-white/30 rounded-full appearance-none cursor-pointer accent-[var(--color-primary)]"
-                      aria-label="Control de volumen"
-                    />
-                  </div>
-                  
-                  <button 
-                    onClick={handleFullscreen}
-                    className="text-white hover:text-[var(--color-primary)] transition-colors"
-                    aria-label="Pantalla completa"
-                  >
-                    <FaExpand className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <iframe 
+              width="100%" 
+              height="100%" 
+              src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&showinfo=0&autoplay=0&mute=1`}
+              title="Hacienda San Carlos Borromeo"
+              frameBorder="0" 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+              allowFullScreen
+              className="absolute top-0 left-0 w-full h-full"
+            ></iframe>
           </div>
         </div>
         

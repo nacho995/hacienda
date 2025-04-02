@@ -408,11 +408,11 @@ export default function HeroSection() {
                     <div className="w-40 h-[1px] bg-[var(--color-primary)] mx-auto mb-6"></div>
                     <div className="relative inline-block mb-2 text-base uppercase tracking-[0.4em] text-[var(--color-primary)] font-semibold z-10">
                       {slide.title}
-                      <div className="absolute inset-0 filter blur-[4px] bg-black/25 -z-10" style={{ clipPath: 'inset(0 -4px -4px -4px round 6px)' }}></div>
+                      <div className="absolute inset-0 filter blur-[4px] bg-white/25 -z-10" style={{ clipPath: 'inset(0 -4px -4px -4px round 6px)' }}></div>
                     </div>
                     <div className="relative inline-block text-lg text-white tracking-wide font-light italic z-10">
                       {slide.subtitle}
-                      <div className="absolute inset-0 filter blur-[4px] bg-black/20 -z-10" style={{ clipPath: 'inset(0 -4px -4px -4px round 6px)' }}></div>
+                      <div className="absolute inset-0 filter blur-[4px] bg-white/20 -z-10" style={{ clipPath: 'inset(0 -4px -4px -4px round 6px)' }}></div>
                     </div>
                     <div className="w-40 h-[1px] bg-[var(--color-primary)] mx-auto mt-6"></div>
                   </div>
@@ -420,12 +420,12 @@ export default function HeroSection() {
                   <h1 className="relative inline-block text-5xl md:text-7xl lg:text-8xl font-[var(--font-display)] font-light mb-12 leading-tight text-white z-10">
                     El <span className="font-semibold text-[var(--color-primary)]">Arte de Celebrar</span><br />Momentos Inolvidables
                   </h1>
-                  <div className="absolute inset-0 filter blur-[8px] bg-black/20 -z-10" style={{ clipPath: 'inset(0 -12px -12px -12px round 16px)' }}></div>
+                  <div className="absolute inset-0 filter blur-[8px] bg-white/20 -z-10" style={{ clipPath: 'inset(0 -12px -12px -12px round 16px)' }}></div>
                   
                   <p className="relative inline-block text-xl md:text-2xl font-[var(--font-display)] font-light mb-16 max-w-2xl mx-auto text-white z-10">
                     Donde cada evento se convierte en un recuerdo eterno envuelto en la más exquisita elegancia.
                   </p>
-                  <div className="absolute inset-0 filter blur-[6px] bg-black/15 -z-10" style={{ clipPath: 'inset(0 -8px -8px -8px round 10px)' }}></div>
+                  <div className="absolute inset-0 filter blur-[6px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -8px -8px -8px round 10px)' }}></div>
                   
                   <div className="flex justify-center space-x-8 animate-delay-400">
                     <Link 
