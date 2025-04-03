@@ -1,42 +1,112 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaEdit, FaTrash, FaBed, FaBath, FaWifi, FaUsers, FaInfoCircle } from 'react-icons/fa';
 import Image from 'next/image';
+import { checkHabitacionAvailability } from '@/services/reservationService';
 
 export default function AdminRooms() {
-  const [rooms] = useState([
-    {
-      id: 1,
-      nombre: 'Suite Principal',
-      descripcion: 'Una suite espaciosa con vista panorámica a los jardines.',
-      capacidad: 2,
-      precio: '$3,500',
-      estado: 'Disponible',
-      caracteristicas: ['Cama King Size', 'Baño Privado', 'WiFi', 'Vista a Jardines'],
-      imagen: '/images/placeholder/room1.jpg.svg'
-    },
-    {
-      id: 2,
-      nombre: 'Habitación Colonial',
-      descripcion: 'Ambiente tradicional con detalles arquitectónicos coloniales.',
-      capacidad: 2,
-      precio: '$2,800',
-      estado: 'Ocupada',
-      caracteristicas: ['Cama Queen Size', 'Baño Privado', 'WiFi', 'Balcón'],
-      imagen: '/images/placeholder/room2.jpg.svg'
-    },
-    {
-      id: 3,
-      nombre: 'Suite Familiar',
-      descripcion: 'Espaciosa suite para familias con áreas separadas.',
-      capacidad: 4,
-      precio: '$4,200',
-      estado: 'Disponible',
-      caracteristicas: ['Cama King Size + Sofá Cama', '2 Baños', 'WiFi', 'Terraza'],
-      imagen: '/images/placeholder/room3.jpg.svg'
-    },
-  ]);
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        // Datos base de las habitaciones según el modelo
+        const habitacionesBase = [
+          {
+            tipo: 'Individual',
+            descripcion: 'Habitación individual cómoda y funcional.',
+            capacidad: 1,
+            precio: '$1,800',
+            caracteristicas: ['Cama Individual', 'Baño Privado', 'WiFi', 'Escritorio'],
+            imagen: '/images/placeholder/room1.jpg.svg',
+            totalDisponibles: 10
+          },
+          {
+            tipo: 'Doble',
+            descripcion: 'Habitación doble con espacio para dos personas.',
+            capacidad: 2,
+            precio: '$2,500',
+            caracteristicas: ['Cama Queen Size', 'Baño Privado', 'WiFi', 'Balcón'],
+            imagen: '/images/placeholder/room2.jpg.svg',
+            totalDisponibles: 15
+          },
+          {
+            tipo: 'Suite',
+            descripcion: 'Suite espaciosa con sala de estar separada.',
+            capacidad: 2,
+            precio: '$3,500',
+            caracteristicas: ['Cama King Size', 'Baño Privado', 'WiFi', 'Sala de Estar'],
+            imagen: '/images/placeholder/room3.jpg.svg',
+            totalDisponibles: 5
+          },
+          {
+            tipo: 'Premium',
+            descripcion: 'Nuestra mejor suite con todas las comodidades.',
+            capacidad: 4,
+            precio: '$4,200',
+            caracteristicas: ['Cama King Size + Sofá Cama', '2 Baños', 'WiFi', 'Terraza Privada'],
+            imagen: '/images/placeholder/room1.jpg.svg',
+            totalDisponibles: 3
+          }
+        ];
+
+        // Fecha actual para comprobar disponibilidad
+        const today = new Date();
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+
+        // Array para almacenar las promesas de disponibilidad
+        const availabilityPromises = habitacionesBase.map(habitacion => 
+          checkHabitacionAvailability({
+            tipoHabitacion: habitacion.tipo,
+            fechaEntrada: today.toISOString().split('T')[0],
+            fechaSalida: nextWeek.toISOString().split('T')[0],
+            numeroHabitaciones: 1
+          }).catch(err => {
+            console.error(`Error al comprobar disponibilidad para ${habitacion.tipo}:`, err);
+            // Retornamos un valor por defecto en caso de error
+            return { disponible: true, habitacionesRestantes: habitacion.totalDisponibles };
+          })
+        );
+
+        // Esperamos todas las promesas
+        const availabilityResults = await Promise.all(availabilityPromises);
+
+        // Combinamos los datos base con la información de disponibilidad
+        const roomsWithAvailability = habitacionesBase.map((habitacion, index) => {
+          const availability = availabilityResults[index] || { 
+            disponible: true, 
+            habitacionesRestantes: habitacion.totalDisponibles 
+          };
+
+          return {
+            id: index + 1,
+            nombre: habitacion.tipo,
+            descripcion: habitacion.descripcion,
+            capacidad: habitacion.capacidad,
+            precio: habitacion.precio,
+            estado: availability.disponible ? 'Disponible' : 'No disponible',
+            caracteristicas: habitacion.caracteristicas,
+            imagen: habitacion.imagen,
+            disponibles: availability.habitacionesRestantes || 0,
+            totalDisponibles: habitacion.totalDisponibles
+          };
+        });
+
+        setRooms(roomsWithAvailability);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching rooms:', error);
+        setError('No se pudieron cargar las habitaciones');
+        setLoading(false);
+      }
+    };
+
+    fetchRooms();
+  }, []);
 
   const getIconForFeature = (feature) => {
     if (feature.includes('Cama')) return FaBed;
@@ -44,6 +114,9 @@ export default function AdminRooms() {
     if (feature.includes('WiFi')) return FaWifi;
     return FaUsers;
   };
+
+  if (loading) return <div className="text-center py-10">Cargando habitaciones...</div>;
+  if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
 
   return (
     <div className="space-y-8">
@@ -138,6 +211,11 @@ export default function AdminRooms() {
                   <FaUsers className="w-4 h-4" />
                   <span>Máx. {room.capacidad} personas</span>
                 </div>
+              </div>
+              
+              {/* Disponibilidad */}
+              <div className="mt-2 text-sm text-gray-600">
+                <span>Disponibles: {room.disponibles} de {room.totalDisponibles}</span>
               </div>
             </div>
           </div>

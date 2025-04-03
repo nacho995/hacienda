@@ -3,7 +3,7 @@ import apiClient from './apiClient';
 // Servicios para reservas de habitaciones
 export const getHabitacionReservations = async () => {
   try {
-    const response = await apiClient.get('/api/reservas/habitaciones');
+    const response = await apiClient.get('/reservas/habitaciones');
     return response.data;
   } catch (error) {
     console.error('Error fetching habitacion reservations:', error);
@@ -13,7 +13,7 @@ export const getHabitacionReservations = async () => {
 
 export const getHabitacionReservation = async (id) => {
   try {
-    const response = await apiClient.get(`/api/reservas/habitaciones/${id}`);
+    const response = await apiClient.get(`/reservas/habitaciones/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching habitacion reservation ${id}:`, error);
@@ -23,7 +23,7 @@ export const getHabitacionReservation = async (id) => {
 
 export const createHabitacionReservation = async (reservationData) => {
   try {
-    const response = await apiClient.post('/api/reservas/habitaciones', reservationData);
+    const response = await apiClient.post('/reservas/habitaciones', reservationData);
     return response.data;
   } catch (error) {
     console.error('Error creating habitacion reservation:', error);
@@ -33,7 +33,7 @@ export const createHabitacionReservation = async (reservationData) => {
 
 export const updateHabitacionReservation = async (id, reservationData) => {
   try {
-    const response = await apiClient.put(`/api/reservas/habitaciones/${id}`, reservationData);
+    const response = await apiClient.put(`/reservas/habitaciones/${id}`, reservationData);
     return response.data;
   } catch (error) {
     console.error(`Error updating habitacion reservation ${id}:`, error);
@@ -43,7 +43,7 @@ export const updateHabitacionReservation = async (id, reservationData) => {
 
 export const asignarHabitacionReservation = async (id, usuarioId) => {
   try {
-    const response = await apiClient.put(`/api/reservas/habitaciones/${id}/asignar`, { usuarioId });
+    const response = await apiClient.put(`/reservas/habitaciones/${id}/asignar`, { usuarioId });
     return response.data;
   } catch (error) {
     console.error(`Error asignando habitacion reservation ${id}:`, error);
@@ -54,7 +54,7 @@ export const asignarHabitacionReservation = async (id, usuarioId) => {
 // Servicios para reservas de eventos
 export const getEventoReservations = async () => {
   try {
-    const response = await apiClient.get('/api/reservas/eventos');
+    const response = await apiClient.get('/reservas/eventos');
     return response.data;
   } catch (error) {
     console.error('Error fetching evento reservations:', error);
@@ -64,7 +64,7 @@ export const getEventoReservations = async () => {
 
 export const getEventoReservation = async (id) => {
   try {
-    const response = await apiClient.get(`/api/reservas/eventos/${id}`);
+    const response = await apiClient.get(`/reservas/eventos/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching evento reservation ${id}:`, error);
@@ -74,7 +74,7 @@ export const getEventoReservation = async (id) => {
 
 export const createEventoReservation = async (reservationData) => {
   try {
-    const response = await apiClient.post('/api/reservas/eventos', reservationData);
+    const response = await apiClient.post('/reservas/eventos', reservationData);
     return response.data;
   } catch (error) {
     console.error('Error creating evento reservation:', error);
@@ -84,7 +84,7 @@ export const createEventoReservation = async (reservationData) => {
 
 export const updateEventoReservation = async (id, reservationData) => {
   try {
-    const response = await apiClient.put(`/api/reservas/eventos/${id}`, reservationData);
+    const response = await apiClient.put(`/reservas/eventos/${id}`, reservationData);
     return response.data;
   } catch (error) {
     console.error(`Error updating evento reservation ${id}:`, error);
@@ -94,7 +94,7 @@ export const updateEventoReservation = async (id, reservationData) => {
 
 export const asignarEventoReservation = async (id, usuarioId) => {
   try {
-    const response = await apiClient.put(`/api/reservas/eventos/${id}/asignar`, { usuarioId });
+    const response = await apiClient.put(`/reservas/eventos/${id}/asignar`, { usuarioId });
     return response.data;
   } catch (error) {
     console.error(`Error asignando evento reservation ${id}:`, error);
@@ -105,7 +105,7 @@ export const asignarEventoReservation = async (id, usuarioId) => {
 // Servicios para reservas de masajes
 export const getMasajeReservations = async () => {
   try {
-    const response = await apiClient.get('/api/reservas/masajes');
+    const response = await apiClient.get('/reservas/masajes');
     return response.data;
   } catch (error) {
     console.error('Error fetching masaje reservations:', error);
@@ -115,7 +115,7 @@ export const getMasajeReservations = async () => {
 
 export const getMasajeReservation = async (id) => {
   try {
-    const response = await apiClient.get(`/api/reservas/masajes/${id}`);
+    const response = await apiClient.get(`/reservas/masajes/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching masaje reservation ${id}:`, error);
@@ -125,7 +125,7 @@ export const getMasajeReservation = async (id) => {
 
 export const createMasajeReservation = async (reservationData) => {
   try {
-    const response = await apiClient.post('/api/reservas/masajes', reservationData);
+    const response = await apiClient.post('/reservas/masajes', reservationData);
     return response.data;
   } catch (error) {
     console.error('Error creating masaje reservation:', error);
@@ -135,7 +135,7 @@ export const createMasajeReservation = async (reservationData) => {
 
 export const updateMasajeReservation = async (id, reservationData) => {
   try {
-    const response = await apiClient.put(`/api/reservas/masajes/${id}`, reservationData);
+    const response = await apiClient.put(`/reservas/masajes/${id}`, reservationData);
     return response.data;
   } catch (error) {
     console.error(`Error updating masaje reservation ${id}:`, error);
@@ -145,7 +145,7 @@ export const updateMasajeReservation = async (id, reservationData) => {
 
 export const asignarMasajeReservation = async (id, usuarioId) => {
   try {
-    const response = await apiClient.put(`/api/reservas/masajes/${id}/asignar`, { usuarioId });
+    const response = await apiClient.put(`/reservas/masajes/${id}/asignar`, { usuarioId });
     return response.data;
   } catch (error) {
     console.error(`Error asignando masaje reservation ${id}:`, error);
@@ -156,7 +156,7 @@ export const asignarMasajeReservation = async (id, usuarioId) => {
 // Verificar disponibilidad
 export const checkHabitacionAvailability = async (availabilityData) => {
   try {
-    const response = await apiClient.post('/api/reservas/habitaciones/disponibilidad', availabilityData);
+    const response = await apiClient.post('/reservas/habitaciones/disponibilidad', availabilityData);
     return response.data;
   } catch (error) {
     console.error('Error checking habitacion availability:', error);
@@ -166,7 +166,7 @@ export const checkHabitacionAvailability = async (availabilityData) => {
 
 export const checkEventoAvailability = async (availabilityData) => {
   try {
-    const response = await apiClient.post('/api/reservas/eventos/disponibilidad', availabilityData);
+    const response = await apiClient.post('/reservas/eventos/disponibilidad', availabilityData);
     return response.data;
   } catch (error) {
     console.error('Error checking evento availability:', error);
@@ -176,7 +176,7 @@ export const checkEventoAvailability = async (availabilityData) => {
 
 export const checkMasajeAvailability = async (availabilityData) => {
   try {
-    const response = await apiClient.post('/api/reservas/masajes/disponibilidad', availabilityData);
+    const response = await apiClient.post('/reservas/masajes/disponibilidad', availabilityData);
     return response.data;
   } catch (error) {
     console.error('Error checking masaje availability:', error);
