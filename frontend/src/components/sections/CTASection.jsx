@@ -92,7 +92,7 @@ export default function CTASection() {
                 </div>
                 
                 <Link 
-                  href="/contacto" 
+                  href="/contact" 
                   className="group inline-flex items-center bg-[var(--color-primary)] text-white px-8 py-4 uppercase tracking-wider text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors duration-300"
                 >
                   <span>Reserva tu fecha</span>

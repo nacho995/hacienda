@@ -129,56 +129,147 @@ export default function ReservarPage() {
   return (
     <main className="min-h-screen bg-[var(--color-cream-light)]">
       {/* Hero section con imagen de fondo */}
-      <section className="relative h-[70vh] min-h-[500px] flex items-center justify-center">
+      <section className="relative h-[85vh] min-h-[700px] flex items-center justify-center pt-32">
         <div className="absolute inset-0 z-0">
           <Image 
-            src="/images/placeholder/gallery1.svg"
+            src="/reserve.png"
             alt="Hacienda San Carlos - Reservaciones"
             fill
-            className="object-cover"
+            className="object-cover transform scale-[1.15] animate-ken-burns"
+            priority
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-[var(--color-accent)]/40 z-0"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[var(--color-accent)]/60 to-black/50 z-0"></div>
+        </div>
+        
+        {/* Overlay decorativo */}
+        <div className="absolute inset-0 pointer-events-none z-10">
+          <div className="absolute top-0 left-0 w-32 h-32 border-l-2 border-t-2 opacity-60" style={{ borderColor: 'var(--color-primary-30)' }}></div>
+          <div className="absolute bottom-0 right-0 w-32 h-32 border-r-2 border-b-2 opacity-60" style={{ borderColor: 'var(--color-primary-30)' }}></div>
+        </div>
+        
+        {/* Medallón decorativo */}
+        <div 
+          className="absolute top-[140px] md:top-[150px] lg:top-[180px] left-[10px] md:left-[40px] lg:left-[80px] transform z-20 pointer-events-none w-[180px] h-[180px] md:w-[220px] md:h-[220px] lg:w-[260px] lg:h-[260px] hidden sm:block"
+          style={{ 
+            transition: 'transform 0.4s ease-out, opacity 0.4s ease-out'
+          }}
+        >
+          <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            {/* Definiciones para filtros */}
+            <defs>
+              <filter id="textShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="black" floodOpacity="0.8" />
+              </filter>
+            </defs>
+            
+            {/* Fondo semitransparente del medallón */}
+            <circle cx="250" cy="250" r="225" fill="rgba(0,0,0,0.3)" />
+            
+            {/* Círculos decorativos externos */}
+            <circle cx="250" cy="250" r="245" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="8,8" opacity="0.3" />
+            <circle cx="250" cy="250" r="230" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="5,5" opacity="0.4" />
+            
+            {/* Forma de medallón radiante */}
+            <path d="M250,30 
+                   C330,30 400,90 430,170
+                   C460,250 440,350 370,410
+                   C300,470 200,470 130,410
+                   C60,350 40,250 70,170
+                   C100,90 170,30 250,30 Z" 
+                fill="none" stroke="#800020" strokeWidth="2" opacity="0.5" />
+            
+            {/* Adorno medallón interno */}
+            <circle cx="250" cy="250" r="150" fill="none" stroke="#800020" strokeWidth="1" opacity="0.3" />
+            <circle cx="250" cy="250" r="120" fill="none" stroke="#800020" strokeWidth="1" strokeDasharray="3,3" opacity="0.4" />
+            
+            {/* Rayos decorativos */}
+            <line x1="250" y1="100" x2="250" y2="25" stroke="#800020" strokeWidth="1" opacity="0.5" />
+            <line x1="100" y1="250" x2="25" y2="250" stroke="#800020" strokeWidth="1" opacity="0.5" />
+            <line x1="250" y1="400" x2="250" y2="475" stroke="#800020" strokeWidth="1" opacity="0.5" />
+            <line x1="400" y1="250" x2="475" y2="250" stroke="#800020" strokeWidth="1" opacity="0.5" />
+            <line x1="175" y1="175" x2="125" y2="125" stroke="#800020" strokeWidth="1" opacity="0.5" />
+            <line x1="325" y1="175" x2="375" y2="125" stroke="#800020" strokeWidth="1" opacity="0.5" />
+            <line x1="175" y1="325" x2="125" y2="375" stroke="#800020" strokeWidth="1" opacity="0.5" />
+            <line x1="325" y1="325" x2="375" y2="375" stroke="#800020" strokeWidth="1" opacity="0.5" />
+            
+            {/* Elementos decorativos de celebración */}
+            <path d="M250,180 
+                   C270,150 310,150 310,180 
+                   C310,210 250,240 250,240 
+                   C250,240 190,210 190,180 
+                   C190,150 230,150 250,180 Z" 
+                fill="none" stroke="#800020" strokeWidth="2" opacity="0.6" />
+            
+            {/* Calendario decorativo */}
+            <rect x="200" y="270" width="100" height="90" rx="5" fill="none" stroke="#FFFAF0" strokeWidth="1.5" opacity="0.8" />
+            <line x1="220" y1="270" x2="220" y2="260" stroke="#FFFAF0" strokeWidth="1.5" opacity="0.8" />
+            <line x1="280" y1="270" x2="280" y2="260" stroke="#FFFAF0" strokeWidth="1.5" opacity="0.8" />
+            <line x1="200" y1="295" x2="300" y2="295" stroke="#FFFAF0" strokeWidth="1" opacity="0.6" />
+            <text x="250" y="330" textAnchor="middle" fontFamily="serif" fontSize="32" fill="#FFFAF0" fontWeight="bold" opacity="0.9" filter="url(#textShadow)">
+              ✓
+            </text>
+            
+            {/* Texto elegante en el centro */}
+            <g transform="translate(250, 200)">
+              <text textAnchor="middle" fontFamily="serif" fontSize="26" fill="#FFFAF0" fontWeight="light" opacity="0.95" letterSpacing="3" filter="url(#textShadow)">
+                RESERVA
+              </text>
+            </g>
+          </svg>
         </div>
         
         <div className="relative z-10 container-custom text-center text-white">
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-5xl md:text-7xl font-[var(--font-display)] mb-6 shadow-text-strong"
-          >
-            Reserve su <span className="text-[var(--color-primary)]">Evento</span>
-          </motion.h1>
+          {/* Decorador superior elegante */}
+          <div className="flex flex-col items-center mb-6 md:mb-8 animate-delay-100">
+            <div className="w-24 md:w-32 lg:w-40 h-[1px] bg-[var(--color-primary)] mx-auto mb-3"></div>
+            <div className="relative inline-block mb-2 text-sm md:text-base uppercase tracking-[0.3em] md:tracking-[0.4em] text-[var(--color-primary)] font-extrabold drop-shadow-[0_0_3px_rgba(190,150,50,0.7)] z-10">
+              Eventos Exclusivos
+              <div className="absolute inset-0 filter blur-[4px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -6px -6px -6px round 6px)' }}></div>
+            </div>
+            <div className="relative inline-block text-base md:text-lg text-white tracking-wide font-medium drop-shadow-[0_0_3px_rgba(110,70,20,0.9)] z-10">
+              Celebraciones Inolvidables
+              <div className="absolute inset-0 filter blur-[4px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -6px -8px -6px round 6px)' }}></div>
+            </div>
+            <div className="w-24 md:w-32 lg:w-40 h-[1px] bg-[var(--color-primary)] mx-auto mt-3"></div>
+          </div>
           
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
-            className="w-32 h-[1px] bg-[var(--color-primary)] mx-auto mb-8"
-          ></motion.div>
+          {/* Título principal - Reserve su Evento */}
+          <div className="relative inline-block mb-8 z-10 w-full text-center">
+            <motion.h1 
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className="text-5xl md:text-7xl font-[var(--font-display)] font-normal leading-tight tracking-tight relative px-3 md:px-4 mb-6 inline-block"
+            >
+              <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Reserve su</span> <span className="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Evento</span>
+              <div className="absolute inset-0 filter blur-[8px] bg-white/15 -z-10" style={{ clipPath: 'inset(-15px -25px -35px -25px round 16px)' }}></div>
+            </motion.h1>
+          </div>
           
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="text-xl md:text-2xl max-w-3xl mx-auto leading-relaxed mb-12 shadow-text"
-          >
-            Haga realidad su evento soñado en nuestra exclusiva hacienda. Seleccione una fecha y deje que nuestro equipo se encargue de todos los detalles.
-          </motion.p>
+          {/* Subtítulo debajo del título principal */}
+          <div className="relative inline-block text-lg sm:text-xl md:text-2xl font-[var(--font-display)] font-medium mb-12 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto z-10 tracking-wide px-4 text-center">
+            <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Haga realidad su evento soñado en nuestra exclusiva hacienda. Seleccione una fecha y deje que nuestro </span><span className="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">equipo</span><span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> se encargue de todos los detalles.</span>
+            <div className="absolute inset-0 filter blur-[6px] bg-white/15 -z-10" style={{ clipPath: 'inset(-10px -20px -25px -20px round 10px)' }}></div>
+          </div>
           
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.8 }}
+            transition={{ duration: 0.7, delay: 1.2 }}
           >
             <a 
               href="#paso-1" 
-              className="inline-block bg-[var(--color-primary)] text-white px-10 py-4 text-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors shadow-lg"
+              className="px-10 py-4 bg-[var(--color-primary)] text-white text-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors inline-block shadow-xl transform hover:scale-105 transition-transform duration-300"
             >
               Comenzar Reservación
             </a>
           </motion.div>
         </div>
+        
+        {/* Elementos decorativos */}
+        <div className="absolute top-20 left-20 w-32 h-32 border border-white/20 rounded-full animate-pulse"></div>
+        <div className="absolute bottom-32 right-20 w-48 h-48 border border-[var(--color-primary)]/30 rounded-full animate-pulse delay-1000"></div>
+        <div className="absolute top-40 right-40 w-20 h-20 border border-[var(--color-primary)]/40 rounded-full animate-pulse delay-500"></div>
       </section>
       
       {/* Sistema de reservas en pasos */}

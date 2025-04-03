@@ -101,26 +101,22 @@ const TERAPEUTAS = [
 export default function MasajesPage() {
   const [selectedMassage, setSelectedMassage] = useState(null);
   const [animateHero, setAnimateHero] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
   const heroRef = useRef(null);
   const scrollRef = useRef(null);
   
   // Efecto para animación inicial
   useEffect(() => {
     setAnimateHero(true);
-    
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
-  // Calcular opacidad para elementos parallax en función del scroll
-  const heroOpacity = Math.max(1 - scrollY * 0.002, 0);
-  const heroScale = 1 + scrollY * 0.0003;
-  const heroTranslateY = scrollY * 0.5;
+  // Configuración del efecto parallax con framer-motion
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"]
+  });
+  
+  // Transformación para el efecto parallax (solo la imagen)
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
   
   const handleScrollDown = () => {
     if (scrollRef.current) {
@@ -135,22 +131,72 @@ export default function MasajesPage() {
         ref={heroRef}
         className="relative h-screen overflow-hidden flex items-center justify-center"
       >
-        {/* Fondo con efecto parallax */}
-        <div 
-          className="absolute inset-0 z-0"
+        {/* Fondo con efecto parallax (solo la imagen) */}
+        <motion.div 
+          className="absolute inset-0 z-0 w-full h-full overflow-hidden"
           style={{ 
-            opacity: heroOpacity,
-            transform: `scale(${heroScale}) translateY(-${heroTranslateY}px)`
+            y: backgroundY
           }}
         >
           <Image
-            src="/images/placeholder/spa-hero.svg"
+            src="/bienestar.jpg"
             alt="Experiencia de bienestar en Hacienda San Carlos"
             fill
-            className="object-cover transition-transform duration-700"
+            className="object-cover transform scale-[1.15] animate-ken-burns"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/70 to-black/50"></div>
+          {/* Overlay con gradiente similar al de imagendron.jpg */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[var(--color-accent)]/60 to-black/50"></div>
+        </motion.div>
+        
+        {/* Overlay decorativo */}
+        <div className="absolute inset-0 pointer-events-none z-10">
+          <div className="absolute top-0 left-0 w-32 h-32 border-l-2 border-t-2 opacity-60" style={{ borderColor: 'var(--color-primary-30)' }}></div>
+          <div className="absolute bottom-0 right-0 w-32 h-32 border-r-2 border-b-2 opacity-60" style={{ borderColor: 'var(--color-primary-30)' }}></div>
+        </div>
+        
+        {/* Medallón decorativo - ahora con hidden sm:block */}
+        <div 
+          className="absolute top-[140px] md:top-[150px] lg:top-[180px] left-[10px] md:left-[40px] lg:left-[80px] transform z-20 pointer-events-none w-[180px] h-[180px] md:w-[220px] md:h-[220px] lg:w-[260px] lg:h-[260px] hidden sm:block"
+        >
+          <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            {/* Definiciones para filtros */}
+            <defs>
+              <filter id="textShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="black" floodOpacity="0.8" />
+              </filter>
+            </defs>
+            
+            {/* Fondo semitransparente del medallón */}
+            <circle cx="250" cy="250" r="225" fill="rgba(0,0,0,0.3)" />
+            
+            {/* Círculos decorativos externos */}
+            <circle cx="250" cy="250" r="245" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="8,8" opacity="0.3" />
+            <circle cx="250" cy="250" r="230" fill="none" stroke="#FFFAF0" strokeWidth="1" strokeDasharray="5,5" opacity="0.4" />
+            
+            {/* Forma de medallón radiante */}
+            <path d="M250,30 
+                   C330,30 400,90 430,170
+                   C460,250 440,350 370,410
+                   C300,470 200,470 130,410
+                   C60,350 40,250 70,170
+                   C100,90 170,30 250,30 Z" 
+                fill="none" stroke="#800020" strokeWidth="2" opacity="0.5" />
+            
+            {/* Adorno medallón interno */}
+            <circle cx="250" cy="250" r="150" fill="none" stroke="#800020" strokeWidth="1" opacity="0.3" />
+            <circle cx="250" cy="250" r="120" fill="none" stroke="#800020" strokeWidth="1" strokeDasharray="3,3" opacity="0.4" />
+            
+            {/* Texto elegante en el centro */}
+            <g transform="translate(250, 250)" className="events-text">
+              <text textAnchor="middle" fontFamily="serif" fontSize="30" fill="#FFFAF0" fontWeight="light" opacity="0.95" letterSpacing="4" filter="url(#textShadow)">
+                BIENESTAR
+              </text>
+              <text textAnchor="middle" fontFamily="serif" fontSize="18" fill="#FFFAF0" fontWeight="light" opacity="0.9" letterSpacing="2" y="30">
+                CUERPO Y ALMA
+              </text>
+            </g>
+          </svg>
         </div>
         
         {/* Contenido del hero */}
@@ -161,26 +207,31 @@ export default function MasajesPage() {
             transition={{ duration: 1, ease: "easeOut" }}
             className="max-w-4xl mx-auto"
           >
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-[var(--font-display)] text-white mb-6 leading-tight">
-              Santuario <span className="text-[var(--color-primary)]">de Bienestar</span>
-            </h1>
+            {/* Decorador superior elegante */}
+            <div className="flex flex-col items-center mb-4 md:mb-6 lg:mb-8 animate-delay-100 pt-0 md:pt-0 lg:pt-0">
+              <div className="w-24 md:w-32 lg:w-40 h-[1px] bg-[var(--color-primary)] mx-auto mb-3"></div>
+              <div className="relative inline-block mb-2 text-sm md:text-base uppercase tracking-[0.3em] md:tracking-[0.4em] text-[var(--color-primary)] font-extrabold drop-shadow-[0_0_3px_rgba(190,150,50,0.7)] z-10">
+                Bienestar & Armonía
+                <div className="absolute inset-0 filter blur-[4px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -6px -6px -6px round 6px)' }}></div>
+              </div>
+              <div className="relative inline-block text-base md:text-lg text-white tracking-wide font-medium drop-shadow-[0_0_3px_rgba(110,70,20,0.9)] z-10">
+                Experiencias de renovación para cuerpo y alma
+                <div className="absolute inset-0 filter blur-[4px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -6px -8px -6px round 6px)' }}></div>
+              </div>
+              <div className="w-24 md:w-32 lg:w-40 h-[1px] bg-[var(--color-primary)] mx-auto mt-3"></div>
+            </div>
             
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={animateHero ? { width: "150px" } : {}}
-              transition={{ duration: 1.5, delay: 0.5 }}
-              className="h-[2px] bg-[var(--color-primary)] mx-auto mb-10"
-            ></motion.div>
+            <div className="relative inline-block mb-4 md:mb-6 lg:mb-8 z-10">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-[var(--font-display)] font-normal leading-tight tracking-tight relative px-3 md:px-4">
+                <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Santuario</span> <span className="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">de Bienestar</span>
+                <div className="absolute inset-0 filter blur-[8px] bg-white/15 -z-10" style={{ clipPath: 'inset(-15px -25px -35px -25px round 16px)' }}></div>
+              </h1>
+            </div>
             
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={animateHero ? { opacity: 1 } : {}}
-              transition={{ duration: 1, delay: 0.8 }}
-              className="text-white/90 text-xl md:text-2xl mb-12 max-w-3xl mx-auto leading-relaxed"
-            >
-              Descubre un oasis de tranquilidad en nuestra hacienda, donde las técnicas ancestrales se 
-              fusionan con terapias modernas para renovar cuerpo, mente y alma.
-            </motion.p>
+            <div className="relative inline-block text-lg sm:text-xl md:text-2xl font-[var(--font-display)] font-medium mb-8 md:mb-12 lg:mb-16 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto z-10 tracking-wide px-4">
+              <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Descubre un oasis de tranquilidad en nuestra hacienda, donde las </span><span className="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">técnicas ancestrales</span><span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> se fusionan con terapias modernas para renovar cuerpo, mente y alma.</span>
+              <div className="absolute inset-0 filter blur-[6px] bg-white/15 -z-10" style={{ clipPath: 'inset(-10px -20px -25px -20px round 10px)' }}></div>
+            </div>
             
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -195,20 +246,6 @@ export default function MasajesPage() {
               </Link>
             </motion.div>
           </motion.div>
-          
-          {/* Botón para scroll down */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={animateHero ? { opacity: 1 } : {}}
-            transition={{ duration: 1, delay: 1.5 }}
-            className="absolute bottom-10 left-1/2 transform -translate-x-1/2 cursor-pointer"
-            onClick={handleScrollDown}
-          >
-            <div className="flex flex-col items-center">
-              <p className="text-white mb-2 text-sm tracking-widest">DESCUBRE</p>
-              <FaChevronDown className="text-white text-2xl animate-bounce" />
-            </div>
-          </motion.div>
         </div>
         
         {/* Elementos decorativos */}
@@ -220,9 +257,26 @@ export default function MasajesPage() {
       {/* Introducción */}
       <section 
         ref={scrollRef} 
-        className="py-20 bg-[var(--color-cream-light)]"
+        className="py-20 bg-[var(--color-cream-light)] relative overflow-hidden"
       >
-        <div className="container mx-auto px-6">
+        {/* Elementos decorativos con parallax */}
+        <motion.div 
+          className="absolute -top-20 -left-20 w-64 h-64 rounded-full bg-[var(--color-primary)]/5"
+          style={{
+            y: useTransform(scrollYProgress, [0, 1], ["100px", "-100px"]),
+            x: useTransform(scrollYProgress, [0, 1], ["-50px", "50px"]),
+          }}
+        ></motion.div>
+        
+        <motion.div 
+          className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-[var(--color-primary)]/10"
+          style={{
+            y: useTransform(scrollYProgress, [0, 1], ["150px", "-50px"]),
+            x: useTransform(scrollYProgress, [0, 1], ["50px", "-30px"]),
+          }}
+        ></motion.div>
+        
+        <div className="container mx-auto px-6 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-4xl md:text-5xl font-[var(--font-display)] text-[var(--color-accent)] mb-6">
               El Arte del Bienestar
@@ -436,24 +490,23 @@ export default function MasajesPage() {
       
       {/* Sección de Promoción */}
       <section className="py-32 relative overflow-hidden">
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 bg-no-repeat bg-cover">
           <Image
             src="/images/placeholder/spa-promo.svg"
             alt="Promoción especial de masajes"
             fill
             className="object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent"></div>
         </div>
         
         <div className="container mx-auto px-6 relative z-10">
-          <div className="max-w-xl">
+          <div className="max-w-xl bg-white/90 p-8 rounded-lg shadow-lg">
             <motion.h2
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-[var(--font-display)] text-white mb-6"
+              className="text-4xl md:text-5xl font-[var(--font-display)] text-black mb-6"
             >
               Oferta Especial <span className="text-[var(--color-primary)]">para Huéspedes</span>
             </motion.h2>
@@ -471,7 +524,7 @@ export default function MasajesPage() {
               whileInView={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.3 }}
               viewport={{ once: true }}
-              className="text-white/90 text-lg mb-10"
+              className="text-black text-lg mb-10"
             >
               Reserva tu estancia en nuestra hacienda y disfruta de un 20% de descuento 
               en cualquiera de nuestros tratamientos de bienestar. Una experiencia 
@@ -538,17 +591,17 @@ export default function MasajesPage() {
       </section>
       
       {/* CTA final */}
-      <section className="py-16 bg-[var(--color-primary-5)]">
-        <div className="container mx-auto px-6 text-center">
+      <section className="py-16 bg-[var(--color-primary-5)] relative">
+        <div className="container mx-auto px-6 text-center relative z-20">
           <h2 className="text-3xl md:text-4xl font-[var(--font-display)] text-[var(--color-accent)] mb-6">
-            Reserva Tu Experiencia de Bienestar
+            Reserva Tu <span className="text-[var(--color-primary)]">Experiencia de Bienestar</span>
           </h2>
           <p className="text-gray-700 max-w-2xl mx-auto mb-10">
             Permítete un momento de indulgencia y transformación. Nuestros terapeutas están listos para guiarte en un viaje de renovación completa.
           </p>
           <Link
             href="/contact"
-            className="inline-block px-8 py-4 bg-[var(--color-primary)] text-white text-lg hover:bg-[var(--color-primary-dark)] transition-colors shadow-lg"
+            className="inline-block px-8 py-4 bg-[var(--color-primary)] text-white text-lg hover:bg-[var(--color-primary-dark)] transition-colors shadow-lg relative z-30"
           >
             Contactar Ahora
           </Link>

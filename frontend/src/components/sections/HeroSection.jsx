@@ -263,7 +263,7 @@ export default function HeroSection() {
       {/* Medallón decorativo central con efecto de parallax */}
       <div 
         ref={medallionRef}
-        className="absolute top-[160px] md:top-[180px] lg:top-[220px] left-[10px] md:left-[40px] lg:left-[100px] transform z-20 pointer-events-none w-[200px] h-[200px] md:w-[250px] md:h-[250px] lg:w-[300px] lg:h-[300px]"
+        className="absolute top-[160px] md:top-[180px] lg:top-[220px] left-[10px] md:left-[40px] lg:left-[100px] transform z-20 pointer-events-none w-[200px] h-[200px] md:w-[250px] md:h-[250px] lg:w-[300px] lg:h-[300px] hidden sm:block"
         style={{ 
           transition: 'transform 0.4s ease-out, opacity 0.4s ease-out'
         }}

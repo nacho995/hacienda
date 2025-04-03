@@ -102,7 +102,7 @@ export default function Navbar() {
       {/* Barra de navegación principal */}
       <nav className={`fixed top-0 w-full transition-all duration-500 z-50 ${
         isScrolled 
-          ? 'py-3 bg-white/95 backdrop-blur-sm shadow-lg' 
+          ? 'py-3 bg-black/50 backdrop-blur-md shadow-lg' 
           : 'py-5 bg-black/20 backdrop-blur-sm md:pt-8 lg:mt-10'
       }`}>
         <div className="max-w-7xl mx-auto px-6">
@@ -115,7 +115,7 @@ export default function Navbar() {
                   href={getNavHref(link.href, link.isPage)}
                   className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
                     isScrolled 
-                      ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
+                      ? 'text-white hover:text-[var(--color-primary)]' 
                       : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-[var(--color-primary)]'
                   }`}
                 >
@@ -124,8 +124,23 @@ export default function Navbar() {
               ))}
             </div>
 
+            {/* Botón de menú móvil (visible solo en móvil) - Ahora colocado antes del logo */}
+            <div className="lg:hidden">
+              <button
+                className="text-3xl relative z-50 p-2 rounded-full bg-[var(--color-primary)]/80 backdrop-blur-sm"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              >
+                {isMobileMenuOpen ? (
+                  <FaTimes className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                ) : (
+                  <FaBars className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                )}
+              </button>
+            </div>
+
             {/* Logo y sello (centrado) */}
-            <div className="flex-shrink-0 relative mx-4">
+            <div className="flex-shrink-0 relative mx-auto">
               {/* Sello decorativo en lugar del logo */}
               <div className="relative h-16 md:h-20 w-32 md:w-40 flex items-center justify-center">
                 {/* Dos capas - externa rotativa e interna estática */}
@@ -393,7 +408,7 @@ export default function Navbar() {
                   href={getNavHref(link.href, link.isPage)}
                   className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
                     isScrolled 
-                      ? 'text-[var(--color-accent)] hover:text-[var(--color-primary)]' 
+                      ? 'text-white hover:text-[var(--color-primary)]' 
                       : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-[var(--color-primary)]'
                   }`}
                 >
@@ -406,7 +421,7 @@ export default function Navbar() {
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
                 className={`transition-colors duration-300 ${
                   isScrolled 
-                    ? 'text-[var(--color-accent)]' 
+                    ? 'text-white' 
                     : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
                 }`}
               >
@@ -424,28 +439,13 @@ export default function Navbar() {
                 <span className="font-medium uppercase tracking-wider text-sm">Reservar</span>
               </Link>
             </div>
-
-            {/* Botón de menú móvil (visible solo en móvil) */}
-            <div className="lg:hidden flex justify-end flex-1">
-              <button
-                className="text-2xl relative z-50"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              >
-                {isMobileMenuOpen ? (
-                  <FaTimes className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
-                ) : (
-                  <FaBars className={isScrolled ? 'text-[var(--color-accent)]' : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'} />
-                )}
-              </button>
-            </div>
           </div>
         </div>
       </nav>
 
       {/* Barra de búsqueda */}
       <div 
-        className={`fixed w-full bg-white shadow-md z-40 transition-all duration-500 ${
+        className={`fixed w-full bg-black/50 backdrop-blur-md shadow-md z-40 transition-all duration-500 ${
           isSearchOpen ? 'top-[80px] opacity-100' : '-top-20 opacity-0'
         }`}
       >
@@ -454,7 +454,7 @@ export default function Navbar() {
             <input 
               type="text" 
               placeholder="Buscar..." 
-              className="w-full px-4 py-3 bg-gray-100 focus:outline-none focus:bg-gray-50 transition-colors"
+              className="w-full px-4 py-3 bg-black/30 text-white border border-gray-700 rounded-md focus:outline-none focus:border-[var(--color-primary)] focus:bg-black/40 transition-colors placeholder-white/60"
             />
             <button className="absolute right-4 top-1/2 transform -translate-y-1/2 text-[var(--color-primary)]">
               <FaSearch />

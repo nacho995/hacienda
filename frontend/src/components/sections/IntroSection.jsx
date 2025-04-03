@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { GiCastle } from 'react-icons/gi';
 import { FaHeart, FaGift, FaPlayCircle, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaQuoteLeft, FaChevronDown } from 'react-icons/fa';
 import { MdReplay10, MdForward10 } from 'react-icons/md';
@@ -11,11 +11,284 @@ export default function IntroSection() {
   const videoContainerRef = useRef(null);
   
   // ID del video de YouTube
-  const youtubeVideoId = 'bKKyopab1C4';
+  const youtubeVideoId = 'Xn8RQw-AvcA';
   
   // Estado para video y controles
   const [showControls, setShowControls] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [showYouTubePlayer, setShowYouTubePlayer] = useState(false);
+  const [player, setPlayer] = useState(null);
+  const playerContainerRef = useRef(null);
+  
+  // Cargar la API de YouTube
+  useEffect(() => {
+    // Función global que YouTube llamará cuando el API esté listo
+    window.onYouTubeIframeAPIReady = () => {
+      if (!showYouTubePlayer || !playerContainerRef.current) return;
+      
+      const newPlayer = new window.YT.Player('youtube-player', {
+        videoId: youtubeVideoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          rel: 0,
+          showinfo: 0,
+          mute: 1,
+          modestbranding: 1,
+          enablejsapi: 1,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange
+        }
+      });
+      
+      setPlayer(newPlayer);
+    };
+    
+    // Cargar el script de la API de YouTube
+    const loadYouTubeAPI = () => {
+      const existingScript = document.getElementById('youtube-api');
+      if (!existingScript) {
+        const tag = document.createElement('script');
+        tag.id = 'youtube-api';
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.async = true;
+        document.head.appendChild(tag);
+      } else if (window.YT && showYouTubePlayer && playerContainerRef.current) {
+        window.onYouTubeIframeAPIReady();
+      }
+    };
+    
+    if (showYouTubePlayer) {
+      loadYouTubeAPI();
+    }
+  }, [showYouTubePlayer, youtubeVideoId]);
+  
+  // Efecto para manejar el monitoreo del tiempo y limpiar recursos
+  useEffect(() => {
+    let timeMonitoringInterval;
+    
+    if (player && typeof player.getDuration === 'function') {
+      // Iniciar temporizador
+      setVideoDuration(player.getDuration());
+      
+      timeMonitoringInterval = setInterval(() => {
+        try {
+          const currentTime = player.getCurrentTime();
+          setVideoProgress(currentTime);
+        } catch (error) {
+          console.error("Error actualizando tiempo:", error);
+        }
+      }, 250);
+    }
+    
+    return () => {
+      if (timeMonitoringInterval) {
+        clearInterval(timeMonitoringInterval);
+      }
+    };
+  }, [player]);
+  
+  const onPlayerReady = (event) => {
+    const duration = event.target.getDuration();
+    setVideoDuration(duration);
+    event.target.playVideo();
+    setIsVideoPlaying(true);
+  };
+  
+  const onPlayerStateChange = (event) => {
+    const newState = event.data;
+    setIsVideoPlaying(newState === window.YT.PlayerState.PLAYING);
+  };
+  
+  // Iniciar reproducción de YouTube
+  const startPlayback = () => {
+    setShowYouTubePlayer(true);
+  };
+  
+  // Control de reproducción
+  const togglePlay = (e) => {
+    if (e) e.stopPropagation();
+    
+    if (!showYouTubePlayer) {
+      startPlayback();
+      return;
+    }
+    
+    if (player && typeof player.getPlayerState === 'function') {
+      try {
+        const playerState = player.getPlayerState();
+        if (playerState === window.YT.PlayerState.PLAYING) {
+          player.pauseVideo();
+        } else {
+          player.playVideo();
+        }
+      } catch (error) {
+        console.error("Error al cambiar estado de reproducción:", error);
+      }
+    }
+  };
+  
+  // Control de mute
+  const toggleMute = (e) => {
+    if (e) e.stopPropagation();
+    
+    if (player) {
+      try {
+        if (isMuted) {
+          player.unMute();
+        } else {
+          player.mute();
+        }
+        setIsMuted(!isMuted);
+      } catch (error) {
+        console.error("Error al cambiar estado de mute:", error);
+      }
+    }
+  };
+  
+  // Saltar adelante 10 segundos
+  const seekForward = (e) => {
+    if (e) e.stopPropagation();
+    
+    if (player && typeof player.seekTo === 'function' && typeof player.getCurrentTime === 'function') {
+      try {
+        const currentTime = player.getCurrentTime();
+        const newTime = Math.min(currentTime + 10, videoDuration);
+        player.seekTo(newTime, true);
+      } catch (error) {
+        console.error("Error al avanzar:", error);
+      }
+    }
+  };
+  
+  // Saltar atrás 10 segundos
+  const seekBackward = (e) => {
+    if (e) e.stopPropagation();
+    
+    if (player && typeof player.seekTo === 'function' && typeof player.getCurrentTime === 'function') {
+      try {
+        const currentTime = player.getCurrentTime();
+        const newTime = Math.max(currentTime - 10, 0);
+        player.seekTo(newTime, true);
+      } catch (error) {
+        console.error("Error al retroceder:", error);
+      }
+    }
+  };
+  
+  // Estado para manejar el arrastre de la barra de progreso
+  const [isDragging, setIsDragging] = useState(false);
+  const progressBarRef = useRef(null);
+  
+  // Iniciar arrastre
+  const startDrag = (e) => {
+    e.stopPropagation();
+    setIsDragging(true);
+    handleProgressBarInteraction(e);
+    
+    // Añadir listeners para movimiento y finalización
+    document.addEventListener('mousemove', handleDrag);
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchmove', handleDrag);
+    document.addEventListener('touchend', endDrag);
+  };
+  
+  // Durante el arrastre
+  const handleDrag = useCallback((e) => {
+    if (isDragging) {
+      handleProgressBarInteraction(e);
+    }
+  }, [isDragging]);
+  
+  // Finalizar arrastre
+  const endDrag = useCallback((e) => {
+    if (isDragging) {
+      handleProgressBarInteraction(e);
+      setIsDragging(false);
+      
+      // Eliminar listeners
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', endDrag);
+      document.removeEventListener('touchmove', handleDrag);
+      document.removeEventListener('touchend', endDrag);
+    }
+  }, [isDragging, handleDrag]);
+  
+  // Limpiar eventos cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', endDrag);
+      document.removeEventListener('touchmove', handleDrag);
+      document.removeEventListener('touchend', endDrag);
+    };
+  }, [handleDrag, endDrag]);
+  
+  // Manejar interacción con la barra de progreso (clic o arrastre)
+  const handleProgressBarInteraction = (e) => {
+    if (!progressBarRef.current || !player || !videoDuration) return;
+    
+    let clientX;
+    
+    // Manejar tanto eventos de mouse como touch
+    if (e.type.startsWith('touch')) {
+      const touch = e.touches[0] || e.changedTouches[0];
+      clientX = touch.clientX;
+    } else {
+      clientX = e.clientX;
+    }
+    
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const position = clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, position / rect.width));
+    const seekTime = percentage * videoDuration;
+    
+    // Actualizar visualmente de inmediato para mejor UX
+    setVideoProgress(seekTime);
+    
+    // Solo enviar al video cuando se termine de arrastrar o en un clic
+    if (e.type === 'mouseup' || e.type === 'touchend' || e.type === 'click') {
+      player.seekTo(seekTime, true);
+    }
+  };
+  
+  // Click en la barra de progreso
+  const handleProgressBarClick = (e) => {
+    e.stopPropagation();
+    if (!player || !videoDuration) return;
+    
+    handleProgressBarInteraction(e);
+  };
+  
+  // Formatear tiempo en formato mm:ss
+  const formatTime = (seconds) => {
+    if (!seconds) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+  
+  // Activar pantalla completa  
+  const toggleFullScreen = (e) => {
+    e.stopPropagation();
+    const container = playerContainerRef.current;
+    
+    if (!container) return;
+    
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().catch(err => {
+        console.error(`Error al intentar mostrar pantalla completa: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
   
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -50,22 +323,142 @@ export default function IntroSection() {
           </p>
         </div>
         
-        {/* Video de YouTube */}
+        {/* Video de YouTube con controles personalizados */}
         <div className="my-20 fade-in animate-delay-200">
           <div 
-            className="relative overflow-hidden rounded-lg shadow-2xl aspect-video"
-            ref={videoContainerRef}
+            className="relative overflow-hidden rounded-lg shadow-2xl aspect-video cursor-pointer"
+            ref={playerContainerRef}
+            onMouseEnter={() => setShowControls(true)}
+            onMouseLeave={() => setShowControls(false)}
+            onClick={togglePlay}
           >
-            <iframe 
-              width="100%" 
-              height="100%" 
-              src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&showinfo=0&autoplay=0&mute=1`}
-              title="Hacienda San Carlos Borromeo"
-              frameBorder="0" 
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-              allowFullScreen
-              className="absolute top-0 left-0 w-full h-full"
-            ></iframe>
+            {/* Imagen de previsualización */}
+            {!showYouTubePlayer && (
+              <div className="absolute inset-0 z-10">
+                <div className="relative w-full h-full">
+                  <img 
+                    src={`https://img.youtube.com/vi/${youtubeVideoId}/maxresdefault.jpg`}
+                    alt="Video de Hacienda San Carlos Borromeo"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <button
+                      className="w-20 h-20 bg-[var(--color-primary)]/90 hover:bg-[var(--color-primary)] text-white rounded-full flex items-center justify-center transition-all transform hover:scale-110 shadow-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startPlayback();
+                      }}
+                      aria-label="Reproducir video"
+                    >
+                      <FaPlayCircle className="w-10 h-10" />
+                    </button>
+                  </div>
+                  <div className="absolute bottom-8 left-0 right-0 text-center text-white text-xl font-semibold drop-shadow-lg">
+                    Hacienda San Carlos Borromeo - Espacios
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Contenedor para el reproductor de YouTube */}
+            {showYouTubePlayer && (
+              <div className="absolute inset-0 z-0">
+                <div id="youtube-player" className="w-full h-full"></div>
+              </div>
+            )}
+            
+            {/* Controles personalizados */}
+            {showYouTubePlayer && (
+              <div 
+                className={`absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 flex flex-col justify-end p-4 transition-opacity duration-300 z-20 ${
+                  showControls ? 'opacity-100' : 'opacity-0'
+                }`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Barra de progreso */}
+                <div 
+                  ref={progressBarRef}
+                  className="w-full h-3 bg-white/30 rounded-full mb-4 relative overflow-visible cursor-pointer group py-4"
+                  onClick={handleProgressBarClick}
+                  onMouseDown={startDrag}
+                  onTouchStart={startDrag}
+                >
+                  <div 
+                    className="absolute left-0 top-1/2 transform -translate-y-1/2 h-3 bg-[var(--color-primary)] rounded-full" 
+                    style={{ width: `${videoDuration ? (videoProgress / videoDuration) * 100 : 0}%` }}
+                  ></div>
+                  <div 
+                    className={`absolute top-1/2 transform -translate-y-1/2 h-6 w-6 bg-[var(--color-primary)] rounded-full shadow-md border-2 border-white transition-transform ${isDragging ? 'scale-125' : 'group-hover:scale-110'}`}
+                    style={{ left: `calc(${videoDuration ? (videoProgress / videoDuration) * 100 : 0}% - 12px)` }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      startDrag(e);
+                    }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                      startDrag(e);
+                    }}
+                  ></div>
+                </div>
+                
+                {/* Controles de reproducción */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <button 
+                      onClick={seekBackward}
+                      className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                      aria-label="Retroceder 10 segundos"
+                    >
+                      <MdReplay10 className="w-6 h-6" />
+                    </button>
+                    
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePlay();
+                      }}
+                      className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] w-10 h-10 rounded-full flex items-center justify-center text-white transition-all transform hover:scale-110"
+                      aria-label={isVideoPlaying ? "Pausar" : "Reproducir"}
+                    >
+                      {isVideoPlaying ? <FaPause className="w-4 h-4" /> : <FaPlayCircle className="w-5 h-5" />}
+                    </button>
+                    
+                    <button 
+                      onClick={seekForward}
+                      className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                      aria-label="Avanzar 10 segundos"
+                    >
+                      <MdForward10 className="w-6 h-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-center space-x-4">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMute();
+                      }}
+                      className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                      aria-label={isMuted ? "Activar sonido" : "Silenciar"}
+                    >
+                      {isMuted ? <FaVolumeMute className="w-5 h-5" /> : <FaVolumeUp className="w-5 h-5" />}
+                    </button>
+                    
+                    <span className="text-white text-sm hidden sm:inline-block">
+                      {formatTime(videoProgress)} / {formatTime(videoDuration)}
+                    </span>
+                    
+                    <button 
+                      onClick={toggleFullScreen}
+                      className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                      aria-label="Pantalla completa"
+                    >
+                      <FaExpand className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         

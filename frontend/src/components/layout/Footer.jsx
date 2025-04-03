@@ -64,40 +64,46 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
           {/* Columna 1: Información de contacto */}
           <div className={`transition-all duration-700 delay-100 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary)] mb-6 font-medium">Información de Contacto</h3>
-            <div className="w-12 h-[1px] bg-[var(--color-primary)] mb-8"></div>
+            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary-light)] mb-6 font-bold tracking-wide border-b-2 border-[var(--color-primary)] pb-2 inline-block">Información de Contacto</h3>
+            <div className="w-12 h-[2px] bg-gradient-to-r from-[var(--color-primary-light)] to-transparent mb-8"></div>
             
             <div className="space-y-4">
-              <div className="flex items-start space-x-4">
-                <FaMapMarkerAlt className="text-[var(--color-primary)] mt-1" />
-                <div>
-                  <p className="text-white/80">Camino a la Hacienda 123</p>
+              <div className="flex items-start space-x-4 group">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-lg ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                  <FaMapMarkerAlt className="text-white text-sm" />
+                </div>
+                <div className="group-hover:translate-x-1 transition-transform duration-300">
+                  <p className="text-white/90 font-medium">Camino a la Hacienda 123</p>
                   <p className="text-white/80">Cuernavaca, Morelos, México</p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-4">
-                <FaPhone className="text-[var(--color-primary)]" />
-                <p className="text-white/80">+52 (777) 123-4567</p>
+              <div className="flex items-center space-x-4 group">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-lg ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                  <FaPhone className="text-white text-sm" />
+                </div>
+                <p className="text-white/90 font-medium group-hover:translate-x-1 transition-transform duration-300">+52 (777) 123-4567</p>
               </div>
               
-              <div className="flex items-center space-x-4">
-                <FaEnvelope className="text-[var(--color-primary)]" />
-                <p className="text-white/80">info@haciendasancarlos.com</p>
+              <div className="flex items-center space-x-4 group">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-lg ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                  <FaEnvelope className="text-white text-sm" />
+                </div>
+                <p className="text-white/90 font-medium group-hover:translate-x-1 transition-transform duration-300">info@haciendasancarlos.com</p>
               </div>
             </div>
             
             <div className="flex space-x-4 mt-8">
-              <a href="#" className="w-10 h-10 rounded-full border border-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white">
+              <a href="#" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
                 <FaFacebookF />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full border border-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white">
+              <a href="#" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
                 <FaInstagram />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full border border-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white">
+              <a href="#" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
                 <FaPinterestP />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full border border-[var(--color-primary)] flex items-center justify-center text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white">
+              <a href="#" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
                 <FaTwitter />
               </a>
             </div>
@@ -105,44 +111,56 @@ export default function Footer() {
           
           {/* Columna 2: Enlaces Rápidos */}
           <div className={`transition-all duration-700 delay-200 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary)] mb-6 font-medium">Enlaces Rápidos</h3>
-            <div className="w-12 h-[1px] bg-[var(--color-primary)] mb-8"></div>
+            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary-light)] mb-6 font-bold tracking-wide border-b-2 border-[var(--color-primary)] pb-2 inline-block">Enlaces Rápidos</h3>
+            <div className="w-12 h-[2px] bg-gradient-to-r from-[var(--color-primary-light)] to-transparent mb-8"></div>
             
             <ul className="space-y-3">
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Inicio
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Inicio</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/#events" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Eventos
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/#events" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Eventos</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/#gallery" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Galería
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/#gallery" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Galería</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/habitaciones" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Habitaciones
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/habitaciones" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Habitaciones</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/masajes" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Bienestar
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/masajes" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Bienestar</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/contact" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Contacto
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/contact" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Contacto</span>
                 </Link>
               </li>
             </ul>
@@ -150,38 +168,48 @@ export default function Footer() {
           
           {/* Columna 3: Páginas legales */}
           <div className={`transition-all duration-700 delay-300 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary)] mb-6 font-medium">Información Legal</h3>
-            <div className="w-12 h-[1px] bg-[var(--color-primary)] mb-8"></div>
+            <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary-light)] mb-6 font-bold tracking-wide border-b-2 border-[var(--color-primary)] pb-2 inline-block">Información Legal</h3>
+            <div className="w-12 h-[2px] bg-gradient-to-r from-[var(--color-primary-light)] to-transparent mb-8"></div>
             
             <ul className="space-y-3">
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/aviso-legal" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Aviso Legal
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/aviso-legal" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Aviso Legal</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/cookies" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Política de Cookies
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/cookies" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Política de Cookies</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/privacidad" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Política de Privacidad
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/privacidad" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Política de Privacidad</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/terminos" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Términos de Uso
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/terminos" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Términos de Uso</span>
                 </Link>
               </li>
-              <li className="text-white/80 hover:text-white transition-colors">
-                <Link href="/reservar" className="flex items-center">
-                  <FaChevronRight className="mr-2 text-[var(--color-primary)] text-xs" />
-                  Reservar
+              <li className="text-white/90 hover:text-white transition-all duration-200 group">
+                <Link href="/reservar" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
+                    <FaChevronRight className="text-white text-[10px]" />
+                  </div>
+                  <span className="font-medium">Reservar</span>
                 </Link>
               </li>
             </ul>
@@ -189,17 +217,17 @@ export default function Footer() {
         </div>
         
         {/* Banner decorativo */}
-        <div className={`relative overflow-hidden border-t border-b py-12 mb-12 transition-all duration-700 delay-500 transform ${isVisible ? 'opacity-100' : 'opacity-0'}`} style={{ borderColor: 'var(--color-primary-20)' }}>
-          <div className="absolute top-0 left-0 w-20 h-1 bg-[var(--color-primary)]"></div>
-          <div className="absolute bottom-0 right-0 w-20 h-1 bg-[var(--color-primary)]"></div>
+        <div className={`relative overflow-hidden bg-[var(--color-accent-dark)] rounded-lg shadow-2xl py-12 px-8 mb-12 transition-all duration-700 delay-500 transform ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[var(--color-primary)] via-transparent to-[var(--color-primary)]"></div>
+          <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[var(--color-primary)] via-transparent to-[var(--color-primary)]"></div>
           
           <div className="flex flex-col md:flex-row items-center justify-center md:justify-between">
             <div className="text-2xl md:text-3xl font-[var(--font-display)] font-light mb-6 md:mb-0 text-center md:text-left">
-              ¿Planeas un <span className="text-[var(--color-primary)]">evento inolvidable</span>?
+              ¿Planeas un <span className="text-[var(--color-primary-light)] font-bold">evento inolvidable</span>?
             </div>
             <Link 
               href="/contact" 
-              className="px-8 py-3 bg-[var(--color-primary)] text-white uppercase tracking-wider text-sm hover:bg-[var(--color-primary-dark)] transition-colors"
+              className="px-8 py-3 bg-[var(--color-primary)] text-white uppercase tracking-wider text-sm hover:bg-transparent hover:text-[var(--color-primary)] border border-[var(--color-primary)] transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               Contáctanos
             </Link>
@@ -208,18 +236,18 @@ export default function Footer() {
       </div>
       
       {/* Copyright */}
-      <div className="bg-black/30 py-6">
+      <div className="bg-black/50 backdrop-blur-sm py-6">
         <div className="container-custom">
-          <div className="flex flex-col md:flex-row justify-between items-center text-white/60 text-sm">
-            <div>
+          <div className="flex flex-col md:flex-row justify-between items-center text-white/80 text-sm">
+            <div className="font-medium">
               &copy; {new Date().getFullYear()} Hacienda San Carlos. Todos los derechos reservados.
             </div>
-            <div className="mt-4 md:mt-0">
-              Hecho con <FaHeart className="inline-block text-[var(--color-primary)] mx-1" /> en México
+            <div className="mt-4 md:mt-0 font-medium">
+              Hecho con <span className="inline-flex items-center justify-center w-5 h-5 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] rounded-full mx-1 shadow-lg ring-1 ring-white/10"><FaHeart className="text-white text-xs animate-pulse" /></span> en México
             </div>
             <div className="mt-4 md:mt-0 flex space-x-4">
-              <Link href="/privacidad" className="hover:text-white transition-colors">Privacidad</Link>
-              <Link href="/cookies" className="hover:text-white transition-colors">Cookies</Link>
+              <Link href="/privacidad" className="hover:text-white transition-colors font-medium hover:underline">Privacidad</Link>
+              <Link href="/cookies" className="hover:text-white transition-colors font-medium hover:underline">Cookies</Link>
             </div>
           </div>
         </div>
