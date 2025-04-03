@@ -4,10 +4,16 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { FaCalendarAlt, FaCheck, FaWifi, FaCoffee, FaTv, FaSnowflake } from 'react-icons/fa';
 import { HABITACIONES } from './RoomListSection';
+import { createHabitacionReservation } from '@/services/reservationService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function BookingFormSection({ selectedRoom, onSelectRoom, formData, setFormData }) {
+  const { user } = useAuth();
   const [isFormValid, setIsFormValid] = useState(false);
   const [showReservationSuccess, setShowReservationSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reservationError, setReservationError] = useState(null);
+  const [reservationConfirmation, setReservationConfirmation] = useState(null);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -38,30 +44,79 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     );
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Aquí iría la lógica para enviar la reserva a un API
-    console.log("Datos de reserva:", formData);
+    if (!isFormValid || isSubmitting) return;
     
-    // Mostrar mensaje de éxito sin hacer scroll
-    setShowReservationSuccess(true);
+    setIsSubmitting(true);
+    setReservationError(null);
     
-    // Reset del formulario después de unos segundos
-    setTimeout(() => {
-      setShowReservationSuccess(false);
-      setFormData({
-        nombre: '',
-        email: '',
-        telefono: '',
-        fechaEntrada: '',
-        fechaSalida: '',
-        huespedes: 1,
-        habitacion: '',
-        mensaje: ''
-      });
-      onSelectRoom(null);
-    }, 5000);
+    try {
+      // Preparar datos para la API
+      const selectedRoomData = HABITACIONES.find(h => h.id.toString() === formData.habitacion);
+      
+      if (!selectedRoomData) {
+        throw new Error('Habitación no encontrada');
+      }
+      
+      const fechaEntrada = new Date(formData.fechaEntrada);
+      const fechaSalida = new Date(formData.fechaSalida);
+      
+      // Calcular número de noches
+      const diferenciaMs = fechaSalida - fechaEntrada;
+      const numeroNoches = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+      
+      // Calcular precio total
+      const precioTotal = selectedRoomData.precio * numeroNoches;
+      
+      // Crear objeto de reserva
+      const reservaData = {
+        usuario: user?._id || null, // El usuario puede estar autenticado o no
+        nombre: formData.nombre,
+        apellidos: formData.nombre.split(' ').slice(1).join(' ') || "No proporcionado", // Aproximación simple
+        email: formData.email,
+        telefono: formData.telefono,
+        tipoHabitacion: selectedRoomData.tipoHabitacion,
+        numeroHabitaciones: 1,
+        fechaEntrada: formData.fechaEntrada,
+        fechaSalida: formData.fechaSalida,
+        numeroAdultos: parseInt(formData.huespedes) || 1,
+        numeroNinos: 0,
+        peticionesEspeciales: formData.mensaje || '',
+        precioTotal: precioTotal,
+        // Otros campos se completarán con valores por defecto en el backend
+      };
+      
+      // Enviar a la API
+      const response = await createHabitacionReservation(reservaData);
+      
+      // Guardar confirmación
+      setReservationConfirmation(response);
+      
+      // Mostrar mensaje de éxito
+      setShowReservationSuccess(true);
+      
+      // Reset del formulario después de unos segundos
+      setTimeout(() => {
+        setFormData({
+          nombre: '',
+          email: '',
+          telefono: '',
+          fechaEntrada: '',
+          fechaSalida: '',
+          huespedes: 1,
+          habitacion: '',
+          mensaje: ''
+        });
+        onSelectRoom(null);
+      }, 5000);
+    } catch (error) {
+      console.error('Error al crear la reserva:', error);
+      setReservationError(error.message || 'Error al procesar su reserva. Por favor, inténtelo de nuevo.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -80,8 +135,16 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                   <FaCheck className="text-green-600 text-2xl" />
                 </div>
                 <h3 className="text-2xl font-[var(--font-display)] text-[var(--color-accent)] mb-4">
-                  ¡Reserva Recibida!
+                  ¡Reserva Confirmada!
                 </h3>
+                {reservationConfirmation && (
+                  <div className="mb-6 p-4 bg-[var(--color-primary-5)] border border-[var(--color-primary-20)] rounded">
+                    <p className="font-medium mb-2">Número de confirmación:</p>
+                    <p className="text-xl font-bold text-[var(--color-primary)]">
+                      {reservationConfirmation.numeroConfirmacion || 'Pendiente'}
+                    </p>
+                  </div>
+                )}
                 <p className="text-gray-600 max-w-md mx-auto mb-8">
                   Gracias por su reserva. Hemos recibido su solicitud y nos pondremos en contacto con usted a la brevedad para confirmar los detalles.
                 </p>
@@ -136,6 +199,13 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {reservationError && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded">
+                    <p className="font-medium">Error:</p>
+                    <p>{reservationError}</p>
                   </div>
                 )}
 
@@ -260,38 +330,39 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                       name="huespedes"
                       value={formData.huespedes}
                       onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors" 
+                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                      required
                     >
-                      {[...Array(4)].map((_, i) => (
-                        <option key={i} value={i + 1}>{i + 1}</option>
+                      {[...Array(selectedRoom ? selectedRoom.capacidad : 4).keys()].map(i => (
+                        <option key={i+1} value={i+1}>{i+1} {i === 0 ? 'persona' : 'personas'}</option>
                       ))}
                     </select>
                   </div>
                   
                   <div className="space-y-1">
                     <label htmlFor="habitacion" className="block text-sm font-medium text-gray-700">
-                      Seleccionar habitación
+                      Tipo de habitación
                     </label>
                     <select 
                       id="habitacion" 
                       name="habitacion"
                       value={formData.habitacion}
                       onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors" 
+                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                       required
                     >
                       <option value="">Seleccione una habitación</option>
-                      {HABITACIONES.map((habitacion) => (
-                        <option key={habitacion.id} value={habitacion.id}>
-                          {habitacion.nombre} - ${habitacion.precio}/noche
+                      {HABITACIONES.map(h => (
+                        <option key={h.id} value={h.id}>
+                          {h.nombre} - ${h.precio}/noche
                         </option>
                       ))}
                     </select>
                   </div>
                   
-                  <div className="md:col-span-2 space-y-1">
-                    <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700">
-                      Solicitudes especiales (opcional)
+                  <div className="md:col-span-2">
+                    <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700 mb-1">
+                      Peticiones especiales
                     </label>
                     <textarea 
                       id="mensaje" 
@@ -300,24 +371,18 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                       onChange={handleInputChange}
                       rows="4" 
                       className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                      placeholder="Indique cualquier petición especial, alergias, necesidades de accesibilidad, etc."
                     ></textarea>
                   </div>
                   
-                  <div className="md:col-span-2 mt-4">
+                  <div className="md:col-span-2 mt-4 text-center">
                     <button 
-                      type="submit" 
-                      disabled={!isFormValid}
-                      className={`w-full py-3 font-medium tracking-wide text-white transition-colors ${
-                        isFormValid 
-                          ? 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)]' 
-                          : 'bg-gray-400 cursor-not-allowed'
-                      }`}
+                      type="submit"
+                      disabled={!isFormValid || isSubmitting}
+                      className={`btn-primary px-10 ${(!isFormValid || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      Enviar Solicitud de Reserva
+                      {isSubmitting ? 'Procesando...' : 'Confirmar Reserva'}
                     </button>
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      Al enviar este formulario, acepta nuestros términos y condiciones de reserva.
-                    </p>
                   </div>
                 </form>
               </>
