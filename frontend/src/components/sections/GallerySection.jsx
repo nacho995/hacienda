@@ -149,7 +149,7 @@ export default function GallerySection() {
   const galleryRef = useRef(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [currentCategory, setCurrentCategory] = useState('todas');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'slider'
+  const [viewMode, setViewMode] = useState('slider'); // 'grid' o 'slider'
   const [currentSlide, setCurrentSlide] = useState(0);
   
   // Categorías disponibles
@@ -289,23 +289,8 @@ export default function GallerySection() {
           {/* Selector de modo de visualización */}
           <div className="flex justify-center space-x-3 mb-6">
             <motion.button
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center px-4 py-2 rounded-l-full border ${
-                viewMode === 'grid'
-                  ? 'bg-[var(--color-primary-10)] border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'bg-white/80 border-gray-300 text-gray-600 hover:bg-gray-100'
-              }`}
-              whileHover={viewMode !== 'grid' ? { scale: 1.05 } : {}}
-              whileTap={{ scale: 0.98 }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-              Cuadrícula
-            </motion.button>
-            <motion.button
               onClick={() => setViewMode('slider')}
-              className={`flex items-center px-4 py-2 rounded-r-full border ${
+              className={`flex items-center px-4 py-2 rounded-l-full border ${
                 viewMode === 'slider'
                   ? 'bg-[var(--color-primary-10)] border-[var(--color-primary)] text-[var(--color-primary)]'
                   : 'bg-white/80 border-gray-300 text-gray-600 hover:bg-gray-100'
@@ -317,6 +302,21 @@ export default function GallerySection() {
                 <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
               </svg>
               Presentación
+            </motion.button>
+            <motion.button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center px-4 py-2 rounded-r-full border ${
+                viewMode === 'grid'
+                  ? 'bg-[var(--color-primary-10)] border-[var(--color-primary)] text-[var(--color-primary)]'
+                  : 'bg-white/80 border-gray-300 text-gray-600 hover:bg-gray-100'
+              }`}
+              whileHover={viewMode !== 'grid' ? { scale: 1.05 } : {}}
+              whileTap={{ scale: 0.98 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+              Cuadrícula
             </motion.button>
           </div>
 

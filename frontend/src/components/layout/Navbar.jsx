@@ -107,7 +107,7 @@ export default function Navbar() {
       }`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
-            {/* Logo y navegación izquierda */}
+            {/* Navegación izquierda */}
             <div className="hidden lg:flex flex-1 items-center justify-end space-x-8">
               {navLinks.slice(0, 3).map((link) => (
                 <Link
@@ -124,7 +124,7 @@ export default function Navbar() {
               ))}
             </div>
 
-            {/* Botón de menú móvil (visible solo en móvil) - Ahora colocado antes del logo */}
+            {/* Botón de menú móvil (visible solo en móvil) */}
             <div className="lg:hidden">
               <button
                 className="text-3xl relative z-50 p-2 rounded-full bg-[var(--color-primary)]/80 backdrop-blur-sm"
@@ -464,17 +464,26 @@ export default function Navbar() {
       </div>
 
       {/* Menú móvil */}
-      <div className={`fixed inset-0 z-40 bg-[var(--color-accent)]/95 backdrop-blur-md overflow-y-auto transition-transform duration-500 transform ${
+      <div className={`fixed inset-0 z-40 overflow-y-auto transition-transform duration-500 transform ${
         isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
       }`}>
-        <div className="container mx-auto p-6 pt-24 md:pt-32 lg:pt-24">
+        {/* Fondo con gradiente elegante */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)] via-[#990026] to-[var(--color-primary-dark)] opacity-95 backdrop-blur-md"></div>
+        
+        {/* Elementos decorativos */}
+        <div className="absolute top-0 left-0 w-64 h-64 border-l-2 border-t-2 border-white/10 opacity-30"></div>
+        <div className="absolute bottom-0 right-0 w-64 h-64 border-r-2 border-b-2 border-white/10 opacity-30"></div>
+        <div className="absolute top-1/4 right-10 w-32 h-32 rounded-full bg-[var(--color-primary-light)]/10 blur-xl"></div>
+        <div className="absolute bottom-1/4 left-10 w-40 h-40 rounded-full bg-white/5 blur-xl"></div>
+        
+        <div className="container mx-auto p-6 pt-24 md:pt-32 lg:pt-24 relative z-10">
           <div className="mt-8 md:mt-12">
             <ul className="space-y-6 text-center font-[var(--font-display)]">
               {navLinks.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={getNavHref(link.href, link.isPage)}
-                    className="text-2xl text-white font-light tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)] hover:text-[var(--color-primary)] transition-colors duration-300"
+                    className="text-2xl text-white font-semibold tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] hover:text-[var(--color-cream-light)] transition-colors duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     {link.label}
@@ -487,7 +496,7 @@ export default function Navbar() {
             <div className="mt-12 text-center">
               <Link
                 href="/reservar"
-                className="inline-flex items-center justify-center space-x-2 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors px-8 py-4 uppercase tracking-wider font-semibold shadow-[0_4px_8px_rgba(0,0,0,0.3)]"
+                className="inline-flex items-center justify-center space-x-2 bg-white text-[var(--color-primary)] hover:bg-[var(--color-cream-light)] transition-colors px-8 py-4 uppercase tracking-wider font-semibold shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <FaCalendarAlt className="mr-2" />
@@ -497,12 +506,12 @@ export default function Navbar() {
             
             <div className="mt-12 flex flex-col items-center space-y-4 text-white">
               <div className="flex items-center space-x-2">
-                <FaPhoneAlt className="h-4 w-4 text-[var(--color-primary)]" />
-                <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">+52 (777) 123-4567</span>
+                <FaPhoneAlt className="h-4 w-4 text-white" />
+                <span className="font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">+52 (777) 123-4567</span>
               </div>
               <div className="flex items-center space-x-2">
-                <FaRegEnvelope className="h-4 w-4 text-[var(--color-primary)]" />
-                <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">info@haciendasancarlos.com</span>
+                <FaRegEnvelope className="h-4 w-4 text-white" />
+                <span className="font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">info@haciendasancarlos.com</span>
               </div>
             </div>
           </div>

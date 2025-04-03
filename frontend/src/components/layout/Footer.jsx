@@ -47,20 +47,7 @@ export default function Footer() {
       <div className="absolute bottom-10 right-0 w-40 h-40 border-r-2 border-b-2" style={{ borderColor: 'var(--color-primary-30)' }}></div>
       
       <div className="container-custom relative">
-        {/* Logo y sello */}
-        <div className={`text-center mb-16 transition-all duration-1000 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-          <Image 
-            src="/images/logo.svg"
-            alt="Hacienda San Carlos"
-            width={180}
-            height={80}
-            className="mx-auto"
-          />
-          <div className="mt-8 text-sm opacity-80 font-light tracking-wide uppercase">
-            Creando momentos extraordinarios desde 1920
-          </div>
-        </div>
-        
+        {/* Se elimina el Logo y sello */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
           {/* Columna 1: Información de contacto */}
           <div className={`transition-all duration-700 delay-100 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
@@ -217,37 +204,69 @@ export default function Footer() {
         </div>
         
         {/* Banner decorativo */}
-        <div className={`relative overflow-hidden bg-[var(--color-accent-dark)] rounded-lg shadow-2xl py-12 px-8 mb-12 transition-all duration-700 delay-500 transform ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className={`relative overflow-hidden bg-[var(--color-accent-dark)] rounded-lg shadow-2xl p-12 mb-12 transition-all duration-700 delay-500 transform ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+          {/* Bordes decorativos animados */}
           <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[var(--color-primary)] via-transparent to-[var(--color-primary)]"></div>
           <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[var(--color-primary)] via-transparent to-[var(--color-primary)]"></div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[var(--color-primary)] to-transparent"></div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[var(--color-primary)] to-transparent"></div>
           
-          <div className="flex flex-col md:flex-row items-center justify-center md:justify-between">
-            <div className="text-2xl md:text-3xl font-[var(--font-display)] font-light mb-6 md:mb-0 text-center md:text-left">
-              ¿Planeas un <span className="text-[var(--color-primary-light)] font-bold">evento inolvidable</span>?
+          {/* Elementos decorativos de fondo */}
+          <div className="absolute top-4 left-4 w-16 h-16 border border-[var(--color-primary)]/20 rounded-full"></div>
+          <div className="absolute bottom-4 right-4 w-24 h-24 border border-[var(--color-primary)]/20 rounded-full"></div>
+          <div className="absolute top-1/2 right-8 transform -translate-y-1/2 w-4 h-4 bg-[var(--color-primary)]/30 rounded-full blur-sm"></div>
+          
+          <div className="flex flex-col md:flex-row items-center justify-center md:justify-between relative z-10">
+            <div className="text-2xl md:text-3xl font-[var(--font-display)] font-light mb-8 md:mb-0 text-center md:text-left perspective-[1000px] transform-style-preserve-3d">
+              ¿Planeas un <span className="font-bold transform-style-preserve-3d" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-primary)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(20px)", display: "inline-block"}}>evento inolvidable</span>?
             </div>
             <Link 
               href="/contact" 
-              className="px-8 py-3 bg-[var(--color-primary)] text-white uppercase tracking-wider text-sm hover:bg-transparent hover:text-[var(--color-primary)] border border-[var(--color-primary)] transition-all duration-300 transform hover:scale-105 shadow-lg"
+              className="px-8 py-4 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-dark)] text-white uppercase tracking-wider text-sm hover:from-[var(--color-primary-dark)] hover:to-[var(--color-primary)] border border-white/10 hover:border-white/30 transition-all duration-300 transform hover:scale-105 shadow-lg rounded-sm flex items-center group"
             >
-              Contáctanos
+              <span className="mr-2">Contáctanos</span>
+              <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
             </Link>
           </div>
         </div>
       </div>
       
       {/* Copyright */}
-      <div className="bg-black/50 backdrop-blur-sm py-6">
+      <div className="bg-black/50 backdrop-blur-sm py-8 border-t border-[var(--color-primary)]/30">
         <div className="container-custom">
-          <div className="flex flex-col md:flex-row justify-between items-center text-white/80 text-sm">
-            <div className="font-medium">
-              &copy; {new Date().getFullYear()} Hacienda San Carlos. Todos los derechos reservados.
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 justify-between items-center text-white/80 text-sm">
+            <div className="flex items-center justify-center md:justify-start space-x-2">
+              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-lg">
+                <span className="text-white text-xs font-bold">©</span>
+              </div>
+              <div className="font-medium">
+                {new Date().getFullYear()} Hacienda San Carlos. Todos los derechos reservados.
+              </div>
             </div>
-            <div className="mt-4 md:mt-0 font-medium">
-              Hecho con <span className="inline-flex items-center justify-center w-5 h-5 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] rounded-full mx-1 shadow-lg ring-1 ring-white/10"><FaHeart className="text-white text-xs animate-pulse" /></span> en México
+            
+            <div className="flex items-center justify-center">
+              <div className="h-px w-12 bg-gradient-to-r from-transparent via-[var(--color-primary)]/50 to-transparent hidden md:block"></div>
+              <div className="px-4 font-medium">
+                Hecho con <span className="inline-flex items-center justify-center w-5 h-5 bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] rounded-full mx-1 shadow-lg ring-1 ring-white/10"><FaHeart className="text-white text-xs animate-pulse" /></span> en México
+              </div>
+              <div className="h-px w-12 bg-gradient-to-r from-transparent via-[var(--color-primary)]/50 to-transparent hidden md:block"></div>
             </div>
-            <div className="mt-4 md:mt-0 flex space-x-4">
-              <Link href="/privacidad" className="hover:text-white transition-colors font-medium hover:underline">Privacidad</Link>
-              <Link href="/cookies" className="hover:text-white transition-colors font-medium hover:underline">Cookies</Link>
+            
+            <div className="flex space-x-6 justify-center md:justify-end">
+              <Link href="/privacidad" className="hover:text-white transition-colors font-medium hover:underline flex items-center">
+                <span className="w-1 h-1 rounded-full bg-[var(--color-primary)] mr-2"></span>
+                Privacidad
+              </Link>
+              <Link href="/cookies" className="hover:text-white transition-colors font-medium hover:underline flex items-center">
+                <span className="w-1 h-1 rounded-full bg-[var(--color-primary)] mr-2"></span>
+                Cookies
+              </Link>
+              <Link href="/aviso-legal" className="hover:text-white transition-colors font-medium hover:underline flex items-center">
+                <span className="w-1 h-1 rounded-full bg-[var(--color-primary)] mr-2"></span>
+                Legal
+              </Link>
             </div>
           </div>
         </div>

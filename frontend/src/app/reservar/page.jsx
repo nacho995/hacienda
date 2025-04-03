@@ -222,8 +222,10 @@ export default function ReservarPage() {
           {/* Decorador superior elegante */}
           <div className="flex flex-col items-center mb-6 md:mb-8 animate-delay-100">
             <div className="w-24 md:w-32 lg:w-40 h-[1px] bg-[var(--color-primary)] mx-auto mb-3"></div>
-            <div className="relative inline-block mb-2 text-sm md:text-base uppercase tracking-[0.3em] md:tracking-[0.4em] text-[var(--color-primary)] font-extrabold drop-shadow-[0_0_3px_rgba(190,150,50,0.7)] z-10">
-              Eventos Exclusivos
+            <div className="relative inline-block mb-2 text-sm md:text-base uppercase tracking-[0.3em] md:tracking-[0.4em] text-[var(--color-primary)] font-extrabold z-10 transform-style-preserve-3d">
+              <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-primary)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(10px)", display: "inline-block"}}>
+                Eventos Exclusivos
+              </span>
               <div className="absolute inset-0 filter blur-[4px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -6px -6px -6px round 6px)' }}></div>
             </div>
             <div className="relative inline-block text-base md:text-lg text-white tracking-wide font-medium drop-shadow-[0_0_3px_rgba(110,70,20,0.9)] z-10">
@@ -234,21 +236,21 @@ export default function ReservarPage() {
           </div>
           
           {/* Título principal - Reserve su Evento */}
-          <div className="relative inline-block mb-8 z-10 w-full text-center">
+          <div className="relative inline-block mb-8 z-10 w-full text-center perspective-[1000px]">
             <motion.h1 
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 1, ease: "easeOut" }}
-              className="text-5xl md:text-7xl font-[var(--font-display)] font-normal leading-tight tracking-tight relative px-3 md:px-4 mb-6 inline-block"
+              className="text-5xl md:text-7xl font-[var(--font-display)] leading-tight tracking-tight relative px-3 md:px-4 mb-6 inline-block transform-style-preserve-3d"
             >
-              <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Reserve su</span> <span className="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Evento</span>
+              <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Reserve su</span> <span className="font-bold text-[var(--color-primary)] transform-style-preserve-3d" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-primary)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(20px)", display: "inline-block"}}>Evento</span>
               <div className="absolute inset-0 filter blur-[8px] bg-white/15 -z-10" style={{ clipPath: 'inset(-15px -25px -35px -25px round 16px)' }}></div>
             </motion.h1>
           </div>
           
           {/* Subtítulo debajo del título principal */}
-          <div className="relative inline-block text-lg sm:text-xl md:text-2xl font-[var(--font-display)] font-medium mb-12 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto z-10 tracking-wide px-4 text-center">
-            <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Haga realidad su evento soñado en nuestra exclusiva hacienda. Seleccione una fecha y deje que nuestro </span><span className="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">equipo</span><span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> se encargue de todos los detalles.</span>
+          <div className="relative inline-block text-lg sm:text-xl md:text-2xl font-[var(--font-display)] font-medium mb-12 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto z-10 tracking-wide px-4 text-center perspective-[1000px]">
+            <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Haga realidad su evento soñado en nuestra exclusiva hacienda. Seleccione una fecha y deje que nuestro </span><span className="font-bold transform-style-preserve-3d" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-primary)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(20px)", display: "inline-block"}}>equipo</span><span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> se encargue de todos los detalles.</span>
             <div className="absolute inset-0 filter blur-[6px] bg-white/15 -z-10" style={{ clipPath: 'inset(-10px -20px -25px -20px round 10px)' }}></div>
           </div>
           

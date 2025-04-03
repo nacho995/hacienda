@@ -167,9 +167,9 @@ export default function HabitacionesPage() {
   return (
     <main>
       {/* Sección Hero */}
-      <section className="relative h-[70vh] overflow-hidden">
+      <section className="relative h-[80vh] overflow-hidden pt-24 sm:pt-28 md:pt-32">
         <div 
-          className="absolute inset-0 bg-[url('/habitacion.JPG')] bg-cover bg-center"
+          className="absolute inset-0 bg-[url('/habitacion.JPG')] bg-cover bg-center w-screen"
           style={{
             transform: `translateY(${scrollY * 0.15}px)`,
             transition: 'transform 0.3s ease-out',
@@ -178,12 +178,44 @@ export default function HabitacionesPage() {
           }}
         ></div>
         {/* Overlay con degradado para mejorar visibilidad */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/60 z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/60 z-10 w-screen"></div>
+        
+        {/* Contenido del hero */}
+        <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-white pt-16 sm:pt-20">
+          <div className="text-center px-2 sm:px-4 max-w-5xl mx-auto perspective-[1000px]">
+            {/* Decorador superior elegante */}
+            <div className="flex flex-col items-center mb-4 md:mb-6 lg:mb-8 animate-delay-100 pt-0 md:pt-0 lg:pt-0">
+              <div className="w-24 md:w-32 lg:w-40 h-[1px] bg-[var(--color-primary)] mx-auto mb-3"></div>
+              <div className="relative inline-block mb-2 transform-style-preserve-3d">
+                <span className="block text-sm md:text-base uppercase tracking-[0.3em] md:tracking-[0.4em] z-10" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-primary)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(10px)", display: "inline-block"}}>
+                  Confort & Elegancia
+                </span>
+                <div className="absolute inset-0 filter blur-[4px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -6px -6px -6px round 6px)' }}></div>
+              </div>
+            </div>
+            
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-[var(--font-display)] leading-tight tracking-tight mb-4 transform-style-preserve-3d">
+              <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Habitaciones </span>
+              <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-primary)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(20px)", display: "inline-block"}}>de Ensueño</span>
+            </h1>
+            
+            <p className="text-base sm:text-lg md:text-xl lg:text-2xl max-w-3xl mx-auto mb-8 perspective-[1000px] transform-style-preserve-3d">
+              <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Experimente el lujo y la comodidad en un entorno de </span>
+              <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-primary)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(20px)", display: "inline-block"}}>tradición histórica</span>
+            </p>
+            
+            <div className="mt-8">
+              <a href="#habitaciones" className="px-6 sm:px-8 py-2 sm:py-3 text-sm sm:text-base bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors rounded shadow-lg inline-block transform hover:scale-105 transition-transform duration-300">
+                Ver Habitaciones
+              </a>
+            </div>
+          </div>
+        </div>
         
         {/* Elemento decorativo desplazado hacia la izquierda con efecto de parallax */}
         <div 
           ref={decorativeElementRef}
-          className="absolute top-[60%] left-[20%] transform -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none"
+          className="absolute top-[60%] left-[20%] transform -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none hidden sm:block"
           style={{ 
             width: '380px', 
             height: '380px',
@@ -248,16 +280,6 @@ export default function HabitacionesPage() {
             <circle cx="220" cy="300" r="15" fill="none" stroke="#FFFAF0" strokeWidth="2" opacity="0.7" />
             <circle cx="280" cy="300" r="15" fill="none" stroke="#FFFAF0" strokeWidth="2" opacity="0.7" />
           </svg>
-        </div>
-        
-        <div className="relative z-20 container-custom h-full flex flex-col justify-end items-center text-center text-white pb-32">
-          <h1 className="font-[var(--font-display)] text-5xl md:text-6xl mb-6 elegant-reveal">
-            Nuestras Habitaciones
-          </h1>
-          <div className="w-24 h-[1px] bg-[var(--color-primary)] mb-8"></div>
-          <p className="max-w-2xl text-lg mb-8 shadow-text-strong">
-            Disfrute de una estancia inolvidable en nuestras habitaciones de lujo, donde la historia y la comodidad se unen para crear una experiencia única.
-          </p>
         </div>
       </section>
 

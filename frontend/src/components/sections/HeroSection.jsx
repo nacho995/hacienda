@@ -11,60 +11,66 @@ const carouselData = [
     type: 'image',
     src: '/imagendron.jpg',
     alt: 'Hacienda San Carlos - Vista aérea principal',
-    title: 'Elegancia & Tradición',
+    title: 'ELEGANCIA & TRADICIÓN',
     subtitle: 'Un espacio donde la historia cobra vida',
-    heading: 'El <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Arte de Celebrar</span><br /><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Momentos</span> <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Inolvidables</span>',
-    description: '<span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Donde cada evento se convierte en un </span><span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">recuerdo eterno</span><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> envuelto en la más exquisita elegancia.</span>',
+    heading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">El</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">ARTE DE CELEBRAR</span>',
+    secondHeading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Momentos</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">INOLVIDABLES</span>',
+    description: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Donde cada evento se convierte en un </span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">RECUERDO ETERNO</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">envuelto en la más exquisita elegancia.</span>',
     cta: 'Conocer Más'
   },
   {
     type: 'image',
     src: '/imagendron2.jpg',
     alt: 'Hacienda San Carlos - Vista aérea panorámica',
-    title: 'Eventos & Celebraciones',
+    title: 'EVENTOS & CELEBRACIONES',
     subtitle: 'Momentos inolvidables en un entorno único',
-    heading: 'Tu <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Boda Perfecta</span><br /><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Merece un</span> <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Lugar Único</span>',
-    description: '<span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Creamos </span><span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">experiencias a medida</span><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> para que tu día especial sea exactamente como lo imaginaste.</span>',
+    heading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Tu</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">BODA PERFECTA</span>',
+    secondHeading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Merece un</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">LUGAR ÚNICO</span>',
+    description: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Creamos </span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">EXPERIENCIAS A MEDIDA</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">para que tu día especial sea exactamente como lo imaginaste.</span>',
     cta: 'Ver Bodas'
   },
   {
     type: 'image',
     src: '/imagendron3.jpg',
     alt: 'Hacienda San Carlos - Vista aérea de jardines',
-    title: 'Naturaleza & Armonía',
+    title: 'NATURALEZA & ARMONÍA',
     subtitle: 'Jardines exuberantes para su deleite',
-    heading: '<span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Espacios</span> <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Únicos</span><br /><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Para</span> <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Cada</span> <span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Ocasión</span>',
-    description: '<span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Nuestros </span><span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">jardines y salones</span><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> se adaptan a tu visión y estilo para crear el ambiente perfecto.</span>',
+    heading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">ESPACIOS</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">ÚNICOS</span>',
+    secondHeading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Para</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">CADA</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Ocasión</span>',
+    description: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Nuestros </span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">JARDINES Y SALONES</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">se adaptan a tu visión y estilo para crear el ambiente perfecto.</span>',
     cta: 'Espacios'
   },
   {
     type: 'image',
     src: '/imagendron4.jpg',
     alt: 'Hacienda San Carlos - Vista aérea completa',
-    title: 'Explora & Descubre',
+    title: 'EXPLORA & DESCUBRE',
     subtitle: 'Recorre virtualmente nuestras instalaciones',
-    heading: '<span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Tradición</span> <span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">y</span> <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Elegancia</span><br /><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">En</span> <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Cada Detalle</span>',
-    description: '<span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">La perfecta combinación entre </span><span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">historia y modernidad</span><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> para eventos que trascienden el tiempo.</span>',
+    heading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">TRADICIÓN</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">y</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">ELEGANCIA</span>',
+    secondHeading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">En</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">CADA DETALLE</span>',
+    description: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">La perfecta combinación entre </span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">HISTORIA Y MODERNIDAD</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">para eventos que trascienden el tiempo.</span>',
     cta: 'Galería'
   },
   {
     type: 'image',
     src: '/imagendron5.jpg',
     alt: 'Hacienda San Carlos - Vista aérea de piscina y áreas verdes',
-    title: 'Relax & Confort',
+    title: 'RELAX & CONFORT',
     subtitle: 'Disfruta de nuestras áreas de descanso',
-    heading: '<span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Eventos</span> <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Corporativos</span><br /><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">De</span> <span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Alto Nivel</span>',
-    description: '<span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">El entorno perfecto para </span><span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">reuniones ejecutivas</span><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">, conferencias y eventos empresariales exclusivos.</span>',
+    heading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">EVENTOS</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">CORPORATIVOS</span>',
+    secondHeading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">De</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">ALTO NIVEL</span>',
+    description: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">El entorno perfecto para </span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">REUNIONES EJECUTIVAS</span><span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">, conferencias y eventos empresariales exclusivos.</span>',
     cta: 'Eventos'
   },
   {
     type: 'image',
     src: '/imagendron6.JPG',
     alt: 'Hacienda San Carlos - Vista aérea jardines traseros',
-    title: 'Jardines & Espacios',
+    title: 'JARDINES & ESPACIOS',
     subtitle: 'Áreas exclusivas para tu celebración',
-    heading: '<span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Celebraciones</span> <span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Familiares</span><br /><span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">Memorables</span>',
-    description: '<span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">El escenario ideal para reunir a tus </span><span class="font-bold text-[var(--color-primary)] drop-shadow-[0_0_8px_rgba(190,150,50,0.7)]">seres queridos</span><span class="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> en ocasiones especiales inolvidables.</span>',
+    heading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">CELEBRACIONES</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">Familiares</span>',
+    secondHeading: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">MEMORABLES</span>',
+    description: '<span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">El escenario ideal para reunir a tus </span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: var(--color-primary); font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">SERES QUERIDOS</span> <span style="font-family: \'Trajan Pro\', \'Cinzel\', \'Didot\', serif; color: #FFFFFF; font-weight: 900; text-shadow: 0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB; transform: translateZ(20px); display: inline-block;">en ocasiones especiales inolvidables.</span>',
     cta: 'Contacto'
   }
 ];
@@ -225,7 +231,7 @@ export default function HeroSection() {
   const current = carouselData[currentSlide];
 
   return (
-    <section className="relative h-[100vh] min-h-[800px] md:min-h-[850px] lg:min-h-[900px] w-full overflow-hidden">
+    <section className="relative h-[90vh] min-h-[650px] md:min-h-[700px] lg:min-h-[750px] w-full overflow-hidden">
       {/* Gradiente de fondo */}
       <div className="absolute inset-0 bg-gradient-to-b from-[var(--color-accent)]/30 to-[var(--color-accent)]/50 z-10"></div>
       
@@ -380,26 +386,11 @@ export default function HeroSection() {
       </div>
       
       {/* Contenido principal */}
-      <div className="absolute inset-0 z-30 flex flex-col justify-start items-center pt-12 md:pt-14 lg:pt-16">
-        <div className="container mx-auto px-4 lg:px-8 pt-8">
+      <div className="absolute inset-0 z-30 flex flex-col justify-center items-center">
+        <div className="container mx-auto px-4 lg:px-8">
           <div className="max-w-6xl mx-auto text-center">
-            {/* Logo centrado con animación */}
-            <div className="mb-4 transform-gpu animate-float pt-8 md:pt-10 lg:pt-12">
-              <div className="relative inline-block">
-                <Image 
-                  src="/images/logo.svg"
-                  alt="Hacienda San Carlos Borromeo"
-                  width={280}
-                  height={100}
-                  className="mx-auto relative z-10"
-                />
-                <div className="absolute inset-0 filter blur-[6px] bg-white/15 -z-10" style={{ clipPath: 'inset(-10px -20px -15px -20px round 10px)' }}></div>
-              </div>
-            
-            </div>
-            
-            {/* Slider de contenido */}
-            <div className="relative overflow-hidden h-[350px] md:h-[420px] lg:h-[450px] mt-0">
+            {/* Slider de contenido - bajado para que no se tape con navbar */}
+            <div className="relative overflow-hidden h-[300px] md:h-[350px] lg:h-[380px] mt-20 md:mt-28 lg:mt-32 perspective-[1000px]">
               {carouselData.map((slide, index) => (
                 <div 
                   key={index}
@@ -418,29 +409,53 @@ export default function HeroSection() {
                   }`}
                 >
                   {/* Decorador superior elegante */}
-                  <div className="flex flex-col items-center mb-4 md:mb-6 lg:mb-8 animate-delay-100 pt-0 md:pt-0 lg:pt-0">
-                    <div className="w-24 md:w-32 lg:w-40 h-[1px] bg-[var(--color-primary)] mx-auto mb-3"></div>
-                    <div className="relative inline-block mb-2 text-sm md:text-base uppercase tracking-[0.3em] md:tracking-[0.4em] text-[var(--color-primary)] font-extrabold drop-shadow-[0_0_3px_rgba(190,150,50,0.7)] z-10">
-                      {slide.title}
+                  <div className="flex flex-col items-center mb-4 md:mb-6 lg:mb-8 animate-delay-100 pt-0">
+                    <div className="w-20 md:w-24 lg:w-32 h-[1px] bg-[var(--color-primary)] mx-auto mb-2"></div>
+                    <div className="relative inline-block mb-1">
+                      <span className="block text-xs md:text-sm uppercase tracking-[0.2em] md:tracking-[0.3em] font-extrabold z-10 transform-style-preserve-3d" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#FFFFFF", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(10px)", display: "inline-block"}}>
+                        {slide.title}
+                      </span>
                       <div className="absolute inset-0 filter blur-[4px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -6px -6px -6px round 6px)' }}></div>
                     </div>
-                    <div className="relative inline-block text-base md:text-lg text-white tracking-wide font-medium drop-shadow-[0_0_3px_rgba(110,70,20,0.9)] z-10">
-                      {slide.subtitle}
+                    <div className="relative inline-block">
+                      <span className="block text-sm md:text-base font-[var(--font-display)] text-white tracking-wide drop-shadow-[0_0_3px_rgba(110,70,20,0.9)] z-10">
+                        {slide.subtitle}
+                      </span>
                       <div className="absolute inset-0 filter blur-[4px] bg-white/15 -z-10" style={{ clipPath: 'inset(0 -6px -8px -6px round 6px)' }}></div>
                     </div>
-                    <div className="w-24 md:w-32 lg:w-40 h-[1px] bg-[var(--color-primary)] mx-auto mt-3"></div>
+                    <div className="w-20 md:w-24 lg:w-32 h-[1px] bg-[var(--color-primary)] mx-auto mt-2 mb-4"></div>
                   </div>
                   
-                  <div className="relative inline-block mb-4 md:mb-6 lg:mb-8 z-10">
-                    <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-[var(--font-display)] font-normal leading-tight text-white tracking-tight relative px-3 md:px-4">
-                      <span dangerouslySetInnerHTML={{ __html: slide.heading }} />
-                      <div className="absolute inset-0 filter blur-[8px] bg-white/15 -z-10" style={{ clipPath: 'inset(-15px -25px -35px -25px round 16px)' }}></div>
-                    </h1>
-                  </div>
-                  
-                  <div className="relative inline-block text-lg sm:text-xl md:text-2xl font-[var(--font-display)] font-medium mb-8 md:mb-12 lg:mb-16 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto text-white z-10 tracking-wide px-4">
-                    <span dangerouslySetInnerHTML={{ __html: slide.description }} />
-                    <div className="absolute inset-0 filter blur-[6px] bg-white/15 -z-10" style={{ clipPath: 'inset(-10px -20px -25px -20px round 10px)' }}></div>
+                  {/* Layout nuevo para mostrar el heading primero - unificando estilos de letra */}
+                  <div className="flex flex-col items-center justify-center gap-2 md:gap-3 text-center perspective-[1000px] transform-style-preserve-3d">
+                    <div className="relative z-10">
+                      <div className="relative transform-style-preserve-3d">
+                        <h1 className="text-3xl sm:text-4xl md:text-4xl lg:text-5xl xl:text-5xl font-[var(--font-display)] leading-tight tracking-tight inline-block transform-style-preserve-3d">
+                          <span dangerouslySetInnerHTML={{ __html: slide.heading.replace(/font-family: '.*?'/, "font-family: 'Trajan Pro', 'Cinzel', 'Didot', serif") }} />
+                        </h1>
+                        <div className="absolute inset-0 filter blur-[8px] bg-white/15 -z-10" style={{ clipPath: 'inset(-15px -25px -35px -25px round 16px)' }}></div>
+                      </div>
+                    </div>
+                    
+                    {slide.secondHeading && (
+                      <div className="relative z-10">
+                        <div className="relative transform-style-preserve-3d">
+                          <h2 className="text-3xl sm:text-4xl md:text-4xl lg:text-5xl xl:text-5xl font-[var(--font-display)] font-normal leading-tight tracking-tight inline-block mt-0 transform-style-preserve-3d">
+                            <span dangerouslySetInnerHTML={{ __html: slide.secondHeading.replace(/font-family: '.*?'/, "font-family: 'Trajan Pro', 'Cinzel', 'Didot', serif") }} />
+                          </h2>
+                          <div className="absolute inset-0 filter blur-[8px] bg-white/15 -z-10" style={{ clipPath: 'inset(-15px -25px -35px -25px round 16px)' }}></div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="relative z-10 mt-3 md:mt-4">
+                      <div className="relative transform-style-preserve-3d">
+                        <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-[var(--font-display)] font-normal max-w-3xl mx-auto text-white transform-style-preserve-3d">
+                          <span dangerouslySetInnerHTML={{ __html: slide.description.replace(/font-family: '.*?'/, "font-family: 'Trajan Pro', 'Cinzel', 'Didot', serif") }} />
+                        </p>
+                        <div className="absolute inset-0 filter blur-[6px] bg-white/15 -z-10" style={{ clipPath: 'inset(-10px -20px -25px -20px round 10px)' }}></div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -449,13 +464,13 @@ export default function HeroSection() {
         </div>
         
         {/* Controles del carrusel */}
-        <div className="absolute top-[80%] md:top-[82%] lg:top-[84%] left-1/2 transform -translate-x-1/2 flex items-center space-x-4 md:space-x-6 z-30">
+        <div className="absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 md:space-x-6 z-30">
           <button
             onClick={handlePrevSlide}
-            className="w-12 h-12 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-[var(--color-primary)]/20 transition-all duration-300"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-[var(--color-primary)]/20 transition-all duration-300"
             aria-label="Diapositiva anterior"
           >
-            <FaAngleLeft className="h-6 w-6" />
+            <FaAngleLeft className="h-5 w-5" />
           </button>
           
           <div className="flex items-center space-x-2">
@@ -465,8 +480,8 @@ export default function HeroSection() {
                 onClick={() => goToSlide(index)}
                 className={`h-[3px] transition-all duration-500 ${
                   index === currentSlide 
-                    ? 'w-10 bg-[var(--color-primary)]' 
-                    : 'w-5 bg-white/30 hover:bg-white/50'
+                    ? 'w-8 bg-[var(--color-primary)]' 
+                    : 'w-4 bg-white/30 hover:bg-white/50'
                 }`}
                 aria-label={`Ir a diapositiva ${index + 1}`}
               />
@@ -475,10 +490,10 @@ export default function HeroSection() {
           
           <button
             onClick={handleNextSlide}
-            className="w-12 h-12 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-[var(--color-primary)]/20 transition-all duration-300"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-[var(--color-primary)]/20 transition-all duration-300"
             aria-label="Siguiente diapositiva"
           >
-            <FaAngleRight className="h-6 w-6" />
+            <FaAngleRight className="h-5 w-5" />
           </button>
         </div>
       </div>

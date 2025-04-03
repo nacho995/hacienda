@@ -25,12 +25,16 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
+    width: 100%;
   }
 
   body {
     @apply bg-white text-gray-800;
     font-family: var(--font-body);
     letter-spacing: 0.02em;
+    overflow-x: hidden;
+    width: 100%;
   }
   
   h1, h2, h3, h4, h5, h6 {

@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { GiCastle } from 'react-icons/gi';
 import { FaHeart, FaGift, FaPlayCircle, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaQuoteLeft, FaChevronDown } from 'react-icons/fa';
-import { MdReplay10, MdForward10 } from 'react-icons/md';
+import { MdReplay10, MdForward10, MdSubtitles, MdSubtitlesOff } from 'react-icons/md';
+import Image from 'next/image';
 
 export default function IntroSection() {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef(null);
   const videoContainerRef = useRef(null);
+  const [logoVisible, setLogoVisible] = useState(false);
   
   // ID del video de YouTube
   const youtubeVideoId = 'Xn8RQw-AvcA';
@@ -17,6 +19,9 @@ export default function IntroSection() {
   const [showControls, setShowControls] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [volume, setVolume] = useState(100);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [showYouTubePlayer, setShowYouTubePlayer] = useState(false);
@@ -29,62 +34,139 @@ export default function IntroSection() {
     window.onYouTubeIframeAPIReady = () => {
       if (!showYouTubePlayer || !playerContainerRef.current) return;
       
-      const newPlayer = new window.YT.Player('youtube-player', {
-        videoId: youtubeVideoId,
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          rel: 0,
-          showinfo: 0,
-          mute: 1,
-          modestbranding: 1,
-          enablejsapi: 1,
-          origin: window.location.origin
-        },
-        events: {
-          onReady: onPlayerReady,
-          onStateChange: onPlayerStateChange
-        }
-      });
-      
-      setPlayer(newPlayer);
+      try {
+        const newPlayer = new window.YT.Player('youtube-player', {
+          videoId: youtubeVideoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            rel: 0,
+            showinfo: 0,
+            mute: 1,
+            modestbranding: 1,
+            enablejsapi: 1,
+            origin: window.location.origin,
+            cc_load_policy: 0, // Por defecto sin subtítulos
+            cc_lang_pref: 'es' // Preferencia de idioma español
+          },
+          events: {
+            onReady: onPlayerReady,
+            onStateChange: onPlayerStateChange,
+            onError: (e) => console.error("Error en YouTube Player:", e)
+          }
+        });
+        
+        setPlayer(newPlayer);
+      } catch (error) {
+        console.error("Error al crear el reproductor de YouTube:", error);
+      }
     };
     
     // Cargar el script de la API de YouTube
     const loadYouTubeAPI = () => {
-      const existingScript = document.getElementById('youtube-api');
-      if (!existingScript) {
-        const tag = document.createElement('script');
-        tag.id = 'youtube-api';
-        tag.src = 'https://www.youtube.com/iframe_api';
-        tag.async = true;
-        document.head.appendChild(tag);
-      } else if (window.YT && showYouTubePlayer && playerContainerRef.current) {
-        window.onYouTubeIframeAPIReady();
+      try {
+        const existingScript = document.getElementById('youtube-api');
+        if (!existingScript) {
+          const tag = document.createElement('script');
+          tag.id = 'youtube-api';
+          tag.src = 'https://www.youtube.com/iframe_api';
+          tag.async = true;
+          document.head.appendChild(tag);
+        } else if (window.YT && window.YT.Player && showYouTubePlayer && playerContainerRef.current) {
+          window.onYouTubeIframeAPIReady();
+        }
+      } catch (error) {
+        console.error("Error en loadYouTubeAPI:", error);
       }
     };
     
     if (showYouTubePlayer) {
       loadYouTubeAPI();
     }
+    
+    return () => {
+      // Limpieza al desmontar
+      if (player && typeof player.destroy === 'function') {
+        try {
+          player.destroy();
+        } catch (error) {
+          console.error("Error al destruir el reproductor:", error);
+        }
+      }
+    };
   }, [showYouTubePlayer, youtubeVideoId]);
+  
+  const onPlayerReady = (event) => {
+    try {
+      const player = event.target;
+      // Inicializar duración
+      const duration = player.getDuration();
+      
+      setVideoDuration(duration);
+      player.playVideo();
+      setIsVideoPlaying(true);
+      
+      // Asegurar que el progreso se inicie desde cero
+      setVideoProgress(0);
+    } catch (error) {
+      console.error("Error en onPlayerReady:", error);
+    }
+  };
+  
+  const onPlayerStateChange = (event) => {
+    try {
+      const newState = event.data;
+      
+      setIsVideoPlaying(newState === window.YT.PlayerState.PLAYING);
+      
+      // Actualizar duración si no está definida
+      if (videoDuration <= 0 && event.target.getDuration) {
+        const duration = event.target.getDuration();
+        if (duration > 0) {
+          setVideoDuration(duration);
+        }
+      }
+      
+      // Si está reproduciendo, comenzar a actualizar el tiempo actual
+      if (newState === window.YT.PlayerState.PLAYING) {
+        // Actualizar tiempo inmediatamente
+        if (event.target.getCurrentTime) {
+          const currentTime = event.target.getCurrentTime();
+          setVideoProgress(currentTime);
+        }
+      }
+    } catch (error) {
+      console.error("Error en onPlayerStateChange:", error);
+    }
+  };
   
   // Efecto para manejar el monitoreo del tiempo y limpiar recursos
   useEffect(() => {
     let timeMonitoringInterval;
     
-    if (player && typeof player.getDuration === 'function') {
-      // Iniciar temporizador
-      setVideoDuration(player.getDuration());
-      
-      timeMonitoringInterval = setInterval(() => {
-        try {
-          const currentTime = player.getCurrentTime();
-          setVideoProgress(currentTime);
-        } catch (error) {
-          console.error("Error actualizando tiempo:", error);
-        }
-      }, 250);
+    if (player && isVideoPlaying) {
+      try {
+        // Iniciar temporizador solo si el video está reproduciéndose
+        timeMonitoringInterval = setInterval(() => {
+          try {
+            if (player && typeof player.getCurrentTime === 'function') {
+              const currentTime = player.getCurrentTime();
+              const duration = player.getDuration(); // Actualizar duración regularmente
+              
+              // Actualizar duración si es mayor que la almacenada
+              if (duration > videoDuration) {
+                setVideoDuration(duration);
+              }
+              
+              setVideoProgress(currentTime);
+            }
+          } catch (error) {
+            console.error("Error actualizando tiempo:", error);
+          }
+        }, 500); // Intervalo más largo para mejor rendimiento
+      } catch (error) {
+        console.error("Error al inicializar monitoreo de tiempo:", error);
+      }
     }
     
     return () => {
@@ -92,19 +174,7 @@ export default function IntroSection() {
         clearInterval(timeMonitoringInterval);
       }
     };
-  }, [player]);
-  
-  const onPlayerReady = (event) => {
-    const duration = event.target.getDuration();
-    setVideoDuration(duration);
-    event.target.playVideo();
-    setIsVideoPlaying(true);
-  };
-  
-  const onPlayerStateChange = (event) => {
-    const newState = event.data;
-    setIsVideoPlaying(newState === window.YT.PlayerState.PLAYING);
-  };
+  }, [player, isVideoPlaying, videoDuration]);
   
   // Iniciar reproducción de YouTube
   const startPlayback = () => {
@@ -142,14 +212,47 @@ export default function IntroSection() {
       try {
         if (isMuted) {
           player.unMute();
+          player.setVolume(volume);
         } else {
           player.mute();
         }
         setIsMuted(!isMuted);
+        setShowVolumeSlider(!showVolumeSlider);
       } catch (error) {
         console.error("Error al cambiar estado de mute:", error);
       }
     }
+  };
+  
+  // Control de volumen
+  const handleVolumeChange = (e) => {
+    if (e) e.stopPropagation();
+    
+    if (player) {
+      try {
+        const newVolume = parseInt(e.target.value);
+        setVolume(newVolume);
+        
+        player.setVolume(newVolume);
+        
+        // Si el volumen es 0, silenciar; de lo contrario, asegurar que no está silenciado
+        if (newVolume === 0) {
+          player.mute();
+          setIsMuted(true);
+        } else if (isMuted) {
+          player.unMute();
+          setIsMuted(false);
+        }
+      } catch (error) {
+        console.error("Error al cambiar volumen:", error);
+      }
+    }
+  };
+  
+  // Mostrar/ocultar control de volumen
+  const toggleVolumeSlider = (e) => {
+    if (e) e.stopPropagation();
+    setShowVolumeSlider(!showVolumeSlider);
   };
   
   // Saltar adelante 10 segundos
@@ -234,27 +337,33 @@ export default function IntroSection() {
   const handleProgressBarInteraction = (e) => {
     if (!progressBarRef.current || !player || !videoDuration) return;
     
-    let clientX;
-    
-    // Manejar tanto eventos de mouse como touch
-    if (e.type.startsWith('touch')) {
-      const touch = e.touches[0] || e.changedTouches[0];
-      clientX = touch.clientX;
-    } else {
-      clientX = e.clientX;
-    }
-    
-    const rect = progressBarRef.current.getBoundingClientRect();
-    const position = clientX - rect.left;
-    const percentage = Math.max(0, Math.min(1, position / rect.width));
-    const seekTime = percentage * videoDuration;
-    
-    // Actualizar visualmente de inmediato para mejor UX
-    setVideoProgress(seekTime);
-    
-    // Solo enviar al video cuando se termine de arrastrar o en un clic
-    if (e.type === 'mouseup' || e.type === 'touchend' || e.type === 'click') {
-      player.seekTo(seekTime, true);
+    try {
+      let clientX;
+      
+      // Manejar tanto eventos de mouse como touch
+      if (e.type.startsWith('touch')) {
+        const touch = e.touches[0] || e.changedTouches[0];
+        clientX = touch.clientX;
+      } else {
+        clientX = e.clientX;
+      }
+      
+      const rect = progressBarRef.current.getBoundingClientRect();
+      const position = clientX - rect.left;
+      const percentage = Math.max(0, Math.min(1, position / rect.width));
+      const seekTime = percentage * videoDuration;
+      
+      // Actualizar visualmente de inmediato para mejor UX
+      setVideoProgress(seekTime);
+      
+      // Solo enviar al video cuando se termine de arrastrar o en un clic
+      if (e.type === 'mouseup' || e.type === 'touchend' || e.type === 'click') {
+        if (player && typeof player.seekTo === 'function') {
+          player.seekTo(seekTime, true);
+        }
+      }
+    } catch (error) {
+      console.error("Error en handleProgressBarInteraction:", error);
     }
   };
   
@@ -268,7 +377,8 @@ export default function IntroSection() {
   
   // Formatear tiempo en formato mm:ss
   const formatTime = (seconds) => {
-    if (!seconds) return "0:00";
+    if (isNaN(seconds) || seconds === null || seconds === undefined) return "0:00";
+    seconds = Math.max(0, seconds);
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -287,6 +397,58 @@ export default function IntroSection() {
       });
     } else {
       document.exitFullscreen();
+    }
+  };
+  
+  // Renderizado de la barra de progreso
+  const renderProgressBar = () => {
+    const progressPercentage = videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0;
+    
+    return (
+      <div 
+        ref={progressBarRef}
+        className="w-full h-3 bg-white/30 rounded-full mb-4 relative overflow-visible cursor-pointer group py-4"
+        onClick={handleProgressBarClick}
+        onMouseDown={startDrag}
+        onTouchStart={startDrag}
+      >
+        <div 
+          className="absolute left-0 top-1/2 transform -translate-y-1/2 h-3 bg-[var(--color-primary)] rounded-full" 
+          style={{ width: `${progressPercentage}%` }}
+        ></div>
+        <div 
+          className={`absolute top-1/2 transform -translate-y-1/2 h-6 w-6 bg-[var(--color-primary)] rounded-full shadow-md border-2 border-white transition-transform ${isDragging ? 'scale-125' : 'group-hover:scale-110'}`}
+          style={{ left: `calc(${progressPercentage}% - 12px)` }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            startDrag(e);
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            startDrag(e);
+          }}
+        ></div>
+      </div>
+    );
+  };
+  
+  // Control de subtítulos
+  const toggleSubtitles = (e) => {
+    if (e) e.stopPropagation();
+    
+    if (player) {
+      try {
+        if (!subtitlesEnabled) {
+          player.loadModule('captions');
+          player.setOption('captions', 'track', {'languageCode': 'es'});
+          player.setOption('captions', 'displaySettings', {'background': '#00000066'});
+        } else {
+          player.unloadModule('captions');
+        }
+        setSubtitlesEnabled(!subtitlesEnabled);
+      } catch (error) {
+        console.error("Error al cambiar estado de subtítulos:", error);
+      }
     }
   };
   
@@ -310,9 +472,40 @@ export default function IntroSection() {
     };
   }, []);
 
+  // Efecto para mostrar el logo con delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLogoVisible(true);
+    }, 800);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <section ref={sectionRef} id="intro" className="section-padding bg-[var(--color-cream-light)]">
-      <div className="max-w-6xl mx-auto px-6">
+    <section
+      id="intro"
+      ref={sectionRef}
+      className="relative pt-16 pb-24 bg-white overflow-hidden"
+    >
+      {/* Logo elegante en la esquina superior */}
+      <div className="absolute top-4 lg:top-8 left-4 lg:left-8 z-20 transform transition-all duration-1000" style={{ opacity: logoVisible ? 1 : 0, transform: logoVisible ? 'translateY(0)' : 'translateY(-20px)' }}>
+        <div className="relative group">
+          <div className="absolute inset-0 rounded-xl bg-white/70 backdrop-blur-md -z-10 shadow-xl"></div>
+          <div className="absolute inset-0 rounded-xl border border-[var(--color-primary-light)]/30 -z-10"></div>
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-[var(--color-primary-light)]/0 via-[var(--color-primary-light)]/30 to-[var(--color-primary-light)]/0 rounded-xl opacity-0 group-hover:opacity-100 blur-md transition-opacity duration-500 -z-20"></div>
+          <div className="p-2.5">
+            <Image 
+              src="/logo.png"
+              alt="Hacienda San Carlos"
+              width={250}
+              height={175}
+              className="object-contain filter drop-shadow-[0_0_5px_rgba(0,0,0,0.2)] transition-all duration-500 group-hover:drop-shadow-[0_0_8px_rgba(0,0,0,0.3)] group-hover:scale-105"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="container-custom">
         <div className="text-center mb-20">
           <h2 className="elegant-title centered fade-in text-5xl md:text-6xl font-[var(--font-display)] text-[var(--color-accent)] mb-12 font-light">
             Un <span className="text-[var(--color-primary)] font-semibold">Legado</span> de Distinción
@@ -376,30 +569,7 @@ export default function IntroSection() {
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Barra de progreso */}
-                <div 
-                  ref={progressBarRef}
-                  className="w-full h-3 bg-white/30 rounded-full mb-4 relative overflow-visible cursor-pointer group py-4"
-                  onClick={handleProgressBarClick}
-                  onMouseDown={startDrag}
-                  onTouchStart={startDrag}
-                >
-                  <div 
-                    className="absolute left-0 top-1/2 transform -translate-y-1/2 h-3 bg-[var(--color-primary)] rounded-full" 
-                    style={{ width: `${videoDuration ? (videoProgress / videoDuration) * 100 : 0}%` }}
-                  ></div>
-                  <div 
-                    className={`absolute top-1/2 transform -translate-y-1/2 h-6 w-6 bg-[var(--color-primary)] rounded-full shadow-md border-2 border-white transition-transform ${isDragging ? 'scale-125' : 'group-hover:scale-110'}`}
-                    style={{ left: `calc(${videoDuration ? (videoProgress / videoDuration) * 100 : 0}% - 12px)` }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      startDrag(e);
-                    }}
-                    onTouchStart={(e) => {
-                      e.stopPropagation();
-                      startDrag(e);
-                    }}
-                  ></div>
-                </div>
+                {renderProgressBar()}
                 
                 {/* Controles de reproducción */}
                 <div className="flex items-center justify-between">
@@ -433,16 +603,40 @@ export default function IntroSection() {
                   </div>
                   
                   <div className="flex items-center space-x-4">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleMute();
-                      }}
+                    <button
+                      onClick={toggleSubtitles}
                       className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
-                      aria-label={isMuted ? "Activar sonido" : "Silenciar"}
+                      aria-label={subtitlesEnabled ? "Desactivar subtítulos" : "Activar subtítulos"}
+                      title={subtitlesEnabled ? "Desactivar subtítulos" : "Activar subtítulos"}
                     >
-                      {isMuted ? <FaVolumeMute className="w-5 h-5" /> : <FaVolumeUp className="w-5 h-5" />}
+                      {subtitlesEnabled ? <MdSubtitles className="w-5 h-5" /> : <MdSubtitlesOff className="w-5 h-5" />}
                     </button>
+                    
+                    <div className="relative flex items-center">
+                      <button 
+                        onClick={toggleVolumeSlider}
+                        className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                        aria-label={isMuted ? "Activar sonido" : "Silenciar"}
+                      >
+                        {isMuted ? <FaVolumeMute className="w-5 h-5" /> : <FaVolumeUp className="w-5 h-5" />}
+                      </button>
+                      
+                      {showVolumeSlider && (
+                        <div className="absolute bottom-full left-0 mb-2 bg-black/80 p-2 rounded-lg w-32">
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="100" 
+                            value={volume} 
+                            onChange={handleVolumeChange}
+                            className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer"
+                            style={{
+                              accentColor: 'var(--color-primary)'
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
                     
                     <span className="text-white text-sm hidden sm:inline-block">
                       {formatTime(videoProgress)} / {formatTime(videoDuration)}
@@ -475,8 +669,10 @@ export default function IntroSection() {
         {/* Historia de la Hacienda - Formato renovado */}
         <div className="my-20 fade-in animate-delay-300">
           <div className="text-center mb-12">
-            <h3 className="text-4xl font-[var(--font-display)] text-[var(--color-accent-dark)] mb-6 font-semibold">
-              Historia y Tradición
+            <h3 className="text-4xl font-[var(--font-display)] text-[var(--color-accent-dark)] mb-6 font-semibold perspective-[1000px] transform-style-preserve-3d">
+              <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#A52A2A", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB"}}>
+                Historia y Tradición
+              </span>
             </h3>
             <div className="w-32 h-1 bg-[var(--color-primary)] mx-auto mb-6"></div>
           </div>
@@ -492,14 +688,22 @@ export default function IntroSection() {
                 />
               </div>
               <div className="bg-white/80 p-6 rounded-lg shadow-sm border border-[var(--color-accent)]/10">
-                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3">Orígenes Virreinales</h4>
+                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3 perspective-[1000px] transform-style-preserve-3d">
+                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#A52A2A", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px #8B0000, -0.5px -0.5px 0px #FFDBDB"}}>
+                    Orígenes Virreinales
+                  </span>
+                </h4>
                 <p className="leading-relaxed text-[var(--color-accent-dark)]">
                   Fundada durante la época virreinal del siglo XVII, esta joya arquitectónica fue originalmente establecida como una hacienda productora de caña de azúcar y pulque. Sus gruesos muros de cantera, patios con fuentes ornamentales y elegantes arcos fusionan perfectamente la arquitectura colonial española con elementos indígenas locales.
                 </p>
               </div>
               
               <div className="bg-[var(--color-primary-light)]/5 p-6 rounded-lg shadow-sm border border-[var(--color-primary)]/10">
-                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3">Testigo de la Independencia</h4>
+                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3 perspective-[1000px] transform-style-preserve-3d">
+                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#A52A2A", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px #8B0000, -0.5px -0.5px 0px #FFDBDB"}}>
+                    Testigo de la Independencia
+                  </span>
+                </h4>
                 <p className="leading-relaxed text-[var(--color-accent-dark)]">
                   Durante la Guerra de Independencia, la hacienda sirvió como refugio temporal para insurgentes. Sus paredes fueron testigos de conversaciones secretas y planes que ayudaron a forjar el México libre que conocemos hoy.
                 </p>
@@ -509,7 +713,11 @@ export default function IntroSection() {
             {/* Segunda columna con texto e imagen */}
             <div className="space-y-6">
               <div className="bg-[var(--color-accent-light)]/5 p-6 rounded-lg shadow-sm border border-[var(--color-accent)]/10">
-                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3">Época Revolucionaria</h4>
+                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3 perspective-[1000px] transform-style-preserve-3d">
+                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#A52A2A", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px #8B0000, -0.5px -0.5px 0px #FFDBDB"}}>
+                    Época Revolucionaria
+                  </span>
+                </h4>
                 <p className="leading-relaxed text-[var(--color-accent-dark)]">
                   En la época revolucionaria, la hacienda fue escenario de reuniones clandestinas que determinarían el rumbo del país. Figuras históricas recorrieron estos pasillos, dejando su huella imborrable en cada rincón de este monumento histórico.
                 </p>
@@ -524,9 +732,13 @@ export default function IntroSection() {
               </div>
               
               <div className="bg-white/80 p-6 rounded-lg shadow-sm border border-[var(--color-accent)]/10">
-                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3">Renacimiento y Esplendor</h4>
+                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3 perspective-[1000px] transform-style-preserve-3d">
+                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#A52A2A", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px #8B0000, -0.5px -0.5px 0px #FFDBDB"}}>
+                    Renacimiento Cultural
+                  </span>
+                </h4>
                 <p className="leading-relaxed text-[var(--color-accent-dark)]">
-                  Tras décadas de abandono después de la Revolución Mexicana, la hacienda fue meticulosamente restaurada a finales del siglo XX. Cada rincón fue rehabilitado respetando técnicas tradicionales y materiales originales, preservando su autenticidad histórica mientras se adaptaba para convertirse en un extraordinario recinto para eventos.
+                  Tras un cuidadoso proceso de restauración, la hacienda ha recuperado su esplendor original, convirtiéndose en un símbolo de preservación del patrimonio histórico y cultural de México.
                 </p>
               </div>
             </div>
@@ -544,7 +756,7 @@ export default function IntroSection() {
           
           <div className="space-y-4 text-lg leading-relaxed max-w-4xl mx-auto">
             <p>
-              Hoy, la <span className="font-semibold text-[var(--color-primary)]">Hacienda San Carlos Borromeo</span> se alza como un símbolo de elegancia atemporal y preservación cultural. Sus jardines centenarios, con árboles que han sido testigos silenciosos de la historia, crean un ambiente de serenidad mágica inigualable.
+              Hoy, la <span className="font-semibold perspective-[1000px] transform-style-preserve-3d inline-block" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#A52A2A", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px #8B0000, -0.5px -0.5px 0px #FFDBDB"}}>Hacienda San Carlos Borromeo</span> se alza como un símbolo de elegancia atemporal y preservación cultural. Sus jardines centenarios, con árboles que han sido testigos silenciosos de la historia, crean un ambiente de serenidad mágica inigualable.
             </p>
             <p>
               Cada celebración que tiene lugar entre sus muros continúa la tradición de momentos significativos que han definido a esta hacienda a lo largo de los siglos, permitiendo a sus visitantes:
