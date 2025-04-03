@@ -1,0 +1,45 @@
+# Dependencias
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Variables de entorno
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+
+# Directorios de datos
+data/
+uploads/
+
+# Directorios de compilación
+dist/
+build/
+coverage/
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+.directory
+
+# Archivos de IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos de caché
+.npm
+.eslintcache
+.node_repl_history
+
+# Archivos específicos de desarrollo
+.nodemon.json
+nodemon-debug.log 

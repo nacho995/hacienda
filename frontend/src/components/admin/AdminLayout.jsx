@@ -16,73 +16,48 @@ import {
   FaUserShield,
   FaChartPie
 } from 'react-icons/fa';
+import { useAuth } from '@/context/AuthContext';
+import { toast } from 'react-toastify';
 
 export default function AdminLayout({ children }) {
-  const [userData, setUserData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const { user, isAuthenticated, isAdmin, loading, logout } = useAuth();
   
-  // Obtener información del usuario
+  // Redirigir al login si no está autenticado o no es admin
   useEffect(() => {
-    const checkSession = () => {
-      try {
-        // Obtener la cookie de sesión
-        const cookies = document.cookie.split(';');
-        const sessionCookie = cookies.find(cookie => cookie.trim().startsWith('adminSession='));
-        
-        if (!sessionCookie) {
-          // No hay sesión, redirigir al login
-          router.push('/admin/login');
-          return;
-        }
-        
-        // Extraer el valor de la cookie
-        const sessionValue = sessionCookie.split('=')[1];
-        // Intentar decodificar la cookie (puede estar codificada en URI)
-        let sessionData;
-        try {
-          sessionData = JSON.parse(decodeURIComponent(sessionValue));
-        } catch (e) {
-          // Si falla el decodeURIComponent, intentar sin decodificar
-          sessionData = JSON.parse(sessionValue);
-        }
-        
-        // Verificar que la sesión sea válida
-        if (!sessionData || !sessionData.authenticated) {
-          router.push('/admin/login');
-          return;
-        }
-        
-        // Guardar datos del usuario
-        setUserData(sessionData);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error verificando sesión:', error);
-        // Si hay algún error, redirigir al login
-        router.push('/admin/login');
-      }
-    };
-    
-    checkSession();
-  }, [router, pathname]);
+    if (!loading && (!isAuthenticated || !isAdmin)) {
+      router.push('/admin/login');
+    }
+  }, [isAuthenticated, isAdmin, loading, router]);
 
   // Función para cerrar sesión
-  const handleLogout = () => {
-    // Eliminar la cookie
-    document.cookie = 'adminSession=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    // Redirigir al login
-    router.push('/admin/login');
+  const handleLogout = async () => {
+    try {
+      const result = await logout();
+      if (result.success) {
+        toast.success('Sesión cerrada correctamente');
+        router.push('/admin/login');
+      } else {
+        toast.error('Error al cerrar sesión');
+      }
+    } catch (error) {
+      console.error('Error en logout:', error);
+      toast.error('Error al cerrar sesión');
+    }
   };
 
-  // Si no hay datos de usuario, mostrar una pantalla de carga
-  if (!userData) {
+  // Si está cargando o no hay usuario autenticado, mostrar una pantalla de carga
+  if (loading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="bg-white p-8 rounded-lg shadow-md">
+      <div className="min-h-screen flex items-center justify-center bg-slate-800">
+        <div className="bg-slate-700 p-8 rounded-lg shadow-md text-white">
           <h1 className="text-2xl font-bold mb-4">Cargando...</h1>
           <p>Verificando tu sesión</p>
+          <div className="mt-4 flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          </div>
         </div>
       </div>
     );
@@ -135,11 +110,11 @@ export default function AdminLayout({ children }) {
         <div className="p-4 border-b border-slate-700">
           <div className="flex items-center">
             <div className="bg-slate-600 w-10 h-10 rounded-full flex items-center justify-center mr-2">
-              <span className="text-lg font-semibold">{userData.name?.charAt(0) || 'A'}</span>
+              <span className="text-lg font-semibold">{user.nombre?.charAt(0) || user.email?.charAt(0) || 'A'}</span>
             </div>
             <div>
-              <div className="font-semibold">{userData.name || 'Administrador'}</div>
-              <div className="text-sm text-slate-300">{userData.email}</div>
+              <div className="font-semibold">{user.nombre || 'Administrador'}</div>
+              <div className="text-sm text-slate-300">{user.email}</div>
             </div>
           </div>
         </div>

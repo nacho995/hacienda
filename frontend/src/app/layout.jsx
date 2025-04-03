@@ -1,7 +1,7 @@
 import './globals.css';
+import 'react-toastify/dist/ReactToastify.css';
+import { AuthProvider } from '@/context/AuthContext';
 import AnimatedBackground from '@/components/layout/AnimatedBackground';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
 
 export const metadata = {
   title: 'Hacienda San Carlos Borromeo',
@@ -16,9 +16,9 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         <AnimatedBackground />
-        <Navbar />
-        {children}
-        <Footer />
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -497,8 +497,8 @@ export default function IntroSection() {
             <Image 
               src="/logo.png"
               alt="Hacienda San Carlos"
-              width={250}
-              height={175}
+              width={300}
+              height={75}
               className="object-contain filter drop-shadow-[0_0_5px_rgba(0,0,0,0.2)] transition-all duration-500 group-hover:drop-shadow-[0_0_8px_rgba(0,0,0,0.3)] group-hover:scale-105"
             />
           </div>

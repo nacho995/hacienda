@@ -1,29 +1,42 @@
 "use client";
 
-import '../globals.css';
-import AdminLayout from '@/components/admin/AdminLayout';
 import { usePathname } from 'next/navigation';
+import AdminLayout from '@/components/admin/AdminLayout';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default function AdminRootLayout({ children }) {
   const pathname = usePathname();
   
-  // Si estamos en las páginas de autenticación, no mostrar el AdminLayout
-  if (pathname === '/admin/login' || pathname === '/admin/registro') {
-    return (
-      <div className="admin-page">
-        <div className="admin-auth-page">
+  // Verificar si estamos en páginas de autenticación
+  const isAuthPage = pathname === '/admin/login' || pathname === '/admin/registro';
+  
+  return (
+    <>
+      {isAuthPage ? (
+        // Para páginas de autenticación, mostrar solo el contenido
+        <div className="min-h-screen flex items-center justify-center">
           {children}
         </div>
-      </div>
-    );
-  }
-  
-  // Para el resto de páginas admin, usar el AdminLayout
-  return (
-    <div className="admin-page">
-      <AdminLayout>
-        {children}
-      </AdminLayout>
-    </div>
+      ) : (
+        // Para el resto de páginas admin, usar el AdminLayout
+        <AdminLayout>
+          {children}
+        </AdminLayout>
+      )}
+      
+      <ToastContainer 
+        position="bottom-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="dark"
+      />
+    </>
   );
 } 

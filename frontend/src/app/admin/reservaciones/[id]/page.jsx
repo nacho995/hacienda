@@ -14,8 +14,19 @@ import {
   FaCheckCircle, 
   FaTimesCircle, 
   FaEdit, 
-  FaArrowLeft 
+  FaArrowLeft,
+  FaUserPlus,
+  FaSpinner
 } from 'react-icons/fa';
+import { toast } from 'react-hot-toast';
+
+import { 
+  asignarHabitacionReservation,
+  asignarEventoReservation,
+  asignarMasajeReservation
+} from '@/services/reservationService';
+
+import userService from '@/api/services/userService';
 
 export default function ReservationDetails() {
   const params = useParams();
@@ -26,6 +37,10 @@ export default function ReservationDetails() {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showEditPanel, setShowEditPanel] = useState(false);
   const [statusNote, setStatusNote] = useState('');
+  const [usuarios, setUsuarios] = useState([]);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assignLoading, setAssignLoading] = useState(false);
 
   useEffect(() => {
     // En una aplicación real, aquí harías una petición a tu API
@@ -61,6 +76,24 @@ export default function ReservationDetails() {
     getReservation();
   }, [params.id]);
 
+  // Cargar usuarios para el diálogo de asignación
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await userService.getAllUsers();
+        if (response.success) {
+          setUsuarios(response.data);
+        }
+      } catch (err) {
+        console.error('Error cargando usuarios:', err);
+      }
+    };
+
+    if (isAuthenticated && isAdmin) {
+      fetchUsers();
+    }
+  }, [isAuthenticated, isAdmin]);
+
   const handleConfirm = () => {
     // Aquí iría la lógica para confirmar la reserva
     setReservation({
@@ -87,6 +120,60 @@ export default function ReservationDetails() {
     });
     setShowCancelDialog(false);
     setStatusNote('');
+  };
+
+  // Función para asignar la reserva a un usuario
+  const handleAssign = async () => {
+    if (!selectedUser) {
+      toast.error('Por favor, selecciona un usuario para asignar la reserva');
+      return;
+    }
+
+    setAssignLoading(true);
+    try {
+      let response;
+      
+      if (reservationType === 'habitacion') {
+        response = await asignarHabitacionReservation(params.id, selectedUser);
+      } else if (reservationType === 'evento') {
+        response = await asignarEventoReservation(params.id, selectedUser);
+      } else if (reservationType === 'masaje') {
+        response = await asignarMasajeReservation(params.id, selectedUser);
+      }
+      
+      if (response.success) {
+        // Actualizar la reserva en el estado
+        setReservation({
+          ...reservation,
+          asignadoA: selectedUser,
+          historial: [
+            ...reservation.historial,
+            { 
+              fecha: new Date().toISOString().split('T')[0], 
+              accion: `Reserva asignada a: ${usuarios.find(u => u._id === selectedUser)?.nombre || 'Usuario'}`, 
+              usuario: 'Admin' 
+            }
+          ]
+        });
+        
+        toast.success('Reserva asignada correctamente');
+        setShowAssignDialog(false);
+      } else {
+        toast.error(response.message || 'Error al asignar la reserva');
+      }
+    } catch (error) {
+      console.error('Error asignando reserva:', error);
+      toast.error('Error al asignar la reserva');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  // Encontrar el usuario asignado a la reserva
+  const getAssignedUserName = () => {
+    if (!reservation.asignadoA) return 'Sin asignar';
+    const assignedUser = usuarios.find(u => u._id === reservation.asignadoA);
+    return assignedUser ? `${assignedUser.nombre} ${assignedUser.apellidos}` : 'Usuario desconocido';
   };
 
   const StatusBadge = ({ status }) => {
@@ -297,6 +384,13 @@ export default function ReservationDetails() {
                   <FaEdit className="mr-2" />
                   Editar Reservación
                 </button>
+                <button 
+                  onClick={() => setShowAssignDialog(true)}
+                  className="w-full py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center justify-center"
+                >
+                  <FaUserPlus className="mr-2" />
+                  Asignar a Usuario
+                </button>
               </div>
             </div>
           </div>
@@ -433,6 +527,57 @@ export default function ReservationDetails() {
                 className="w-full py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para asignar la reserva a un usuario */}
+      {showAssignDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-4">Asignar Reserva a Usuario</h2>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Asignación actual: <span className="font-medium">{getAssignedUserName()}</span>
+              </p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Selecciona un usuario:
+              </label>
+              <select
+                value={selectedUser}
+                onChange={(e) => setSelectedUser(e.target.value)}
+                className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
+              >
+                <option value="">-- Seleccionar usuario --</option>
+                {usuarios.map(user => (
+                  <option key={user._id} value={user._id}>
+                    {user.nombre} {user.apellidos} ({user.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowAssignDialog(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAssign}
+                disabled={assignLoading || !selectedUser}
+                className={`px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 ${(assignLoading || !selectedUser) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {assignLoading ? (
+                  <>
+                    <FaSpinner className="inline animate-spin mr-2" />
+                    Asignando...
+                  </>
+                ) : 'Asignar'}
               </button>
             </div>
           </div>
