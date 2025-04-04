@@ -12,7 +12,10 @@ import {
   updateMasajeReservation,
   deleteHabitacionReservation,
   deleteEventoReservation,
-  deleteMasajeReservation
+  deleteMasajeReservation,
+  unassignHabitacionReservation,
+  unassignEventoReservation,
+  unassignMasajeReservation
 } from '@/services/reservationService';
 import userService from '@/services/userService';
 import { useAuth } from '@/context/AuthContext';
@@ -54,6 +57,22 @@ export default function AdminReservations() {
     router.push(newUrl, { scroll: false });
   };
   
+  // Función para obtener el nombre del usuario asignado
+  const getUsuarioAsignado = (reserva) => {
+    if (!reserva.asignadoA) return 'Sin asignar';
+    
+    // Si la reserva tiene los datos del usuario populados
+    if (typeof reserva.asignadoA === 'object' && reserva.asignadoA.nombre) {
+      return `${reserva.asignadoA.nombre} ${reserva.asignadoA.apellidos}`;
+    }
+    
+    // Si solo tenemos el ID, buscamos en la lista de usuarios
+    const usuarioAsignado = usuarios.find(u => u._id === reserva.asignadoA);
+    return usuarioAsignado ? 
+      `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos}` : 
+      'Usuario asignado';
+  };
+  
   // Función para cargar todas las reservaciones
   const loadReservations = async () => {
     try {
@@ -66,8 +85,8 @@ export default function AdminReservations() {
         if (usersResponse.success && Array.isArray(usersResponse.data)) {
           setUsuarios(usersResponse.data);
         } else {
-          setUsuarios([]);
           console.warn('No se pudieron cargar los usuarios o formato incorrecto:', usersResponse);
+          setUsuarios([]);
         }
       } catch (userError) {
         console.error('Error al cargar usuarios:', userError);
@@ -76,13 +95,13 @@ export default function AdminReservations() {
       
       // Cargar las reservas según el tipo seleccionado
       const [habitacionData, eventoData, masajeData] = await Promise.all([
-        filterType === 'all' || filterType === 'habitacion' ? getHabitacionReservations() : Promise.resolve([]),
-        filterType === 'all' || filterType === 'evento' ? getEventoReservations() : Promise.resolve([]),
-        filterType === 'all' || filterType === 'masaje' ? getMasajeReservations() : Promise.resolve([])
+        filterType === 'all' || filterType === 'habitacion' ? getHabitacionReservations() : Promise.resolve({ data: [] }),
+        filterType === 'all' || filterType === 'evento' ? getEventoReservations() : Promise.resolve({ data: [] }),
+        filterType === 'all' || filterType === 'masaje' ? getMasajeReservations() : Promise.resolve({ data: [] })
       ]);
       
       // Formatear los datos para la tabla
-      const habitacionReservations = Array.isArray(habitacionData) ? habitacionData.map(h => ({
+      const habitacionReservations = Array.isArray(habitacionData.data) ? habitacionData.data.map(h => ({
         id: h._id,
         cliente: `${h.nombre} ${h.apellidos}`,
         tipo: 'habitacion',
@@ -95,7 +114,7 @@ export default function AdminReservations() {
         asignadoA: h.asignadoA
       })) : [];
       
-      const eventoReservations = Array.isArray(eventoData) ? eventoData.map(e => ({
+      const eventoReservations = Array.isArray(eventoData.data) ? eventoData.data.map(e => ({
         id: e._id,
         cliente: `${e.nombreContacto} ${e.apellidosContacto}`,
         tipo: 'evento',
@@ -107,7 +126,7 @@ export default function AdminReservations() {
         asignadoA: e.asignadoA
       })) : [];
       
-      const masajeReservations = Array.isArray(masajeData) ? masajeData.map(m => ({
+      const masajeReservations = Array.isArray(masajeData.data) ? masajeData.data.map(m => ({
         id: m._id,
         cliente: `${m.nombre} ${m.apellidos}`,
         tipo: 'masaje',
@@ -138,6 +157,11 @@ export default function AdminReservations() {
   // Filtrar reservaciones según los filtros aplicados
   const getFilteredReservations = () => {
     return allReservations.filter(reservation => {
+      // Obtener el ID del usuario asignado, manejando tanto objetos como IDs directos
+      const reservaAsignadaId = typeof reservation.asignadoA === 'object' ? 
+        reservation.asignadoA?._id : 
+        reservation.asignadoA;
+
       // Filtrado por búsqueda
       const matchesSearch =
         reservation.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -158,8 +182,8 @@ export default function AdminReservations() {
       
       // Filtrado por usuario asignado
       const matchesUser = filterUser === 'all' ? true :
-        filterUser === 'sin_asignar' ? !reservation.asignadoA :
-        reservation.asignadoA === filterUser;
+        filterUser === 'sin_asignar' ? !reservaAsignadaId :
+        reservaAsignadaId === filterUser;
       
       return matchesSearch && matchesStatus && matchesType && matchesUser;
     });
@@ -219,13 +243,6 @@ export default function AdminReservations() {
       default:
         return 'Todas las Reservaciones';
     }
-  };
-
-  // Función para obtener el nombre del usuario asignado
-  const getUsuarioAsignado = (reserva) => {
-    if (!reserva.asignadoA) return 'Sin asignar';
-    const usuarioAsignado = usuarios.find(u => u._id === reserva.asignadoA);
-    return usuarioAsignado ? `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos}` : 'Usuario desconocido';
   };
   
   // Función para confirmar una reserva
@@ -346,6 +363,46 @@ export default function AdminReservations() {
     }
   };
   
+  // Función para desasignar una reserva
+  const handleUnassignReservation = async (id, tipo) => {
+    try {
+      let response;
+      switch(tipo) {
+        case 'habitacion':
+          response = await unassignHabitacionReservation(id);
+          break;
+        case 'evento':
+          response = await unassignEventoReservation(id);
+          break;
+        case 'masaje':
+          response = await unassignMasajeReservation(id);
+          break;
+        default:
+          throw new Error('Tipo de reserva no válido');
+      }
+      
+      if (response && response.success) {
+        toast.success('Reserva desasignada exitosamente');
+        
+        // Actualizar el estado localmente
+        setAllReservations(prevReservations => {
+          return prevReservations.map(reserva => {
+            if (reserva.id === id) {
+              return { ...reserva, asignadoA: null };
+            }
+            return reserva;
+          });
+        });
+      } else {
+        const errorMsg = response?.message || 'Error desconocido al desasignar la reserva';
+        toast.error('Error al desasignar la reserva: ' + errorMsg);
+      }
+    } catch (error) {
+      console.error('Error desasignando reserva:', error);
+      toast.error('Error al desasignar la reserva: ' + (error.message || 'Error desconocido'));
+    }
+  };
+  
   // Añadir esta función para manejar el clic en el menú de tres puntos
   const toggleDropdown = (id) => {
     if (activeDropdown === id) {
@@ -458,8 +515,8 @@ export default function AdminReservations() {
 
       {/* Tabla de Reservaciones */}
       {!loading && !error && (
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="overflow-x-auto max-h-full">
+        <div className="bg-white rounded-xl shadow-lg">
+          <div className="overflow-x-auto">
             <table className="w-full table-auto">
               <thead>
                 <tr className="bg-gray-50">
@@ -533,68 +590,91 @@ export default function AdminReservations() {
                           reservation.total}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="relative dropdown">
+                        <div className="relative">
                           <button 
+                            type="button"
                             onClick={() => toggleDropdown(reservation.id)}
-                            className="text-gray-400 hover:text-gray-900 p-2 rounded-full hover:bg-gray-100"
+                            className="text-gray-400 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                           >
                             <FaEllipsisV />
                           </button>
-                          <div 
-                            className={`fixed inset-0 bg-transparent ${activeDropdown === reservation.id ? 'block' : 'hidden'}`}
-                            onClick={() => setActiveDropdown(null)}
-                            style={{ zIndex: 40 }}
-                          ></div>
-                          <div 
-                            className={`dropdown-menu bg-white rounded-md shadow-lg ${activeDropdown === reservation.id ? 'block' : 'hidden'}`}
-                            style={{ 
-                              position: 'absolute',
-                              top: '0',
-                              right: '2rem',
-                              width: '12rem',
-                              zIndex: 50,
-                              border: '1px solid #e5e7eb',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-                            }}
-                          >
-                            <Link
-                              href={getReservationPath(reservation.tipo, reservation.id)}
-                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                            >
-                              Ver detalles
-                            </Link>
-                            {reservation.estado.toLowerCase() === 'pendiente' && (
-                              <button 
-                                onClick={() => {
-                                  handleConfirmReservation(reservation.id, reservation.tipo);
-                                  setActiveDropdown(null);
+                          
+                          {activeDropdown === reservation.id && (
+                            <>
+                              <div className="fixed inset-0 z-[9998]" onClick={() => setActiveDropdown(null)}></div>
+                              <div
+                                className="absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[9999]"
+                                style={{
+                                  position: 'fixed',
+                                  transform: `translate(${-100}px, ${20}px)`
                                 }}
-                                className="block px-4 py-2 text-sm text-green-700 hover:bg-green-100 w-full text-left"
                               >
-                                Confirmar
-                              </button>
-                            )}
-                            {reservation.estado.toLowerCase() !== 'cancelada' && (
-                              <button 
-                                onClick={() => {
-                                  handleCancelReservation(reservation.id, reservation.tipo);
-                                  setActiveDropdown(null);
-                                }}
-                                className="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-100 w-full text-left"
-                              >
-                                Cancelar
-                              </button>
-                            )}
-                            <button 
-                              onClick={() => {
-                                handleDeleteReservation(reservation.id, reservation.tipo);
-                                setActiveDropdown(null);
-                              }}
-                              className="block px-4 py-2 text-sm text-red-700 hover:bg-red-100 w-full text-left"
-                            >
-                              Eliminar
-                            </button>
-                          </div>
+                                <div className="py-1" role="menu" aria-orientation="vertical">
+                                  <Link
+                                    href={getReservationPath(reservation.tipo, reservation.id)}
+                                    className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 w-full text-left"
+                                    role="menuitem"
+                                  >
+                                    Ver detalles
+                                  </Link>
+                                  
+                                  <button 
+                                    onClick={() => {
+                                      handleConfirmReservation(reservation.id, reservation.tipo);
+                                    }}
+                                    className={`block px-4 py-2 text-sm w-full text-left ${
+                                      reservation.estado.toLowerCase() === 'confirmada' 
+                                        ? 'text-gray-400 cursor-not-allowed' 
+                                        : 'text-green-700 hover:bg-green-50'
+                                    }`}
+                                    disabled={reservation.estado.toLowerCase() === 'confirmada'}
+                                    role="menuitem"
+                                  >
+                                    Confirmar
+                                  </button>
+                                  
+                                  <button 
+                                    onClick={() => {
+                                      handleCancelReservation(reservation.id, reservation.tipo);
+                                    }}
+                                    className={`block px-4 py-2 text-sm w-full text-left ${
+                                      reservation.estado.toLowerCase() === 'cancelada' 
+                                        ? 'text-gray-400 cursor-not-allowed' 
+                                        : 'text-orange-700 hover:bg-orange-50'
+                                    }`}
+                                    disabled={reservation.estado.toLowerCase() === 'cancelada'}
+                                    role="menuitem"
+                                  >
+                                    Cancelar
+                                  </button>
+
+                                  {reservation.asignadoA && (
+                                    <button 
+                                      onClick={() => {
+                                        handleUnassignReservation(reservation.id, reservation.tipo);
+                                        setActiveDropdown(null);
+                                      }}
+                                      className="text-amber-700 block px-4 py-2 text-sm hover:bg-amber-50 w-full text-left"
+                                      role="menuitem"
+                                    >
+                                      Desasignar
+                                    </button>
+                                  )}
+                                  
+                                  <button 
+                                    onClick={() => {
+                                      handleDeleteReservation(reservation.id, reservation.tipo);
+                                      setActiveDropdown(null);
+                                    }}
+                                    className="text-red-700 block px-4 py-2 text-sm hover:bg-red-50 w-full text-left"
+                                    role="menuitem"
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

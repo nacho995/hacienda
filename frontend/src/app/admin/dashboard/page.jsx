@@ -10,7 +10,12 @@ import {
   getEventoReservations, 
   getMasajeReservations,
   getAllReservationsForDashboard,
-  assignEventoReservation
+  assignEventoReservation,
+  assignHabitacionReservation,
+  assignMasajeReservation,
+  unassignEventoReservation,
+  unassignHabitacionReservation,
+  unassignMasajeReservation
 } from '@/services/reservationService';
 import userService from '@/services/userService';
 import { toast } from 'sonner';
@@ -167,12 +172,20 @@ export default function AdminDashboard() {
     };
   }, [loadDashboardData]);
 
-  // Obtener nombre de usuario asignado a partir del ID
+  // Función para obtener el nombre del usuario asignado
   const getUsuarioAsignado = (reserva) => {
     if (!reserva.asignadoA) return 'Sin asignar';
     
+    // Si la reserva tiene los datos del usuario populados
+    if (typeof reserva.asignadoA === 'object' && reserva.asignadoA.nombre) {
+      return `${reserva.asignadoA.nombre} ${reserva.asignadoA.apellidos}`;
+    }
+    
+    // Si solo tenemos el ID, buscamos en la lista de usuarios
     const usuarioAsignado = usuarios.find(u => u._id === reserva.asignadoA);
-    return usuarioAsignado ? `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos || ''}` : 'Sin asignar';
+    return usuarioAsignado ? 
+      `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos}` : 
+      'Usuario asignado';
   };
   
   // Obtener badge de estado con colores
@@ -268,26 +281,132 @@ export default function AdminDashboard() {
     setShowAssignModal(true);
   };
 
-  // Función para asignar evento al usuario actual
-  const handleAssignToMe = async (reservationId) => {
+  // Función para asignar una reserva a mí mismo
+  const handleAssignToMe = async (reserva) => {
     try {
-      setAssigningReservation(true);
-      const response = await assignEventoReservation(reservationId);
+      setIsRefreshing(true);
+      let response;
       
-      if (response && response.success) {
+      switch (reserva.tipo) {
+        case 'evento':
+          response = await assignEventoReservation(reserva._id);
+          break;
+        case 'habitacion':
+          response = await assignHabitacionReservation(reserva._id);
+          break;
+        case 'masaje':
+          response = await assignMasajeReservation(reserva._id);
+          break;
+        default:
+          throw new Error('Tipo de reserva no válido');
+      }
+
+      if (response.success) {
         toast.success('Reserva asignada exitosamente');
-        loadDashboardData(true); // Recargar los datos
+        
+        // Actualizar el estado localmente
+        const updateReservation = (list) => list.map(r => {
+          if (r._id === reserva._id) {
+            return { ...r, asignadoA: user._id };
+          }
+          return r;
+        });
+
+        setAllReservations(prev => updateReservation(prev));
+        setEventoReservations(prev => updateReservation(prev));
+        setHabitacionReservations(prev => updateReservation(prev));
+        setMasajeReservations(prev => updateReservation(prev));
+        
+        // Recargar los datos para asegurar sincronización
+        await loadDashboardData(false);
         setShowAssignModal(false);
       } else {
-        toast.error('Error al asignar la reserva');
+        toast.error(response.message || 'Error al asignar la reserva');
       }
     } catch (error) {
-      console.error('Error asignando reserva:', error);
-      toast.error('Error al asignar la reserva: ' + (error.message || 'Error desconocido'));
+      console.error('Error al asignar reserva:', error);
+      toast.error(error.message || 'Error al asignar la reserva');
     } finally {
-      setAssigningReservation(false);
+      setIsRefreshing(false);
     }
   };
+
+  // Función para desasignar una reserva
+  const handleUnassign = async (reserva) => {
+    try {
+      setIsRefreshing(true);
+      let response;
+      
+      switch (reserva.tipo) {
+        case 'evento':
+          response = await unassignEventoReservation(reserva._id);
+          break;
+        case 'habitacion':
+          response = await unassignHabitacionReservation(reserva._id);
+          break;
+        case 'masaje':
+          response = await unassignMasajeReservation(reserva._id);
+          break;
+        default:
+          throw new Error('Tipo de reserva no válido');
+      }
+
+      if (response && response.success) {
+        toast.success('Reserva desasignada exitosamente');
+        
+        // Actualizar el estado localmente
+        const updateReservation = (list) => 
+          list.map(r => {
+            if (r._id === reserva._id) {
+              return { 
+                ...r, 
+                asignadoA: null,
+                estado: 'Pendiente' // Actualizar también el estado
+              };
+            }
+            return r;
+          });
+
+        setAllReservations(prev => updateReservation(prev));
+        setEventoReservations(prev => updateReservation(prev));
+        setHabitacionReservations(prev => updateReservation(prev));
+        setMasajeReservations(prev => updateReservation(prev));
+        
+        // Recargar los datos para asegurar sincronización
+        await loadDashboardData(false);
+      } else {
+        toast.error(response?.message || 'Error al desasignar la reserva');
+      }
+    } catch (error) {
+      console.error('Error al desasignar reserva:', error);
+      toast.error(error.message || 'Error al desasignar la reserva');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Función para filtrar las reservas según el usuario seleccionado
+  const getFilteredReservations = (reservations) => {
+    return reservations.filter(reserva => {
+      const reservaAsignadaId = typeof reserva.asignadoA === 'object' ? 
+        reserva.asignadoA?._id : 
+        reserva.asignadoA;
+
+      if (filtroUsuario === 'todos') {
+        return true;
+      } else if (filtroUsuario === 'sin_asignar') {
+        return !reservaAsignadaId;
+      } else {
+        return reservaAsignadaId === filtroUsuario;
+      }
+    });
+  };
+
+  // Aplicar filtros a cada tipo de reserva
+  const filteredHabitacionReservations = getFilteredReservations(habitacionReservations);
+  const filteredEventoReservations = getFilteredReservations(eventoReservations);
+  const filteredMasajeReservations = getFilteredReservations(masajeReservations);
+  const filteredAllReservations = getFilteredReservations(allReservations);
 
   // Si está cargando, mostrar spinner
   if (isLoading) {
@@ -337,11 +456,12 @@ export default function AdminDashboard() {
           >
             <option value="todos">Todas las reservas</option>
             <option value="sin_asignar">Sin asignar</option>
-            {usuarios.map(user => (
-              <option key={user._id} value={user._id}>
-                {user.nombre} {user.apellidos || ''}
+            {usuarios.filter(u => u._id !== user?._id).map(usuario => (
+              <option key={usuario._id} value={usuario._id}>
+                Asignadas a: {usuario.nombre} {usuario.apellidos || ''}
               </option>
             ))}
+            <option value={user?._id}>Mis reservas</option>
           </select>
           
           {/* Botón de actualización manual */}
@@ -399,9 +519,9 @@ export default function AdminDashboard() {
           </Link>
         </div>
         <div className="p-4">
-          {allReservations.length > 0 ? (
+          {filteredAllReservations.length > 0 ? (
             <div className="space-y-3">
-              {allReservations.slice(0, 10).map((reserva) => (
+              {filteredAllReservations.slice(0, 10).map((reserva) => (
                 <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
                   <div className="flex justify-between mb-1">
                     <div className="flex items-center">
@@ -417,17 +537,29 @@ export default function AdminDashboard() {
                     <span>{reserva.tituloDisplay}</span>
                   </div>
                   <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                    <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
+                    <span className={`flex items-center ${
+                      reserva.asignadoA ? 'text-green-600' : 'text-gray-500'
+                    }`}>
+                      <FaUserCircle className="mr-1" />
+                      {getUsuarioAsignado(reserva)}
+                    </span>
                     <div className="flex space-x-2">
                       <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
                         Ver detalles
                       </Link>
-                      {reserva.tipo === 'evento' && !reserva.asignadoA && (
+                      {!reserva.asignadoA ? (
                         <button 
-                          onClick={() => handleOpenAssignModal(reserva)}
+                          onClick={() => handleAssignToMe(reserva)}
                           className="text-[var(--color-primary)] hover:underline"
                         >
                           Asignar a mí
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => handleUnassign(reserva)}
+                          className="text-amber-600 hover:underline"
+                        >
+                          Desasignar
                         </button>
                       )}
                     </div>
@@ -460,9 +592,9 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="p-4">
-            {habitacionReservations.length > 0 ? (
+            {filteredHabitacionReservations.length > 0 ? (
               <div className="space-y-3">
-                {habitacionReservations.slice(0, 5).map((reserva) => (
+                {filteredHabitacionReservations.slice(0, 5).map((reserva) => (
                   <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
                     <div className="flex justify-between mb-1">
                       <span className="font-medium">{reserva.clienteDisplay}</span>
@@ -473,7 +605,12 @@ export default function AdminDashboard() {
                       <span>{reserva.tipoHabitacion}</span>
                     </div>
                     <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                      <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
+                      <span className={`flex items-center ${
+                        reserva.asignadoA ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        <FaUserCircle className="mr-1" />
+                        {getUsuarioAsignado(reserva)}
+                      </span>
                       <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
                         Ver detalles
                       </Link>
@@ -504,9 +641,9 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="p-4">
-            {eventoReservations.length > 0 ? (
+            {filteredEventoReservations.length > 0 ? (
               <div className="space-y-3">
-                {eventoReservations.slice(0, 5).map((reserva) => (
+                {filteredEventoReservations.slice(0, 5).map((reserva) => (
                   <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
                     <div className="flex justify-between mb-1">
                       <div className="flex items-center">
@@ -522,17 +659,29 @@ export default function AdminDashboard() {
                       <span>{reserva.tituloDisplay}</span>
                     </div>
                     <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                      <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
+                      <span className={`flex items-center ${
+                        reserva.asignadoA ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        <FaUserCircle className="mr-1" />
+                        {getUsuarioAsignado(reserva)}
+                      </span>
                       <div className="flex space-x-2">
                         <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
                           Ver detalles
                         </Link>
-                        {reserva.tipo === 'evento' && !reserva.asignadoA && (
+                        {!reserva.asignadoA ? (
                           <button 
-                            onClick={() => handleOpenAssignModal(reserva)}
+                            onClick={() => handleAssignToMe(reserva)}
                             className="text-[var(--color-primary)] hover:underline"
                           >
                             Asignar a mí
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => handleUnassign(reserva)}
+                            className="text-amber-600 hover:underline"
+                          >
+                            Desasignar
                           </button>
                         )}
                       </div>
@@ -563,9 +712,9 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="p-4">
-            {masajeReservations.length > 0 ? (
+            {filteredMasajeReservations.length > 0 ? (
               <div className="space-y-3">
-                {masajeReservations.slice(0, 5).map((reserva) => (
+                {filteredMasajeReservations.slice(0, 5).map((reserva) => (
                   <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
                     <div className="flex justify-between mb-1">
                       <span className="font-medium">{reserva.clienteDisplay}</span>
@@ -576,7 +725,12 @@ export default function AdminDashboard() {
                       <span>{reserva.tipoMasaje}</span>
                     </div>
                     <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                      <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
+                      <span className={`flex items-center ${
+                        reserva.asignadoA ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        <FaUserCircle className="mr-1" />
+                        {getUsuarioAsignado(reserva)}
+                      </span>
                       <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
                         Ver detalles
                       </Link>
@@ -612,7 +766,7 @@ export default function AdminDashboard() {
               <button
                 type="button"
                 className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:bg-[var(--color-primary-dark)] transition-colors flex items-center"
-                onClick={() => handleAssignToMe(selectedReservation._id)}
+                onClick={() => handleAssignToMe(selectedReservation)}
                 disabled={assigningReservation}
               >
                 {assigningReservation && <FaSpinner className="animate-spin mr-2" />}

@@ -56,6 +56,15 @@ export function AuthProvider({ children }) {
         // Limpiar cualquier error previo
         setAuthError(null);
         
+        // Obtener token del localStorage
+        const token = localStorage.getItem('authToken');
+        if (!token) {
+          console.log('No se encontró token en localStorage');
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        
         // Intentar obtener el usuario actual del servicio
         const userData = await authService.getCurrentUser();
         
@@ -111,6 +120,10 @@ export function AuthProvider({ children }) {
       
       if (response.success) {
         setUser(response.data);
+        // Guardar el token en localStorage
+        if (response.token) {
+          localStorage.setItem('authToken', response.token);
+        }
         return { success: true };
       } else {
         setAuthError({

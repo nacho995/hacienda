@@ -5,61 +5,25 @@ import { FaSearch, FaPlus, FaEdit, FaTrash, FaKey, FaUserShield, FaEllipsisV, Fa
 import { useRouter } from 'next/navigation';
 import userService from '@/services/userService';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
 
 export default function AdminUsuarios() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [accessDenied, setAccessDenied] = useState(false);
+  const { user, isAuthenticated, isAdmin, loading: authLoading } = useAuth();
   const [loadingUsers, setLoadingUsers] = useState(false);
   
+  // Redirigir si no está autenticado o no es admin
   useEffect(() => {
-    // Verificar si el usuario tiene permisos de administrador
-    const checkAdminPermission = () => {
-      try {
-        // Obtener la cookie de sesión
-        const cookies = document.cookie.split(';');
-        const sessionCookie = cookies.find(cookie => cookie.trim().startsWith('adminSession='));
-        
-        if (!sessionCookie) {
-          router.push('/admin/login');
-          return;
-        }
-        
-        // Extraer el valor de la cookie
-        const sessionValue = sessionCookie.split('=')[1];
-        // Intentar decodificar la cookie (puede estar codificada en URI)
-        let sessionData;
-        try {
-          sessionData = JSON.parse(decodeURIComponent(sessionValue));
-        } catch (e) {
-          // Si falla el decodeURIComponent, intentar sin decodificar
-          sessionData = JSON.parse(sessionValue);
-        }
-        
-        // Verificar que la sesión sea válida y tenga rol de administrador
-        if (!sessionData || !sessionData.authenticated) {
-          router.push('/admin/login');
-          return;
-        }
-        
-        // Guardar datos del usuario actual
-        setCurrentUser(sessionData);
-        
-        // Verificar si es administrador
-        if (sessionData.role !== 'Administrador' && sessionData.role !== 'admin') {
-          setAccessDenied(true);
-        }
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error verificando permisos:', error);
-        router.push('/admin/login');
-      }
-    };
-    
-    checkAdminPermission();
-  }, [router]);
+    if (!authLoading && !isAuthenticated) {
+      router.push('/admin/login');
+      return;
+    }
+
+    if (!authLoading && !isAdmin) {
+      router.push('/admin/dashboard');
+      return;
+    }
+  }, [isAuthenticated, isAdmin, authLoading, router]);
 
   const [usuarios, setUsuarios] = useState([]);
 
@@ -88,7 +52,7 @@ export default function AdminUsuarios() {
   // Cargar usuarios de la API
   useEffect(() => {
     const loadUsers = async () => {
-      if (accessDenied || loading) return;
+      if (!isAuthenticated || !isAdmin) return;
       
       try {
         setLoadingUsers(true);
@@ -114,7 +78,7 @@ export default function AdminUsuarios() {
     };
     
     loadUsers();
-  }, [accessDenied, loading]);
+  }, [isAuthenticated, isAdmin]);
   
   const filteredUsuarios = usuarios.filter(usuario => {
     return (
@@ -126,7 +90,7 @@ export default function AdminUsuarios() {
   });
   
   const handleNewUser = () => {
-    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
+    if (!isAdmin) {
       alert('Solo los administradores pueden crear nuevos usuarios');
       return;
     }
@@ -144,7 +108,7 @@ export default function AdminUsuarios() {
   };
   
   const handleEditUser = (user) => {
-    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
+    if (!isAdmin) {
       alert('Solo los administradores pueden editar usuarios');
       return;
     }
@@ -163,7 +127,7 @@ export default function AdminUsuarios() {
   };
   
   const handleDeleteUser = (user) => {
-    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
+    if (!isAdmin) {
       alert('Solo los administradores pueden eliminar usuarios');
       return;
     }
@@ -200,7 +164,7 @@ export default function AdminUsuarios() {
   };
   
   const handleChangePassword = (user) => {
-    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin' && currentUser?.email !== user.email) {
+    if (!isAdmin && user.email !== user.email) {
       alert('Solo puedes cambiar tu propia contraseña o ser administrador');
       return;
     }
@@ -232,7 +196,7 @@ export default function AdminUsuarios() {
   
   const saveUser = async () => {
     // Verificar que el usuario sea administrador
-    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
+    if (!isAdmin) {
       alert('No tienes permisos para realizar esta acción');
       return;
     }
@@ -309,7 +273,7 @@ export default function AdminUsuarios() {
   };
   
   const toggleUserStatus = async (userId) => {
-    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
+    if (!isAdmin) {
       alert('Solo los administradores pueden cambiar el estado de los usuarios');
       return;
     }
@@ -353,32 +317,10 @@ export default function AdminUsuarios() {
   };
   
   // Si está cargando, mostrar indicador
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-  
-  // Si no tiene acceso, mostrar mensaje
-  if (accessDenied) {
-    return (
-      <div className="bg-red-50 border-l-4 border-red-500 p-8 rounded-lg shadow-md">
-        <div className="flex items-start">
-          <FaLock className="text-red-500 w-8 h-8 mr-4 flex-shrink-0" />
-          <div>
-            <h1 className="text-2xl font-[var(--font-display)] text-red-700 mb-4">
-              Acceso Restringido
-            </h1>
-            <p className="text-red-600 mb-2">
-              No tienes los permisos necesarios para acceder a la gestión de usuarios.
-            </p>
-            <p className="text-gray-700">
-              Esta sección está reservada exclusivamente para administradores del sistema. Si necesitas realizar cambios en los usuarios, contacta al administrador.
-            </p>
-          </div>
-        </div>
       </div>
     );
   }
@@ -394,7 +336,7 @@ export default function AdminUsuarios() {
             Gestiona los usuarios del sistema y sus permisos
           </p>
         </div>
-        {currentUser?.role === 'Administrador' || currentUser?.role === 'admin' ? (
+        {isAdmin ? (
           <button
             onClick={handleNewUser}
             className="px-4 py-2 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"

@@ -55,10 +55,42 @@ export const asignarHabitacionReservation = async (id, usuarioId) => {
 export const getEventoReservations = async () => {
   try {
     const response = await apiClient.get('/reservas/eventos');
-    return response.data;
+    
+    // Verificar si la respuesta tiene el formato esperado
+    if (response && response.data) {
+      // Si la respuesta ya es un array, devolverlo con el formato correcto
+      if (Array.isArray(response.data)) {
+        return {
+          success: true,
+          data: response.data
+        };
+      }
+      
+      // Si la respuesta ya tiene el formato {success, data}, devolverla como está
+      if (response.data.success !== undefined && response.data.data !== undefined) {
+        return response.data;
+      }
+      
+      // Si no tiene ninguno de los formatos anteriores, envolverlo en el formato correcto
+      return {
+        success: true,
+        data: [response.data]
+      };
+    }
+    
+    // Si no hay datos, devolver un formato consistente
+    return {
+      success: false,
+      data: [],
+      message: 'No se encontraron reservas'
+    };
   } catch (error) {
     console.error('Error fetching evento reservations:', error);
-    return []; // Devolver array vacío en caso de error
+    return {
+      success: false,
+      data: [],
+      message: error.message || 'Error al obtener las reservas'
+    };
   }
 };
 
@@ -118,11 +150,34 @@ export const getUnassignedEventoReservations = async () => {
 // Asignar una reserva de evento al usuario actual
 export const assignEventoReservation = async (id) => {
   try {
-    const response = await apiClient.put(`/reservas/eventos/${id}/asignar`);
-    return response.data;
+    // Obtener el ID del usuario actual del localStorage
+    const userString = localStorage.getItem('user');
+    const user = userString ? JSON.parse(userString) : null;
+    
+    if (!user || !user._id) {
+      throw new Error('No se pudo obtener el ID del usuario. Por favor, inicie sesión nuevamente.');
+    }
+    
+    // Enviar el ID del usuario en el cuerpo de la solicitud
+    const response = await apiClient.put(`/reservas/eventos/${id}/asignar`, { 
+      usuarioId: user._id 
+    });
+    
+    // Verificar la respuesta del servidor
+    if (response && response.data) {
+      return {
+        success: true,
+        data: response.data
+      };
+    } else {
+      throw new Error('Respuesta inválida del servidor');
+    }
   } catch (error) {
     console.error(`Error assigning evento reservation ${id}:`, error);
-    throw error;
+    return {
+      success: false,
+      message: error.message || 'Error al asignar la reserva'
+    };
   }
 };
 
@@ -130,10 +185,25 @@ export const assignEventoReservation = async (id) => {
 export const unassignEventoReservation = async (id) => {
   try {
     const response = await apiClient.put(`/reservas/eventos/${id}/desasignar`);
-    return response.data;
+    
+    // Verificar si la respuesta existe y tiene datos
+    if (response && response.data) {
+      return {
+        success: true,
+        data: response.data
+      };
+    } else {
+      return {
+        success: false,
+        message: 'Respuesta inválida del servidor'
+      };
+    }
   } catch (error) {
     console.error(`Error unassigning evento reservation ${id}:`, error);
-    throw error;
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Error al desasignar la reserva'
+    };
   }
 };
 
@@ -456,5 +526,55 @@ export const deleteMasajeReservation = async (id) => {
   } catch (error) {
     console.error('Error deleting masaje reservation:', error);
     throw error;
+  }
+};
+
+// Desasignar una reserva de habitación
+export const unassignHabitacionReservation = async (id) => {
+  try {
+    const response = await apiClient.put(`/reservas/habitaciones/${id}/desasignar`);
+    
+    if (response && response.data) {
+      return {
+        success: true,
+        data: response.data
+      };
+    } else {
+      return {
+        success: false,
+        message: 'Respuesta inválida del servidor'
+      };
+    }
+  } catch (error) {
+    console.error(`Error unassigning habitacion reservation ${id}:`, error);
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Error al desasignar la reserva'
+    };
+  }
+};
+
+// Desasignar una reserva de masaje
+export const unassignMasajeReservation = async (id) => {
+  try {
+    const response = await apiClient.put(`/reservas/masajes/${id}/desasignar`);
+    
+    if (response && response.data) {
+      return {
+        success: true,
+        data: response.data
+      };
+    } else {
+      return {
+        success: false,
+        message: 'Respuesta inválida del servidor'
+      };
+    }
+  } catch (error) {
+    console.error(`Error unassigning masaje reservation ${id}:`, error);
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Error al desasignar la reserva'
+    };
   }
 }; 

@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { getEventoReservation, updateEventoReservation, deleteEventoReservation } from '@/services/reservationService';
 import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaGlassCheers, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaUtensils } from 'react-icons/fa';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
+import React from 'react';
 
 export default function EventoReservationDetail({ params }) {
   const router = useRouter();
-  const id = params.id;
+  const id = React.use(params).id;
   const { user } = useAuth();
   
   const [reservation, setReservation] = useState(null);
