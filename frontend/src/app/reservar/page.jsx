@@ -4,9 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { FaCalendarAlt, FaUsers, FaChevronRight, FaCheck, FaRegClock } from 'react-icons/fa';
+import { FaCalendarAlt, FaUsers, FaChevronRight, FaCheck, FaRegClock, FaExclamationTriangle } from 'react-icons/fa';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import { createEventoReservation, checkEventoAvailability, getEventoOccupiedDates } from '@/services/reservationService';
+import apiClient from '@/services/apiClient';
+import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
 
 // Importar componentes
 import DatePicker from 'react-datepicker';
@@ -16,7 +20,7 @@ import "react-datepicker/dist/react-datepicker.css";
 const tiposEvento = [
   {
     id: 'boda',
-    titulo: 'Bodas',
+    titulo: 'Boda',
     descripcion: 'Ceremonias inolvidables en un entorno de ensueño',
     imagen: '/images/placeholder/gallery1.svg',
     capacidad: '50-300',
@@ -24,43 +28,32 @@ const tiposEvento = [
   },
   {
     id: 'corporativo',
-    titulo: 'Eventos Corporativos',
+    titulo: 'Corporativo',
     descripcion: 'Reuniones ejecutivas, conferencias y presentaciones',
     imagen: '/images/placeholder/gallery2.svg',
     capacidad: '20-200',
     precio: 'Desde $35,000'
   },
   {
-    id: 'social',
-    titulo: 'Eventos Sociales',
-    descripcion: 'Cumpleaños, aniversarios y celebraciones especiales',
+    id: 'cumpleanos',
+    titulo: 'Cumpleaños',
+    descripcion: 'Celebraciones especiales con amigos y familia',
     imagen: '/images/placeholder/gallery3.svg',
     capacidad: '30-250',
     precio: 'Desde $40,000'
   },
   {
-    id: 'ceremonia',
-    titulo: 'Ceremonias',
-    descripcion: 'Ceremonias religiosas y actos solemnes',
+    id: 'aniversario',
+    titulo: 'Aniversario',
+    descripcion: 'Conmemora tus momentos más importantes',
     imagen: '/images/placeholder/gallery1.svg',
     capacidad: '30-150',
     precio: 'Desde $30,000'
   }
 ];
 
-// Fechas no disponibles (simular base de datos)
-const fechasOcupadas = [
-  new Date(2023, 5, 10),
-  new Date(2023, 5, 11),
-  new Date(2023, 5, 20),
-  new Date(2023, 6, 5),
-  new Date(2023, 6, 6),
-  new Date(2023, 6, 15),
-  new Date(2023, 7, 10),
-  new Date(2023, 7, 11)
-];
-
 export default function ReservarPage() {
+  const { user, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     tipoEvento: '',
     fecha: null,
@@ -75,6 +68,42 @@ export default function ReservarPage() {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [fechaSeleccionada, setFechaSeleccionada] = useState(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmationData, setConfirmationData] = useState(null);
+  const [fechasOcupadas, setFechasOcupadas] = useState([]);
+  
+  // Rellenar el formulario con datos del usuario si está autenticado
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      setFormData(prev => ({
+        ...prev,
+        nombre: user.nombre || prev.nombre,
+        email: user.email || prev.email,
+        telefono: user.telefono || prev.telefono
+      }));
+    }
+  }, [isAuthenticated, user]);
+  
+  // Cargar fechas ocupadas desde el backend al montar el componente
+  useEffect(() => {
+    const cargarFechasOcupadas = async () => {
+      try {
+        // Obtener fechas ocupadas de eventos
+        const fechas = await getEventoOccupiedDates();
+        if (Array.isArray(fechas) && fechas.length > 0) {
+          // Convertir a fechas simples para el calendario
+          const fechasSimples = fechas.map(item => item.fecha);
+          setFechasOcupadas(fechasSimples);
+        }
+      } catch (error) {
+        console.error("Error al cargar fechas ocupadas:", error);
+        toast.error("No se pudieron cargar las fechas ocupadas");
+      }
+    };
+    
+    cargarFechasOcupadas();
+  }, []);
   
   const handleSelectTipoEvento = (tipo) => {
     setFormData(prev => ({ ...prev, tipoEvento: tipo }));
@@ -106,11 +135,133 @@ export default function ReservarPage() {
     }));
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Formulario enviado:", formData);
-    setPaso(4);
-    document.getElementById('paso-4').scrollIntoView({ behavior: 'smooth' });
+    setSubmitError(null);
+    setIsSubmitting(true);
+    
+    try {
+      // Convertir el tipo de evento para el backend
+      const tipoSeleccionado = tiposEvento.find(t => t.id === formData.tipoEvento);
+      
+      // Validar los datos obligatorios
+      if (!tipoSeleccionado || !formData.fecha || formData.invitados < 10 || !formData.nombre || !formData.email || !formData.telefono) {
+        setSubmitError('Por favor, completa todos los campos obligatorios. El número mínimo de invitados es 10.');
+        toast.error('Faltan datos obligatorios');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Formatear fecha para el backend (si no es un objeto Date)
+      const fechaEvento = formData.fecha instanceof Date ? formData.fecha : new Date(formData.fecha);
+      
+      // Extraer nombre y apellidos del campo nombre completo
+      const nombreCompleto = formData.nombre.trim().split(' ');
+      const nombre = nombreCompleto[0] || '';
+      // Asegurar que apellidos no esté vacío
+      const apellidos = nombreCompleto.slice(1).join(' ') || nombre; // Usar nombre como apellido si no hay apellido
+      
+      try {
+        // Verificar disponibilidad primero
+        const disponibilidadData = {
+          fechaEvento: fechaEvento.toISOString().split('T')[0],
+          horaInicio: '12:00',
+          horaFin: '18:00',
+          espacioSeleccionado: 'Jardín Principal'
+        };
+        
+        const disponibilidadResponse = await checkEventoAvailability(disponibilidadData);
+        console.log('Respuesta de disponibilidad:', disponibilidadResponse);
+        
+        // Verificar si la respuesta es undefined o no tiene la estructura esperada
+        if (!disponibilidadResponse || !disponibilidadResponse.success || 
+            !disponibilidadResponse.disponible || !disponibilidadResponse.disponible.disponible) {
+          
+          // Extraer el mensaje de error de la respuesta correctamente
+          let mensaje = 'El espacio no está disponible para la fecha y hora seleccionadas';
+          
+          if (disponibilidadResponse && disponibilidadResponse.disponible && disponibilidadResponse.disponible.mensaje) {
+            mensaje = disponibilidadResponse.disponible.mensaje;
+          } else if (disponibilidadResponse && disponibilidadResponse.message) {
+            mensaje = disponibilidadResponse.message;
+          }
+            
+          setSubmitError(`No se puede reservar: ${mensaje}`);
+          toast.error('Horario no disponible');
+          setIsSubmitting(false);
+          
+          // Agregar la fecha a fechasOcupadas si no está ya
+          const fechaNueva = new Date(fechaEvento);
+          fechaNueva.setHours(0, 0, 0, 0);
+          
+          // Verificar si la fecha ya está en el array de fechas ocupadas
+          const yaExiste = fechasOcupadas.some(f => 
+            f.getDate() === fechaNueva.getDate() && 
+            f.getMonth() === fechaNueva.getMonth() && 
+            f.getFullYear() === fechaNueva.getFullYear()
+          );
+          
+          if (!yaExiste) {
+            setFechasOcupadas(prev => [...prev, fechaNueva]);
+          }
+          
+          return;
+        }
+        
+        // Si está disponible, crear la reserva
+        const reservaData = {
+          nombreEvento: `${tipoSeleccionado.titulo} - ${formData.nombre}`,
+          tipoEvento: tipoSeleccionado.titulo,
+          nombreContacto: nombre,
+          apellidosContacto: apellidos,
+          emailContacto: formData.email,
+          telefonoContacto: formData.telefono,
+          fecha: fechaEvento,
+          horaInicio: '12:00',
+          horaFin: '18:00',
+          espacioSeleccionado: 'Jardín Principal',
+          numeroInvitados: parseInt(formData.invitados),
+          peticionesEspeciales: formData.comentarios || '',
+          presupuestoEstimado: parseInt(tipoSeleccionado.precio.replace(/[^0-9]/g, '')) || 0
+        };
+        
+        console.log('Enviando datos de reserva:', reservaData);
+        
+        // Enviar al backend
+        const response = await createEventoReservation(reservaData);
+        console.log('Respuesta del servidor:', response);
+        
+        // Guardar datos de confirmación
+        setConfirmationData(response.data);
+        
+        // Avanzar al paso de confirmación
+        setPaso(4);
+        document.getElementById('paso-4').scrollIntoView({ behavior: 'smooth' });
+      } catch (apiError) {
+        console.error('Error en la API:', apiError);
+        let errorMessage = 'Error desconocido al procesar la solicitud';
+        
+        if (apiError.status) {
+          // Este es un error formateado por nuestro interceptor de apiClient
+          errorMessage = apiError.message || errorMessage;
+        } else if (apiError.response && apiError.response.data) {
+          // Error de respuesta de axios tradicional
+          errorMessage = apiError.response.data.message || errorMessage;
+        } else if (apiError.message) {
+          // Error general con mensaje
+          errorMessage = apiError.message;
+        }
+        
+        setSubmitError(`Error del servidor: ${errorMessage}`);
+        toast.error('Error al procesar la reserva. Contacte a soporte técnico.');
+      }
+    } catch (error) {
+      console.error('Error general al crear reserva:', error);
+      setSubmitError('Ha ocurrido un error al procesar su reserva. Por favor, inténtelo de nuevo o contacte con nosotros directamente.');
+      toast.error('Error al procesar la reserva: ' + (error.message || 'Error desconocido'));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   // Deshabilitar fechas pasadas y fechas ocupadas
@@ -139,6 +290,7 @@ export default function ReservarPage() {
             src="/reserve.png"
             alt="Hacienda San Carlos - Reservaciones"
             fill
+            sizes="100vw"
             className="object-cover transform scale-[1.15] animate-ken-burns"
             priority
           />
@@ -347,6 +499,7 @@ export default function ReservarPage() {
                     src={tipo.imagen}
                     alt={tipo.titulo}
                     fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                     className={`object-cover transition-transform duration-700 ${
                       hoveredCard === tipo.id ? 'scale-110' : 'scale-100'
                     }`}
@@ -608,10 +761,22 @@ export default function ReservarPage() {
               <div className="mt-10">
                 <button
                   type="submit"
-                  className="w-full bg-[var(--color-primary)] text-white py-4 text-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors rounded-lg shadow-lg"
+                  disabled={isSubmitting}
+                  className={`w-full bg-[var(--color-primary)] text-white py-4 text-lg font-medium transition-colors rounded-lg shadow-lg ${
+                    isSubmitting 
+                      ? 'opacity-70 cursor-not-allowed' 
+                      : 'hover:bg-[var(--color-primary-dark)]'
+                  }`}
                 >
-                  Confirmar Reserva
+                  {isSubmitting ? 'Procesando...' : 'Confirmar Reserva'}
                 </button>
+                
+                {submitError && (
+                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-start">
+                    <FaExclamationTriangle className="flex-shrink-0 mt-1 mr-2" />
+                    <p>{submitError}</p>
+                  </div>
+                )}
               </div>
             </form>
           </div>
@@ -642,6 +807,7 @@ export default function ReservarPage() {
                 <h3 className="text-lg font-medium mb-4 text-[var(--color-primary)]">Detalles de su reserva:</h3>
                 
                 <div className="space-y-2 text-gray-700">
+                  <p><strong>Número de confirmación:</strong> {confirmationData?.numeroConfirmacion || 'Pendiente'}</p>
                   <p><strong>Tipo de evento:</strong> {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento).titulo}</p>
                   <p><strong>Fecha:</strong> {formData.fecha && formData.fecha.toLocaleDateString()}</p>
                   <p><strong>Invitados:</strong> {formData.invitados}</p>

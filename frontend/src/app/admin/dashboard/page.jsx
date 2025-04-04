@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaCalendarAlt, FaBed, FaUsers, FaClipboardList, FaGlassCheers, FaSpa, FaEye, FaUserCircle } from 'react-icons/fa';
+import { FaCalendarAlt, FaBed, FaUsers, FaClipboardList, FaGlassCheers, FaSpa, FaEye, FaUserCircle, FaSync, FaSpinner } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { 
   getHabitacionReservations, 
   getEventoReservations, 
-  getMasajeReservations 
+  getMasajeReservations,
+  getAllReservationsForDashboard,
+  assignEventoReservation
 } from '@/services/reservationService';
 import userService from '@/services/userService';
+import { toast } from 'sonner';
 
 export default function AdminDashboard() {
   const { isAuthenticated, isAdmin, loading, user } = useAuth();
@@ -26,10 +29,19 @@ export default function AdminDashboard() {
   const [habitacionReservations, setHabitacionReservations] = useState([]);
   const [eventoReservations, setEventoReservations] = useState([]);
   const [masajeReservations, setMasajeReservations] = useState([]);
+  const [allReservations, setAllReservations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
   const [filtroUsuario, setFiltroUsuario] = useState('todos');
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState(null);
+  const [assigningReservation, setAssigningReservation] = useState(false);
+  
+  // Referencia para el intervalo de actualización automática
+  const autoRefreshInterval = useRef(null);
 
   // Redirigir si no está autenticado o no es admin
   useEffect(() => {
@@ -38,119 +50,152 @@ export default function AdminDashboard() {
     }
   }, [loading, isAuthenticated, isAdmin, router]);
 
-  useEffect(() => {
-    // Cargar usuarios
-    const loadUsers = async () => {
-      try {
-        const response = await userService.getAllUsers();
-        if (response.success && Array.isArray(response.data)) {
-          setUsuarios(response.data);
-          setStats(prevStats => ({
-            ...prevStats,
-            totalUsers: response.data.length
-          }));
-        } else {
-          // Si no hay datos o no es array, inicializar con array vacío
-          setUsuarios([]);
-          console.warn('No se pudieron cargar los usuarios o formato incorrecto:', response);
-        }
-      } catch (err) {
-        console.error('Error cargando usuarios:', err);
-        // Si hay error 401, el apiClient ya limpiará el token y user
-        if (err.status === 401) {
-          // No hacer nada aquí, el router se encargará de la redirección
-          console.log('Error de autenticación al cargar usuarios');
-        }
-        setUsuarios([]);
+  // Cargar usuarios
+  const loadUsers = async () => {
+    try {
+      const usersResponse = await userService.getAllUsers();
+      if (usersResponse.success && Array.isArray(usersResponse.data)) {
+        setUsuarios(usersResponse.data);
+      } else if (Array.isArray(usersResponse)) {
+        setUsuarios(usersResponse);
+      } else {
+        console.error('Formato de respuesta inesperado para usuarios:', usersResponse);
       }
-    };
-
-    // Cargar datos reales desde la API
-    const loadDashboardData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Cargar usuarios primero
-        await loadUsers();
-        
-        try {
-          // Obtener reservas de habitaciones, eventos y masajes
-          const [habitacionesData, eventosData, masajesData] = await Promise.all([
-            getHabitacionReservations(),
-            getEventoReservations(),
-            getMasajeReservations()
-          ]);
-          
-          // Filtrar por usuario asignado si se selecciona uno específico
-          const habitacionesFiltradas = filtroUsuario === 'todos' 
-            ? habitacionesData 
-            : filtroUsuario === 'sin_asignar'
-              ? habitacionesData.filter(reserva => !reserva.asignadoA)
-              : habitacionesData.filter(reserva => reserva.asignadoA === filtroUsuario);
-              
-          const eventosFiltrados = filtroUsuario === 'todos' 
-            ? eventosData 
-            : filtroUsuario === 'sin_asignar'
-              ? eventosData.filter(reserva => !reserva.asignadoA)
-              : eventosData.filter(reserva => reserva.asignadoA === filtroUsuario);
-              
-          const masajesFiltrados = filtroUsuario === 'todos' 
-            ? masajesData 
-            : filtroUsuario === 'sin_asignar'
-              ? masajesData.filter(reserva => !reserva.asignadoA)
-              : masajesData.filter(reserva => reserva.asignadoA === filtroUsuario);
-          
-          // Guardar los datos de reservas
-          setHabitacionReservations(habitacionesFiltradas);
-          setEventoReservations(eventosFiltrados);
-          setMasajeReservations(masajesFiltrados);
-          
-          // Calcular estadísticas
-          const totalReservations = habitacionesData.length + eventosData.length + masajesData.length;
-          const pendingReservations = [...habitacionesData, ...eventosData, ...masajesData].filter(
-            reserva => reserva.estado && reserva.estado.toLowerCase() === 'pendiente'
-          ).length;
-          const confirmedReservations = [...habitacionesData, ...eventosData, ...masajesData].filter(
-            reserva => reserva.estado && reserva.estado.toLowerCase() === 'confirmada'
-          ).length;
-          
-          // Actualizar estadísticas
-          setStats(prevStats => ({
-            ...prevStats,
-            totalReservations,
-            pendingReservations,
-            confirmedReservations,
-            occupiedRooms: habitacionesData.filter(h => 
-              h.estado && h.estado.toLowerCase() === 'confirmada'
-            ).length
-          }));
-        } catch (reservationError) {
-          console.error('Error cargando reservas:', reservationError);
-          if (reservationError.status === 401) {
-            console.log('Error de autenticación al cargar reservas');
-          } else {
-            setError('Error al cargar reservas. Por favor, recarga la página.');
-          }
-        }
-        
-      } catch (err) {
-        console.error('Error cargando datos del dashboard:', err);
-        setError('Error al cargar datos. Por favor, recarga la página.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // Solo cargar datos si el usuario está autenticado
-    if (isAuthenticated && isAdmin) {
-      loadDashboardData();
+    } catch (err) {
+      console.error('Error cargando usuarios:', err);
     }
-  }, [isAuthenticated, isAdmin, filtroUsuario]);
+  };
 
-  // Si está cargando, no mostrar contenido
-  if (loading || !isAuthenticated || !isAdmin) {
-    return null; // El AdminLayout se encargará de la redirección
-  }
+  // Función para cargar los datos del dashboard (memoizada con useCallback)
+  const loadDashboardData = useCallback(async (showToast = false) => {
+    try {
+      if (showToast) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setError(null);
+      
+      // Cargar usuarios primero
+      await loadUsers();
+      
+      try {
+        // Obtener todas las reservas con el nuevo método unificado
+        const todasLasReservas = await getAllReservationsForDashboard();
+        setAllReservations(todasLasReservas);
+        
+        // Separar por tipo para las estadísticas
+        const habitaciones = todasLasReservas.filter(r => r.tipo === 'habitacion');
+        const eventos = todasLasReservas.filter(r => r.tipo === 'evento');
+        const masajes = todasLasReservas.filter(r => r.tipo === 'masaje');
+        
+        setHabitacionReservations(habitaciones);
+        setEventoReservations(eventos);
+        setMasajeReservations(masajes);
+        
+        // Calcular estadísticas
+        const totalReservations = todasLasReservas.length;
+        const pendingReservations = todasLasReservas.filter(
+          r => r.estado && r.estado.toLowerCase() === 'pendiente'
+        ).length;
+        const confirmedReservations = todasLasReservas.filter(
+          r => r.estado && r.estado.toLowerCase() === 'confirmada'
+        ).length;
+        
+        const occupiedRooms = habitaciones.reduce((total, h) => {
+          return total + (h.numeroHabitaciones || 1);
+        }, 0);
+        
+        setStats({
+          totalReservations,
+          pendingReservations,
+          confirmedReservations,
+          totalRooms: 24,
+          occupiedRooms,
+          totalUsers: usuarios.length
+        });
+        
+        // Actualizar la hora de última actualización
+        setLastUpdate(new Date());
+        
+        if (showToast) {
+          toast.success('Datos actualizados correctamente');
+        }
+      } catch (error) {
+        console.error('Error cargando reservas:', error);
+        setError('Error al cargar los datos de reservas');
+        if (showToast) {
+          toast.error('Error al actualizar los datos');
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error cargando dashboard:', error);
+      setError('Error al cargar los datos del dashboard');
+      if (showToast) {
+        toast.error('Error al actualizar los datos');
+      }
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [usuarios.length]);
+
+  // Función de actualización manual
+  const handleManualRefresh = () => {
+    loadDashboardData(true);
+  };
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    if (loading) return;
+    loadDashboardData();
+  }, [loading, filtroUsuario, loadDashboardData]);
+
+  // Configurar actualización automática cada 2 minutos
+  useEffect(() => {
+    // Iniciar intervalo cuando el componente se monte
+    autoRefreshInterval.current = setInterval(() => {
+      loadDashboardData();
+    }, 120000); // 2 minutos en milisegundos
+    
+    // Limpiar intervalo cuando el componente se desmonte
+    return () => {
+      if (autoRefreshInterval.current) {
+        clearInterval(autoRefreshInterval.current);
+      }
+    };
+  }, [loadDashboardData]);
+
+  // Obtener nombre de usuario asignado a partir del ID
+  const getUsuarioAsignado = (reserva) => {
+    if (!reserva.asignadoA) return 'Sin asignar';
+    
+    const usuarioAsignado = usuarios.find(u => u._id === reserva.asignadoA);
+    return usuarioAsignado ? `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos || ''}` : 'Sin asignar';
+  };
+  
+  // Obtener badge de estado con colores
+  const getStatusBadge = (estado) => {
+    if (!estado) return null;
+    
+    const estadoLower = estado.toLowerCase();
+    let colorClass = 'bg-gray-100 text-gray-800';
+    
+    if (estadoLower === 'confirmada') {
+      colorClass = 'bg-green-100 text-green-800';
+    } else if (estadoLower === 'pendiente') {
+      colorClass = 'bg-yellow-100 text-yellow-800';
+    } else if (estadoLower === 'cancelada') {
+      colorClass = 'bg-red-100 text-red-800';
+    }
+    
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+        {estado}
+      </span>
+    );
+  };
 
   const dashboardCards = [
     {
@@ -200,228 +245,382 @@ export default function AdminDashboard() {
     return new Date(dateString).toLocaleDateString('es-ES');
   };
 
-  // Obtener estado con color para las tablas
-  const getStatusBadge = (status) => {
-    const statusLower = status?.toLowerCase() || '';
-    if (statusLower === 'confirmada') {
-      return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Confirmada</span>;
-    } else if (statusLower === 'pendiente') {
-      return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>;
-    } else if (statusLower === 'cancelada') {
-      return <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Cancelada</span>;
+  // Formatear la hora para la última actualización
+  const formatLastUpdate = () => {
+    const now = new Date();
+    const diffInMinutes = Math.floor((now - lastUpdate) / (1000 * 60));
+    
+    if (diffInMinutes < 1) {
+      return 'hace unos segundos';
+    } else if (diffInMinutes === 1) {
+      return 'hace 1 minuto';
+    } else if (diffInMinutes < 60) {
+      return `hace ${diffInMinutes} minutos`;
+    } else {
+      const hours = Math.floor(diffInMinutes / 60);
+      return `hace ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
     }
-    return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{status || 'Desconocido'}</span>;
   };
 
-  // Encontrar nombre de usuario asignado
-  const getUsuarioAsignado = (reserva) => {
-    if (!reserva.asignadoA) return 'Sin asignar';
-    const usuarioAsignado = usuarios.find(u => u._id === reserva.asignadoA);
-    return usuarioAsignado ? `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos}` : 'Usuario desconocido';
+  // Función para abrir el modal de asignación
+  const handleOpenAssignModal = (reservation) => {
+    setSelectedReservation(reservation);
+    setShowAssignModal(true);
   };
+
+  // Función para asignar evento al usuario actual
+  const handleAssignToMe = async (reservationId) => {
+    try {
+      setAssigningReservation(true);
+      const response = await assignEventoReservation(reservationId);
+      
+      if (response && response.success) {
+        toast.success('Reserva asignada exitosamente');
+        loadDashboardData(true); // Recargar los datos
+        setShowAssignModal(false);
+      } else {
+        toast.error('Error al asignar la reserva');
+      }
+    } catch (error) {
+      console.error('Error asignando reserva:', error);
+      toast.error('Error al asignar la reserva: ' + (error.message || 'Error desconocido'));
+    } finally {
+      setAssigningReservation(false);
+    }
+  };
+
+  // Si está cargando, mostrar spinner
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Si hay error, mostrar mensaje
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl text-red-600 mb-4">Error al cargar el dashboard</h2>
+        <p className="text-gray-600">{error}</p>
+        <button 
+          onClick={handleManualRefresh}
+          className="mt-4 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors flex items-center justify-center mx-auto"
+        >
+          <FaSync className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> 
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-[var(--font-display)] text-gray-800 mb-2">
-        Bienvenido, {user?.name || 'Administrador'}
-      </h1>
-      <p className="text-gray-600">Aquí tienes un resumen de la actividad reciente.</p>
-      
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-          <p className="text-red-700">{error}</p>
+    <div className="space-y-6">
+      {/* Encabezado */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+        <div>
+          <h1 className="text-3xl font-[var(--font-display)] text-gray-800">
+            Panel de Control
+          </h1>
+          <p className="text-gray-600">
+            Bienvenido, {user?.nombre || 'Administrador'} · {new Date().toLocaleDateString()}
+          </p>
         </div>
-      )}
-      
-      {/* Filtro de usuario */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4">
-          <label htmlFor="filtroUsuario" className="text-gray-700 font-medium">
-            Ver reservas asignadas a:
-          </label>
-          <div className="relative">
-            <select
-              id="filtroUsuario"
-              value={filtroUsuario}
-              onChange={(e) => setFiltroUsuario(e.target.value)}
-              className="appearance-none pl-3 pr-10 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
-            >
-              <option value="todos">Todas las reservas</option>
-              <option value="sin_asignar">Sin asignar</option>
-              {usuarios.map(usuario => (
-                <option key={usuario._id} value={usuario._id}>
-                  {usuario.nombre} {usuario.apellidos}
-                </option>
-              ))}
-            </select>
-            <FaUserCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          </div>
+        
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          {/* Filtro por usuario asignado */}
+          <select 
+            value={filtroUsuario}
+            onChange={(e) => setFiltroUsuario(e.target.value)}
+            className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+          >
+            <option value="todos">Todas las reservas</option>
+            <option value="sin_asignar">Sin asignar</option>
+            {usuarios.map(user => (
+              <option key={user._id} value={user._id}>
+                {user.nombre} {user.apellidos || ''}
+              </option>
+            ))}
+          </select>
+          
+          {/* Botón de actualización manual */}
+          <button 
+            onClick={handleManualRefresh} 
+            disabled={isRefreshing}
+            className="px-3 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors flex items-center justify-center whitespace-nowrap"
+            title="Actualizar datos del dashboard"
+          >
+            <FaSync className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> 
+            Actualizar
+          </button>
         </div>
-        <p className="mt-2 text-sm text-gray-500">
-          Selecciona un usuario para ver solo las reservas asignadas a él, o 'Sin asignar' para ver las reservas pendientes de asignación.
+      </div>
+      
+      {/* Indicador de última actualización */}
+      <div className="flex justify-end">
+        <p className="text-xs text-gray-500">
+          Última actualización: {formatLastUpdate()}
         </p>
       </div>
       
-      {isLoading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin h-10 w-10 border-4 border-[var(--color-primary)] border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando datos...</p>
+      {/* Tarjetas de estadísticas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {dashboardCards.map((card, index) => (
+          <div key={index} className={`${card.color} border rounded-xl p-6 shadow-sm`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">{card.title}</h2>
+              {card.icon}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {card.stats.map((stat, statIndex) => (
+                <div key={statIndex} className="text-center">
+                  <p className="text-xl font-bold">{stat.value}</p>
+                  <p className="text-xs text-gray-600">{stat.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Todas las reservas unificadas */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="font-semibold flex items-center">
+            <FaCalendarAlt className="mr-2 text-amber-500" />
+            Todas las reservaciones recientes
+          </h2>
+          <Link 
+            href="/admin/reservaciones" 
+            className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
+          >
+            <FaEye className="mr-1" /> Ver todas
+          </Link>
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            {dashboardCards.map((card, index) => (
-              <div key={index} className={`rounded-lg shadow-sm p-5 ${card.color} border transition-transform hover:shadow-md`}>
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="font-semibold text-gray-800">{card.title}</h2>
-                  {card.icon}
-                </div>
-                <div className="space-y-2">
-                  {card.stats.map((stat, idx) => (
-                    <div key={idx} className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">{stat.label}</span>
-                      <span className="font-semibold text-lg">{stat.value}</span>
+        <div className="p-4">
+          {allReservations.length > 0 ? (
+            <div className="space-y-3">
+              {allReservations.slice(0, 10).map((reserva) => (
+                <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+                  <div className="flex justify-between mb-1">
+                    <div className="flex items-center">
+                      <span className="inline-block w-24 font-medium text-sm px-2 py-1 bg-gray-100 rounded-full mr-2 text-center">
+                        {reserva.tipoDisplay}
+                      </span>
+                      <span className="font-medium">{reserva.clienteDisplay}</span>
                     </div>
-                  ))}
+                    {getStatusBadge(reserva.estado)}
+                  </div>
+                  <div className="text-sm text-gray-600 flex justify-between">
+                    <span>{reserva.fechaDisplay}</span>
+                    <span>{reserva.tituloDisplay}</span>
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1 flex justify-between">
+                    <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
+                    <div className="flex space-x-2">
+                      <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
+                        Ver detalles
+                      </Link>
+                      {reserva.tipo === 'evento' && !reserva.asignadoA && (
+                        <button 
+                          onClick={() => handleOpenAssignModal(reserva)}
+                          className="text-[var(--color-primary)] hover:underline"
+                        >
+                          Asignar a mí
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-500">
+              No hay reservaciones recientes
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Contenedor de 3 columnas con las diferentes reservas por tipo */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Reservaciones de habitaciones */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="font-semibold flex items-center">
+              <FaBed className="mr-2 text-blue-500" />
+              Habitaciones Recientes
+            </h2>
+            <Link 
+              href="/admin/reservaciones?tipo=habitacion" 
+              className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
+            >
+              <FaEye className="mr-1" /> Ver todas
+            </Link>
           </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Reservaciones de habitaciones */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="font-semibold flex items-center">
-                  <FaBed className="mr-2 text-blue-500" />
-                  Habitaciones Recientes
-                </h2>
-                <Link 
-                  href="/admin/reservaciones?tipo=habitacion" 
-                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
-                >
-                  <FaEye className="mr-1" /> Ver todas
-                </Link>
+          <div className="p-4">
+            {habitacionReservations.length > 0 ? (
+              <div className="space-y-3">
+                {habitacionReservations.slice(0, 5).map((reserva) => (
+                  <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+                    <div className="flex justify-between mb-1">
+                      <span className="font-medium">{reserva.clienteDisplay}</span>
+                      {getStatusBadge(reserva.estado)}
+                    </div>
+                    <div className="text-sm text-gray-600 flex justify-between">
+                      <span>{formatDate(reserva.fechaEntrada)} - {formatDate(reserva.fechaSalida)}</span>
+                      <span>{reserva.tipoHabitacion}</span>
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1 flex justify-between">
+                      <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
+                      <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
+                        Ver detalles
+                      </Link>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="p-4">
-                {habitacionReservations.length > 0 ? (
-                  <div className="space-y-3">
-                    {habitacionReservations.slice(0, 5).map((reserva) => (
-                      <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-                        <div className="flex justify-between mb-1">
-                          <span className="font-medium">{reserva.nombre} {reserva.apellidos}</span>
-                          {getStatusBadge(reserva.estado)}
-                        </div>
-                        <div className="text-sm text-gray-600 flex justify-between">
-                          <span>{formatDate(reserva.fechaEntrada)} - {formatDate(reserva.fechaSalida)}</span>
-                          <span>{reserva.tipoHabitacion}</span>
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                          <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
-                          <Link href={`/admin/reservaciones/habitacion/${reserva._id}`} className="text-[var(--color-primary)] hover:underline">
-                            Ver detalles
-                          </Link>
-                        </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                No hay reservaciones de habitaciones recientes
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Reservaciones de eventos */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="font-semibold flex items-center">
+              <FaGlassCheers className="mr-2 text-purple-500" />
+              Eventos Recientes
+            </h2>
+            <Link 
+              href="/admin/reservaciones?tipo=evento" 
+              className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
+            >
+              <FaEye className="mr-1" /> Ver todos
+            </Link>
+          </div>
+          <div className="p-4">
+            {eventoReservations.length > 0 ? (
+              <div className="space-y-3">
+                {eventoReservations.slice(0, 5).map((reserva) => (
+                  <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+                    <div className="flex justify-between mb-1">
+                      <div className="flex items-center">
+                        <span className="inline-block w-24 font-medium text-sm px-2 py-1 bg-gray-100 rounded-full mr-2 text-center">
+                          {reserva.tipoDisplay}
+                        </span>
+                        <span className="font-medium">{reserva.clienteDisplay}</span>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    No hay reservaciones de habitaciones recientes
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Reservaciones de eventos */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="font-semibold flex items-center">
-                  <FaGlassCheers className="mr-2 text-purple-500" />
-                  Eventos Recientes
-                </h2>
-                <Link 
-                  href="/admin/reservaciones?tipo=evento" 
-                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
-                >
-                  <FaEye className="mr-1" /> Ver todos
-                </Link>
-              </div>
-              <div className="p-4">
-                {eventoReservations.length > 0 ? (
-                  <div className="space-y-3">
-                    {eventoReservations.slice(0, 5).map((reserva) => (
-                      <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-                        <div className="flex justify-between mb-1">
-                          <span className="font-medium">{reserva.nombreEvento || `Evento de ${reserva.nombreContacto}`}</span>
-                          {getStatusBadge(reserva.estado)}
-                        </div>
-                        <div className="text-sm text-gray-600 flex justify-between">
-                          <span>{formatDate(reserva.fecha)}</span>
-                          <span>{reserva.horaInicio} - {reserva.horaFin}</span>
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                          <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
-                          <Link href={`/admin/reservaciones/evento/${reserva._id}`} className="text-[var(--color-primary)] hover:underline">
-                            Ver detalles
-                          </Link>
-                        </div>
+                      {getStatusBadge(reserva.estado)}
+                    </div>
+                    <div className="text-sm text-gray-600 flex justify-between">
+                      <span>{reserva.fechaDisplay}</span>
+                      <span>{reserva.tituloDisplay}</span>
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1 flex justify-between">
+                      <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
+                      <div className="flex space-x-2">
+                        <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
+                          Ver detalles
+                        </Link>
+                        {reserva.tipo === 'evento' && !reserva.asignadoA && (
+                          <button 
+                            onClick={() => handleOpenAssignModal(reserva)}
+                            className="text-[var(--color-primary)] hover:underline"
+                          >
+                            Asignar a mí
+                          </button>
+                        )}
                       </div>
-                    ))}
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    No hay reservaciones de eventos recientes
-                  </div>
-                )}
+                ))}
               </div>
-            </div>
-            
-            {/* Reservaciones de masajes */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="font-semibold flex items-center">
-                  <FaSpa className="mr-2 text-green-500" />
-                  Masajes Recientes
-                </h2>
-                <Link 
-                  href="/admin/reservaciones?tipo=masaje" 
-                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
-                >
-                  <FaEye className="mr-1" /> Ver todos
-                </Link>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                No hay reservaciones de eventos recientes
               </div>
-              <div className="p-4">
-                {masajeReservations.length > 0 ? (
-                  <div className="space-y-3">
-                    {masajeReservations.slice(0, 5).map((reserva) => (
-                      <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-                        <div className="flex justify-between mb-1">
-                          <span className="font-medium">{reserva.nombre} {reserva.apellidos}</span>
-                          {getStatusBadge(reserva.estado)}
-                        </div>
-                        <div className="text-sm text-gray-600 flex justify-between">
-                          <span>{formatDate(reserva.fecha)}</span>
-                          <span>{reserva.hora} - {reserva.tipoMasaje}</span>
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                          <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
-                          <Link href={`/admin/reservaciones/masaje/${reserva._id}`} className="text-[var(--color-primary)] hover:underline">
-                            Ver detalles
-                          </Link>
-                        </div>
-                      </div>
-                    ))}
+            )}
+          </div>
+        </div>
+        
+        {/* Reservaciones de masajes */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="font-semibold flex items-center">
+              <FaSpa className="mr-2 text-green-500" />
+              Masajes Recientes
+            </h2>
+            <Link 
+              href="/admin/reservaciones?tipo=masaje" 
+              className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
+            >
+              <FaEye className="mr-1" /> Ver todos
+            </Link>
+          </div>
+          <div className="p-4">
+            {masajeReservations.length > 0 ? (
+              <div className="space-y-3">
+                {masajeReservations.slice(0, 5).map((reserva) => (
+                  <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+                    <div className="flex justify-between mb-1">
+                      <span className="font-medium">{reserva.clienteDisplay}</span>
+                      {getStatusBadge(reserva.estado)}
+                    </div>
+                    <div className="text-sm text-gray-600 flex justify-between">
+                      <span>{formatDate(reserva.fecha)} - {reserva.hora}</span>
+                      <span>{reserva.tipoMasaje}</span>
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1 flex justify-between">
+                      <span>Asignado a: {getUsuarioAsignado(reserva)}</span>
+                      <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
+                        Ver detalles
+                      </Link>
+                    </div>
                   </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    No hay reservaciones de masajes recientes
-                  </div>
-                )}
+                ))}
               </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                No hay reservaciones de masajes recientes
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {showAssignModal && selectedReservation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Asignar reserva</h3>
+            <p className="mb-4">
+              ¿Deseas asignar la reserva de <strong>{selectedReservation.clienteDisplay}</strong> a tu cuenta?
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+                onClick={() => setShowAssignModal(false)}
+                disabled={assigningReservation}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:bg-[var(--color-primary-dark)] transition-colors flex items-center"
+                onClick={() => handleAssignToMe(selectedReservation._id)}
+                disabled={assigningReservation}
+              >
+                {assigningReservation && <FaSpinner className="animate-spin mr-2" />}
+                Confirmar asignación
+              </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

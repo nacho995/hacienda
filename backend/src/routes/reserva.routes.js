@@ -6,7 +6,8 @@ const {
   actualizarReservaHabitacion,
   eliminarReservaHabitacion,
   comprobarDisponibilidadHabitacion,
-  asignarReservaHabitacion
+  asignarReservaHabitacion,
+  obtenerFechasOcupadas: obtenerFechasOcupadasHabitacion
 } = require('../controllers/reservaHabitacion.controller');
 
 // Importar controladores para eventos y masajes
@@ -18,7 +19,8 @@ const {
   eliminarReservaEvento,
   comprobarDisponibilidadEvento,
   asignarReservaEvento,
-  desasignarReserva
+  desasignarReserva,
+  obtenerFechasOcupadas: obtenerFechasOcupadasEvento
 } = require('../controllers/reservaEvento.controller');
 
 const {
@@ -37,6 +39,7 @@ const router = express.Router();
 
 // Rutas para reservas de habitaciones
 router.post('/habitaciones/disponibilidad', comprobarDisponibilidadHabitacion);
+router.get('/habitaciones/fechas-ocupadas', obtenerFechasOcupadasHabitacion);
 
 router.route('/habitaciones')
   .post(protectRoute, crearReservaHabitacion)
@@ -52,9 +55,10 @@ router.put('/habitaciones/:id/asignar', protectRoute, authorize('admin'), asigna
 
 // Rutas para eventos
 router.post('/eventos/disponibilidad', comprobarDisponibilidadEvento);
+router.get('/eventos/fechas-ocupadas', obtenerFechasOcupadasEvento);
 
 router.route('/eventos')
-  .post(protectRoute, crearReservaEvento)
+  .post(crearReservaEvento)
   .get(protectRoute, obtenerReservasEvento);
 
 router.route('/eventos/:id')

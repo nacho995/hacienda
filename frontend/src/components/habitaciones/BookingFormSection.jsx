@@ -1,11 +1,19 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { FaCalendarAlt, FaCheck, FaWifi, FaCoffee, FaTv, FaSnowflake } from 'react-icons/fa';
+import { FaCalendarAlt, FaCheck, FaWifi, FaCoffee, FaTv, FaSnowflake, FaUserFriends, FaDoorOpen, FaEnvelope, FaPhone, FaPen, FaSpinner } from 'react-icons/fa';
 import { HABITACIONES } from './RoomListSection';
-import { createHabitacionReservation } from '@/services/reservationService';
-import { useAuth } from '@/contexts/AuthContext';
+import { createHabitacionReservation, getHabitacionOccupiedDates } from '@/services/reservationService';
+import { useAuth } from '@/context/AuthContext';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
+import { registerLocale, setDefaultLocale } from 'react-datepicker';
+import es from 'date-fns/locale/es';
+import { motion, AnimatePresence } from 'framer-motion';
+
+registerLocale('es', es);
+setDefaultLocale('es');
 
 export default function BookingFormSection({ selectedRoom, onSelectRoom, formData, setFormData }) {
   const { user } = useAuth();
@@ -14,6 +22,48 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reservationError, setReservationError] = useState(null);
   const [reservationConfirmation, setReservationConfirmation] = useState(null);
+  const [fechasOcupadas, setFechasOcupadas] = useState([]);
+  const [fechaEntrada, setFechaEntrada] = useState(null);
+  const [fechaSalida, setFechaSalida] = useState(null);
+
+  // Cargar fechas ocupadas desde el backend
+  useEffect(() => {
+    const cargarFechasOcupadas = async () => {
+      try {
+        // Si hay una habitación seleccionada, filtrar por tipo
+        const params = {};
+        if (selectedRoom) {
+          params.tipoHabitacion = selectedRoom.tipoHabitacion;
+        }
+        
+        const fechas = await getHabitacionOccupiedDates(params);
+        if (Array.isArray(fechas) && fechas.length > 0) {
+          setFechasOcupadas(fechas);
+        }
+      } catch (error) {
+        console.error("Error al cargar fechas ocupadas de habitaciones:", error);
+      }
+    };
+    
+    cargarFechasOcupadas();
+  }, [selectedRoom]);
+
+  // Convertir fechas de entrada/salida a formato ISO para el formulario al seleccionarlas
+  useEffect(() => {
+    if (fechaEntrada) {
+      setFormData(prev => ({
+        ...prev,
+        fechaEntrada: fechaEntrada.toISOString().split('T')[0]
+      }));
+    }
+    
+    if (fechaSalida) {
+      setFormData(prev => ({
+        ...prev,
+        fechaSalida: fechaSalida.toISOString().split('T')[0]
+      }));
+    }
+  }, [fechaEntrada, fechaSalida, setFormData]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -117,6 +167,32 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Función para verificar si una fecha está disponible
+  const esDisponible = (date) => {
+    // No permitir fechas pasadas
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (date < hoy) return false;
+    
+    // Verificar contra fechas ocupadas
+    for (const reserva of fechasOcupadas) {
+      const entrada = new Date(reserva.fechaEntrada);
+      const salida = new Date(reserva.fechaSalida);
+      
+      // Normalizar fechas para comparación
+      entrada.setHours(0, 0, 0, 0);
+      salida.setHours(0, 0, 0, 0);
+      date.setHours(0, 0, 0, 0);
+      
+      // Si la fecha está dentro del rango de una reserva, no está disponible
+      if (date >= entrada && date <= salida) {
+        return false;
+      }
+    }
+    
+    return true;
   };
 
   return (
@@ -276,19 +352,16 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                       Fecha de entrada
                     </label>
                     <div className="relative">
-                      <input 
-                        type="date" 
-                        id="fechaEntrada" 
-                        name="fechaEntrada"
-                        value={formData.fechaEntrada}
-                        onChange={handleInputChange}
-                        min={new Date().toISOString().split('T')[0]}
+                      <DatePicker
+                        selected={fechaEntrada}
+                        onChange={date => setFechaEntrada(date)}
+                        filterDate={esDisponible}
+                        minDate={new Date()}
+                        dateFormat="dd/MM/yyyy"
+                        locale="es"
                         className="w-full p-2 pl-3 pr-10 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors cursor-pointer"
+                        placeholderText="Seleccione fecha de entrada"
                         required
-                        onClick={(e) => {
-                          // Asegurarse de que el calendario se abre al hacer clic en cualquier parte del contenedor
-                          e.currentTarget.showPicker && e.currentTarget.showPicker();
-                        }}
                       />
                       <div className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500 pointer-events-none">
                         <FaCalendarAlt />
@@ -301,19 +374,17 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                       Fecha de salida
                     </label>
                     <div className="relative">
-                      <input 
-                        type="date" 
-                        id="fechaSalida" 
-                        name="fechaSalida"
-                        value={formData.fechaSalida}
-                        onChange={handleInputChange}
-                        min={formData.fechaEntrada || new Date().toISOString().split('T')[0]}
+                      <DatePicker
+                        selected={fechaSalida}
+                        onChange={date => setFechaSalida(date)}
+                        filterDate={esDisponible}
+                        minDate={fechaEntrada || new Date()}
+                        dateFormat="dd/MM/yyyy"
+                        locale="es"
                         className="w-full p-2 pl-3 pr-10 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors cursor-pointer"
+                        placeholderText="Seleccione fecha de salida"
                         required
-                        onClick={(e) => {
-                          // Asegurarse de que el calendario se abre al hacer clic en cualquier parte del contenedor
-                          e.currentTarget.showPicker && e.currentTarget.showPicker();
-                        }}
+                        disabled={!fechaEntrada}
                       />
                       <div className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500 pointer-events-none">
                         <FaCalendarAlt />

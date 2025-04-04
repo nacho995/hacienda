@@ -248,7 +248,7 @@ const ReservaEventosList = () => {
 
                   <div className="mt-4 flex space-x-2">
                     <a
-                      href={`/admin/reservaciones/evento/id?id=${reserva._id}`}
+                      href={`/admin/reservaciones/evento/${reserva._id}`}
                       className="flex-1 bg-gray-100 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-200 transition-colors flex items-center justify-center"
                     >
                       Ver detalles

@@ -4,7 +4,7 @@ const ReservaEventoSchema = new mongoose.Schema({
   usuario: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
   },
   asignadoA: {
     type: mongoose.Schema.Types.ObjectId,
@@ -144,13 +144,33 @@ ReservaEventoSchema.statics.comprobarDisponibilidad = async function(
   espacioSeleccionado,
   fecha,
   horaInicio,
-  horaFin
+  horaFin,
+  reservaIdExcluir = null
 ) {
+  // Validar que el espacio seleccionado sea válido
+  const espaciosValidos = ['Jardín Principal', 'Salón Hacienda', 'Terraza', 'Patio Central', 'Sala VIP'];
+  if (!espaciosValidos.includes(espacioSeleccionado)) {
+    return {
+      disponible: false,
+      mensaje: `Espacio no válido. Los espacios disponibles son: ${espaciosValidos.join(', ')}`
+    };
+  }
+  
   const fechaObj = new Date(fecha);
+  if (isNaN(fechaObj.getTime())) {
+    return {
+      disponible: false,
+      mensaje: 'La fecha proporcionada no es válida'
+    };
+  }
+  
   const fechaFormateada = fechaObj.toISOString().split('T')[0];
   
   // Convertir horas a minutos para comparación
   const convertirAMinutos = (hora) => {
+    if (!hora || !hora.includes(':')) {
+      return 0;
+    }
     const [horas, minutos] = hora.split(':').map(Number);
     return horas * 60 + minutos;
   };
@@ -167,14 +187,21 @@ ReservaEventoSchema.statics.comprobarDisponibilidad = async function(
   }
   
   // Buscar reservas que se solapen en el mismo espacio y día
-  const reservas = await this.find({
+  const queryReservas = {
     espacioSeleccionado,
     estadoReserva: { $ne: 'cancelada' },
     fecha: {
       $gte: new Date(fechaFormateada),
       $lt: new Date(fechaFormateada + 'T23:59:59.999Z')
     }
-  });
+  };
+  
+  // Si se proporciona un ID de reserva a excluir, añadirlo a la consulta
+  if (reservaIdExcluir) {
+    queryReservas._id = { $ne: reservaIdExcluir };
+  }
+  
+  const reservas = await this.find(queryReservas);
   
   // Verificar solapamiento de horarios
   for (const reserva of reservas) {

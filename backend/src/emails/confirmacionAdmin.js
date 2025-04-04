@@ -1,11 +1,24 @@
-const emailConfirmacionAdmin = (nombre, url) => {
+const emailConfirmacionAdmin = (datos) => {
+  // Verificación de seguridad para evitar errores con propiedades undefined
+  const datosSeguro = datos || {};
+  
+  // Extraer datos con valores predeterminados
+  const tipo = datosSeguro.tipo || 'reserva';
+  const cliente = datosSeguro.cliente || 'Cliente';
+  const email = datosSeguro.email || 'No especificado';
+  const telefono = datosSeguro.telefono || 'No especificado';
+  const fecha = datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada';
+  const hora = datosSeguro.hora || 'No especificada';
+  const detalles = datosSeguro.detalles || 'No hay detalles adicionales';
+  const comentarios = datosSeguro.comentarios || 'No hay comentarios';
+  
   return `
   <!DOCTYPE html>
   <html lang="es">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirmación de Cuenta Admin</title>
+    <title>Nueva Reserva - Admin Notification</title>
     <style>
       body {
         font-family: 'Didot', 'Times New Roman', serif;
@@ -34,31 +47,24 @@ const emailConfirmacionAdmin = (nombre, url) => {
       }
       .content {
         padding: 30px 20px;
-        text-align: center;
       }
       h1 {
         color: #800020;
         font-size: 24px;
         margin-bottom: 20px;
         font-weight: normal;
+        text-align: center;
+      }
+      h3 {
+        color: #800020;
+        font-size: 18px;
+        margin-top: 25px;
+        margin-bottom: 15px;
+        font-weight: normal;
       }
       p {
         margin-bottom: 15px;
         font-size: 16px;
-      }
-      .btn {
-        display: inline-block;
-        padding: 12px 24px;
-        background-color: #800020;
-        color: #fff;
-        text-decoration: none;
-        border-radius: 4px;
-        font-size: 16px;
-        margin: 20px 0;
-        transition: background-color 0.3s;
-      }
-      .btn:hover {
-        background-color: #600018;
       }
       .footer {
         text-align: center;
@@ -77,10 +83,26 @@ const emailConfirmacionAdmin = (nombre, url) => {
         background-color: #f9f5f0;
         border-left: 3px solid #800020;
         margin: 20px 0;
+        text-align: center;
       }
       .divider {
         height: 1px;
         background: linear-gradient(to right, transparent, #800020, transparent);
+        margin: 20px 0;
+      }
+      .details {
+        background-color: #f9f5f0;
+        padding: 20px;
+        border-radius: 6px;
+        margin: 25px 0;
+      }
+      .details p {
+        margin: 10px 0;
+      }
+      .alert {
+        background-color: #ff6b6b20;
+        border-left: 4px solid #ff6b6b;
+        padding: 15px;
         margin: 20px 0;
       }
     </style>
@@ -92,27 +114,26 @@ const emailConfirmacionAdmin = (nombre, url) => {
       </div>
       
       <div class="content">
-        <h1>Bienvenido/a al Equipo Administrativo</h1>
+        <h1>Nueva Reserva de ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</h1>
         
-        <p>Estimado/a <strong>${nombre}</strong>,</p>
-        
-        <div class="quote">
-          "Cada piedra de esta hacienda cuenta una historia, cada rincón guarda un recuerdo, y ahora, usted forma parte de este legado centenario de elegancia y tradición."
+        <div class="alert">
+          <p>Se ha recibido una nueva solicitud de reserva que requiere atención.</p>
         </div>
         
-        <p>Es un placer darle la bienvenida al equipo administrativo de <strong>Hacienda San Carlos Borromeo</strong>. Su cuenta ha sido creada con éxito, pero necesita ser confirmada para comenzar a gestionar nuestros servicios.</p>
+        <div class="details">
+          <h3>Detalles de la Reserva</h3>
+          <p><strong>Cliente:</strong> ${cliente}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Teléfono:</strong> ${telefono}</p>
+          <p><strong>Fecha:</strong> ${fecha}</p>
+          <p><strong>Hora:</strong> ${hora}</p>
+          <p><strong>Detalles:</strong> ${detalles}</p>
+          <p><strong>Comentarios adicionales:</strong> ${comentarios}</p>
+        </div>
         
-        <p>Por favor, haga clic en el siguiente botón para activar su cuenta:</p>
-        
-        <a href="${url}" class="btn">Confirmar Mi Cuenta</a>
+        <p>Por favor revise esta reserva en el panel de administración y contacte al cliente lo antes posible para confirmar los detalles.</p>
         
         <div class="divider"></div>
-        
-        <p>Si tiene alguna pregunta o necesita asistencia, no dude en contactarnos:</p>
-        <p><strong>Email:</strong> hdasancarlos@gmail.com</p>
-        <p><strong>Teléfono:</strong> +52 (123) 456-7890</p>
-        
-        <p>Este enlace expirará en 24 horas por motivos de seguridad.</p>
       </div>
       
       <div class="footer">

@@ -371,4 +371,93 @@ exports.asignarReservaHabitacion = async (req, res) => {
       error: error.message
     });
   }
+};
+
+/**
+ * @desc    Obtener fechas ocupadas para habitaciones
+ * @route   GET /api/reservas/habitaciones/fechas-ocupadas
+ * @access  Public
+ */
+exports.obtenerFechasOcupadas = async (req, res) => {
+  try {
+    // Parámetros opcionales para filtrar por tipo de habitación y fechas
+    const { tipoHabitacion, fechaInicio, fechaFin } = req.query;
+    
+    // Construir el query
+    const query = {
+      estadoReserva: { $ne: 'cancelada' }
+    };
+    
+    // Si se especifica un tipo de habitación, filtrar por él
+    if (tipoHabitacion) {
+      query.tipoHabitacion = tipoHabitacion;
+    }
+    
+    // Si hay fechas de inicio y fin, filtrar el rango
+    if (fechaInicio && fechaFin) {
+      // Para habitaciones, hay que considerar todo el rango de fechas (entrada a salida)
+      query.$or = [
+        // Fecha entrada está dentro del rango solicitado
+        {
+          fechaEntrada: {
+            $gte: new Date(fechaInicio),
+            $lte: new Date(fechaFin)
+          }
+        },
+        // Fecha salida está dentro del rango solicitado
+        {
+          fechaSalida: {
+            $gte: new Date(fechaInicio),
+            $lte: new Date(fechaFin)
+          }
+        },
+        // El rango solicitado está completamente dentro de la estancia
+        {
+          fechaEntrada: { $lte: new Date(fechaInicio) },
+          fechaSalida: { $gte: new Date(fechaFin) }
+        }
+      ];
+    } else if (fechaInicio) {
+      // Solo hay fecha de inicio (buscar reservas desde esa fecha)
+      query.fechaSalida = { $gte: new Date(fechaInicio) };
+    } else if (fechaFin) {
+      // Solo hay fecha de fin (buscar reservas hasta esa fecha)
+      query.fechaEntrada = { $lte: new Date(fechaFin) };
+    } else {
+      // Si no hay fechas, establecer un rango por defecto (próximos 12 meses)
+      const hoy = new Date();
+      const finPeriodo = new Date();
+      finPeriodo.setFullYear(hoy.getFullYear() + 1);
+      
+      query.$or = [
+        { fechaEntrada: { $gte: hoy, $lte: finPeriodo } },
+        { fechaSalida: { $gte: hoy, $lte: finPeriodo } },
+        { fechaEntrada: { $lte: hoy }, fechaSalida: { $gte: finPeriodo } }
+      ];
+    }
+    
+    // Proyectar solo los campos necesarios
+    const reservas = await ReservaHabitacion.find(query, 'fechaEntrada fechaSalida tipoHabitacion numeroHabitaciones')
+      .sort({ fechaEntrada: 1 });
+    
+    // Preparar datos para el frontend
+    const fechasOcupadas = reservas.map(reserva => ({
+      fechaEntrada: reserva.fechaEntrada,
+      fechaSalida: reserva.fechaSalida,
+      tipoHabitacion: reserva.tipoHabitacion,
+      numeroHabitaciones: reserva.numeroHabitaciones
+    }));
+    
+    res.status(200).json({
+      success: true,
+      data: fechasOcupadas
+    });
+  } catch (error) {
+    console.error('Error al obtener fechas ocupadas de habitaciones:', error);
+    res.status(500).json({
+      success: false,
+      message: 'No se pudieron obtener las fechas ocupadas',
+      error: error.message
+    });
+  }
 }; 

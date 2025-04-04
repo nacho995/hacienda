@@ -1,4 +1,12 @@
-const emailConfirmacionReserva = (tipoReserva, datos) => {
+const emailConfirmacionReserva = (datos) => {
+  // Verificación de seguridad para evitar errores con propiedades undefined
+  const datosSeguro = datos || {};
+
+  // Determinar el tipo de reserva basado en los campos disponibles
+  let tipoReserva = 'desconocido';
+  if (datosSeguro.tipoHabitacion) tipoReserva = 'habitacion';
+  else if (datosSeguro.tipoEvento) tipoReserva = 'evento';
+  else if (datosSeguro.tipoMasaje) tipoReserva = 'masaje';
   
   const obtenerDetallesReserva = () => {
     switch(tipoReserva) {
@@ -6,15 +14,15 @@ const emailConfirmacionReserva = (tipoReserva, datos) => {
         return `
           <div class="details">
             <h3>Detalles de su Reserva de Habitación</h3>
-            <p><strong>Número de Confirmación:</strong> ${datos.numeroConfirmacion}</p>
-            <p><strong>Tipo de Habitación:</strong> ${datos.tipoHabitacion}</p>
-            <p><strong>Número de Habitaciones:</strong> ${datos.numeroHabitaciones}</p>
-            <p><strong>Fecha de Entrada:</strong> ${new Date(datos.fechaEntrada).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p><strong>Fecha de Salida:</strong> ${new Date(datos.fechaSalida).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p><strong>Adultos:</strong> ${datos.numeroAdultos}</p>
-            <p><strong>Niños:</strong> ${datos.numeroNinos}</p>
-            <p><strong>Precio Total:</strong> €${datos.precioTotal}</p>
-            <p><strong>Estado:</strong> ${datos.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
+            <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
+            <p><strong>Tipo de Habitación:</strong> ${datosSeguro.tipoHabitacion || 'No especificado'}</p>
+            <p><strong>Número de Habitaciones:</strong> ${datosSeguro.numeroHabitaciones || '1'}</p>
+            <p><strong>Fecha de Entrada:</strong> ${datosSeguro.fechaEntrada ? new Date(datosSeguro.fechaEntrada).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
+            <p><strong>Fecha de Salida:</strong> ${datosSeguro.fechaSalida ? new Date(datosSeguro.fechaSalida).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
+            <p><strong>Adultos:</strong> ${datosSeguro.numeroAdultos || '0'}</p>
+            <p><strong>Niños:</strong> ${datosSeguro.numeroNinos || '0'}</p>
+            <p><strong>Precio Total:</strong> €${datosSeguro.precioTotal || '0'}</p>
+            <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
           </div>
         `;
       
@@ -22,15 +30,15 @@ const emailConfirmacionReserva = (tipoReserva, datos) => {
         return `
           <div class="details">
             <h3>Detalles de su Reserva de Evento</h3>
-            <p><strong>Número de Confirmación:</strong> ${datos.numeroConfirmacion}</p>
-            <p><strong>Nombre del Evento:</strong> ${datos.nombreEvento}</p>
-            <p><strong>Tipo de Evento:</strong> ${datos.tipoEvento}</p>
-            <p><strong>Fecha:</strong> ${new Date(datos.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p><strong>Horario:</strong> De ${datos.horaInicio} a ${datos.horaFin}</p>
-            <p><strong>Espacio:</strong> ${datos.espacioSeleccionado}</p>
-            <p><strong>Número de Invitados:</strong> ${datos.numeroInvitados}</p>
-            <p><strong>Presupuesto Estimado:</strong> €${datos.presupuestoEstimado}</p>
-            <p><strong>Estado:</strong> ${datos.estadoReserva === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
+            <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
+            <p><strong>Nombre del Evento:</strong> ${datosSeguro.nombreEvento || 'No especificado'}</p>
+            <p><strong>Tipo de Evento:</strong> ${datosSeguro.tipoEvento || 'No especificado'}</p>
+            <p><strong>Fecha:</strong> ${datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
+            <p><strong>Horario:</strong> De ${datosSeguro.horaInicio || '00:00'} a ${datosSeguro.horaFin || '00:00'}</p>
+            <p><strong>Espacio:</strong> ${datosSeguro.espacioSeleccionado || 'No especificado'}</p>
+            <p><strong>Número de Invitados:</strong> ${datosSeguro.numeroInvitados || '0'}</p>
+            <p><strong>Presupuesto Estimado:</strong> €${datosSeguro.presupuestoEstimado || '0'}</p>
+            <p><strong>Estado:</strong> ${datosSeguro.estadoReserva === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
           </div>
         `;
       
@@ -38,14 +46,14 @@ const emailConfirmacionReserva = (tipoReserva, datos) => {
         return `
           <div class="details">
             <h3>Detalles de su Reserva de Masaje</h3>
-            <p><strong>Número de Confirmación:</strong> ${datos.numeroConfirmacion}</p>
-            <p><strong>Tipo de Masaje:</strong> ${datos.tipoMasaje}</p>
-            <p><strong>Duración:</strong> ${datos.duracion} minutos</p>
-            <p><strong>Fecha:</strong> ${new Date(datos.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            <p><strong>Hora:</strong> ${datos.hora}</p>
-            <p><strong>Número de Personas:</strong> ${datos.numeroPersonas}</p>
-            <p><strong>Precio Total:</strong> €${datos.precioTotal}</p>
-            <p><strong>Estado:</strong> ${datos.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
+            <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
+            <p><strong>Tipo de Masaje:</strong> ${datosSeguro.tipoMasaje || 'No especificado'}</p>
+            <p><strong>Duración:</strong> ${datosSeguro.duracion || '0'} minutos</p>
+            <p><strong>Fecha:</strong> ${datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
+            <p><strong>Hora:</strong> ${datosSeguro.hora || '00:00'}</p>
+            <p><strong>Número de Personas:</strong> ${datosSeguro.numeroPersonas || '1'}</p>
+            <p><strong>Precio Total:</strong> €${datosSeguro.precioTotal || '0'}</p>
+            <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
           </div>
         `;
       
@@ -53,6 +61,10 @@ const emailConfirmacionReserva = (tipoReserva, datos) => {
         return '<p>Detalles de su reserva no disponibles.</p>';
     }
   };
+  
+  // Obtener nombre y apellidos seguros
+  const nombreMostrar = datosSeguro.nombreContacto || datosSeguro.nombre || 'Estimado/a Cliente';
+  const apellidosMostrar = datosSeguro.apellidosContacto || datosSeguro.apellidos || '';
   
   return `
   <!DOCTYPE html>
@@ -170,7 +182,7 @@ const emailConfirmacionReserva = (tipoReserva, datos) => {
       <div class="content">
         <h1>¡Su Reserva ha sido Recibida!</h1>
         
-        <p>Estimado/a <strong>${datos.nombre} ${datos.apellidos || datos.apellidosContacto || ''}</strong>,</p>
+        <p>Estimado/a <strong>${nombreMostrar} ${apellidosMostrar}</strong>,</p>
         
         <p>Gracias por elegir <strong>Hacienda San Carlos Borromeo</strong> para su ${
           tipoReserva === 'habitacion' ? 'estancia' : 
@@ -186,7 +198,7 @@ const emailConfirmacionReserva = (tipoReserva, datos) => {
         
         <p>
           ${
-            datos.estado === 'confirmada' || datos.estadoReserva === 'confirmada' 
+            (datosSeguro.estado === 'confirmada' || datosSeguro.estadoReserva === 'confirmada')
               ? 'Su reserva ha sido confirmada. ¡Le esperamos con gran ilusión!' 
               : 'Estamos procesando su reserva y le enviaremos una confirmación definitiva en breve.'
           }

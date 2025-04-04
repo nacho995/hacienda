@@ -6,11 +6,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   getHabitacionReservations, 
   getEventoReservations, 
-  getMasajeReservations 
+  getMasajeReservations,
+  updateHabitacionReservation,
+  updateEventoReservation,
+  updateMasajeReservation,
+  deleteHabitacionReservation,
+  deleteEventoReservation,
+  deleteMasajeReservation
 } from '@/services/reservationService';
 import userService from '@/services/userService';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function AdminReservations() {
   const { user } = useAuth();
@@ -27,6 +34,7 @@ export default function AdminReservations() {
   const [filterType, setFilterType] = useState(initialFilterType);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activeDropdown, setActiveDropdown] = useState(null);
   
   // Cargar reservaciones al montar el componente
   useEffect(() => {
@@ -193,9 +201,9 @@ export default function AdminReservations() {
   };
 
   const getReservationPath = (tipo, id) => {
-    if (tipo === 'habitacion') return `/admin/reservaciones/habitacion/id?id=${id}`;
-    if (tipo === 'evento') return `/admin/reservaciones/evento/id?id=${id}`;
-    if (tipo === 'masaje') return `/admin/reservaciones/masaje/id?id=${id}`;
+    if (tipo === 'habitacion') return `/admin/reservaciones/habitacion/${id}`;
+    if (tipo === 'evento') return `/admin/reservaciones/evento/${id}`;
+    if (tipo === 'masaje') return `/admin/reservaciones/masaje/${id}`;
     return `/admin/reservaciones/${id}`;
   };
 
@@ -218,6 +226,133 @@ export default function AdminReservations() {
     if (!reserva.asignadoA) return 'Sin asignar';
     const usuarioAsignado = usuarios.find(u => u._id === reserva.asignadoA);
     return usuarioAsignado ? `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos}` : 'Usuario desconocido';
+  };
+  
+  // Función para confirmar una reserva
+  const handleConfirmReservation = async (id, tipo) => {
+    try {
+      let response;
+      switch(tipo) {
+        case 'habitacion':
+          response = await updateHabitacionReservation(id, { estado: 'Confirmada' });
+          break;
+        case 'evento':
+          response = await updateEventoReservation(id, { estado: 'Confirmada' });
+          break;
+        case 'masaje':
+          response = await updateMasajeReservation(id, { estado: 'Confirmada' });
+          break;
+        default:
+          throw new Error('Tipo de reserva no válido');
+      }
+      
+      if (response && response.success) {
+        toast.success('Reserva confirmada exitosamente');
+        
+        // Actualizar el estado localmente sin necesidad de recargar todo
+        setAllReservations(prevReservations => {
+          return prevReservations.map(reserva => {
+            if (reserva.id === id) {
+              return { ...reserva, estado: 'Confirmada' };
+            }
+            return reserva;
+          });
+        });
+      } else {
+        const errorMsg = response?.message || 'Error desconocido al confirmar la reserva';
+        toast.error('Error al confirmar la reserva: ' + errorMsg);
+        console.error('Error en la respuesta del servidor:', response);
+      }
+    } catch (error) {
+      console.error('Error confirmando reserva:', error);
+      toast.error('Error al confirmar la reserva: ' + (error.message || 'Error desconocido'));
+    }
+  };
+  
+  // Función para cancelar una reserva
+  const handleCancelReservation = async (id, tipo) => {
+    try {
+      let response;
+      switch(tipo) {
+        case 'habitacion':
+          response = await updateHabitacionReservation(id, { estado: 'Cancelada' });
+          break;
+        case 'evento':
+          response = await updateEventoReservation(id, { estado: 'Cancelada' });
+          break;
+        case 'masaje':
+          response = await updateMasajeReservation(id, { estado: 'Cancelada' });
+          break;
+        default:
+          throw new Error('Tipo de reserva no válido');
+      }
+      
+      if (response && response.success) {
+        toast.success('Reserva cancelada exitosamente');
+        
+        // Actualizar el estado localmente sin necesidad de recargar todo
+        setAllReservations(prevReservations => {
+          return prevReservations.map(reserva => {
+            if (reserva.id === id) {
+              return { ...reserva, estado: 'Cancelada' };
+            }
+            return reserva;
+          });
+        });
+      } else {
+        const errorMsg = response?.message || 'Error desconocido al cancelar la reserva';
+        toast.error('Error al cancelar la reserva: ' + errorMsg);
+        console.error('Error en la respuesta del servidor:', response);
+      }
+    } catch (error) {
+      console.error('Error cancelando reserva:', error);
+      toast.error('Error al cancelar la reserva: ' + (error.message || 'Error desconocido'));
+    }
+  };
+  
+  // Función para eliminar una reserva
+  const handleDeleteReservation = async (id, tipo) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta reserva? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    
+    try {
+      let response;
+      switch(tipo) {
+        case 'habitacion':
+          response = await deleteHabitacionReservation(id);
+          break;
+        case 'evento':
+          response = await deleteEventoReservation(id);
+          break;
+        case 'masaje':
+          response = await deleteMasajeReservation(id);
+          break;
+        default:
+          throw new Error('Tipo de reserva no válido');
+      }
+      
+      if (response && response.success) {
+        toast.success('Reserva eliminada exitosamente');
+        loadReservations(); // Recargar los datos
+      } else {
+        const errorMsg = response?.message || 'Error desconocido al eliminar la reserva';
+        toast.error('Error al eliminar la reserva: ' + errorMsg);
+        console.error('Error en la respuesta del servidor:', response);
+      }
+    } catch (error) {
+      console.error('Error eliminando reserva:', error);
+      toast.error('Error al eliminar la reserva: ' + (error.message || 'Error desconocido'));
+    }
+  };
+  
+  // Añadir esta función para manejar el clic en el menú de tres puntos
+  const toggleDropdown = (id) => {
+    if (activeDropdown === id) {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown(id);
+    }
   };
   
   return (
@@ -324,8 +459,8 @@ export default function AdminReservations() {
       {/* Tabla de Reservaciones */}
       {!loading && !error && (
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto max-h-full">
+            <table className="w-full table-auto">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -354,7 +489,7 @@ export default function AdminReservations() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody>
                 {filteredReservations.length > 0 ? (
                   filteredReservations.map((reservation) => (
                     <tr key={reservation.id} className="hover:bg-gray-50">
@@ -398,35 +533,67 @@ export default function AdminReservations() {
                           reservation.total}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="relative group">
-                          <button className="text-gray-400 hover:text-gray-900 focus:outline-none">
+                        <div className="relative dropdown">
+                          <button 
+                            onClick={() => toggleDropdown(reservation.id)}
+                            className="text-gray-400 hover:text-gray-900 p-2 rounded-full hover:bg-gray-100"
+                          >
                             <FaEllipsisV />
                           </button>
-                          <div className="absolute right-0 z-10 w-48 mt-2 origin-top-right bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
-                            <div className="py-1">
-                              <a 
-                                href={getReservationPath(reservation.tipo, reservation.id)}
-                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          <div 
+                            className={`fixed inset-0 bg-transparent ${activeDropdown === reservation.id ? 'block' : 'hidden'}`}
+                            onClick={() => setActiveDropdown(null)}
+                            style={{ zIndex: 40 }}
+                          ></div>
+                          <div 
+                            className={`dropdown-menu bg-white rounded-md shadow-lg ${activeDropdown === reservation.id ? 'block' : 'hidden'}`}
+                            style={{ 
+                              position: 'absolute',
+                              top: '0',
+                              right: '2rem',
+                              width: '12rem',
+                              zIndex: 50,
+                              border: '1px solid #e5e7eb',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                            }}
+                          >
+                            <Link
+                              href={getReservationPath(reservation.tipo, reservation.id)}
+                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                            >
+                              Ver detalles
+                            </Link>
+                            {reservation.estado.toLowerCase() === 'pendiente' && (
+                              <button 
+                                onClick={() => {
+                                  handleConfirmReservation(reservation.id, reservation.tipo);
+                                  setActiveDropdown(null);
+                                }}
+                                className="block px-4 py-2 text-sm text-green-700 hover:bg-green-100 w-full text-left"
                               >
-                                Ver detalles
-                              </a>
-                              {reservation.estado.toLowerCase() === 'pendiente' && (
-                                <>
-                                  <a 
-                                    href="#" 
-                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                  >
-                                    Confirmar
-                                  </a>
-                                  <a 
-                                    href="#" 
-                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                  >
-                                    Cancelar
-                                  </a>
-                                </>
-                              )}
-                            </div>
+                                Confirmar
+                              </button>
+                            )}
+                            {reservation.estado.toLowerCase() !== 'cancelada' && (
+                              <button 
+                                onClick={() => {
+                                  handleCancelReservation(reservation.id, reservation.tipo);
+                                  setActiveDropdown(null);
+                                }}
+                                className="block px-4 py-2 text-sm text-orange-700 hover:bg-orange-100 w-full text-left"
+                              >
+                                Cancelar
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => {
+                                handleDeleteReservation(reservation.id, reservation.tipo);
+                                setActiveDropdown(null);
+                              }}
+                              className="block px-4 py-2 text-sm text-red-700 hover:bg-red-100 w-full text-left"
+                            >
+                              Eliminar
+                            </button>
                           </div>
                         </div>
                       </td>
