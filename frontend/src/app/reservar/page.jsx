@@ -10,7 +10,6 @@ import Footer from '@/components/layout/Footer';
 import { createEventoReservation, checkEventoAvailability, getEventoOccupiedDates } from '@/services/reservationService';
 import apiClient from '@/services/apiClient';
 import { toast } from 'sonner';
-import { useAuth } from '@/context/AuthContext';
 
 // Importar componentes
 import DatePicker from 'react-datepicker';
@@ -53,7 +52,6 @@ const tiposEvento = [
 ];
 
 export default function ReservarPage() {
-  const { user, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
     tipoEvento: '',
     fecha: null,
@@ -72,18 +70,6 @@ export default function ReservarPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmationData, setConfirmationData] = useState(null);
   const [fechasOcupadas, setFechasOcupadas] = useState([]);
-  
-  // Rellenar el formulario con datos del usuario si está autenticado
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      setFormData(prev => ({
-        ...prev,
-        nombre: user.nombre || prev.nombre,
-        email: user.email || prev.email,
-        telefono: user.telefono || prev.telefono
-      }));
-    }
-  }, [isAuthenticated, user]);
   
   // Cargar fechas ocupadas desde el backend al montar el componente
   useEffect(() => {
