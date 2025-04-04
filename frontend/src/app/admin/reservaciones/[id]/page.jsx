@@ -26,7 +26,7 @@ import {
   asignarMasajeReservation
 } from '@/services/reservationService';
 
-import userService from '@/api/services/userService';
+import userService from '@/services/userService';
 
 export default function ReservationDetails() {
   const params = useParams();

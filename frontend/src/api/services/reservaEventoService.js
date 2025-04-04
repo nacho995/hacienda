@@ -58,6 +58,24 @@ const reservaEventoService = {
    */
   comprobarDisponibilidad: async (params) => {
     return apiClient.post(ENDPOINTS.RESERVAS_EVENTOS.DISPONIBILIDAD, params);
+  },
+
+  /**
+   * Asignar una reserva de evento al usuario actual
+   * @param {string} id - ID de la reserva
+   * @returns {Promise} Promesa con la respuesta del servidor
+   */
+  asignarReserva: async (id) => {
+    return apiClient.put(ENDPOINTS.RESERVAS_EVENTOS.ASIGNAR(id));
+  },
+
+  /**
+   * Desasignar una reserva de evento
+   * @param {string} id - ID de la reserva
+   * @returns {Promise} Promesa con la respuesta del servidor
+   */
+  desasignarReserva: async (id) => {
+    return apiClient.put(ENDPOINTS.RESERVAS_EVENTOS.DESASIGNAR(id));
   }
 };
 

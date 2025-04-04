@@ -106,7 +106,13 @@ exports.obtenerReservasEvento = async (req, res) => {
     
     // Si no es admin, solo ver sus propias reservas
     if (req.user.role !== 'admin') {
-      query.usuario = req.user.id;
+      // Ver tanto las reservas propias como las asignadas a este usuario
+      query = {
+        $or: [
+          { usuario: req.user.id },
+          { asignadoA: req.user.id }
+        ]
+      };
     }
     
     // Filtros opcionales
@@ -123,9 +129,15 @@ exports.obtenerReservasEvento = async (req, res) => {
         $lte: fechaFin
       };
     }
+
+    // Filtro opcional para mostrar solo reservas sin asignar
+    if (req.query.sinAsignar === 'true') {
+      query.asignadoA = null;
+    }
     
     const reservas = await ReservaEvento.find(query)
       .populate('usuario', 'nombre apellidos email telefono')
+      .populate('asignadoA', 'nombre apellidos email')
       .sort({ fechaEvento: 1, horaInicio: 1 });
       
     res.status(200).json({
@@ -379,6 +391,84 @@ exports.asignarReservaEvento = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al asignar la reserva de evento',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Asignar una reserva a un usuario
+ * @route   PUT /api/reservas/eventos/:id/asignar
+ * @access  Private
+ */
+exports.asignarReserva = async (req, res) => {
+  try {
+    const reserva = await ReservaEvento.findById(req.params.id);
+
+    if (!reserva) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reserva no encontrada'
+      });
+    }
+
+    // Asignar al usuario actual
+    reserva.asignadoA = req.user.id;
+    await reserva.save();
+
+    res.status(200).json({
+      success: true,
+      data: reserva,
+      message: 'Reserva asignada exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al asignar reserva:', error);
+    res.status(500).json({
+      success: false,
+      message: 'No se pudo asignar la reserva',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Desasignar una reserva
+ * @route   PUT /api/reservas/eventos/:id/desasignar
+ * @access  Private
+ */
+exports.desasignarReserva = async (req, res) => {
+  try {
+    const reserva = await ReservaEvento.findById(req.params.id);
+
+    if (!reserva) {
+      return res.status(404).json({
+        success: false,
+        message: 'Reserva no encontrada'
+      });
+    }
+
+    // Verificar que el usuario actual es quien tiene asignada la reserva
+    if (reserva.asignadoA && reserva.asignadoA.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para desasignar esta reserva'
+      });
+    }
+
+    // Desasignar reserva
+    reserva.asignadoA = null;
+    await reserva.save();
+
+    res.status(200).json({
+      success: true,
+      data: reserva,
+      message: 'Reserva desasignada exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al desasignar reserva:', error);
+    res.status(500).json({
+      success: false,
+      message: 'No se pudo desasignar la reserva',
       error: error.message
     });
   }

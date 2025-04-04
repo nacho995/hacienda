@@ -1,5 +1,5 @@
 // Configuración base para la API
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 // Timeout para peticiones fetch (en milisegundos)
 export const FETCH_TIMEOUT = 10000; // 10 segundos
@@ -8,36 +8,38 @@ export const FETCH_TIMEOUT = 10000; // 10 segundos
 export const ENDPOINTS = {
   // Autenticación
   AUTH: {
-    REGISTER: '/auth/register',
-    LOGIN: '/auth/login',
-    LOGOUT: '/auth/logout',
-    CONFIRM: '/auth/confirm',
-    ME: '/auth/me',
-    REGISTER_ADMIN: '/auth/register-admin',
+    REGISTER: '/api/auth/register',
+    LOGIN: '/api/auth/login',
+    LOGOUT: '/api/auth/logout',
+    CONFIRM: '/api/auth/confirm',
+    ME: '/api/auth/me',
+    REGISTER_ADMIN: '/api/auth/register-admin',
   },
   // Usuarios
   USERS: {
-    ALL: '/users',
-    SINGLE: (id) => `/users/${id}`,
-    ME: '/users/me',
+    ALL: '/api/users',
+    SINGLE: (id) => `/api/users/${id}`,
+    ME: '/api/users/me',
   },
   // Reservas de Habitaciones
   RESERVAS_HABITACIONES: {
-    ALL: '/reservas/habitaciones',
-    SINGLE: (id) => `/reservas/habitaciones/${id}`,
-    DISPONIBILIDAD: '/reservas/habitaciones/disponibilidad',
+    ALL: '/api/reservas/habitaciones',
+    SINGLE: (id) => `/api/reservas/habitaciones/${id}`,
+    DISPONIBILIDAD: '/api/reservas/habitaciones/disponibilidad',
   },
   // Reservas de Eventos
   RESERVAS_EVENTOS: {
-    ALL: '/reservas/eventos',
-    SINGLE: (id) => `/reservas/eventos/${id}`,
-    DISPONIBILIDAD: '/reservas/eventos/disponibilidad',
+    ALL: '/api/reservas/eventos',
+    SINGLE: (id) => `/api/reservas/eventos/${id}`,
+    DISPONIBILIDAD: '/api/reservas/eventos/disponibilidad',
+    ASIGNAR: (id) => `/api/reservas/eventos/${id}/asignar`,
+    DESASIGNAR: (id) => `/api/reservas/eventos/${id}/desasignar`,
   },
   // Reservas de Masajes
   RESERVAS_MASAJES: {
-    ALL: '/reservas/masajes',
-    SINGLE: (id) => `/reservas/masajes/${id}`,
-    DISPONIBILIDAD: '/reservas/masajes/disponibilidad',
+    ALL: '/api/reservas/masajes',
+    SINGLE: (id) => `/api/reservas/masajes/${id}`,
+    DISPONIBILIDAD: '/api/reservas/masajes/disponibilidad',
   },
 };
 

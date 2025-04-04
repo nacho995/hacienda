@@ -1,7 +1,7 @@
 import './globals.css';
-import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider } from '@/context/AuthContext';
 import AnimatedBackground from '@/components/layout/AnimatedBackground';
+import { Toaster } from 'sonner';
 
 export const metadata = {
   title: 'Hacienda San Carlos Borromeo',
@@ -19,6 +19,7 @@ export default function RootLayout({ children }) {
         <AuthProvider>
           {children}
         </AuthProvider>
+        <Toaster richColors position="bottom-right" />
       </body>
     </html>
   );

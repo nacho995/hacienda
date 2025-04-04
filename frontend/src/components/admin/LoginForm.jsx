@@ -2,13 +2,16 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { FaEnvelope, FaLock, FaExclamationTriangle } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function AdminLoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
   const { login } = useAuth();
+  const router = useRouter();
   
   const {
     register,
@@ -18,6 +21,8 @@ export default function AdminLoginForm() {
 
   const onSubmit = async (data) => {
     try {
+      // Limpiar mensajes de error anteriores
+      setErrorMessage(null);
       setIsSubmitting(true);
       
       // Llamar a la función de login del contexto de autenticación
@@ -25,11 +30,18 @@ export default function AdminLoginForm() {
       
       if (result.success) {
         toast.success('Sesión iniciada correctamente');
+        // Redirigir al dashboard después de un pequeño retraso
+        setTimeout(() => {
+          router.push('/admin/dashboard');
+        }, 500);
       } else {
+        // Mostrar error en el formulario y con toast
+        setErrorMessage(result.message || 'Credenciales incorrectas');
         toast.error(result.message || 'Error al iniciar sesión');
       }
     } catch (error) {
       console.error('Error en login:', error);
+      setErrorMessage('Error al conectar con el servidor. Inténtelo de nuevo más tarde.');
       toast.error('Error al iniciar sesión. Inténtelo de nuevo más tarde.');
     } finally {
       setIsSubmitting(false);
@@ -41,6 +53,14 @@ export default function AdminLoginForm() {
       <h2 className="text-2xl font-semibold text-center text-white mb-8 drop-shadow-md">
         Acceso Administrativo
       </h2>
+      
+      {/* Mensaje de error general */}
+      {errorMessage && (
+        <div className="bg-red-900/60 border border-red-600 p-3 rounded-lg text-red-200 text-sm flex items-start">
+          <FaExclamationTriangle className="flex-shrink-0 mr-2 mt-0.5" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
       
       {/* Email */}
       <div>
@@ -61,7 +81,7 @@ export default function AdminLoginForm() {
             })}
             className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-700 bg-black/50 text-white focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-base"
             disabled={isSubmitting}
-            autoComplete="off"
+            autoComplete="email"
           />
         </div>
         {errors.email && (
@@ -87,7 +107,7 @@ export default function AdminLoginForm() {
             })}
             className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-700 bg-black/50 text-white focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent text-base"
             disabled={isSubmitting}
-            autoComplete="off"
+            autoComplete="current-password"
           />
         </div>
         {errors.password && (

@@ -17,7 +17,8 @@ const {
   actualizarReservaEvento,
   eliminarReservaEvento,
   comprobarDisponibilidadEvento,
-  asignarReservaEvento
+  asignarReservaEvento,
+  desasignarReserva
 } = require('../controllers/reservaEvento.controller');
 
 const {
@@ -61,8 +62,9 @@ router.route('/eventos/:id')
   .put(protectRoute, actualizarReservaEvento)
   .delete(protectRoute, eliminarReservaEvento);
 
-// Ruta para asignar reservas de eventos
+// Nuevas rutas para asignar/desasignar reservas
 router.put('/eventos/:id/asignar', protectRoute, authorize('admin'), asignarReservaEvento);
+router.put('/eventos/:id/desasignar', protectRoute, desasignarReserva);
 
 // Rutas para masajes
 router.post('/masajes/disponibilidad', comprobarDisponibilidadMasaje);

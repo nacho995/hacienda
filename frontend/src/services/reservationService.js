@@ -7,7 +7,7 @@ export const getHabitacionReservations = async () => {
     return response.data;
   } catch (error) {
     console.error('Error fetching habitacion reservations:', error);
-    throw error;
+    return []; // Devolver array vacío en caso de error
   }
 };
 
@@ -58,7 +58,7 @@ export const getEventoReservations = async () => {
     return response.data;
   } catch (error) {
     console.error('Error fetching evento reservations:', error);
-    throw error;
+    return []; // Devolver array vacío en caso de error
   }
 };
 
@@ -102,6 +102,39 @@ export const asignarEventoReservation = async (id, usuarioId) => {
   }
 };
 
+// Obtener reservas sin asignar (visualización general)
+export const getUnassignedEventoReservations = async () => {
+  try {
+    const response = await apiClient.get('/reservas/eventos?sinAsignar=true');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching unassigned evento reservations:', error);
+    return []; // Devolver array vacío en caso de error
+  }
+};
+
+// Asignar una reserva de evento al usuario actual
+export const assignEventoReservation = async (id) => {
+  try {
+    const response = await apiClient.put(`/reservas/eventos/${id}/asignar`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error assigning evento reservation ${id}:`, error);
+    throw error;
+  }
+};
+
+// Desasignar una reserva de evento
+export const unassignEventoReservation = async (id) => {
+  try {
+    const response = await apiClient.put(`/reservas/eventos/${id}/desasignar`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error unassigning evento reservation ${id}:`, error);
+    throw error;
+  }
+};
+
 // Servicios para reservas de masajes
 export const getMasajeReservations = async () => {
   try {
@@ -109,7 +142,7 @@ export const getMasajeReservations = async () => {
     return response.data;
   } catch (error) {
     console.error('Error fetching masaje reservations:', error);
-    throw error;
+    return []; // Devolver array vacío en caso de error
   }
 };
 

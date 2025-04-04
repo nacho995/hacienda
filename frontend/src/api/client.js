@@ -36,6 +36,7 @@ const apiClient = {
   setToken: (token) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('authToken', token);
+      console.log('Token guardado en localStorage:', token);
     }
   },
   
@@ -53,6 +54,9 @@ const apiClient = {
     
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+      console.log(`Petición a ${endpoint} con token: ${token.substring(0, 15)}...`);
+    } else {
+      console.log(`Petición a ${endpoint} sin token de autenticación`);
     }
     
     const options = {

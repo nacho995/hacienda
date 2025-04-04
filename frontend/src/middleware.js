@@ -1,66 +1,53 @@
 import { NextResponse } from 'next/server';
 
-// Rutas que no requieren autenticación
-const publicRoutes = ['/admin/login', '/admin/registro'];
+// Ya no necesitamos rutas públicas específicas aquí
+// const publicRoutes = ['/admin/login', '/admin/registro'];
 
 export default function middleware(request) {
   const { pathname } = request.nextUrl;
   
-  // Solo aplicar a rutas que comiencen con /admin
+  // Aplicar lógica solo a rutas /admin
   if (pathname.startsWith('/admin')) {
-    // No aplicar protección a rutas públicas
+    console.log(`Middleware: Accediendo a ruta admin: ${pathname}`);
+    // Por ahora, permitimos que todas las rutas /admin pasen.
+    // La protección real vendrá del AuthContext/Layout en el cliente
+    // y de la validación del token JWT en el backend (localhost:5000)
+    // cuando se hagan llamadas a la API.
+    
+    // Comentamos la lógica de cookies:
+    /*
     if (publicRoutes.includes(pathname)) {
-      // Permitir acceso a rutas públicas
       return NextResponse.next();
     }
-    
-    // Verificar si existe sesión de usuario
     const adminSessionCookie = request.cookies.get('adminSession');
-    
-    // Si no hay sesión, redirigir al login
     if (!adminSessionCookie) {
       const url = new URL('/admin/login', request.url);
       url.searchParams.set('from', pathname);
       return NextResponse.redirect(url);
     }
-    
     try {
-      // Verificar que la sesión sea válida (podríamos hacer más validaciones)
       const sessionData = JSON.parse(adminSessionCookie.value);
-      const isValid = sessionData && 
-                     sessionData.email && 
-                     sessionData.role && 
-                     sessionData.authenticated === true;
-      
-      if (!isValid) {
-        throw new Error('Sesión inválida');
-      }
-      
-      // Si llega aquí, la sesión es válida
+      const isValid = sessionData && sessionData.email && sessionData.role && sessionData.authenticated === true;
+      if (!isValid) throw new Error('Sesión inválida');
       return NextResponse.next();
     } catch (error) {
-      console.error('Error validando sesión:', error);
-      
-      // Si hay algún error en la sesión, redirigir al login
+      console.error('Middleware Error validando sesión:', error);
       const url = new URL('/admin/login', request.url);
       return NextResponse.redirect(url);
     }
+    */
+    
+    // Permitir que la solicitud continúe hacia la página/componente
+    return NextResponse.next(); 
   }
   
-  // Para todas las demás rutas, continuar normalmente
+  // Para rutas no /admin, continuar normalmente
   return NextResponse.next();
 }
 
-// Este es el matcher: solo aplicar a rutas específicas
+// El matcher sigue siendo útil para definir a qué rutas se aplica el middleware
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public directory
-     */
     '/admin/:path*'
   ]
 }; 

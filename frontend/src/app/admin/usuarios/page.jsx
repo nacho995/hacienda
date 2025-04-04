@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaSearch, FaPlus, FaEdit, FaTrash, FaKey, FaUserShield, FaEllipsisV, FaChevronDown, FaCheck, FaTimes, FaExclamationCircle, FaLock } from 'react-icons/fa';
+import { FaSearch, FaPlus, FaEdit, FaTrash, FaKey, FaUserShield, FaEllipsisV, FaChevronDown, FaCheck, FaTimes, FaExclamationCircle, FaLock, FaSpinner } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
+import userService from '@/services/userService';
+import { toast } from 'sonner';
 
 export default function AdminUsuarios() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   
   useEffect(() => {
     // Verificar si el usuario tiene permisos de administrador
@@ -44,7 +47,7 @@ export default function AdminUsuarios() {
         setCurrentUser(sessionData);
         
         // Verificar si es administrador
-        if (sessionData.role !== 'Administrador') {
+        if (sessionData.role !== 'Administrador' && sessionData.role !== 'admin') {
           setAccessDenied(true);
         }
         
@@ -58,40 +61,7 @@ export default function AdminUsuarios() {
     checkAdminPermission();
   }, [router]);
 
-  const [usuarios, setUsuarios] = useState([
-    {
-      id: 1,
-      nombre: 'Admin Principal',
-      email: 'admin@haciendasancarlos.com',
-      role: 'Administrador',
-      fechaCreacion: '2023-10-15',
-      activo: true
-    },
-    {
-      id: 2,
-      nombre: 'Juan García',
-      email: 'juan@haciendasancarlos.com',
-      role: 'Editor',
-      fechaCreacion: '2024-01-20',
-      activo: true
-    },
-    {
-      id: 3,
-      nombre: 'María López',
-      email: 'maria@haciendasancarlos.com',
-      role: 'Gestor',
-      fechaCreacion: '2024-02-10',
-      activo: true
-    },
-    {
-      id: 4,
-      nombre: 'Carlos Rodríguez',
-      email: 'carlos@haciendasancarlos.com',
-      role: 'Visualizador',
-      fechaCreacion: '2024-03-05',
-      activo: false
-    }
-  ]);
+  const [usuarios, setUsuarios] = useState([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showUserForm, setShowUserForm] = useState(false);
@@ -115,16 +85,48 @@ export default function AdminUsuarios() {
     confirmPassword: ''
   });
   
+  // Cargar usuarios de la API
+  useEffect(() => {
+    const loadUsers = async () => {
+      if (accessDenied || loading) return;
+      
+      try {
+        setLoadingUsers(true);
+        const response = await userService.getAllUsers();
+        
+        // Comprobar si la respuesta es un array directo o un objeto con format {success, data}
+        if (Array.isArray(response)) {
+          // Si la API devuelve directamente un array de usuarios
+          setUsuarios(response);
+        } else if (response.success && Array.isArray(response.data)) {
+          // Si la API devuelve {success: true, data: [...]}
+          setUsuarios(response.data);
+        } else {
+          toast.error('Error al cargar los usuarios');
+          console.error('Respuesta inesperada al cargar usuarios:', response);
+        }
+      } catch (error) {
+        toast.error('Error al cargar los usuarios');
+        console.error('Error cargando usuarios:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    
+    loadUsers();
+  }, [accessDenied, loading]);
+  
   const filteredUsuarios = usuarios.filter(usuario => {
     return (
-      usuario.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      usuario.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      usuario.role.toLowerCase().includes(searchTerm.toLowerCase())
+      usuario.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      usuario.apellidos?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      usuario.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      usuario.role?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
   
   const handleNewUser = () => {
-    if (currentUser?.role !== 'Administrador') {
+    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
       alert('Solo los administradores pueden crear nuevos usuarios');
       return;
     }
@@ -132,40 +134,42 @@ export default function AdminUsuarios() {
     setEditUser(null);
     setNewUser({
       nombre: '',
+      apellidos: '',
       email: '',
       password: '',
-      role: 'Visualizador',
+      role: 'usuario',
       activo: true
     });
     setShowUserForm(true);
   };
   
   const handleEditUser = (user) => {
-    if (currentUser?.role !== 'Administrador') {
+    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
       alert('Solo los administradores pueden editar usuarios');
       return;
     }
     
     setEditUser(user);
     setNewUser({
-      nombre: user.nombre,
-      email: user.email,
+      nombre: user.nombre || '',
+      apellidos: user.apellidos || '',
+      email: user.email || '',
       password: '',
-      role: user.role,
-      activo: user.activo
+      role: user.role || 'usuario',
+      activo: user.confirmado === true
     });
     setShowUserForm(true);
     setShowDropdown(null);
   };
   
   const handleDeleteUser = (user) => {
-    if (currentUser?.role !== 'Administrador') {
+    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
       alert('Solo los administradores pueden eliminar usuarios');
       return;
     }
     
     // No permitir eliminar al admin principal
-    if (user.role === 'Administrador' && user.email === 'admin@haciendasancarlos.com') {
+    if (user.role === 'admin' && user.email === 'admin@hacienda-sancarlos.com') {
       alert('No se puede eliminar al administrador principal del sistema');
       return;
     }
@@ -175,14 +179,28 @@ export default function AdminUsuarios() {
     setShowDropdown(null);
   };
   
-  const confirmDeleteUser = () => {
-    setUsuarios(usuarios.filter(u => u.id !== userToDelete.id));
-    setShowDeleteConfirm(false);
-    setUserToDelete(null);
+  const confirmDeleteUser = async () => {
+    try {
+      const result = await userService.deleteUser(userToDelete._id);
+      
+      if (result.success) {
+        // Eliminar usuario del estado local
+        setUsuarios(usuarios.filter(u => u._id !== userToDelete._id));
+        toast.success('Usuario eliminado correctamente');
+      } else {
+        toast.error(result.message || 'Error al eliminar usuario');
+      }
+    } catch (error) {
+      console.error('Error eliminando usuario:', error);
+      toast.error('Error al eliminar usuario');
+    } finally {
+      setShowDeleteConfirm(false);
+      setUserToDelete(null);
+    }
   };
   
   const handleChangePassword = (user) => {
-    if (currentUser?.role !== 'Administrador' && currentUser?.email !== user.email) {
+    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin' && currentUser?.email !== user.email) {
       alert('Solo puedes cambiar tu propia contraseña o ser administrador');
       return;
     }
@@ -212,73 +230,125 @@ export default function AdminUsuarios() {
     });
   };
   
-  const saveUser = () => {
+  const saveUser = async () => {
     // Verificar que el usuario sea administrador
-    if (currentUser?.role !== 'Administrador') {
+    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
       alert('No tienes permisos para realizar esta acción');
       return;
     }
     
-    if (editUser) {
-      // Actualizar usuario existente
-      setUsuarios(
-        usuarios.map(user => 
-          user.id === editUser.id 
-            ? { ...user, ...newUser } 
-            : user
-        )
-      );
-    } else {
-      // Crear nuevo usuario
-      const newId = Math.max(...usuarios.map(u => u.id)) + 1;
-      setUsuarios([
-        ...usuarios,
-        {
-          id: newId,
-          ...newUser,
-          fechaCreacion: new Date().toISOString().split('T')[0]
+    try {
+      if (editUser) {
+        // Actualizar usuario existente
+        const userData = {
+          nombre: newUser.nombre,
+          apellidos: newUser.apellidos,
+          role: newUser.role,
+          confirmado: newUser.activo
+        };
+        
+        const result = await userService.updateUser(editUser._id, userData);
+        
+        if (result.success) {
+          // Actualizar la lista de usuarios
+          setUsuarios(usuarios.map(user => 
+            user._id === editUser._id ? { ...user, ...userData } : user
+          ));
+          toast.success('Usuario actualizado correctamente');
+        } else {
+          toast.error(result.message || 'Error al actualizar usuario');
         }
-      ]);
+      } else {
+        // Crear nuevo usuario
+        const userData = {
+          ...newUser,
+          confirmado: newUser.activo
+        };
+        
+        const result = await userService.createUser(userData);
+        
+        if (result.success) {
+          // Añadir el nuevo usuario a la lista
+          setUsuarios([...usuarios, result.data]);
+          toast.success('Usuario creado correctamente');
+        } else {
+          toast.error(result.message || 'Error al crear usuario');
+        }
+      }
+      
+      setShowUserForm(false);
+    } catch (error) {
+      console.error('Error guardando usuario:', error);
+      toast.error('Error al guardar usuario');
     }
-    
-    setShowUserForm(false);
   };
   
-  const savePassword = () => {
+  const savePassword = async () => {
     // Verificar que las contraseñas coincidan
     if (newPassword.password !== newPassword.confirmPassword) {
-      alert('Las contraseñas no coinciden');
+      toast.error('Las contraseñas no coinciden');
       return;
     }
     
-    // En una aplicación real, aquí enviarías a tu API
-    // Por ahora solo cerramos el formulario
-    setShowChangePasswordForm(false);
-    setUserToChangePassword(null);
-    
-    alert('Contraseña actualizada correctamente');
+    try {
+      const result = await userService.updatePassword(userToChangePassword._id, {
+        password: newPassword.password
+      });
+      
+      if (result.success) {
+        toast.success('Contraseña actualizada correctamente');
+        setShowChangePasswordForm(false);
+        setUserToChangePassword(null);
+      } else {
+        toast.error(result.message || 'Error al actualizar contraseña');
+      }
+    } catch (error) {
+      console.error('Error actualizando contraseña:', error);
+      toast.error('Error al actualizar contraseña');
+    }
   };
   
-  const toggleUserStatus = (userId) => {
-    if (currentUser?.role !== 'Administrador') {
+  const toggleUserStatus = async (userId) => {
+    if (currentUser?.role !== 'Administrador' && currentUser?.role !== 'admin') {
       alert('Solo los administradores pueden cambiar el estado de los usuarios');
       return;
     }
     
+    // Encontrar el usuario
+    const targetUser = usuarios.find(u => u._id === userId);
+    
     // No permitir desactivar al admin principal
-    const targetUser = usuarios.find(u => u.id === userId);
-    if (targetUser.role === 'Administrador' && targetUser.email === 'admin@haciendasancarlos.com' && targetUser.activo) {
+    if (targetUser.role === 'admin' && targetUser.email === 'admin@hacienda-sancarlos.com' && targetUser.confirmado) {
       alert('No se puede desactivar al administrador principal del sistema');
       return;
     }
     
-    setUsuarios(
-      usuarios.map(user => 
-        user.id === userId 
-          ? { ...user, activo: !user.activo } 
-          : user
-      )
-    );
+    try {
+      const newStatus = !targetUser.confirmado;
+      
+      const result = await userService.updateUser(userId, {
+        confirmado: newStatus
+      });
+      
+      if (result.success) {
+        // Actualizar el estado del usuario en la lista
+        setUsuarios(
+          usuarios.map(user => 
+            user._id === userId 
+              ? { ...user, confirmado: newStatus } 
+              : user
+          )
+        );
+        
+        toast.success(`Usuario ${newStatus ? 'activado' : 'desactivado'} correctamente`);
+      } else {
+        toast.error(result.message || 'Error al cambiar el estado del usuario');
+      }
+    } catch (error) {
+      console.error('Error cambiando estado de usuario:', error);
+      toast.error('Error al cambiar el estado del usuario');
+    }
+    
     setShowDropdown(null);
   };
   
@@ -324,7 +394,7 @@ export default function AdminUsuarios() {
             Gestiona los usuarios del sistema y sus permisos
           </p>
         </div>
-        {currentUser?.role === 'Administrador' && (
+        {currentUser?.role === 'Administrador' || currentUser?.role === 'admin' ? (
           <button
             onClick={handleNewUser}
             className="px-4 py-2 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
@@ -332,7 +402,7 @@ export default function AdminUsuarios() {
             <FaPlus />
             <span>Nuevo Usuario</span>
           </button>
-        )}
+        ) : null}
       </div>
       
       {/* Advertencia de seguridad */}
@@ -362,135 +432,140 @@ export default function AdminUsuarios() {
       </div>
       
       {/* Tabla de usuarios */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Usuario
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rol
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fecha de Creación
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredUsuarios.map((usuario) => (
-                <tr key={usuario.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center">
-                        {usuario.nombre.charAt(0)}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {usuario.nombre}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {usuario.email}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <FaUserShield className="text-[var(--color-primary)] mr-2" />
-                      <span className="text-sm text-gray-900">{usuario.role}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(usuario.fechaCreacion).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        usuario.activo
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {usuario.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
-                    <button
-                      onClick={() => setShowDropdown(showDropdown === usuario.id ? null : usuario.id)}
-                      className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
-                    >
-                      <FaEllipsisV />
-                    </button>
-                    
-                    {showDropdown === usuario.id && (
-                      <div className="absolute right-6 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                        <div className="py-1" role="menu">
-                          <button
-                            onClick={() => handleEditUser(usuario)}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            role="menuitem"
-                          >
-                            <FaEdit className="mr-2" />
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleChangePassword(usuario)}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            role="menuitem"
-                          >
-                            <FaKey className="mr-2" />
-                            Cambiar Contraseña
-                          </button>
-                          <button
-                            onClick={() => toggleUserStatus(usuario.id)}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                            role="menuitem"
-                          >
-                            {usuario.activo ? (
-                              <>
-                                <FaTimes className="mr-2 text-red-500" />
-                                Desactivar
-                              </>
-                            ) : (
-                              <>
-                                <FaCheck className="mr-2 text-green-500" />
-                                Activar
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(usuario)}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
-                            role="menuitem"
-                          >
-                            <FaTrash className="mr-2" />
-                            Eliminar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </td>
+      <div className="bg-white rounded-xl shadow-lg">
+        {loadingUsers ? (
+          <div className="flex items-center justify-center py-10">
+            <FaSpinner className="animate-spin text-3xl text-[var(--color-primary)] mr-3" />
+            <span className="text-gray-600">Cargando usuarios...</span>
+          </div>
+        ) : (
+          <div className="w-full">
+            <table className="w-full min-w-full table-fixed">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[30%]">
+                    Usuario
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    Rol
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                    Fecha de Creación
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    Estado
+                  </th>
+                  <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                    Acciones
+                  </th>
                 </tr>
-              ))}
-              
-              {filteredUsuarios.length === 0 && (
-                <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                    No se encontraron usuarios
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredUsuarios.length > 0 ? filteredUsuarios.map((usuario) => (
+                  <tr key={usuario._id} className="hover:bg-gray-50">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center text-xs">
+                          {usuario.nombre?.charAt(0) || usuario.email?.charAt(0) || '?'}
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900 truncate">
+                            {usuario.nombre} {usuario.apellidos}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate">
+                            {usuario.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center">
+                        <FaUserShield className="text-[var(--color-primary)] mr-2 flex-shrink-0" />
+                        <span className="text-sm text-gray-900">{usuario.role}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-500">
+                      {new Date(usuario.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-3 py-3">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          usuario.confirmado
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}
+                      >
+                        {usuario.confirmado ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-right text-sm font-medium relative">
+                      <button
+                        onClick={() => setShowDropdown(showDropdown === usuario._id ? null : usuario._id)}
+                        className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                      >
+                        <FaEllipsisV />
+                      </button>
+                      
+                      {showDropdown === usuario._id && (
+                        <div className="absolute right-3 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                          <div className="py-1" role="menu">
+                            <button
+                              onClick={() => handleEditUser(usuario)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              role="menuitem"
+                            >
+                              <FaEdit className="mr-2" />
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleChangePassword(usuario)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              role="menuitem"
+                            >
+                              <FaKey className="mr-2" />
+                              Cambiar Contraseña
+                            </button>
+                            <button
+                              onClick={() => toggleUserStatus(usuario._id)}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              role="menuitem"
+                            >
+                              {usuario.confirmado ? (
+                                <>
+                                  <FaTimes className="mr-2 text-red-500" />
+                                  Desactivar
+                                </>
+                              ) : (
+                                <>
+                                  <FaCheck className="mr-2 text-green-500" />
+                                  Activar
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(usuario)}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                              role="menuitem"
+                            >
+                              <FaTrash className="mr-2" />
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="5" className="px-3 py-4 text-center text-gray-500">
+                      No se encontraron usuarios
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
       
       {/* Modal para crear/editar usuario */}
@@ -504,12 +579,26 @@ export default function AdminUsuarios() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre Completo
+                  Nombre
                 </label>
                 <input
                   type="text"
                   name="nombre"
                   value={newUser.nombre}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Apellidos
+                </label>
+                <input
+                  type="text"
+                  name="apellidos"
+                  value={newUser.apellidos}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
                   required
@@ -557,10 +646,9 @@ export default function AdminUsuarios() {
                     onChange={handleInputChange}
                     className="w-full appearance-none px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
                   >
-                    <option value="Administrador">Administrador</option>
-                    <option value="Editor">Editor</option>
-                    <option value="Gestor">Gestor</option>
-                    <option value="Visualizador">Visualizador</option>
+                    <option value="admin">Administrador</option>
+                    <option value="usuario">Usuario</option>
+                    <option value="editor">Editor</option>
                   </select>
                   <FaChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import authService from '@/services/authService';
 
 // Crear el contexto
@@ -20,18 +20,75 @@ export const useAuth = () => {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+
+  // Escuchar eventos de error de autenticación
+  useEffect(() => {
+    const handleAuthError = (event) => {
+      console.log('Evento de error de autenticación recibido:', event.detail);
+      
+      // Limpiar sesión
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      
+      // Actualizar estado
+      setUser(null);
+      setAuthError(event.detail);
+      
+      // Mostrar notificación
+      toast.error(event.detail.message || 'Sesión expirada. Por favor inicie sesión nuevamente.');
+    };
+
+    window.addEventListener('auth-error', handleAuthError);
+    
+    return () => {
+      window.removeEventListener('auth-error', handleAuthError);
+    };
+  }, []);
 
   // Comprobar si hay un usuario autenticado al cargar
   useEffect(() => {
     const checkSession = async () => {
       try {
+        console.log('Verificando sesión activa...');
+        setLoading(true);
+        
+        // Limpiar cualquier error previo
+        setAuthError(null);
+        
         // Intentar obtener el usuario actual del servicio
         const userData = await authService.getCurrentUser();
+        
         if (userData) {
+          console.log('Sesión activa encontrada:', userData.email);
           setUser(userData);
+        } else {
+          console.log('No se encontró una sesión activa o el token expiró');
+          // Asegurarse de que no hay datos antiguos
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          setUser(null);
         }
       } catch (error) {
         console.error('Error verificando sesión:', error);
+        
+        // Limpiar cualquier dato de sesión
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        setUser(null);
+        
+        // Si el error tiene un código específico, establecer el authError
+        if (error.status) {
+          setAuthError({
+            status: error.status,
+            message: error.message || 'Error de autenticación'
+          });
+        } else {
+          setAuthError({
+            status: 500,
+            message: 'Error inesperado al verificar sesión'
+          });
+        }
       } finally {
         setLoading(false);
       }
@@ -44,16 +101,30 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     try {
       setLoading(true);
+      setAuthError(null);
+      
+      // Limpiar cualquier sesión anterior
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      
       const response = await authService.login(email, password);
       
       if (response.success) {
         setUser(response.data);
         return { success: true };
       } else {
+        setAuthError({
+          status: 401,
+          message: response.message || 'Credenciales inválidas'
+        });
         return { success: false, message: response.message || 'Credenciales inválidas' };
       }
     } catch (error) {
       console.error('Error en login:', error);
+      setAuthError({
+        status: error.status || 500,
+        message: error.message || 'Error al iniciar sesión'
+      });
       return { success: false, message: 'Error al iniciar sesión' };
     } finally {
       setLoading(false);
@@ -63,6 +134,8 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     try {
       setLoading(true);
+      setAuthError(null);
+      
       const response = await authService.register(userData);
       
       return response;
@@ -76,12 +149,26 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
+      setLoading(true);
+      
       await authService.logout();
+      
+      // Limpiar estado
       setUser(null);
+      setAuthError(null);
+      
       return { success: true };
     } catch (error) {
       console.error('Error en logout:', error);
+      
+      // Intentar limpiar de todas formas
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      setUser(null);
+      
       return { success: false, message: 'Error al cerrar sesión' };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -95,6 +182,7 @@ export function AuthProvider({ children }) {
     loading,
     isAuthenticated,
     isAdmin,
+    authError,
     login,
     register,
     logout

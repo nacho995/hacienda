@@ -19,17 +19,22 @@ export default function AdminLogin() {
   }, [isAuthenticated, isAdmin, router]);
   
   return (
-    <div className="admin-auth-page">
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black/70 via-black/50 to-black/70">
-        <div className="absolute inset-0 z-[-1]">
-          <Image 
-            src="/imagendron.jpg" 
-            alt="Hacienda San Carlos" 
-            fill 
-            className="object-cover opacity-40"
-          />
-        </div>
-        
+    <div className="admin-auth-page min-h-screen w-full relative">
+      {/* Fondo de imagen con gradiente */}
+      <div className="absolute inset-0 z-0">
+        <Image 
+          src="/imagendron.jpg" 
+          alt="Hacienda San Carlos" 
+          fill
+          sizes="100vw"
+          priority
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/50 to-black/70 opacity-90"></div>
+      </div>
+      
+      {/* Contenido */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center w-full">
         <div className="max-w-md w-full mx-4 my-8">
           <div className="bg-black/40 backdrop-blur-md rounded-2xl shadow-xl overflow-hidden border border-gray-800">
             {/* Header */}

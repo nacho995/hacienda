@@ -17,20 +17,46 @@ import {
   FaChartPie
 } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 
 export default function AdminLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isAdmin, loading, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, loading, authError, logout } = useAuth();
   
   // Redirigir al login si no está autenticado o no es admin
   useEffect(() => {
     if (!loading && (!isAuthenticated || !isAdmin)) {
+      console.log('No autenticado o no es admin, redirigiendo a login');
+      toast.error('Acceso denegado. Debe iniciar sesión como administrador.');
       router.push('/admin/login');
     }
   }, [isAuthenticated, isAdmin, loading, router]);
+
+  // Manejar errores de autenticación
+  useEffect(() => {
+    if (authError) {
+      console.log('Error de autenticación detectado:', authError);
+      
+      // Mostrar notificación
+      toast.error(authError.message || 'Sesión expirada. Por favor inicie sesión nuevamente.');
+      
+      // Esperar un poco antes de redirigir para que el usuario vea la notificación
+      const redirectTimer = setTimeout(() => {
+        router.push('/admin/login');
+      }, 500);
+      
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [authError, router]);
+
+  // Efecto adicional para redirigir cuando no hay usuario después de cargar
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/admin/login');
+    }
+  }, [loading, user, router]);
 
   // Función para cerrar sesión
   const handleLogout = async () => {
@@ -45,16 +71,34 @@ export default function AdminLayout({ children }) {
     } catch (error) {
       console.error('Error en logout:', error);
       toast.error('Error al cerrar sesión');
+      
+      // Forzar redirección a login en caso de error
+      router.push('/admin/login');
     }
   };
 
-  // Si está cargando o no hay usuario autenticado, mostrar una pantalla de carga
-  if (loading || !user) {
+  // Si está cargando, mostrar pantalla de carga
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-800">
         <div className="bg-slate-700 p-8 rounded-lg shadow-md text-white">
           <h1 className="text-2xl font-bold mb-4">Cargando...</h1>
           <p>Verificando tu sesión</p>
+          <div className="mt-4 flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Si no hay usuario después de cargar, mostrar pantalla de redirección
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-800">
+        <div className="bg-slate-700 p-8 rounded-lg shadow-md text-white">
+          <h1 className="text-2xl font-bold mb-4">Redirigiendo...</h1>
+          <p>No se ha detectado una sesión activa</p>
           <div className="mt-4 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
           </div>

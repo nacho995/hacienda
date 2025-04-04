@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { toast } from 'react-toastify';
+import { toast } from 'sonner';
 import { FaUser, FaEnvelope, FaLock, FaPhone, FaExclamationTriangle } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
 

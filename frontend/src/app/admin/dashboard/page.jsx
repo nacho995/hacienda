@@ -10,7 +10,7 @@ import {
   getEventoReservations, 
   getMasajeReservations 
 } from '@/services/reservationService';
-import userService from '@/api/services/userService';
+import userService from '@/services/userService';
 
 export default function AdminDashboard() {
   const { isAuthenticated, isAdmin, loading, user } = useAuth();
@@ -43,15 +43,25 @@ export default function AdminDashboard() {
     const loadUsers = async () => {
       try {
         const response = await userService.getAllUsers();
-        if (response.success) {
+        if (response.success && Array.isArray(response.data)) {
           setUsuarios(response.data);
           setStats(prevStats => ({
             ...prevStats,
             totalUsers: response.data.length
           }));
+        } else {
+          // Si no hay datos o no es array, inicializar con array vacío
+          setUsuarios([]);
+          console.warn('No se pudieron cargar los usuarios o formato incorrecto:', response);
         }
       } catch (err) {
         console.error('Error cargando usuarios:', err);
+        // Si hay error 401, el apiClient ya limpiará el token y user
+        if (err.status === 401) {
+          // No hacer nada aquí, el router se encargará de la redirección
+          console.log('Error de autenticación al cargar usuarios');
+        }
+        setUsuarios([]);
       }
     };
 
@@ -63,56 +73,66 @@ export default function AdminDashboard() {
         // Cargar usuarios primero
         await loadUsers();
         
-        // Obtener reservas de habitaciones, eventos y masajes
-        const [habitacionesData, eventosData, masajesData] = await Promise.all([
-          getHabitacionReservations(),
-          getEventoReservations(),
-          getMasajeReservations()
-        ]);
+        try {
+          // Obtener reservas de habitaciones, eventos y masajes
+          const [habitacionesData, eventosData, masajesData] = await Promise.all([
+            getHabitacionReservations(),
+            getEventoReservations(),
+            getMasajeReservations()
+          ]);
+          
+          // Filtrar por usuario asignado si se selecciona uno específico
+          const habitacionesFiltradas = filtroUsuario === 'todos' 
+            ? habitacionesData 
+            : filtroUsuario === 'sin_asignar'
+              ? habitacionesData.filter(reserva => !reserva.asignadoA)
+              : habitacionesData.filter(reserva => reserva.asignadoA === filtroUsuario);
+              
+          const eventosFiltrados = filtroUsuario === 'todos' 
+            ? eventosData 
+            : filtroUsuario === 'sin_asignar'
+              ? eventosData.filter(reserva => !reserva.asignadoA)
+              : eventosData.filter(reserva => reserva.asignadoA === filtroUsuario);
+              
+          const masajesFiltrados = filtroUsuario === 'todos' 
+            ? masajesData 
+            : filtroUsuario === 'sin_asignar'
+              ? masajesData.filter(reserva => !reserva.asignadoA)
+              : masajesData.filter(reserva => reserva.asignadoA === filtroUsuario);
+          
+          // Guardar los datos de reservas
+          setHabitacionReservations(habitacionesFiltradas);
+          setEventoReservations(eventosFiltrados);
+          setMasajeReservations(masajesFiltrados);
+          
+          // Calcular estadísticas
+          const totalReservations = habitacionesData.length + eventosData.length + masajesData.length;
+          const pendingReservations = [...habitacionesData, ...eventosData, ...masajesData].filter(
+            reserva => reserva.estado && reserva.estado.toLowerCase() === 'pendiente'
+          ).length;
+          const confirmedReservations = [...habitacionesData, ...eventosData, ...masajesData].filter(
+            reserva => reserva.estado && reserva.estado.toLowerCase() === 'confirmada'
+          ).length;
+          
+          // Actualizar estadísticas
+          setStats(prevStats => ({
+            ...prevStats,
+            totalReservations,
+            pendingReservations,
+            confirmedReservations,
+            occupiedRooms: habitacionesData.filter(h => 
+              h.estado && h.estado.toLowerCase() === 'confirmada'
+            ).length
+          }));
+        } catch (reservationError) {
+          console.error('Error cargando reservas:', reservationError);
+          if (reservationError.status === 401) {
+            console.log('Error de autenticación al cargar reservas');
+          } else {
+            setError('Error al cargar reservas. Por favor, recarga la página.');
+          }
+        }
         
-        // Filtrar por usuario asignado si se selecciona uno específico
-        const habitacionesFiltradas = filtroUsuario === 'todos' 
-          ? habitacionesData 
-          : filtroUsuario === 'sin_asignar'
-            ? habitacionesData.filter(reserva => !reserva.asignadoA)
-            : habitacionesData.filter(reserva => reserva.asignadoA === filtroUsuario);
-            
-        const eventosFiltrados = filtroUsuario === 'todos' 
-          ? eventosData 
-          : filtroUsuario === 'sin_asignar'
-            ? eventosData.filter(reserva => !reserva.asignadoA)
-            : eventosData.filter(reserva => reserva.asignadoA === filtroUsuario);
-            
-        const masajesFiltrados = filtroUsuario === 'todos' 
-          ? masajesData 
-          : filtroUsuario === 'sin_asignar'
-            ? masajesData.filter(reserva => !reserva.asignadoA)
-            : masajesData.filter(reserva => reserva.asignadoA === filtroUsuario);
-        
-        // Guardar los datos de reservas
-        setHabitacionReservations(habitacionesFiltradas);
-        setEventoReservations(eventosFiltrados);
-        setMasajeReservations(masajesFiltrados);
-        
-        // Calcular estadísticas
-        const totalReservations = habitacionesData.length + eventosData.length + masajesData.length;
-        const pendingReservations = [...habitacionesData, ...eventosData, ...masajesData].filter(
-          reserva => reserva.estado && reserva.estado.toLowerCase() === 'pendiente'
-        ).length;
-        const confirmedReservations = [...habitacionesData, ...eventosData, ...masajesData].filter(
-          reserva => reserva.estado && reserva.estado.toLowerCase() === 'confirmada'
-        ).length;
-        
-        // Actualizar estadísticas
-        setStats(prevStats => ({
-          ...prevStats,
-          totalReservations,
-          pendingReservations,
-          confirmedReservations,
-          occupiedRooms: habitacionesData.filter(h => 
-            h.estado && h.estado.toLowerCase() === 'confirmada'
-          ).length
-        }));
       } catch (err) {
         console.error('Error cargando datos del dashboard:', err);
         setError('Error al cargar datos. Por favor, recarga la página.');

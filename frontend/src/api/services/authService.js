@@ -20,6 +20,7 @@ const authService = {
     const response = await apiClient.post(ENDPOINTS.AUTH.LOGIN, credentials);
     
     if (response.success && response.token) {
+      console.log('Token recibido en login:', response.token);
       apiClient.setToken(response.token);
       
       // Guardar información del usuario en el localStorage
