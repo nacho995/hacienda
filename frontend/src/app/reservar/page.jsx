@@ -236,7 +236,15 @@ export default function ReservarPage() {
         
         // Avanzar al paso de confirmación
         setPaso(4);
-        document.getElementById('paso-4').scrollIntoView({ behavior: 'smooth' });
+        
+        // Esperar a que el componente se renderice antes de hacer scroll
+        setTimeout(() => {
+          const paso4Element = document.getElementById('paso-4');
+          if (paso4Element) {
+            paso4Element.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+        
       } catch (apiError) {
         console.error('Error en la API:', apiError);
         let errorMessage = 'Error desconocido al procesar la solicitud';
