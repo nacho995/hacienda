@@ -11,10 +11,10 @@ const userService = {
   getAllUsers: async () => {
     try {
       const response = await apiClient.get('/users');
-      return response.data;
+      return response;
     } catch (error) {
-      console.error('Error obteniendo usuarios:', error);
-      return { success: false, data: [], message: 'Error al obtener usuarios' };
+      console.error('Error al obtener usuarios:', error);
+      throw error;
     }
   },
   
@@ -26,7 +26,7 @@ const userService = {
   getSingleUser: async (id) => {
     try {
       const response = await apiClient.get(`/users/${id}`);
-      return response.data;
+      return response;
     } catch (error) {
       console.error(`Error obteniendo usuario ${id}:`, error);
       return { success: false, data: null, message: 'Error al obtener usuario' };
@@ -40,7 +40,7 @@ const userService = {
   getMe: async () => {
     try {
       const response = await apiClient.get('/users/me');
-      return response.data;
+      return response;
     } catch (error) {
       console.error('Error obteniendo perfil:', error);
       return { success: false, data: null, message: 'Error al obtener perfil' };
@@ -56,10 +56,10 @@ const userService = {
   updateUser: async (id, userData) => {
     try {
       const response = await apiClient.put(`/users/${id}`, userData);
-      return response.data;
+      return response;
     } catch (error) {
-      console.error(`Error actualizando usuario ${id}:`, error);
-      return { success: false, message: 'Error al actualizar usuario' };
+      console.error('Error al actualizar usuario:', error);
+      throw error;
     }
   },
   
@@ -71,10 +71,46 @@ const userService = {
   deleteUser: async (id) => {
     try {
       const response = await apiClient.delete(`/users/${id}`);
-      return response.data;
+      return response;
     } catch (error) {
-      console.error(`Error eliminando usuario ${id}:`, error);
-      return { success: false, message: 'Error al eliminar usuario' };
+      console.error('Error al eliminar usuario:', error);
+      throw error;
+    }
+  },
+
+  // Crear un nuevo usuario
+  createUser: async (userData) => {
+    try {
+      const response = await apiClient.post('/users', userData);
+      return response;
+    } catch (error) {
+      console.error('Error al crear usuario:', error);
+      throw error;
+    }
+  },
+
+  // Cambiar contraseña de usuario
+  updatePassword: async (userId, passwordData) => {
+    try {
+      const response = await apiClient.put(
+        `/users/${userId}/password`,
+        passwordData
+      );
+      return response;
+    } catch (error) {
+      console.error('Error al actualizar contraseña:', error);
+      throw error;
+    }
+  },
+
+  // Obtener un usuario específico
+  getUser: async (userId) => {
+    try {
+      const response = await apiClient.get(`/users/${userId}`);
+      return response;
+    } catch (error) {
+      console.error('Error al obtener usuario:', error);
+      throw error;
     }
   }
 };

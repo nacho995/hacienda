@@ -23,7 +23,7 @@ export default function AdminLayout({ children }) {
   const pathname = usePathname();
   const { user, isAuthenticated, isAdmin, loading, authError, logout } = useAuth();
 
-  // Redirigir al login si no está autenticado o no es admin
+  // Manejar la autenticación y redirección
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       console.log('No autenticado, redirigiendo a login');
@@ -73,6 +73,11 @@ export default function AdminLayout({ children }) {
         </div>
       </div>
     );
+  }
+
+  // Si es la página de login, mostrar sin layout
+  if (pathname === '/admin/login') {
+    return children;
   }
 
   // Si no está autenticado o no es admin, no mostrar nada mientras se redirige
@@ -166,141 +171,41 @@ export default function AdminLayout({ children }) {
                 className="relative z-10"
               />
             </div>
-
-            <style jsx>{`
-              @keyframes morph {
-                0% { border-radius: 55% 45% 48% 52%; }
-                25% { border-radius: 51% 49% 45% 55%; }
-                50% { border-radius: 48% 52% 52% 48%; }
-                75% { border-radius: 52% 48% 48% 52%; }
-                100% { border-radius: 55% 45% 48% 52%; }
-              }
-            `}</style>
           </div>
           <h1 className="text-2xl font-semibold text-center text-white">Panel Admin</h1>
         </div>
-        
-        {/* Versión móvil del logo */}
-        <div className="md:hidden">
-          <div className="relative w-32 h-32 flex items-center justify-center">
-            {/* Forma de puerta de castillo versión móvil */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              {/* Puerta principal */}
-              <div className="absolute w-24 h-28 bg-white rounded-t-[80px] shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-                {/* Líneas decorativas superiores */}
-                <div className="absolute top-3 left-3 right-3 h-[1px] bg-slate-200"></div>
-                <div className="absolute top-6 left-3 right-3 h-[1px] bg-slate-200"></div>
-                {/* Líneas verticales */}
-                <div className="absolute top-9 left-3 w-[1px] h-6 bg-slate-200"></div>
-                <div className="absolute top-9 right-3 w-[1px] h-6 bg-slate-200"></div>
-                {/* Líneas decorativas inferiores */}
-                <div className="absolute bottom-6 left-3 right-3 h-[1px] bg-slate-200"></div>
-                <div className="absolute bottom-3 left-3 right-3 h-[1px] bg-slate-200"></div>
-              </div>
-              {/* Torre izquierda */}
-              <div className="absolute w-6 h-32 bg-white left-4 rounded-t-lg shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-                <div className="absolute top-3 left-1 right-1 h-[1px] bg-slate-200"></div>
-                <div className="absolute top-6 left-1 right-1 h-[1px] bg-slate-200"></div>
-                <div className="absolute bottom-6 left-1 right-1 h-[1px] bg-slate-200"></div>
-              </div>
-              {/* Torre derecha */}
-              <div className="absolute w-6 h-32 bg-white right-4 rounded-t-lg shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-                <div className="absolute top-3 left-1 right-1 h-[1px] bg-slate-200"></div>
-                <div className="absolute top-6 left-1 right-1 h-[1px] bg-slate-200"></div>
-                <div className="absolute bottom-6 left-1 right-1 h-[1px] bg-slate-200"></div>
-              </div>
-              {/* Almenas superiores con líneas */}
-              <div className="absolute top-0 w-full flex justify-center space-x-1">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="relative w-3 h-4 bg-white rounded-t-lg shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-                    <div className="absolute top-1.5 left-0.5 right-0.5 h-[1px] bg-slate-200"></div>
-                  </div>
-                ))}
-              </div>
-              {/* Arco decorativo */}
-              <div className="absolute top-9 left-1/2 transform -translate-x-1/2 w-18 h-18 border-t-[1px] border-slate-200 rounded-full"></div>
-            </div>
-            <Image 
-              src="/logo.png" 
-              alt="Logo Hacienda San Carlos" 
-              width={80} 
-              height={80} 
-              className="relative z-10"
-            />
-          </div>
-        </div>
-        
-        {/* Información del usuario */}
-        <div className="p-6 border-b border-white/5">
-          <div className="flex items-center bg-white/5 backdrop-blur-2xl p-4 rounded-xl">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)] to-white/20 rounded-full blur-md opacity-20"></div>
-              <div className="relative bg-slate-700/50 w-12 h-12 rounded-full flex items-center justify-center shadow-lg">
-                <span className="text-xl font-semibold text-white">
-                  {user?.nombre?.charAt(0) || user?.email?.charAt(0) || 'A'}
-                </span>
-              </div>
-            </div>
-            <div className="ml-4">
-              <div className="font-semibold text-white">{user?.nombre || 'Administrador'}</div>
-              <div className="text-sm text-gray-400">{user?.email}</div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Enlaces de navegación */}
+
+        {/* Enlaces del sidebar */}
         <nav className="p-4">
-          <ul className="space-y-2">
-            {sidebarLinks.map((link) => (
-              <li key={link.href}>
-                <Link href={link.href} 
-                  className={`flex items-center px-4 py-3 rounded-xl transition-all duration-200 group
-                  ${pathname === link.href ? 
-                    'bg-gradient-to-r from-[var(--color-primary)] to-transparent text-white' : 
-                    'text-gray-400 hover:bg-black/20 hover:text-white backdrop-blur-xl'}`}>
-                  <span className={`mr-3 transition-transform duration-200 group-hover:scale-110 ${
-                    pathname === link.href ? 'text-white' : 'text-gray-400 group-hover:text-white'
-                  }`}>{link.icon}</span>
-                  <span className="font-medium">{link.name}</span>
-                </Link>
-              </li>
-            ))}
-            <li className="pt-4">
-              <button 
-                onClick={handleLogout}
-                className="w-full flex items-center px-4 py-3 rounded-xl text-gray-400 hover:bg-red-950/30 hover:text-red-300 transition-all duration-200 group backdrop-blur-xl"
-              >
-                <span className="mr-3 text-gray-400 group-hover:text-red-300 transition-transform duration-200 group-hover:scale-110">
-                  <FaSignOutAlt />
-                </span>
-                <span className="font-medium">Cerrar Sesión</span>
-              </button>
-            </li>
-          </ul>
+          {sidebarLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg mb-2 transition-colors ${
+                pathname === link.href
+                  ? 'bg-gradient-to-l from-transparent to-[var(--color-primary)] text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {link.icon}
+              <span>{link.name}</span>
+            </Link>
+          ))}
+          
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors mt-4"
+          >
+            <FaSignOutAlt />
+            <span>Cerrar Sesión</span>
+          </button>
         </nav>
       </div>
 
       {/* Contenido principal */}
-      <div className="flex-1 overflow-auto bg-gradient-to-br from-slate-50/50 to-zinc-100/30 backdrop-blur-md">
-        {/* Header móvil cuando sidebar está cerrado */}
-        {!isSidebarOpen && (
-          <div className="md:hidden bg-white/60 backdrop-blur-md p-4 shadow-sm border-b border-gray-200/50">
-            <h1 className="text-xl font-semibold text-gray-800">
-              {sidebarLinks.find(link => link.href === pathname)?.name || 'Panel de Administración'}
-            </h1>
-          </div>
-        )}
-        
-        {/* Contenido */}
-        <div className="p-8">
-          <div className="bg-white/60 backdrop-blur-md rounded-2xl shadow-xl p-6 border border-gray-200/50 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-[var(--color-primary)]/5 to-rose-500/5 blur-3xl transform rotate-45"></div>
-            <div className="relative z-10">
-              {children}
-            </div>
-          </div>
-        </div>
-      </div>
+      <main className="flex-1 p-6 overflow-x-hidden">
+        {children}
+      </main>
     </div>
   );
 } 

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import userService from '@/services/userService';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
+import { Portal } from '@/components/Portal';
 
 export default function AdminUsuarios() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function AdminUsuarios() {
   const [showChangePasswordForm, setShowChangePasswordForm] = useState(false);
   const [userToChangePassword, setUserToChangePassword] = useState(null);
   const [showDropdown, setShowDropdown] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   
   const [newUser, setNewUser] = useState({
     nombre: '',
@@ -144,22 +146,25 @@ export default function AdminUsuarios() {
   };
   
   const confirmDeleteUser = async () => {
+    if (!userToDelete) {
+      toast.error('No se ha seleccionado ningún usuario para eliminar');
+      return;
+    }
+
     try {
       const result = await userService.deleteUser(userToDelete._id);
-      
+
       if (result.success) {
-        // Eliminar usuario del estado local
         setUsuarios(usuarios.filter(u => u._id !== userToDelete._id));
         toast.success('Usuario eliminado correctamente');
+        setShowDeleteConfirm(false);
+        setUserToDelete(null);
       } else {
         toast.error(result.message || 'Error al eliminar usuario');
       }
     } catch (error) {
       console.error('Error eliminando usuario:', error);
-      toast.error('Error al eliminar usuario');
-    } finally {
-      setShowDeleteConfirm(false);
-      setUserToDelete(null);
+      toast.error(error.response?.data?.message || 'Error al eliminar usuario');
     }
   };
   
@@ -195,125 +200,136 @@ export default function AdminUsuarios() {
   };
   
   const saveUser = async () => {
-    // Verificar que el usuario sea administrador
     if (!isAdmin) {
-      alert('No tienes permisos para realizar esta acción');
+      toast.error('No tienes permisos para realizar esta acción');
       return;
     }
-    
+
     try {
       if (editUser) {
-        // Actualizar usuario existente
         const userData = {
           nombre: newUser.nombre,
           apellidos: newUser.apellidos,
+          email: newUser.email,
           role: newUser.role,
           confirmado: newUser.activo
         };
-        
+
         const result = await userService.updateUser(editUser._id, userData);
-        
+
         if (result.success) {
-          // Actualizar la lista de usuarios
           setUsuarios(usuarios.map(user => 
             user._id === editUser._id ? { ...user, ...userData } : user
           ));
           toast.success('Usuario actualizado correctamente');
+          setShowUserForm(false);
         } else {
           toast.error(result.message || 'Error al actualizar usuario');
         }
       } else {
-        // Crear nuevo usuario
         const userData = {
-          ...newUser,
+          nombre: newUser.nombre,
+          apellidos: newUser.apellidos,
+          email: newUser.email,
+          password: newUser.password,
+          role: newUser.role,
           confirmado: newUser.activo
         };
-        
+
         const result = await userService.createUser(userData);
-        
+
         if (result.success) {
-          // Añadir el nuevo usuario a la lista
           setUsuarios([...usuarios, result.data]);
           toast.success('Usuario creado correctamente');
+          setShowUserForm(false);
         } else {
           toast.error(result.message || 'Error al crear usuario');
         }
       }
-      
-      setShowUserForm(false);
     } catch (error) {
       console.error('Error guardando usuario:', error);
-      toast.error('Error al guardar usuario');
+      toast.error(error.response?.data?.message || 'Error al guardar usuario');
     }
   };
   
   const savePassword = async () => {
-    // Verificar que las contraseñas coincidan
+    if (!newPassword.password || !newPassword.confirmPassword) {
+      toast.error('Por favor, completa todos los campos');
+      return;
+    }
+
     if (newPassword.password !== newPassword.confirmPassword) {
       toast.error('Las contraseñas no coinciden');
       return;
     }
-    
+
+    if (newPassword.password.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
     try {
       const result = await userService.updatePassword(userToChangePassword._id, {
         password: newPassword.password
       });
-      
+
       if (result.success) {
         toast.success('Contraseña actualizada correctamente');
         setShowChangePasswordForm(false);
         setUserToChangePassword(null);
+        setNewPassword({ password: '', confirmPassword: '' });
       } else {
         toast.error(result.message || 'Error al actualizar contraseña');
       }
     } catch (error) {
       console.error('Error actualizando contraseña:', error);
-      toast.error('Error al actualizar contraseña');
+      toast.error(error.response?.data?.message || 'Error al actualizar contraseña');
     }
   };
   
   const toggleUserStatus = async (userId) => {
     if (!isAdmin) {
-      alert('Solo los administradores pueden cambiar el estado de los usuarios');
+      toast.error('Solo los administradores pueden cambiar el estado de los usuarios');
       return;
     }
-    
-    // Encontrar el usuario
+
     const targetUser = usuarios.find(u => u._id === userId);
-    
-    // No permitir desactivar al admin principal
+
     if (targetUser.role === 'admin' && targetUser.email === 'admin@hacienda-sancarlos.com' && targetUser.confirmado) {
-      alert('No se puede desactivar al administrador principal del sistema');
+      toast.error('No se puede desactivar al administrador principal del sistema');
       return;
     }
-    
+
     try {
       const newStatus = !targetUser.confirmado;
-      
       const result = await userService.updateUser(userId, {
         confirmado: newStatus
       });
-      
+
       if (result.success) {
-        // Actualizar el estado del usuario en la lista
-        setUsuarios(
-          usuarios.map(user => 
-            user._id === userId 
-              ? { ...user, confirmado: newStatus } 
-              : user
-          )
-        );
-        
+        setUsuarios(usuarios.map(user => 
+          user._id === userId ? { ...user, confirmado: newStatus } : user
+        ));
         toast.success(`Usuario ${newStatus ? 'activado' : 'desactivado'} correctamente`);
       } else {
         toast.error(result.message || 'Error al cambiar el estado del usuario');
       }
     } catch (error) {
       console.error('Error cambiando estado de usuario:', error);
-      toast.error('Error al cambiar el estado del usuario');
+      toast.error(error.response?.data?.message || 'Error al cambiar el estado del usuario');
     }
-    
+
     setShowDropdown(null);
+  };
+  
+  const handleShowDropdown = (userId, event) => {
+    const button = event.currentTarget;
+    const rect = button.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY,
+      right: window.innerWidth - rect.right
+    });
+    setShowDropdown(userId);
   };
   
   // Si está cargando, mostrar indicador
@@ -441,60 +457,73 @@ export default function AdminUsuarios() {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right text-sm font-medium relative">
-                      <button
-                        onClick={() => setShowDropdown(showDropdown === usuario._id ? null : usuario._id)}
-                        className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
-                      >
-                        <FaEllipsisV />
-                      </button>
-                      
-                      {showDropdown === usuario._id && (
-                        <div className="absolute right-3 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
-                          <div className="py-1" role="menu">
-                            <button
-                              onClick={() => handleEditUser(usuario)}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                              role="menuitem"
+                      <div className="relative">
+                        <button
+                          onClick={(e) => handleShowDropdown(usuario._id, e)}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <FaEllipsisV />
+                        </button>
+                        
+                        {showDropdown === usuario._id && (
+                          <Portal>
+                            <div 
+                              className="fixed inset-0 bg-black bg-opacity-5" 
+                              style={{ zIndex: 999998 }} 
+                              onClick={() => setShowDropdown(null)} 
+                            />
+                            <div
+                              className="absolute bg-white rounded-lg shadow-lg py-2"
+                              style={{
+                                zIndex: 999999,
+                                position: 'fixed',
+                                top: `${dropdownPosition.top}px`,
+                                right: `${dropdownPosition.right}px`,
+                                minWidth: '200px',
+                                marginTop: '5px'
+                              }}
                             >
-                              <FaEdit className="mr-2" />
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => handleChangePassword(usuario)}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                              role="menuitem"
-                            >
-                              <FaKey className="mr-2" />
-                              Cambiar Contraseña
-                            </button>
-                            <button
-                              onClick={() => toggleUserStatus(usuario._id)}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                              role="menuitem"
-                            >
-                              {usuario.confirmado ? (
-                                <>
-                                  <FaTimes className="mr-2 text-red-500" />
-                                  Desactivar
-                                </>
-                              ) : (
-                                <>
-                                  <FaCheck className="mr-2 text-green-500" />
-                                  Activar
-                                </>
-                              )}
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(usuario)}
-                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
-                              role="menuitem"
-                            >
-                              <FaTrash className="mr-2" />
-                              Eliminar
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                              <button
+                                onClick={() => handleEditUser(usuario)}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              >
+                                <FaEdit className="mr-2" />
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleChangePassword(usuario)}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              >
+                                <FaKey className="mr-2" />
+                                Cambiar Contraseña
+                              </button>
+                              <button
+                                onClick={() => toggleUserStatus(usuario._id)}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                              >
+                                {usuario.confirmado ? (
+                                  <>
+                                    <FaTimes className="mr-2 text-red-500" />
+                                    Desactivar
+                                  </>
+                                ) : (
+                                  <>
+                                    <FaCheck className="mr-2 text-green-500" />
+                                    Activar
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(usuario)}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center"
+                              >
+                                <FaTrash className="mr-2" />
+                                Eliminar
+                              </button>
+                            </div>
+                          </Portal>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )) : (
@@ -512,218 +541,224 @@ export default function AdminUsuarios() {
       
       {/* Modal para crear/editar usuario */}
       {showUserForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">
-              {editUser ? 'Editar Usuario' : 'Nuevo Usuario'}
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre
-                </label>
-                <input
-                  type="text"
-                  name="nombre"
-                  value={newUser.nombre}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  required
-                />
-              </div>
+        <Portal>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 999999 }}>
+            <div className="bg-white rounded-xl p-6 max-w-md w-full m-4 max-h-[90vh] overflow-y-auto">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                {editUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+              </h3>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Apellidos
-                </label>
-                <input
-                  type="text"
-                  name="apellidos"
-                  value={newUser.apellidos}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Correo Electrónico
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={newUser.email}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              {!editUser && (
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contraseña
+                    Nombre
                   </label>
                   <input
-                    type="password"
-                    name="password"
-                    value={newUser.password}
+                    type="text"
+                    name="nombre"
+                    value={newUser.nombre}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                    required={!editUser}
+                    required
                   />
                 </div>
-              )}
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol
-                </label>
-                <div className="relative">
-                  <select
-                    name="role"
-                    value={newUser.role}
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Apellidos
+                  </label>
+                  <input
+                    type="text"
+                    name="apellidos"
+                    value={newUser.apellidos}
                     onChange={handleInputChange}
-                    className="w-full appearance-none px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  >
-                    <option value="admin">Administrador</option>
-                    <option value="usuario">Usuario</option>
-                    <option value="editor">Editor</option>
-                  </select>
-                  <FaChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Correo Electrónico
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={newUser.email}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                    required
+                  />
+                </div>
+                
+                {!editUser && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contraseña
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={newUser.password}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                      required={!editUser}
+                    />
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Rol
+                  </label>
+                  <div className="relative">
+                    <select
+                      name="role"
+                      value={newUser.role}
+                      onChange={handleInputChange}
+                      className="w-full appearance-none px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                    >
+                      <option value="admin">Administrador</option>
+                      <option value="usuario">Usuario</option>
+                      <option value="editor">Editor</option>
+                    </select>
+                    <FaChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+                
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="usuarioActivo"
+                    name="activo"
+                    checked={newUser.activo}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 text-[var(--color-primary)] border-gray-300 rounded focus:ring-[var(--color-primary)]"
+                  />
+                  <label htmlFor="usuarioActivo" className="ml-2 text-sm text-gray-700">
+                    Usuario activo
+                  </label>
                 </div>
               </div>
               
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="usuarioActivo"
-                  name="activo"
-                  checked={newUser.activo}
-                  onChange={handleInputChange}
-                  className="w-4 h-4 text-[var(--color-primary)] border-gray-300 rounded focus:ring-[var(--color-primary)]"
-                />
-                <label htmlFor="usuarioActivo" className="ml-2 text-sm text-gray-700">
-                  Usuario activo
-                </label>
+              <div className="flex justify-end gap-4 mt-6">
+                <button
+                  onClick={() => setShowUserForm(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveUser}
+                  className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+                >
+                  {editUser ? 'Actualizar' : 'Crear Usuario'}
+                </button>
               </div>
             </div>
-            
-            <div className="flex justify-end gap-4 mt-6">
-              <button
-                onClick={() => setShowUserForm(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={saveUser}
-                className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-              >
-                {editUser ? 'Actualizar' : 'Crear Usuario'}
-              </button>
-            </div>
           </div>
-        </div>
+        </Portal>
       )}
       
       {/* Modal para confirmar eliminación */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">
-              Eliminar Usuario
-            </h3>
-            
-            <p className="text-gray-600 mb-6">
-              ¿Estás seguro de que deseas eliminar al usuario <span className="font-semibold">{userToDelete?.nombre}</span>? Esta acción no se puede deshacer.
-            </p>
-            
-            <div className="flex justify-end gap-4">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmDeleteUser}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                Eliminar
-              </button>
+        <Portal>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 999999 }}>
+            <div className="bg-white rounded-xl p-6 max-w-md w-full m-4">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                Eliminar Usuario
+              </h3>
+              
+              <p className="text-gray-600 mb-6">
+                ¿Estás seguro de que deseas eliminar al usuario <span className="font-semibold">{userToDelete?.nombre}</span>? Esta acción no se puede deshacer.
+              </p>
+              
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeleteUser}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
       
       {/* Modal para cambiar contraseña */}
       {showChangePasswordForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">
-              Cambiar Contraseña
-            </h3>
-            
-            <p className="text-gray-600 mb-4">
-              Cambiar contraseña para el usuario: <span className="font-semibold">{userToChangePassword?.nombre}</span>
-            </p>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nueva Contraseña
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  value={newPassword.password}
-                  onChange={handlePasswordChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Confirmar Contraseña
-                </label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={newPassword.confirmPassword}
-                  onChange={handlePasswordChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  required
-                />
-              </div>
-              
-              {newPassword.password && newPassword.confirmPassword && newPassword.password !== newPassword.confirmPassword && (
-                <p className="text-red-500 text-sm">
-                  Las contraseñas no coinciden
-                </p>
-              )}
-            </div>
-            
-            <div className="flex justify-end gap-4 mt-6">
-              <button
-                onClick={() => setShowChangePasswordForm(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={savePassword}
-                className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-                disabled={!newPassword.password || !newPassword.confirmPassword || newPassword.password !== newPassword.confirmPassword}
-              >
+        <Portal>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 999999 }}>
+            <div className="bg-white rounded-xl p-6 max-w-md w-full m-4">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">
                 Cambiar Contraseña
-              </button>
+              </h3>
+              
+              <p className="text-gray-600 mb-4">
+                Cambiar contraseña para el usuario: <span className="font-semibold">{userToChangePassword?.nombre}</span>
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nueva Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={newPassword.password}
+                    onChange={handlePasswordChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirmar Contraseña
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={newPassword.confirmPassword}
+                    onChange={handlePasswordChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                    required
+                  />
+                </div>
+                
+                {newPassword.password && newPassword.confirmPassword && newPassword.password !== newPassword.confirmPassword && (
+                  <p className="text-red-500 text-sm">
+                    Las contraseñas no coinciden
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex justify-end gap-4 mt-6">
+                <button
+                  onClick={() => setShowChangePasswordForm(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={savePassword}
+                  className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+                  disabled={!newPassword.password || !newPassword.confirmPassword || newPassword.password !== newPassword.confirmPassword}
+                >
+                  Cambiar Contraseña
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

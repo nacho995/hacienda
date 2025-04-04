@@ -1,6 +1,10 @@
 const Config = require('../models/Config');
 
-// Obtener la configuración actual
+/**
+ * @desc    Obtener la configuración actual
+ * @route   GET /api/config
+ * @access  Private/Admin
+ */
 exports.getConfig = async (req, res) => {
   try {
     let config = await Config.findOne();
@@ -10,12 +14,12 @@ exports.getConfig = async (req, res) => {
       config = await Config.create({});
     }
     
-    res.json({
+    res.status(200).json({
       success: true,
       data: config
     });
   } catch (error) {
-    console.error('Error al obtener la configuración:', error);
+    console.error('Error al obtener configuración:', error);
     res.status(500).json({
       success: false,
       message: 'Error al obtener la configuración',
@@ -24,33 +28,33 @@ exports.getConfig = async (req, res) => {
   }
 };
 
-// Actualizar la configuración
+/**
+ * @desc    Actualizar la configuración
+ * @route   PUT /api/config
+ * @access  Private/Admin
+ */
 exports.updateConfig = async (req, res) => {
   try {
-    const { general, reservacion, pagos, metadata } = req.body;
-    
     let config = await Config.findOne();
     
     // Si no existe configuración, crear una nueva
     if (!config) {
-      config = new Config({});
+      config = await Config.create(req.body);
+    } else {
+      // Actualizar la configuración existente
+      config = await Config.findOneAndUpdate(
+        {},
+        req.body,
+        { new: true, runValidators: true }
+      );
     }
     
-    // Actualizar solo los campos proporcionados
-    if (general) config.general = { ...config.general, ...general };
-    if (reservacion) config.reservacion = { ...config.reservacion, ...reservacion };
-    if (pagos) config.pagos = { ...config.pagos, ...pagos };
-    if (metadata) config.metadata = { ...config.metadata, ...metadata };
-    
-    await config.save();
-    
-    res.json({
+    res.status(200).json({
       success: true,
-      message: 'Configuración actualizada correctamente',
       data: config
     });
   } catch (error) {
-    console.error('Error al actualizar la configuración:', error);
+    console.error('Error al actualizar configuración:', error);
     res.status(500).json({
       success: false,
       message: 'Error al actualizar la configuración',
@@ -59,25 +63,29 @@ exports.updateConfig = async (req, res) => {
   }
 };
 
-// Restaurar configuración por defecto
+/**
+ * @desc    Restablecer la configuración a valores por defecto
+ * @route   POST /api/config/reset
+ * @access  Private/Admin
+ */
 exports.resetConfig = async (req, res) => {
   try {
     // Eliminar la configuración actual
-    await Config.deleteOne();
+    await Config.deleteMany({});
     
-    // Crear una nueva configuración con valores por defecto
+    // Crear nueva configuración con valores por defecto
     const config = await Config.create({});
     
-    res.json({
+    res.status(200).json({
       success: true,
-      message: 'Configuración restaurada a valores por defecto',
-      data: config
+      data: config,
+      message: 'Configuración restablecida a valores por defecto'
     });
   } catch (error) {
-    console.error('Error al restaurar la configuración:', error);
+    console.error('Error al restablecer configuración:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al restaurar la configuración',
+      message: 'Error al restablecer la configuración',
       error: error.message
     });
   }
