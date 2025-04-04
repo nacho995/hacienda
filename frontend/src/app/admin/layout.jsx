@@ -26,14 +26,12 @@ export default function AdminLayout({ children }) {
   // Manejar la autenticación y redirección
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      console.log('No autenticado, redirigiendo a login');
       toast.error('Debe iniciar sesión como administrador.');
       router.push('/admin/login');
       return;
     }
 
     if (!loading && isAuthenticated && !isAdmin) {
-      console.log('Usuario no es admin, redirigiendo a login');
       toast.error('Acceso denegado. Se requieren permisos de administrador.');
       router.push('/admin/login');
       return;
@@ -43,7 +41,6 @@ export default function AdminLayout({ children }) {
   // Manejar errores de autenticación
   useEffect(() => {
     if (authError) {
-      console.log('Error de autenticación detectado:', authError);
       toast.error(authError.message || 'Error de autenticación. Por favor inicie sesión nuevamente.');
     }
   }, [authError]);

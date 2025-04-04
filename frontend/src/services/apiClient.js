@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 // Determinar la URL base según el entorno
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+console.log('API Base URL:', BASE_URL);
 
 // Crear instancia de axios con configuración base
 const apiClient = axios.create({
@@ -9,6 +11,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true
 });
 
 // Función para decodificar un token Base64 de forma segura
@@ -55,27 +58,29 @@ const isPublicRoute = (url) => {
 // Interceptor para manejar tokens en las peticiones
 apiClient.interceptors.request.use(
   (config) => {
-    console.log(`Preparando petición a: ${config.url}`);
+    console.log('Realizando petición a:', config.url);
+    console.log('Método:', config.method?.toUpperCase());
+    console.log('Headers:', config.headers);
     
     // Si es una ruta pública, no es necesario el token
     if (isPublicRoute(config.url)) {
-      console.log('Enviando petición a ruta pública sin token:', config.url);
+      console.log('Ruta pública, no se requiere token');
       return config;
     }
     
     // Obtener token JWT desde localStorage
     const token = localStorage.getItem('authToken');
+    console.log('Token encontrado:', token ? 'Sí' : 'No');
     
     if (token) {
       // Verificar si el token es válido decodificándolo
       const tokenData = safelyDecodeToken(token);
+      console.log('Token decodificado:', tokenData ? 'Válido' : 'Inválido');
       
       if (!tokenData) {
-        // Token inválido, no agregarlo y limpiar localStorage
-        console.log('Token inválido detectado, limpiando localStorage');
+        console.log('Token inválido, limpiando localStorage');
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
-        // Disparar evento de error de autenticación sólo si no es una ruta pública
         if (!isPublicRoute(config.url)) {
           const authErrorEvent = new CustomEvent('auth-error', { 
             detail: { status: 401, message: 'Token inválido' } 
@@ -83,11 +88,9 @@ apiClient.interceptors.request.use(
           window.dispatchEvent(authErrorEvent);
         }
       } else if (tokenData.exp && tokenData.exp < Math.floor(Date.now() / 1000)) {
-        // Token expirado, no agregarlo y limpiar localStorage
-        console.log('Token expirado detectado, limpiando localStorage');
+        console.log('Token expirado, limpiando localStorage');
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
-        // Disparar evento de error de autenticación sólo si no es una ruta pública
         if (!isPublicRoute(config.url)) {
           const authErrorEvent = new CustomEvent('auth-error', { 
             detail: { status: 401, message: 'Sesión expirada' } 
@@ -95,16 +98,11 @@ apiClient.interceptors.request.use(
           window.dispatchEvent(authErrorEvent);
         }
       } else {
-        // Token válido, agregarlo a la petición
+        console.log('Token válido, añadiendo a headers');
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Enviando petición con token válido:', config.url);
       }
-    } else {
-      console.log('Enviando petición sin token:', config.url);
-      // Si no hay token y la ruta no es pública, posiblemente tengamos un problema
-      if (!isPublicRoute(config.url)) {
-        console.warn('Intentando acceder a ruta protegida sin token:', config.url);
-      }
+    } else if (!isPublicRoute(config.url)) {
+      console.warn('Intentando acceder a ruta protegida sin token:', config.url);
     }
     
     return config;
@@ -118,12 +116,11 @@ apiClient.interceptors.request.use(
 // Interceptor para manejar respuestas y errores
 apiClient.interceptors.response.use(
   (response) => {
-    // Procesar respuestas exitosas
-    console.log(`Respuesta exitosa de: ${response.config.url}`);
-    return response.data; // Devolver directamente los datos para simplificar
+    console.log('Respuesta exitosa de:', response.config.url);
+    console.log('Datos:', response.data);
+    return response.data;
   },
   (error) => {
-    // Procesar errores
     const errorResponse = {
       success: false,
       message: 'Error de conexión con el servidor',
@@ -132,36 +129,27 @@ apiClient.interceptors.response.use(
     };
     
     if (error.response) {
-      // El servidor respondió con un código de error
       errorResponse.status = error.response.status;
       errorResponse.message = error.response.data?.message || 'Error en la petición';
       errorResponse.data = error.response.data;
       
       console.error(`Error ${error.response.status} en petición a: ${error.config?.url}`);
+      console.error('Detalles del error:', error.response.data);
       
-      // Manejar errores específicos
       if (error.response.status === 401) {
-        // Comprobar si la petición fue a una ruta pública
         if (!error.config?.url || !isPublicRoute(error.config.url)) {
-          // Sesión caducada o no autenticada, limpiar el localStorage
-          console.error('Error 401: Token no válido o expirado');
+          console.log('Error de autenticación, limpiando localStorage');
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
           
-          // Disparar un evento para notificar a la aplicación sobre el error de autenticación
           const authErrorEvent = new CustomEvent('auth-error', { 
             detail: { status: 401, message: 'Sesión expirada o no autorizada' } 
           });
           window.dispatchEvent(authErrorEvent);
         }
       }
-    } else if (error.request) {
-      // La petición fue hecha pero no se recibió respuesta
-      console.error(`No se recibió respuesta del servidor para: ${error.config?.url}`);
-      errorResponse.message = 'No se recibió respuesta del servidor';
     } else {
-      // Error al configurar la petición
-      console.error('Error al configurar la petición:', error.message);
+      console.error('Error de red:', error.message);
     }
     
     return Promise.reject(errorResponse);

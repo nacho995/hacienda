@@ -18,6 +18,12 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// Logging middleware para depuración
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
+
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -26,10 +32,11 @@ app.use('/api/config', configRoutes);
 
 // Manejo de errores global
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error en el servidor:', err);
   res.status(500).json({
     success: false,
-    message: 'Error interno del servidor'
+    message: 'Error interno del servidor',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 

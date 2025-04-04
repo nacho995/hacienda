@@ -7,13 +7,16 @@ const Config = require('../models/Config');
  */
 exports.getConfig = async (req, res) => {
   try {
+    console.log('Buscando configuración...');
     let config = await Config.findOne();
     
     // Si no existe configuración, crear una con valores por defecto
     if (!config) {
+      console.log('No se encontró configuración, creando una nueva...');
       config = await Config.create({});
     }
     
+    console.log('Configuración encontrada/creada:', config);
     res.status(200).json({
       success: true,
       data: config
@@ -35,10 +38,12 @@ exports.getConfig = async (req, res) => {
  */
 exports.updateConfig = async (req, res) => {
   try {
+    console.log('Actualizando configuración con datos:', req.body);
     let config = await Config.findOne();
     
     // Si no existe configuración, crear una nueva
     if (!config) {
+      console.log('No se encontró configuración, creando una nueva...');
       config = await Config.create(req.body);
     } else {
       // Actualizar la configuración existente
@@ -49,6 +54,7 @@ exports.updateConfig = async (req, res) => {
       );
     }
     
+    console.log('Configuración actualizada:', config);
     res.status(200).json({
       success: true,
       data: config
@@ -70,12 +76,14 @@ exports.updateConfig = async (req, res) => {
  */
 exports.resetConfig = async (req, res) => {
   try {
+    console.log('Restableciendo configuración a valores por defecto...');
     // Eliminar la configuración actual
     await Config.deleteMany({});
     
     // Crear nueva configuración con valores por defecto
     const config = await Config.create({});
     
+    console.log('Configuración restablecida:', config);
     res.status(200).json({
       success: true,
       data: config,

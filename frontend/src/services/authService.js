@@ -3,8 +3,6 @@ import apiClient from './apiClient';
 class AuthService {
   // Iniciar sesión
   async login(email, password) {
-    // --- INICIO LÓGICA SIMPLIFICADA (Solo API) ---
-    console.log('Intentando login con API:', { email });
     try {
       const response = await apiClient.post('/auth/login', { email, password });
 
@@ -17,58 +15,33 @@ class AuthService {
         localStorage.setItem('authToken', response.token);
         localStorage.setItem('user', JSON.stringify(response.user));
 
-        console.log('Token JWT real del backend guardado en localStorage');
-
         // Devolver solo los datos relevantes para el AuthContext
         return {
           success: true,
-          data: response.user // Devolver el objeto user recibido
+          data: response.user
         };
       } else {
-        console.log('Login API fallido:', response.message);
-        return { success: false, message: response.message || 'Credenciales incorrectas desde API' };
+        return { 
+          success: false, 
+          message: response.message || 'Credenciales incorrectas' 
+        };
       }
     } catch (error) {
-      console.error('Error en llamada API login:', error);
-      // El interceptor de apiClient ya maneja el log y evento de error 401
+      console.error('Error de autenticación:', error.message || error);
       return {
         success: false,
-        // Usar el mensaje del error rechazado por apiClient si existe
         message: error.message || 'Error de conexión al intentar iniciar sesión'
       };
     }
-    // --- FIN LÓGICA SIMPLIFICADA ---
   }
   
   // Registrar nuevo usuario
   async register(userData) {
     try {
-      // En este momento, simulamos el registro
-      // Esto será reemplazado por una llamada a la API cuando esté listo
-      
-      console.log('Datos de registro recibidos:', userData);
-      
-      // Simular éxito del registro tras verificar datos básicos
-      if (!userData.email || !userData.password || !userData.nombre) {
-        return {
-          success: false,
-          message: 'Faltan datos obligatorios'
-        };
-      }
-      
-      // Simular demora de red
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return {
-        success: true,
-        message: 'Solicitud de registro enviada correctamente. Un administrador revisará tu cuenta pronto.'
-      };
-      
-      // Cuando el backend esté listo, usar esto:
-      // const response = await apiClient.post('/auth/register', userData);
-      // return response.data;
+      const response = await apiClient.post('/auth/register', userData);
+      return response;
     } catch (error) {
-      console.error('Error en registro:', error);
+      console.error('Error al registrar usuario:', error.message || error);
       return {
         success: false,
         message: error.message || 'Error al registrar usuario'
@@ -83,22 +56,15 @@ class AuthService {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       
-      return {
-        success: true
-      };
+      try {
+        await apiClient.post('/auth/logout');
+      } catch (error) {
+        console.error('Error al cerrar sesión en el servidor:', error.message || error);
+      }
       
-      // Cuando el backend esté listo, usar esto:
-      // try {
-      //   await apiClient.post('/auth/logout');
-      // } catch (error) {
-      //   console.warn('Error al cerrar sesión en el servidor', error);
-      // } finally {
-      //   localStorage.removeItem('authToken');
-      //   localStorage.removeItem('user');
-      //   return { success: true };
-      // }
+      return { success: true };
     } catch (error) {
-      console.error('Error en logout:', error);
+      console.error('Error al cerrar sesión:', error.message || error);
       // Asegurar que se limpie el localStorage incluso si hay error
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
@@ -130,56 +96,46 @@ class AuthService {
         return JSON.parse(atob(token));
       }
     } catch (error) {
-      console.error('Error decodificando token:', error);
+      console.error('Error al decodificar token:', error.message || error);
       return null;
     }
   }
   
   // Obtener usuario actual (VALIDA SIEMPRE CONTRA BACKEND /auth/me)
   async getCurrentUser() {
-    console.log('getCurrentUser: Verificando token local...');
     const token = localStorage.getItem('authToken');
     if (!token) {
-      console.log('getCurrentUser: No hay token almacenado.');
       return null;
     }
 
     // Verificar token localmente (formato y expiración)
     const tokenData = this.decodeToken(token);
     if (!tokenData) {
-      console.error('getCurrentUser: Token local inválido, limpiando.');
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       return null;
     }
     if (tokenData.exp && tokenData.exp < Math.floor(Date.now() / 1000)) {
-      console.log('getCurrentUser: Token local expirado, limpiando.');
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       return null;
     }
 
     // Si el token local es válido, SIEMPRE intentar validar con el backend
-    console.log('getCurrentUser: Token local válido, intentando validar con API /auth/me...');
     try {
       const response = await apiClient.get('/auth/me');
       if (response.success && response.data) {
          // Si el backend confirma, actualizar datos en localStorage y devolverlos
-         localStorage.setItem('user', JSON.stringify(response.data)); // Actualizar con datos frescos
-         console.log('getCurrentUser: Validación API exitosa. Usuario:', response.data.email);
+         localStorage.setItem('user', JSON.stringify(response.data));
          return response.data;
       } else {
          // Si /auth/me falla o no devuelve datos (incluso con token localmente válido)
-         console.warn('getCurrentUser: API /auth/me no validó la sesión, limpiando local.');
          localStorage.removeItem('authToken');
          localStorage.removeItem('user');
          return null;
       }
     } catch (error) {
-      // Si apiClient.get('/auth/me') falla (ej. 401), el interceptor ya limpiará localStorage.
-      // Solo necesitamos asegurarnos de devolver null.
-      console.error('getCurrentUser: Error llamando a /auth/me:', error.message || error);
-      // No necesitamos limpiar aquí, el interceptor lo hace. Devolvemos null.
+      console.error('Error al validar sesión:', error.message || error);
       return null;
     }
   }

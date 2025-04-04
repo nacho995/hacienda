@@ -3,6 +3,10 @@ const User = require('../models/User');
 
 // Middleware para verificar que el usuario está autenticado
 exports.protectRoute = async (req, res, next) => {
+  console.log('Verificando autenticación...');
+  console.log('Headers:', req.headers);
+  console.log('Cookies:', req.cookies);
+  
   let token;
 
   // Verificar si el token existe en los headers
@@ -12,13 +16,16 @@ exports.protectRoute = async (req, res, next) => {
   ) {
     // Extraer el token del header (Bearer TOKEN)
     token = req.headers.authorization.split(' ')[1];
+    console.log('Token encontrado en headers:', token ? 'Sí' : 'No');
   } else if (req.cookies && req.cookies.token) {
     // Si no está en el header, verificar si está en las cookies
     token = req.cookies.token;
+    console.log('Token encontrado en cookies:', token ? 'Sí' : 'No');
   }
 
   // Verificar que el token existe
   if (!token) {
+    console.log('No se encontró token');
     return res.status(401).json({
       success: false,
       message: 'No está autorizado para acceder a esta ruta'
@@ -27,13 +34,18 @@ exports.protectRoute = async (req, res, next) => {
 
   try {
     // Verificar el token
+    console.log('Verificando token...');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('Token decodificado:', decoded);
 
     // Buscar al usuario con ese id
+    console.log('Buscando usuario...');
     const user = await User.findById(decoded.id);
+    console.log('Usuario encontrado:', user ? 'Sí' : 'No');
 
     // Verificar que el usuario existe
     if (!user) {
+      console.log('Usuario no encontrado');
       return res.status(401).json({
         success: false,
         message: 'No se encuentra el usuario con este token'
@@ -42,6 +54,7 @@ exports.protectRoute = async (req, res, next) => {
 
     // Verificar que el usuario está confirmado
     if (!user.confirmado) {
+      console.log('Usuario no confirmado');
       return res.status(401).json({
         success: false,
         message: 'Por favor, espera a que tu cuenta sea aprobada por un administrador'
@@ -50,11 +63,14 @@ exports.protectRoute = async (req, res, next) => {
 
     // Añadir el usuario a la request
     req.user = user;
+    console.log('Usuario autenticado correctamente');
     next();
   } catch (err) {
+    console.error('Error en autenticación:', err);
     return res.status(401).json({
       success: false,
-      message: 'No está autorizado para acceder a esta ruta'
+      message: 'No está autorizado para acceder a esta ruta',
+      error: err.message
     });
   }
 };
@@ -62,7 +78,12 @@ exports.protectRoute = async (req, res, next) => {
 // Middleware para verificar roles de usuario
 exports.authorize = (...roles) => {
   return (req, res, next) => {
+    console.log('Verificando roles...');
+    console.log('Roles permitidos:', roles);
+    console.log('Rol del usuario:', req.user?.role);
+    
     if (!req.user) {
+      console.log('No hay usuario en la request');
       return res.status(401).json({
         success: false,
         message: 'No está autorizado para acceder a esta ruta'
@@ -71,12 +92,14 @@ exports.authorize = (...roles) => {
 
     // Verificar si el rol del usuario está incluido en los roles autorizados
     if (!roles.includes(req.user.role)) {
+      console.log('Rol no autorizado');
       return res.status(403).json({
         success: false,
         message: `El rol ${req.user.role} no está autorizado para acceder a esta ruta`
       });
     }
 
+    console.log('Rol autorizado');
     next();
   };
 };

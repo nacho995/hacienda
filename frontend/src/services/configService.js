@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from './apiClient';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -6,10 +6,10 @@ const configService = {
   // Obtener la configuración actual
   getConfig: async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/config`);
-      return response.data;
+      const response = await apiClient.get('/api/config');
+      return response;
     } catch (error) {
-      console.error('Error al obtener la configuración:', error);
+      console.error('Error al obtener la configuración:', error.message || error);
       throw error;
     }
   },
@@ -17,10 +17,10 @@ const configService = {
   // Actualizar la configuración
   updateConfig: async (configData) => {
     try {
-      const response = await axios.put(`${API_URL}/api/config`, configData);
-      return response.data;
+      const response = await apiClient.put('/api/config', configData);
+      return response;
     } catch (error) {
-      console.error('Error al actualizar la configuración:', error);
+      console.error('Error al actualizar la configuración:', error.message || error);
       throw error;
     }
   },
@@ -28,10 +28,10 @@ const configService = {
   // Restaurar la configuración por defecto
   resetConfig: async () => {
     try {
-      const response = await axios.post(`${API_URL}/api/config/reset`);
-      return response.data;
+      const response = await apiClient.post('/api/config/reset');
+      return response;
     } catch (error) {
-      console.error('Error al restaurar la configuración:', error);
+      console.error('Error al restaurar la configuración:', error.message || error);
       throw error;
     }
   }

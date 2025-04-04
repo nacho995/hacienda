@@ -85,11 +85,10 @@ export default function AdminReservations() {
         if (usersResponse.success && Array.isArray(usersResponse.data)) {
           setUsuarios(usersResponse.data);
         } else {
-          console.warn('No se pudieron cargar los usuarios o formato incorrecto:', usersResponse);
           setUsuarios([]);
         }
       } catch (userError) {
-        console.error('Error al cargar usuarios:', userError);
+        console.error('Error al cargar usuarios:', userError.message || userError);
         setUsuarios([]);
       }
       
@@ -147,7 +146,7 @@ export default function AdminReservations() {
       
       setAllReservations(combinedReservations);
     } catch (error) {
-      console.error('Error al cargar reservaciones:', error);
+      console.error('Error al cargar reservaciones:', error.message || error);
       setError('Error al cargar las reservaciones. Por favor, inténtalo de nuevo.');
     } finally {
       setLoading(false);

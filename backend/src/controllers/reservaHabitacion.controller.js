@@ -61,84 +61,43 @@ exports.crearReservaHabitacion = async (req, res) => {
 // @access  Private/Admin
 exports.obtenerReservasHabitacion = async (req, res) => {
   try {
-    let query;
+    console.log('Obteniendo reservas de habitaciones...');
+    console.log('Usuario:', req.user.id, 'Rol:', req.user.role);
+    
+    let query = {};
     
     // Si el usuario es administrador, puede ver todas las reservas
-    if (req.user.role === 'admin') {
-      query = ReservaHabitacion.find().populate({
-        path: 'usuario',
-        select: 'nombre apellidos email telefono'
-      });
-    } else {
-      // Si es un usuario normal, solo ve sus propias reservas
-      query = ReservaHabitacion.find({ usuario: req.user.id });
+    if (req.user.role !== 'admin') {
+      // Ver tanto las reservas propias como las asignadas a este usuario
+      query = {
+        $or: [
+          { usuario: req.user.id },
+          { asignadoA: req.user.id }
+        ]
+      };
     }
     
-    // Filtrado
-    const queryStr = { ...req.query };
-    const removeFields = ['select', 'sort', 'page', 'limit'];
-    removeFields.forEach(param => delete queryStr[param]);
-    
-    // Convertir en format de mongoose
-    let queryString = JSON.stringify(queryStr);
-    queryString = queryString.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
-    
-    query = query.find(JSON.parse(queryString));
-    
-    // Selección de campos
-    if (req.query.select) {
-      const fields = req.query.select.split(',').join(' ');
-      query = query.select(fields);
-    }
-    
-    // Ordenación
-    if (req.query.sort) {
-      const sortBy = req.query.sort.split(',').join(' ');
-      query = query.sort(sortBy);
-    } else {
-      query = query.sort('-createdAt');
-    }
-    
-    // Paginación
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-    const total = await ReservaHabitacion.countDocuments(JSON.parse(queryString));
-    
-    query = query.skip(startIndex).limit(limit);
+    console.log('Query de búsqueda:', query);
     
     // Ejecutar query
-    const reservas = await query;
+    const reservas = await ReservaHabitacion.find(query)
+      .populate('usuario', 'nombre apellidos email telefono')
+      .populate('asignadoA', 'nombre apellidos email')
+      .sort('-createdAt');
     
-    // Resultado de paginación
-    const pagination = {};
-    
-    if (endIndex < total) {
-      pagination.next = {
-        page: page + 1,
-        limit
-      };
-    }
-    
-    if (startIndex > 0) {
-      pagination.prev = {
-        page: page - 1,
-        limit
-      };
-    }
+    console.log('Número de reservas encontradas:', reservas.length);
     
     res.status(200).json({
       success: true,
       count: reservas.length,
-      pagination,
       data: reservas
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error al obtener las reservas de habitación:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener las reservas de habitación'
+      message: 'Error al obtener las reservas de habitación',
+      error: error.message
     });
   }
 };
