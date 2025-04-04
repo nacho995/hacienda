@@ -1,16 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaSave, FaUndo, FaCalendarAlt, FaEnvelope, FaShieldAlt, FaImage, FaMoneyBillWave, FaCheckCircle } from 'react-icons/fa';
+import { toast } from 'sonner';
+import configService from '@/services/configService';
 
 export default function AdminConfiguracion() {
   const [activeTab, setActiveTab] = useState('general');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
   const [generalSettings, setGeneralSettings] = useState({
-    nombreSitio: 'Hacienda San Carlos Borromeo',
-    direccion: 'Carretera Nacional Km 123, Valle del Silencio',
-    telefono: '+34 612 345 678',
-    email: 'info@haciendasancarlos.com',
-    horarioAtencion: 'Lunes a Viernes: 9:00 AM - 6:00 PM',
+    nombreSitio: '',
+    direccion: '',
+    telefono: '',
+    email: '',
+    horarioAtencion: '',
+    notificaciones: {
+      nuevaReservacion: true,
+      nuevoPago: true
+    }
   });
   
   const [reservacionSettings, setReservacionSettings] = useState({
@@ -19,63 +29,152 @@ export default function AdminConfiguracion() {
     horaInicioDisponible: '10:00',
     horaFinDisponible: '23:00',
     tiempoMinimoEvento: 4,
-    diasNoDisponibles: ['2024-06-24', '2024-12-24', '2024-12-31'],
+    diasNoDisponibles: [],
   });
   
   const [pagosSettings, setPagosSettings] = useState({
     requeridoAnticipo: true,
     porcentajeAnticipo: 30,
-    metodosAceptados: ['Transferencia bancaria', 'Efectivo', 'Tarjeta de crédito'],
+    metodosAceptados: [],
     impuestos: 21,
   });
 
   const [metadataSettings, setMetadataSettings] = useState({
-    siteTitle: 'Hacienda San Carlos Borromeo - Bodas y Eventos Exclusivos',
-    siteDescription: 'Hacienda histórica para celebrar bodas y eventos exclusivos en un entorno natural único.',
-    keywords: 'bodas, eventos, hacienda, celebraciones, fincas para bodas',
+    siteTitle: '',
+    siteDescription: '',
+    keywords: '',
   });
-  
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  
-  const handleSaveSettings = () => {
-    // Aquí iría la lógica para guardar en tu API
-    setIsSaving(true);
-    
-    // Simulamos una petición
-    setTimeout(() => {
-      setIsSaving(false);
-      setSaveSuccess(true);
+
+  // Cargar configuración inicial
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        setIsLoading(true);
+        const config = await configService.getConfig();
+        if (config) {
+          setGeneralSettings(config.general);
+          setReservacionSettings(config.reservacion);
+          setPagosSettings(config.pagos);
+          setMetadataSettings(config.metadata);
+        }
+      } catch (error) {
+        console.error('Error al cargar la configuración:', error);
+        toast.error('Error al cargar la configuración');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadConfig();
+  }, []);
+
+  // Validar fechas no disponibles
+  const validateDates = (dates) => {
+    return dates.every(date => {
+      const regex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!regex.test(date)) return false;
+      const d = new Date(date);
+      return d instanceof Date && !isNaN(d);
+    });
+  };
+
+  // Guardar configuración
+  const handleSaveSettings = async () => {
+    try {
+      setIsSaving(true);
+
+      // Validaciones
+      if (pagosSettings.metodosAceptados.length === 0) {
+        toast.error('Debe seleccionar al menos un método de pago');
+        return;
+      }
+
+      if (!validateDates(reservacionSettings.diasNoDisponibles)) {
+        toast.error('Hay fechas no disponibles con formato inválido');
+        return;
+      }
+
+      const configData = {
+        general: generalSettings,
+        reservacion: reservacionSettings,
+        pagos: pagosSettings,
+        metadata: metadataSettings
+      };
+
+      await configService.updateConfig(configData);
       
-      // Ocultamos el mensaje después de unos segundos
+      setSaveSuccess(true);
+      toast.success('Configuración guardada correctamente');
+      
       setTimeout(() => {
         setSaveSuccess(false);
       }, 3000);
-    }, 1000);
-  };
-  
-  const resetSettings = () => {
-    // Aquí iría la lógica para restaurar configuración por defecto
-    if (window.confirm('¿Estás seguro de que deseas restaurar la configuración por defecto? Esta acción no se puede deshacer.')) {
-      // Por ahora solo mostramos un mensaje
-      alert('Configuración restaurada');
+    } catch (error) {
+      console.error('Error al guardar la configuración:', error);
+      toast.error('Error al guardar la configuración');
+    } finally {
+      setIsSaving(false);
     }
   };
   
+  // Restaurar configuración por defecto
+  const resetSettings = async () => {
+    if (window.confirm('¿Estás seguro de que deseas restaurar la configuración por defecto? Esta acción no se puede deshacer.')) {
+      try {
+        setIsLoading(true);
+        await configService.resetConfig();
+        const defaultConfig = await configService.getConfig();
+        
+        setGeneralSettings(defaultConfig.general);
+        setReservacionSettings(defaultConfig.reservacion);
+        setPagosSettings(defaultConfig.pagos);
+        setMetadataSettings(defaultConfig.metadata);
+        
+        toast.success('Configuración restaurada correctamente');
+      } catch (error) {
+        console.error('Error al restaurar la configuración:', error);
+        toast.error('Error al restaurar la configuración');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Manejadores de cambios
   const handleGeneralChange = (e) => {
-    const { name, value } = e.target;
-    setGeneralSettings(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    const { name, value, type, checked } = e.target;
+    
+    if (name.startsWith('notificaciones.')) {
+      const notificationKey = name.split('.')[1];
+      setGeneralSettings(prev => ({
+        ...prev,
+        notificaciones: {
+          ...prev.notificaciones,
+          [notificationKey]: checked
+        }
+      }));
+    } else {
+      setGeneralSettings(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
+    }
   };
   
   const handleReservacionChange = (e) => {
     const { name, value } = e.target;
-    setReservacionSettings(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    if (name === 'diasNoDisponibles') {
+      const dates = value.split(',').map(date => date.trim());
+      setReservacionSettings(prev => ({
+        ...prev,
+        [name]: dates
+      }));
+    } else {
+      setReservacionSettings(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
   
   const handlePagosChange = (e) => {
@@ -93,7 +192,15 @@ export default function AdminConfiguracion() {
       [name]: value
     }));
   };
-  
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -167,9 +274,15 @@ export default function AdminConfiguracion() {
           {/* Pestaña de Configuración General */}
           {activeTab === 'general' && (
             <div className="space-y-6">
-              <div className="flex items-center space-x-2 text-gray-800 mb-4">
-                <FaImage className="text-[var(--color-primary)]" />
-                <h2 className="text-xl font-semibold">Información General</h2>
+              <div>
+                <div className="flex items-center space-x-2 text-gray-800">
+                  <FaImage className="text-[var(--color-primary)]" />
+                  <h2 className="text-xl font-semibold">Información General</h2>
+                </div>
+                <p className="text-gray-600 mt-2 mb-6">
+                  Configura la información básica de tu negocio, incluyendo datos de contacto y preferencias de notificaciones. 
+                  Esta información se mostrará en diferentes secciones del sitio web y se utilizará para las comunicaciones con los clientes.
+                </p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -253,7 +366,8 @@ export default function AdminConfiguracion() {
                       type="checkbox"
                       id="notifyNewReservation"
                       className="w-4 h-4 text-[var(--color-primary)] border-gray-300 rounded focus:ring-[var(--color-primary)]"
-                      defaultChecked
+                      checked={generalSettings.notificaciones.nuevaReservacion}
+                      onChange={(e) => handleGeneralChange({ target: { name: 'notificaciones.nuevaReservacion', checked: e.target.checked } })}
                     />
                     <label htmlFor="notifyNewReservation" className="ml-2 text-sm text-gray-700">
                       Recibir notificación cuando se cree una nueva reservación
@@ -262,11 +376,12 @@ export default function AdminConfiguracion() {
                   <div className="flex items-center">
                     <input
                       type="checkbox"
-                      id="notifyPayment"
+                      id="notifyNewPayment"
                       className="w-4 h-4 text-[var(--color-primary)] border-gray-300 rounded focus:ring-[var(--color-primary)]"
-                      defaultChecked
+                      checked={generalSettings.notificaciones.nuevoPago}
+                      onChange={(e) => handleGeneralChange({ target: { name: 'notificaciones.nuevoPago', checked: e.target.checked } })}
                     />
-                    <label htmlFor="notifyPayment" className="ml-2 text-sm text-gray-700">
+                    <label htmlFor="notifyNewPayment" className="ml-2 text-sm text-gray-700">
                       Recibir notificación cuando se registre un pago
                     </label>
                   </div>
@@ -278,9 +393,15 @@ export default function AdminConfiguracion() {
           {/* Pestaña de Configuración de Reservaciones */}
           {activeTab === 'reservacion' && (
             <div className="space-y-6">
-              <div className="flex items-center space-x-2 text-gray-800 mb-4">
-                <FaCalendarAlt className="text-[var(--color-primary)]" />
-                <h2 className="text-xl font-semibold">Configuración de Reservaciones</h2>
+              <div>
+                <div className="flex items-center space-x-2 text-gray-800">
+                  <FaCalendarAlt className="text-[var(--color-primary)]" />
+                  <h2 className="text-xl font-semibold">Configuración de Reservaciones</h2>
+                </div>
+                <p className="text-gray-600 mt-2 mb-6">
+                  Establece las reglas y límites para las reservaciones, como el tiempo mínimo de anticipación, horarios disponibles y fechas bloqueadas. 
+                  Estas configuraciones afectarán directamente a las opciones que verán los clientes al realizar una reserva en el sitio web.
+                </p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -385,9 +506,15 @@ export default function AdminConfiguracion() {
           {/* Pestaña de Configuración de Pagos */}
           {activeTab === 'pagos' && (
             <div className="space-y-6">
-              <div className="flex items-center space-x-2 text-gray-800 mb-4">
-                <FaMoneyBillWave className="text-[var(--color-primary)]" />
-                <h2 className="text-xl font-semibold">Configuración de Pagos</h2>
+              <div>
+                <div className="flex items-center space-x-2 text-gray-800">
+                  <FaMoneyBillWave className="text-[var(--color-primary)]" />
+                  <h2 className="text-xl font-semibold">Configuración de Pagos</h2>
+                </div>
+                <p className="text-gray-600 mt-2 mb-6">
+                  Define las políticas de pago, incluyendo anticipos requeridos, métodos de pago aceptados e impuestos aplicables. 
+                  Estas configuraciones determinarán cómo se manejan los pagos y depósitos para las reservaciones.
+                </p>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -395,13 +522,12 @@ export default function AdminConfiguracion() {
                   <div className="flex items-center mb-2">
                     <input
                       type="checkbox"
-                      id="requeridoAnticipo"
-                      name="requeridoAnticipo"
-                      checked={pagosSettings.requeridoAnticipo}
-                      onChange={handlePagosChange}
+                      id="requireDeposit"
                       className="w-4 h-4 text-[var(--color-primary)] border-gray-300 rounded focus:ring-[var(--color-primary)]"
+                      checked={pagosSettings.requeridoAnticipo}
+                      onChange={(e) => handlePagosChange({ target: { name: 'requeridoAnticipo', checked: e.target.checked } })}
                     />
-                    <label htmlFor="requeridoAnticipo" className="ml-2 text-sm font-medium text-gray-700">
+                    <label htmlFor="requireDeposit" className="ml-2 text-sm font-medium text-gray-700">
                       Requerir anticipo para confirmar reservación
                     </label>
                   </div>
@@ -509,9 +635,15 @@ export default function AdminConfiguracion() {
           {/* Pestaña de Configuración SEO */}
           {activeTab === 'seo' && (
             <div className="space-y-6">
-              <div className="flex items-center space-x-2 text-gray-800 mb-4">
-                <FaShieldAlt className="text-[var(--color-primary)]" />
-                <h2 className="text-xl font-semibold">Configuración SEO</h2>
+              <div>
+                <div className="flex items-center space-x-2 text-gray-800">
+                  <FaShieldAlt className="text-[var(--color-primary)]" />
+                  <h2 className="text-xl font-semibold">Configuración SEO</h2>
+                </div>
+                <p className="text-gray-600 mt-2 mb-6">
+                  Optimiza la visibilidad de tu sitio web en los motores de búsqueda configurando títulos, descripciones y palabras clave. 
+                  Estas configuraciones son cruciales para mejorar el posicionamiento en Google y otros buscadores, ayudando a que más clientes potenciales encuentren tu negocio.
+                </p>
               </div>
               
               <div className="space-y-6">
