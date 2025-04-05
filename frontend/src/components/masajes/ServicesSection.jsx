@@ -1,75 +1,64 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FaClock, FaChevronRight } from 'react-icons/fa';
-
-// Datos de servicios de masajes
-const SERVICIOS_MASAJE = [
-  {
-    id: 1,
-    nombre: "Masaje Relajante con Aromaterapia",
-    descripcion: "Sumérgete en un oasis de tranquilidad con nuestro masaje relajante que combina técnicas suaves con aceites esenciales para aliviar el estrés y la tensión.",
-    duracion: "60 / 90 min",
-    precio: 1200,
-    imagen: "/images/placeholder/massage1.svg",
-    destacado: true,
-    beneficios: [
-      "Reduce el estrés y la ansiedad",
-      "Mejora la calidad del sueño",
-      "Alivia dolores musculares",
-      "Aumenta la circulación sanguínea"
-    ]
-  },
-  {
-    id: 2,
-    nombre: "Masaje de Piedras Calientes",
-    descripcion: "Experimenta el poder curativo de las piedras volcánicas calientes combinadas con técnicas de masaje que alivian profundamente la tensión muscular.",
-    duracion: "75 min",
-    precio: 1500,
-    imagen: "/images/placeholder/massage2.svg",
-    destacado: false,
-    beneficios: [
-      "Desbloquea nudos musculares profundos",
-      "Mejora la flexibilidad",
-      "Estimula el metabolismo",
-      "Reduce la inflamación"
-    ]
-  },
-  {
-    id: 3,
-    nombre: "Ritual Herbal Detox",
-    descripcion: "Un tratamiento holístico que comienza con exfoliación, seguido de un masaje con hierbas mexicanas tradicionales que desintoxican y revitalizan el cuerpo.",
-    duracion: "90 min",
-    precio: 1700,
-    imagen: "/images/placeholder/massage3.svg",
-    destacado: false,
-    beneficios: [
-      "Elimina toxinas del cuerpo",
-      "Hidrata y nutre la piel",
-      "Mejora el sistema linfático",
-      "Equilibra las energías corporales"
-    ]
-  },
-  {
-    id: 4,
-    nombre: "Masaje Premium Hacienda",
-    descripcion: "Nuestra experiencia insignia que combina diversas técnicas de masaje con tratamientos faciales, reflexología y aromaterapia para una renovación completa.",
-    duracion: "120 min",
-    precio: 2100,
-    imagen: "/images/placeholder/massage4.svg",
-    destacado: true,
-    beneficios: [
-      "Experiencia integral de bienestar",
-      "Rejuvenecimiento facial y corporal",
-      "Alivio total del estrés",
-      "Sensación de renovación completa"
-    ]
-  }
-];
+import { getTiposMasaje } from '@/services/masajeService';
 
 export default function ServicesSection() {
+  const [servicios, setServicios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const cargarServicios = async () => {
+      try {
+        const tiposMasaje = await getTiposMasaje();
+        setServicios(tiposMasaje);
+      } catch (error) {
+        console.error('Error al cargar los servicios:', error);
+        setError('No se pudieron cargar los servicios');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarServicios();
+  }, []);
+
+  if (loading) {
+    return (
+      <section id="servicios" className="py-24">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto"></div>
+              <p className="mt-4 text-gray-600">Cargando servicios de masaje...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error || !servicios.length) {
+    return (
+      <section id="servicios" className="py-24">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <p className="text-xl text-gray-600">
+                {error || 'No hay servicios disponibles en este momento'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="servicios" className="py-24">
       <div className="container mx-auto px-6">
@@ -85,9 +74,9 @@ export default function ServicesSection() {
         
         {/* Listado de masajes */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-          {SERVICIOS_MASAJE.map((servicio) => (
+          {servicios.map((servicio) => (
             <motion.div
-              key={servicio.id}
+              key={servicio._id}
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
@@ -97,22 +86,17 @@ export default function ServicesSection() {
               <div className="md:w-1/2 relative overflow-hidden rounded-lg">
                 <div className="aspect-w-4 aspect-h-3">
                   <Image
-                    src={servicio.imagen}
-                    alt={servicio.nombre}
+                    src={servicio.imagen || '/images/placeholder/massage1.svg'}
+                    alt={servicio.titulo}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                   />
-                  {servicio.destacado && (
-                    <div className="absolute top-4 right-4 bg-[var(--color-primary)] text-white text-sm px-4 py-1 font-medium">
-                      Destacado
-                    </div>
-                  )}
                 </div>
               </div>
               
               <div className="md:w-1/2">
                 <h3 className="text-2xl font-[var(--font-display)] text-[var(--color-accent)] mb-3">
-                  {servicio.nombre}
+                  {servicio.titulo}
                 </h3>
                 
                 <div className="flex items-center mb-4 text-sm text-gray-600">
@@ -128,21 +112,12 @@ export default function ServicesSection() {
                   {servicio.descripcion}
                 </p>
                 
-                <h4 className="font-medium text-[var(--color-accent)] mb-3">Beneficios:</h4>
-                <ul className="space-y-2 mb-8">
-                  {servicio.beneficios.map((beneficio, index) => (
-                    <li key={index} className="flex items-start">
-                      <FaChevronRight className="mt-1 mr-2 text-[var(--color-primary)] flex-shrink-0" />
-                      <span className="text-gray-600">{beneficio}</span>
-                    </li>
-                  ))}
-                </ul>
-                
                 <Link
-                  href="/reservar"
-                  className="inline-block px-6 py-3 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors"
+                  href={`/reservar?tipo=masaje&id=${servicio._id}&nombre=${encodeURIComponent(servicio.titulo)}&duracion=${encodeURIComponent(servicio.duracion)}&precio=${servicio.precio}`}
+                  className="inline-flex items-center px-6 py-3 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors"
                 >
-                  Reservar Ahora
+                  Reservar como Servicio Adicional
+                  <FaChevronRight className="ml-2" />
                 </Link>
               </div>
             </motion.div>

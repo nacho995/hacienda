@@ -12,7 +12,8 @@ import {
   FaSignOutAlt,
   FaBars,
   FaTimes,
-  FaChartPie
+  FaChartPie,
+  FaSpa
 } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
@@ -67,6 +68,30 @@ export default function AdminLayout({ children }) {
           <div className="mt-4 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
           </div>
+          <button 
+            onClick={() => router.push('/admin/login')} 
+            className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded text-white transition-colors"
+          >
+            Ir a login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Si hay error de autenticación
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-800">
+        <div className="bg-slate-700 p-8 rounded-lg shadow-md text-white">
+          <h1 className="text-2xl font-bold mb-4 text-red-500">Error de autenticación</h1>
+          <p>{authError.message || 'Se ha producido un error al verificar tu sesión'}</p>
+          <button 
+            onClick={() => router.push('/admin/login')} 
+            className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded text-white transition-colors"
+          >
+            Ir a login
+          </button>
         </div>
       </div>
     );
@@ -87,6 +112,7 @@ export default function AdminLayout({ children }) {
     { name: 'Dashboard', href: '/admin/dashboard', icon: <FaChartPie /> },
     { name: 'Reservaciones', href: '/admin/reservaciones', icon: <FaCalendarAlt /> },
     { name: 'Habitaciones', href: '/admin/habitaciones', icon: <FaBed /> },
+    { name: 'Masajes', href: '/admin/masajes', icon: <FaSpa /> },
     { name: 'Usuarios', href: '/admin/usuarios', icon: <FaUsers /> },
     { name: 'Configuración', href: '/admin/configuracion', icon: <FaCog /> },
   ];

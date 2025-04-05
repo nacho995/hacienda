@@ -50,12 +50,47 @@ export default function AdminConfiguracion() {
     const loadConfig = async () => {
       try {
         setIsLoading(true);
-        const config = await configService.getConfig();
-        if (config) {
-          setGeneralSettings(config.general);
-          setReservacionSettings(config.reservacion);
-          setPagosSettings(config.pagos);
-          setMetadataSettings(config.metadata);
+        const response = await configService.getConfig();
+        console.log('Configuración obtenida:', response);
+        
+        if (response && response.success && response.data) {
+          // En caso de que la estructura de datos sea plana,
+          // organizamos los datos en las categorías esperadas
+          const config = response.data;
+          
+          setGeneralSettings({
+            nombreSitio: config.nombreSitio || '',
+            direccion: config.direccion || '',
+            telefono: config.telefono || '',
+            email: config.email || '',
+            horarioAtencion: config.horarioAtencion || '',
+            notificaciones: {
+              nuevaReservacion: config.notificacionesEmail || true,
+              nuevoPago: config.notificacionesEmail || true
+            }
+          });
+          
+          setReservacionSettings({
+            minDiasAnticipacion: config.minDiasAnticipacion || 14,
+            maxDiasAnticipacion: config.maxDiasAnticipacion || 180,
+            horaInicioDisponible: config.horaInicioDisponible || '10:00',
+            horaFinDisponible: config.horaFinDisponible || '23:00',
+            tiempoMinimoEvento: config.tiempoMinimoEvento || 4,
+            diasNoDisponibles: config.diasNoDisponibles || [],
+          });
+          
+          setPagosSettings({
+            requeridoAnticipo: config.requeridoAnticipo || true,
+            porcentajeAnticipo: config.porcentajeAnticipo || 30,
+            metodosAceptados: config.metodosAceptados || ['efectivo', 'transferencia'],
+            impuestos: config.impuestos || 21,
+          });
+          
+          setMetadataSettings({
+            siteTitle: config.siteTitle || '',
+            siteDescription: config.siteDescription || '',
+            keywords: config.keywords?.join(', ') || '',
+          });
         }
       } catch (error) {
         console.error('Error al cargar la configuración:', error);

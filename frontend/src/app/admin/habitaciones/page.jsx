@@ -190,21 +190,21 @@ export default function AdminRooms() {
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-semibold">
-                              {reserva.nombre} {reserva.apellidos}
+                              {reserva.nombreContacto} {reserva.apellidosContacto}
                             </p>
                             <p className="text-sm text-gray-600">
-                              {formatFecha(reserva.fechaEntrada)} - {formatFecha(reserva.fechaSalida)}
+                              {formatFecha(reserva.fecha)} - {formatFecha(reserva.fechaSalida)}
                             </p>
                             <p className="text-sm text-gray-600">
-                              {reserva.numeroHabitaciones} habitación(es)
+                              {reserva.numHuespedes} huésped(es)
                             </p>
                           </div>
                           <span className={`px-2 py-1 text-xs font-semibold rounded-sm ${
-                            reserva.estado === 'confirmada' ? 'bg-green-100 text-green-800' :
-                            reserva.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                            reserva.estadoReserva === 'confirmada' ? 'bg-green-100 text-green-800' :
+                            reserva.estadoReserva === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {reserva.estado}
+                            {reserva.estadoReserva}
                           </span>
                         </div>
                       </div>

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Determinar la URL base según el entorno
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 console.log('API Base URL:', BASE_URL);
 
@@ -11,7 +11,8 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true
+  withCredentials: true,
+  timeout: 10000 // 10 segundos de timeout
 });
 
 // Función para decodificar un token Base64 de forma segura
@@ -62,8 +63,8 @@ const isPublicRoute = (url) => {
 apiClient.interceptors.request.use(
   (config) => {
     console.log('Realizando petición a:', config.url);
+    console.log('URL completa:', `${config.baseURL}${config.url}`);
     console.log('Método:', config.method?.toUpperCase());
-    console.log('Headers:', config.headers);
     
     // Si es una ruta pública, no es necesario el token
     if (isPublicRoute(config.url)) {
@@ -139,6 +140,17 @@ apiClient.interceptors.response.use(
       console.error(`Error ${error.response.status} en petición a: ${error.config?.url}`);
       console.error('Detalles del error:', error.response.data);
       
+      // Log adicional para errores 401 en login
+      if (error.response.status === 401 && error.config?.url.includes('/auth/login')) {
+        console.error('Error 401 en login. Datos enviados:', error.config.data);
+        try {
+          const sentData = JSON.parse(error.config.data);
+          console.log('Email utilizado:', sentData.email);
+        } catch (e) {
+          console.error('No se pudo parsear los datos enviados:', e);
+        }
+      }
+      
       if (error.response.status === 401) {
         if (!error.config?.url || !isPublicRoute(error.config.url)) {
           console.log('Error de autenticación, limpiando localStorage');
@@ -146,11 +158,17 @@ apiClient.interceptors.response.use(
           localStorage.removeItem('user');
           
           const authErrorEvent = new CustomEvent('auth-error', { 
-            detail: { status: 401, message: 'Sesión expirada o no autorizada' } 
+            detail: { 
+              status: 401, 
+              message: error.response.data?.message || 'Sesión expirada o no autorizada'
+            } 
           });
           window.dispatchEvent(authErrorEvent);
         }
       }
+    } else if (error.code === 'ECONNABORTED') {
+      errorResponse.message = 'La petición ha tardado demasiado tiempo. Por favor, inténtelo de nuevo.';
+      console.error('Timeout en la petición:', error);
     } else {
       console.error('Error de red:', error.message);
     }

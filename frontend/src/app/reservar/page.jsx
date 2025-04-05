@@ -7,7 +7,9 @@ import { motion } from 'framer-motion';
 import { FaCalendarAlt, FaUsers, FaChevronRight, FaCheck, FaRegClock, FaExclamationTriangle } from 'react-icons/fa';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
-import { createEventoReservation, checkEventoAvailability, getEventoOccupiedDates } from '@/services/reservationService';
+import { createEventoReservation, checkEventoAvailability, getEventoOccupiedDates, createMasajeReservation, checkMasajeAvailability } from '@/services/reservationService';
+import { getTiposMasaje } from '@/services/masajeService';
+import { getTiposEvento } from '@/services/eventoService';
 import apiClient from '@/services/apiClient';
 import { toast } from 'sonner';
 
@@ -15,52 +17,23 @@ import { toast } from 'sonner';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 
-// Tipos de eventos disponibles
-const tiposEvento = [
-  {
-    id: 'boda',
-    titulo: 'Boda',
-    descripcion: 'Ceremonias inolvidables en un entorno de ensueño',
-    imagen: '/images/placeholder/gallery1.svg',
-    capacidad: '50-300',
-    precio: 'Desde $50,000'
-  },
-  {
-    id: 'corporativo',
-    titulo: 'Corporativo',
-    descripcion: 'Reuniones ejecutivas, conferencias y presentaciones',
-    imagen: '/images/placeholder/gallery2.svg',
-    capacidad: '20-200',
-    precio: 'Desde $35,000'
-  },
-  {
-    id: 'cumpleanos',
-    titulo: 'Cumpleaños',
-    descripcion: 'Celebraciones especiales con amigos y familia',
-    imagen: '/images/placeholder/gallery3.svg',
-    capacidad: '30-250',
-    precio: 'Desde $40,000'
-  },
-  {
-    id: 'aniversario',
-    titulo: 'Aniversario',
-    descripcion: 'Conmemora tus momentos más importantes',
-    imagen: '/images/placeholder/gallery1.svg',
-    capacidad: '30-150',
-    precio: 'Desde $30,000'
-  }
-];
-
 export default function ReservarPage() {
   const [formData, setFormData] = useState({
     tipoEvento: '',
     fecha: null,
     invitados: 50,
     nombre: '',
+    apellidos: '',
     email: '',
     telefono: '',
-    comentarios: ''
+    comentarios: '',
+    masajesSeleccionados: [],
+    masajePreseleccionado: null
   });
+
+  const [tiposEvento, setTiposEvento] = useState([]); // Estado para tipos de evento
+  const [tiposMasaje, setTiposMasaje] = useState([]); // Estado para tipos de masaje
+  const [loading, setLoading] = useState(true); // Nuevo estado para manejar la carga
   
   const [paso, setPaso] = useState(1);
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -91,10 +64,78 @@ export default function ReservarPage() {
     cargarFechasOcupadas();
   }, []);
   
+  // Efecto para manejar los parámetros de URL al cargar la página
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('tipo') === 'masaje') {
+      const masajePreseleccionado = {
+        id: params.get('id'),
+        titulo: params.get('nombre'),
+        duracion: params.get('duracion'),
+        precio: parseInt(params.get('precio')) || 0
+      };
+      
+      setFormData(prev => ({
+        ...prev,
+        masajePreseleccionado
+      }));
+
+      // Mostrar mensaje informativo
+      toast.info('Seleccione un tipo de evento para continuar con la reserva del masaje');
+    }
+  }, []);
+  
+  // Cargar tipos de evento al montar el componente
+  useEffect(() => {
+    const cargarTiposEvento = async () => {
+      try {
+        setLoading(true);
+        const tipos = await getTiposEvento();
+        if (Array.isArray(tipos)) {
+          setTiposEvento(tipos);
+        } else {
+          console.error('Los tipos de evento no son un array:', tipos);
+          toast.error('Error al cargar los tipos de evento');
+        }
+      } catch (error) {
+        console.error('Error al cargar tipos de evento:', error);
+        toast.error('No se pudieron cargar los tipos de evento');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarTiposEvento();
+  }, []);
+  
+  // Cargar tipos de masaje al montar el componente
+  useEffect(() => {
+    const cargarTiposMasaje = async () => {
+      try {
+        const tipos = await getTiposMasaje();
+        setTiposMasaje(tipos);
+      } catch (error) {
+        console.error('Error al cargar tipos de masaje:', error);
+        toast.error('No se pudieron cargar los tipos de masaje');
+      }
+    };
+
+    cargarTiposMasaje();
+  }, []);
+  
   const handleSelectTipoEvento = (tipo) => {
-    setFormData(prev => ({ ...prev, tipoEvento: tipo }));
+    setFormData(prev => {
+      const newFormData = { ...prev, tipoEvento: tipo };
+      
+      // Si hay un masaje preseleccionado, lo agregamos a masajesSeleccionados
+      if (prev.masajePreseleccionado && !prev.masajesSeleccionados.some(m => m.id === prev.masajePreseleccionado.id)) {
+        newFormData.masajesSeleccionados = [prev.masajePreseleccionado];
+      }
+      
+      return newFormData;
+    });
+    
     setPaso(2);
-    // Hacer scroll suave hacia la siguiente sección
     document.getElementById('paso-2').scrollIntoView({ behavior: 'smooth' });
   };
   
@@ -121,138 +162,171 @@ export default function ReservarPage() {
     }));
   };
   
-  const handleSubmit = async (e) => {
+  const handleSubmitMasaje = async (e) => {
     e.preventDefault();
     setSubmitError(null);
     setIsSubmitting(true);
     
     try {
-      // Convertir el tipo de evento para el backend
-      const tipoSeleccionado = tiposEvento.find(t => t.id === formData.tipoEvento);
-      
-      // Validar los datos obligatorios
-      if (!tipoSeleccionado || !formData.fecha || formData.invitados < 10 || !formData.nombre || !formData.email || !formData.telefono) {
-        setSubmitError('Por favor, completa todos los campos obligatorios. El número mínimo de invitados es 10.');
+      if (!formData.fecha || !formData.nombre || !formData.apellidos || !formData.email || !formData.telefono) {
+        setSubmitError('Por favor, completa todos los campos obligatorios.');
         toast.error('Faltan datos obligatorios');
+        return;
+      }
+
+      const fechaReserva = formData.fecha instanceof Date ? formData.fecha : new Date(formData.fecha);
+      
+      const reservaMasajeData = {
+        tipoMasaje: formData.masajePreseleccionado.id,
+        duracion: parseInt(formData.masajePreseleccionado.duracion),
+        fecha: fechaReserva.toISOString().split('T')[0],
+        hora: '10:00', // Hora por defecto
+        nombreContacto: formData.nombre,
+        apellidosContacto: formData.apellidos,
+        emailContacto: formData.email,
+        telefonoContacto: formData.telefono,
+        comentarios: formData.comentarios
+      };
+
+      // Verificar disponibilidad
+      const disponibilidadResponse = await checkMasajeAvailability({
+        fecha: reservaMasajeData.fecha,
+        hora: reservaMasajeData.hora,
+        duracion: reservaMasajeData.duracion
+      });
+
+      if (!disponibilidadResponse.disponible) {
+        setSubmitError('El horario seleccionado no está disponible.');
+        toast.error('Horario no disponible');
+        return;
+      }
+
+      // Crear la reserva
+      const response = await createMasajeReservation(reservaMasajeData);
+      setConfirmationData(response.data);
+      toast.success('Reserva de masaje creada con éxito');
+      setPaso(4);
+    } catch (error) {
+      console.error('Error al crear la reserva de masaje:', error);
+      setSubmitError(error.response?.data?.message || 'Error al crear la reserva');
+      toast.error('Error al crear la reserva');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      // Validar campos obligatorios
+      if (!formData.fecha || !formData.nombre || !formData.apellidos || !formData.email || !formData.telefono) {
+        setSubmitError('Por favor, completa todos los campos obligatorios.');
+        toast.error('Faltan datos obligatorios');
+        return;
+      }
+
+      // Validar tipo de evento
+      if (!formData.tipoEvento) {
+        setSubmitError('Por favor, seleccione un tipo de evento.');
+        toast.error('Seleccione un tipo de evento');
+        return;
+      }
+
+      // Validar número de invitados
+      if (formData.invitados < 10) {
+        setSubmitError('El número mínimo de invitados es 10.');
+        toast.error('Número de invitados inválido');
+        return;
+      }
+
+      const fechaEvento = formData.fecha instanceof Date ? formData.fecha : new Date(formData.fecha);
+      
+      // Obtener el tipo de evento seleccionado
+      const tipoEventoSeleccionado = tiposEvento.find(t => t.id === formData.tipoEvento);
+      if (!tipoEventoSeleccionado) {
+        setSubmitError('Tipo de evento no válido');
+        toast.error('Tipo de evento inválido');
+        return;
+      }
+
+      // Verificar disponibilidad
+      const disponibilidadData = {
+        fecha: fechaEvento.toISOString().split('T')[0],
+        horaInicio: "09:00",
+        horaFin: "21:00",
+        espacio: tipoEventoSeleccionado.espacio || 'jardin'
+      };
+
+      console.log('Verificando disponibilidad con datos:', disponibilidadData);
+      const disponibilidadResponse = await checkEventoAvailability(disponibilidadData);
+      console.log('Respuesta de verificación de disponibilidad:', disponibilidadResponse);
+
+      if (!disponibilidadResponse || !disponibilidadResponse.success || !disponibilidadResponse.disponible) {
+        const errorMsg = disponibilidadResponse?.mensaje || 'El espacio no está disponible para la fecha seleccionada.';
+        console.error('Error de disponibilidad:', errorMsg);
+        setSubmitError(errorMsg);
+        toast.error(errorMsg);
         setIsSubmitting(false);
         return;
       }
+
+      // Si llegamos aquí, el espacio está disponible
+      console.log('Espacio disponible, procediendo con la reserva');
+
+      // Crear objeto de reserva
+      const reservaData = {
+        tipoEvento: tipoEventoSeleccionado._id,
+        nombreEvento: `${formData.nombre} ${formData.apellidos}`,
+        fecha: fechaEvento.toISOString().split('T')[0],
+        horaInicio: "09:00",
+        horaFin: "21:00",
+        espacioSeleccionado: tipoEventoSeleccionado.espacio || 'jardin',
+        numInvitados: parseInt(formData.invitados),
+        nombreContacto: formData.nombre,
+        apellidosContacto: formData.apellidos,
+        emailContacto: formData.email,
+        telefonoContacto: formData.telefono,
+        comentarios: formData.comentarios || '',
+        serviciosAdicionales: formData.masajesSeleccionados.map(masaje => ({
+          tipo: 'masaje',
+          id: masaje.id,
+          titulo: masaje.titulo,
+          precio: masaje.precio
+        }))
+      };
+
+      console.log('Enviando reserva:', reservaData);
+      const response = await createEventoReservation(reservaData);
       
-      // Formatear fecha para el backend (si no es un objeto Date)
-      const fechaEvento = formData.fecha instanceof Date ? formData.fecha : new Date(formData.fecha);
-      
-      // Extraer nombre y apellidos del campo nombre completo
-      const nombreCompleto = formData.nombre.trim().split(' ');
-      const nombre = nombreCompleto[0] || '';
-      // Asegurar que apellidos no esté vacío
-      const apellidos = nombreCompleto.slice(1).join(' ') || nombre; // Usar nombre como apellido si no hay apellido
-      
-      try {
-        // Verificar disponibilidad primero
-        const disponibilidadData = {
-          fechaEvento: fechaEvento.toISOString().split('T')[0],
-          horaInicio: '12:00',
-          horaFin: '18:00',
-          espacioSeleccionado: 'Jardín Principal'
-        };
-        
-        const disponibilidadResponse = await checkEventoAvailability(disponibilidadData);
-        console.log('Respuesta de disponibilidad:', disponibilidadResponse);
-        
-        // Verificar si la respuesta es undefined o no tiene la estructura esperada
-        if (!disponibilidadResponse || !disponibilidadResponse.success || 
-            !disponibilidadResponse.disponible || !disponibilidadResponse.disponible.disponible) {
-          
-          // Extraer el mensaje de error de la respuesta correctamente
-          let mensaje = 'El espacio no está disponible para la fecha y hora seleccionadas';
-          
-          if (disponibilidadResponse && disponibilidadResponse.disponible && disponibilidadResponse.disponible.mensaje) {
-            mensaje = disponibilidadResponse.disponible.mensaje;
-          } else if (disponibilidadResponse && disponibilidadResponse.message) {
-            mensaje = disponibilidadResponse.message;
-          }
-            
-          setSubmitError(`No se puede reservar: ${mensaje}`);
-          toast.error('Horario no disponible');
-          setIsSubmitting(false);
-          
-          // Agregar la fecha a fechasOcupadas si no está ya
-          const fechaNueva = new Date(fechaEvento);
-          fechaNueva.setHours(0, 0, 0, 0);
-          
-          // Verificar si la fecha ya está en el array de fechas ocupadas
-          const yaExiste = fechasOcupadas.some(f => 
-            f.getDate() === fechaNueva.getDate() && 
-            f.getMonth() === fechaNueva.getMonth() && 
-            f.getFullYear() === fechaNueva.getFullYear()
-          );
-          
-          if (!yaExiste) {
-            setFechasOcupadas(prev => [...prev, fechaNueva]);
-          }
-          
-          return;
-        }
-        
-        // Si está disponible, crear la reserva
-        const reservaData = {
-          nombreEvento: `${tipoSeleccionado.titulo} - ${formData.nombre}`,
-          tipoEvento: tipoSeleccionado.titulo,
-          nombreContacto: nombre,
-          apellidosContacto: apellidos,
-          emailContacto: formData.email,
-          telefonoContacto: formData.telefono,
+      if (response && response.success) {
+        const confirmationData = {
+          ...response.data,
+          tipoEvento: tipoEventoSeleccionado.titulo,
           fecha: fechaEvento,
-          horaInicio: '12:00',
-          horaFin: '18:00',
-          espacioSeleccionado: 'Jardín Principal',
-          numeroInvitados: parseInt(formData.invitados),
-          peticionesEspeciales: formData.comentarios || '',
-          presupuestoEstimado: parseInt(tipoSeleccionado.precio.replace(/[^0-9]/g, '')) || 0
+          invitados: formData.invitados,
+          nombre: formData.nombre,
+          apellidos: formData.apellidos,
+          email: formData.email,
+          telefono: formData.telefono,
+          masajesSeleccionados: formData.masajesSeleccionados
         };
         
-        console.log('Enviando datos de reserva:', reservaData);
-        
-        // Enviar al backend
-        const response = await createEventoReservation(reservaData);
-        console.log('Respuesta del servidor:', response);
-        
-        // Guardar datos de confirmación
-        setConfirmationData(response.data);
-        
-        // Avanzar al paso de confirmación
+        setConfirmationData(confirmationData);
+        toast.success('Reserva creada con éxito');
         setPaso(4);
-        
-        // Esperar a que el componente se renderice antes de hacer scroll
-        setTimeout(() => {
-          const paso4Element = document.getElementById('paso-4');
-          if (paso4Element) {
-            paso4Element.scrollIntoView({ behavior: 'smooth' });
-          }
-        }, 100);
-        
-      } catch (apiError) {
-        console.error('Error en la API:', apiError);
-        let errorMessage = 'Error desconocido al procesar la solicitud';
-        
-        if (apiError.status) {
-          // Este es un error formateado por nuestro interceptor de apiClient
-          errorMessage = apiError.message || errorMessage;
-        } else if (apiError.response && apiError.response.data) {
-          // Error de respuesta de axios tradicional
-          errorMessage = apiError.response.data.message || errorMessage;
-        } else if (apiError.message) {
-          // Error general con mensaje
-          errorMessage = apiError.message;
-        }
-        
-        setSubmitError(`Error del servidor: ${errorMessage}`);
-        toast.error('Error al procesar la reserva. Contacte a soporte técnico.');
+      } else {
+        const errorMessage = response?.mensaje || response?.message || 'No se pudo procesar la reserva';
+        setSubmitError(errorMessage);
+        toast.error(errorMessage);
       }
     } catch (error) {
-      console.error('Error general al crear reserva:', error);
-      setSubmitError('Ha ocurrido un error al procesar su reserva. Por favor, inténtelo de nuevo o contacte con nosotros directamente.');
-      toast.error('Error al procesar la reserva: ' + (error.message || 'Error desconocido'));
+      console.error('Error al crear la reserva:', error);
+      const errorMessage = error.mensaje || error.message || 'Error al crear la reserva';
+      setSubmitError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -270,6 +344,356 @@ export default function ReservarPage() {
       date.getDate() === fechaOcupada.getDate() && 
       date.getMonth() === fechaOcupada.getMonth() && 
       date.getFullYear() === fechaOcupada.getFullYear()
+    );
+  };
+  
+  // Función para manejar la selección de masajes
+  const handleMasajeSelection = (masaje) => {
+    setFormData(prev => {
+      const masajesActuales = [...prev.masajesSeleccionados];
+      const index = masajesActuales.findIndex(m => m.id === masaje.id);
+      
+      if (index >= 0) {
+        masajesActuales.splice(index, 1);
+      } else {
+        masajesActuales.push(masaje);
+      }
+      
+      return {
+        ...prev,
+        masajesSeleccionados: masajesActuales
+      };
+    });
+  };
+  
+  const renderResumenMasajes = () => {
+    if (!formData.masajesSeleccionados || formData.masajesSeleccionados.length === 0) {
+      return null;
+    }
+
+    const totalMasajes = formData.masajesSeleccionados.reduce((total, masaje) => total + masaje.precio, 0);
+
+    return (
+      <div className="mt-6 p-4 bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30">
+        <h4 className="text-lg font-[var(--font-display)] mb-4 text-[var(--color-primary)]">
+          Servicios de Masaje Seleccionados
+        </h4>
+        <div className="space-y-3">
+          {formData.masajesSeleccionados.map((masaje, index) => (
+            <div key={index} className="flex justify-between items-start p-3 bg-white/50">
+              <div>
+                <p className="font-medium text-[var(--color-accent)]">{masaje.titulo}</p>
+                <p className="text-sm text-gray-600">Duración: {masaje.duracion}</p>
+              </div>
+              <p className="font-semibold">${masaje.precio}</p>
+            </div>
+          ))}
+          <div className="pt-3 border-t border-[var(--color-primary)]/20">
+            <div className="flex justify-between items-center">
+              <p className="font-medium">Total Servicios de Masaje:</p>
+              <p className="font-semibold text-[var(--color-primary)]">${totalMasajes}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Función para renderizar el masaje preseleccionado
+  const renderMasajePreseleccionado = () => {
+    if (!formData.masajePreseleccionado) return null;
+
+    return (
+      <div className="container-custom mb-8">
+        <div className="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 p-6 rounded-lg">
+          <h3 className="text-xl font-[var(--font-display)] text-[var(--color-primary)] mb-4">
+            Masaje Preseleccionado
+          </h3>
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="font-medium text-[var(--color-accent)]">{formData.masajePreseleccionado.titulo}</p>
+              <p className="text-sm text-gray-600">Duración: {formData.masajePreseleccionado.duracion}</p>
+            </div>
+            <p className="font-semibold">${formData.masajePreseleccionado.precio}</p>
+          </div>
+          <p className="mt-4 text-sm text-[var(--color-primary)]">
+            * Este masaje se agregará automáticamente como servicio adicional al seleccionar un tipo de evento
+          </p>
+        </div>
+      </div>
+    );
+  };
+  
+  // Modificar el renderizado para mostrar información específica de masajes
+  const renderPaso1 = () => {
+    if (loading) {
+      return (
+        <section className="container-custom mb-24">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto"></div>
+              <p className="mt-4 text-gray-600">Cargando tipos de eventos...</p>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    if (!tiposEvento || tiposEvento.length === 0) {
+      return (
+        <section className="container-custom mb-24">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <FaExclamationTriangle className="text-4xl text-yellow-500 mx-auto mb-4" />
+              <p className="text-gray-600">No hay tipos de eventos disponibles en este momento.</p>
+              <p className="text-sm text-gray-500 mt-2">Por favor, inténtelo más tarde.</p>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    return (
+      <section className="container-custom mb-24">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-4xl font-bold mb-4 text-[var(--color-primary)]">
+            Seleccione el tipo de evento
+          </h2>
+          <p className="text-xl max-w-3xl mx-auto text-gray-700">
+            Elija el tipo de evento que desea realizar en nuestras instalaciones
+          </p>
+        </motion.div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {tiposEvento.map((tipo) => (
+            <motion.div 
+              key={tipo._id || tipo.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ y: -5 }}
+              transition={{ duration: 0.3 }}
+              className={`relative bg-white shadow-xl cursor-pointer overflow-hidden h-[400px] border-2 transition-colors ${
+                formData.tipoEvento === tipo.id ? 'border-[var(--color-primary)]' : 'border-transparent'
+              }`}
+              onClick={() => handleSelectTipoEvento(tipo.id)}
+              onMouseEnter={() => setHoveredCard(tipo.id)}
+              onMouseLeave={() => setHoveredCard(null)}
+            >
+              <div className="relative h-full">
+                <Image
+                  src={tipo.imagen || '/images/placeholder/gallery1.svg'}
+                  alt={tipo.titulo}
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-black/20"></div>
+              </div>
+              
+              <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                <h3 className="text-2xl font-[var(--font-display)] mb-2 shadow-text-strong">{tipo.titulo}</h3>
+                <p className="text-white/90 text-sm mb-2 shadow-text line-clamp-2">{tipo.descripcion}</p>
+                
+                <div className="flex justify-between items-center pt-2 opacity-90">
+                  <div className="flex items-center space-x-1 text-xs">
+                    <FaUsers className="text-[var(--color-primary)]" />
+                    <span>{tipo.capacidad} invitados</span>
+                  </div>
+                  <div className="text-sm font-medium">{tipo.precio}</div>
+                </div>
+              </div>
+              
+              {formData.tipoEvento === tipo.id && (
+                <div className="absolute top-3 right-3 w-7 h-7 bg-[var(--color-primary)] rounded-full flex items-center justify-center">
+                  <FaCheck className="text-white text-sm" />
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      </section>
+    );
+  };
+  
+  // Modificar el renderizado del paso 2 para incluir la selección de masajes
+  const renderPaso2 = () => {
+    return (
+      <section id="paso-2" className={`container-custom mb-24 transition-opacity duration-500 ${paso >= 2 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={paso >= 2 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.8 }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-4xl font-bold mb-4 text-[var(--color-primary)]">
+            Seleccione la fecha y servicios adicionales
+          </h2>
+          <p className="text-xl max-w-3xl mx-auto text-gray-700">
+            Elija la fecha para su {formData.tipoEvento && (tiposEvento.find(t => t.id === formData.tipoEvento)?.titulo || 'evento').toLowerCase()} y los servicios que desee incluir
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Calendario y número de invitados (código existente) */}
+          <div className="bg-white p-8 shadow-xl">
+            <h3 className="text-2xl font-[var(--font-display)] text-[var(--color-accent)] mb-6 text-center">Seleccionar Fecha</h3>
+            
+            <div className="mb-8">
+              <div 
+                className="relative cursor-pointer border border-gray-300 p-4 rounded-lg flex items-center"
+                onClick={() => setIsCalendarOpen(!isCalendarOpen)}
+              >
+                <FaCalendarAlt className="text-[var(--color-primary)] mr-3" />
+                <input 
+                  type="text"
+                  className="w-full border-none focus:outline-none pointer-events-none bg-transparent"
+                  value={fechaSeleccionada ? fechaSeleccionada.toLocaleDateString() : 'Seleccionar fecha'}
+                  readOnly
+                />
+                <FaChevronRight className={`transition-transform duration-300 ${isCalendarOpen ? 'rotate-90' : ''}`} />
+              </div>
+              
+              <div className={`mt-2 transition-all duration-300 overflow-hidden ${isCalendarOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                <div className="p-4 border border-gray-200 rounded-lg shadow-md">
+                  <DatePicker
+                    selected={fechaSeleccionada}
+                    onChange={handleFechaChange}
+                    inline
+                    filterDate={esDisponible}
+                    minDate={new Date()}
+                    className="w-full"
+                  />
+                  
+                  <div className="flex justify-between items-center mt-4 text-xs text-gray-500 border-t border-gray-200 pt-4">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-[var(--color-primary)]/20 border border-[var(--color-primary)] mr-2"></div>
+                      <span>Disponible</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-gray-200 border border-gray-300 mr-2"></div>
+                      <span>No disponible</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between mb-6 text-sm">
+              <div className="flex items-center text-[var(--color-primary)]">
+                <FaRegClock className="mr-2" />
+                <span>Horario disponible: 9:00 AM - 11:00 PM</span>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Número de Invitados
+              </label>
+              <div className="relative">
+                <FaUsers className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-primary)]" />
+                <input 
+                  type="number"
+                  name="invitados"
+                  value={formData.invitados}
+                  onChange={handleInvitadosChange}
+                  min="10"
+                  max="300"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
+                />
+              </div>
+              <div className="mt-2 flex justify-between text-xs text-gray-500">
+                <span>Mínimo: 10 invitados</span>
+                <span>Máximo: 300 invitados</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Servicios adicionales y resumen */}
+          <div className="bg-[var(--color-accent)] text-white p-8 shadow-xl">
+            <h3 className="text-2xl font-[var(--font-display)] mb-6">Servicios de Masaje Disponibles</h3>
+            
+            <div className="space-y-4 mb-8">
+              {tiposMasaje.map((masaje) => (
+                <div
+                  key={masaje.id}
+                  className={`p-4 border transition-all cursor-pointer ${
+                    formData.masajesSeleccionados.some(m => m.id === masaje.id)
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/20'
+                      : 'border-white/20 hover:border-[var(--color-primary)]/50'
+                  }`}
+                  onClick={() => handleMasajeSelection(masaje)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-semibold">{masaje.titulo}</h4>
+                      <p className="text-sm text-white/80">{masaje.descripcion}</p>
+                      <p className="text-sm mt-2">Duración: {masaje.duracion}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">${masaje.precio}</p>
+                      {formData.masajesSeleccionados.some(m => m.id === masaje.id) && (
+                        <FaCheck className="text-[var(--color-primary)] mt-2" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Resumen del evento y servicios seleccionados */}
+            <div className="border-t border-white/20 pt-6 mt-6">
+              <h4 className="text-lg font-semibold mb-4">Resumen de su selección</h4>
+              
+              <div className="space-y-2">
+                <p>
+                  <span className="text-white/80">Evento:</span>{' '}
+                  {tiposEvento.find(t => t.id === formData.tipoEvento)?.titulo}
+                </p>
+                <p>
+                  <span className="text-white/80">Fecha:</span>{' '}
+                  {formData.fecha ? formData.fecha.toLocaleDateString() : 'No seleccionada'}
+                </p>
+                <p>
+                  <span className="text-white/80">Invitados:</span>{' '}
+                  {formData.invitados}
+                </p>
+                
+                {formData.masajesSeleccionados.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-white/80">Masajes seleccionados:</p>
+                    <ul className="list-disc list-inside mt-2">
+                      {formData.masajesSeleccionados.map(masaje => (
+                        <li key={masaje.id} className="text-sm">
+                          {masaje.titulo} - {masaje.duracion} - ${masaje.precio}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Total servicios de masaje: ${formData.masajesSeleccionados.reduce((total, masaje) => total + masaje.precio, 0)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={handleProceedToPaso3}
+              disabled={!fechaSeleccionada}
+              className={`w-full mt-8 py-4 px-6 text-center font-medium text-lg transition-all duration-300 ${
+                fechaSeleccionada 
+                  ? 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] cursor-pointer' 
+                  : 'bg-gray-500 cursor-not-allowed opacity-70'
+              }`}
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
+      </section>
     );
   };
   
@@ -399,7 +823,7 @@ export default function ReservarPage() {
           </div>
           
           {/* Subtítulo debajo del título principal */}
-          <div className="relative inline-block text-lg sm:text-xl md:text-2xl font-[var(--font-display)] font-medium mb-12 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto z-10 tracking-wide px-4 text-center perspective-[1000px]">
+          <div className="relative inline-block text-lg sm:text-xl md:text-2xl font-[var(--font-display)] mb-12 max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl mx-auto z-10 tracking-wide px-4 text-center perspective-[1000px]">
             <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">Haga realidad su evento soñado en nuestra exclusiva hacienda. Seleccione una fecha y deje que nuestro </span><span className="font-bold transform-style-preserve-3d" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "white", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(20px)", display: "inline-block"}}>equipo</span><span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]"> se encargue de todos los detalles.</span>
             <div className="absolute inset-0 filter blur-[6px] bg-white/15 -z-10" style={{ clipPath: 'inset(-10px -20px -25px -20px round 10px)' }}></div>
           </div>
@@ -411,7 +835,7 @@ export default function ReservarPage() {
           >
             <a 
               href="#paso-1" 
-              className="px-10 py-4 bg-[var(--color-primary)] text-white text-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors inline-block shadow-xl transform hover:scale-105 transition-transform duration-300"
+              className="px-10 py-4 bg-[var(--color-primary)] text-white text-lg font-medium hover:bg-[var(--color-primary-dark)] inline-block shadow-xl transform hover:scale-105 transition-transform duration-300"
             >
               Comenzar Reservación
             </a>
@@ -459,69 +883,20 @@ export default function ReservarPage() {
         </div>
         
         {/* Paso 1: Selección de tipo de evento */}
-        <section id="paso-1" className="container-custom mb-24">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-[var(--font-display)] text-[var(--color-accent)] mb-6">
-              Elija su <span className="text-[var(--color-primary)] font-semibold">Tipo de Evento</span>
-            </h2>
-            <p className="text-xl max-w-3xl mx-auto text-gray-700">
-              Seleccione el tipo de evento que desea realizar en nuestra hacienda
-            </p>
-          </motion.div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {tiposEvento.map((tipo, index) => (
-              <motion.div 
-                key={tipo.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1, duration: 0.6 }}
-                className={`relative overflow-hidden cursor-pointer group shadow-xl transition-all duration-500 ${
-                  formData.tipoEvento === tipo.id ? 'ring-2 ring-[var(--color-primary)] scale-105' : ''
-                } ${paso > 1 && formData.tipoEvento !== tipo.id ? 'opacity-50' : ''}`}
-                onMouseEnter={() => setHoveredCard(tipo.id)}
-                onMouseLeave={() => setHoveredCard(null)}
-                onClick={() => handleSelectTipoEvento(tipo.id)}
-              >
-                <div className="relative h-60">
-                  <Image 
-                    src={tipo.imagen}
-                    alt={tipo.titulo}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                    className={`object-cover transition-transform duration-700 ${
-                      hoveredCard === tipo.id ? 'scale-110' : 'scale-100'
-                    }`}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent"></div>
-                </div>
-                
-                <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                  <h3 className="text-2xl font-[var(--font-display)] mb-2 shadow-text-strong">{tipo.titulo}</h3>
-                  <p className="text-white/90 text-sm mb-2 shadow-text line-clamp-2">{tipo.descripcion}</p>
-                  
-                  <div className="flex justify-between items-center pt-2 opacity-90">
-                    <div className="flex items-center space-x-1 text-xs">
-                      <FaUsers className="text-[var(--color-primary)]" />
-                      <span>{tipo.capacidad} invitados</span>
-                    </div>
-                    <div className="text-sm font-medium">{tipo.precio}</div>
-                  </div>
-                </div>
-                
-                {formData.tipoEvento === tipo.id && (
-                  <div className="absolute top-3 right-3 w-7 h-7 bg-[var(--color-primary)] rounded-full flex items-center justify-center">
-                    <FaCheck className="text-white text-sm" />
-                  </div>
-                )}
-              </motion.div>
-            ))}
-          </div>
+        <section id="paso-1" className={`mb-16 ${paso !== 1 ? 'opacity-50' : ''}`}>
+          <h2 className="text-3xl font-[var(--font-display)] text-center mb-8">
+            Seleccione el tipo de evento
+          </h2>
+          <p className="text-center text-gray-600 mb-12">
+            Elija el tipo de evento que desea realizar en nuestras instalaciones
+            {formData.masajePreseleccionado && (
+              <span className="block mt-2 text-[var(--color-primary)]">
+                * Se incluirá el masaje seleccionado en su reserva
+              </span>
+            )}
+          </p>
+          {renderMasajePreseleccionado()}
+          {renderPaso1()}
         </section>
         
         {/* Paso 2: Selección de fecha y detalles */}
@@ -532,11 +907,11 @@ export default function ReservarPage() {
             transition={{ duration: 0.8 }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl md:text-5xl font-[var(--font-display)] text-[var(--color-accent)] mb-6">
-              Seleccione la <span className="text-[var(--color-primary)] font-semibold">Fecha y Detalles</span>
+            <h2 className="text-4xl font-bold mb-4 text-[var(--color-primary)]">
+              Seleccione la fecha y número de invitados
             </h2>
             <p className="text-xl max-w-3xl mx-auto text-gray-700">
-              Elija la fecha para su {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento).titulo.toLowerCase()} y el número de invitados
+              Elija la fecha para su {formData.tipoEvento && (tiposEvento.find(t => t.id === formData.tipoEvento)?.titulo || 'evento').toLowerCase()} y el número de invitados
             </p>
           </motion.div>
           
@@ -623,20 +998,20 @@ export default function ReservarPage() {
                 <div className="space-y-6">
                   <div className="p-4 border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10">
                     <h4 className="text-xl font-[var(--font-display)] mb-4">
-                      {tiposEvento.find(t => t.id === formData.tipoEvento).titulo}
+                      {tiposEvento.find(t => t.id === formData.tipoEvento)?.titulo || 'Evento'}
                     </h4>
                     <p className="text-white/80 mb-4">
-                      {tiposEvento.find(t => t.id === formData.tipoEvento).descripcion}
+                      {tiposEvento.find(t => t.id === formData.tipoEvento)?.descripcion || 'Descripción no disponible'}
                     </p>
                     
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-[var(--color-primary)]">Precio:</span>
-                        <p className="font-medium">{tiposEvento.find(t => t.id === formData.tipoEvento).precio}</p>
+                        <p className="font-medium">{tiposEvento.find(t => t.id === formData.tipoEvento)?.precio || 'A consultar'}</p>
                       </div>
                       <div>
                         <span className="text-[var(--color-primary)]">Capacidad:</span>
-                        <p className="font-medium">{tiposEvento.find(t => t.id === formData.tipoEvento).capacidad} invitados</p>
+                        <p className="font-medium">{tiposEvento.find(t => t.id === formData.tipoEvento)?.capacidad || '1'} invitados</p>
                       </div>
                     </div>
                   </div>
@@ -702,6 +1077,21 @@ export default function ReservarPage() {
                   id="nombre"
                   name="nombre"
                   value={formData.nombre}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-2">
+                  Apellidos
+                </label>
+                <input
+                  type="text"
+                  id="apellidos"
+                  name="apellidos"
+                  value={formData.apellidos}
                   onChange={handleInputChange}
                   required
                   className="w-full px-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
@@ -800,14 +1190,55 @@ export default function ReservarPage() {
               <div className="bg-gray-50 p-6 mb-8 text-left rounded-lg">
                 <h3 className="text-lg font-medium mb-4 text-[var(--color-primary)]">Detalles de su reserva:</h3>
                 
-                <div className="space-y-2 text-gray-700">
-                  <p><strong>Número de confirmación:</strong> {confirmationData?.numeroConfirmacion || 'Pendiente'}</p>
-                  <p><strong>Tipo de evento:</strong> {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento).titulo}</p>
-                  <p><strong>Fecha:</strong> {formData.fecha && formData.fecha.toLocaleDateString()}</p>
-                  <p><strong>Invitados:</strong> {formData.invitados}</p>
-                  <p><strong>Nombre:</strong> {formData.nombre}</p>
-                  <p><strong>Email:</strong> {formData.email}</p>
-                  <p><strong>Teléfono:</strong> {formData.telefono}</p>
+                <div className="space-y-6">
+                  {/* Detalles del Evento */}
+                  <div>
+                    <h4 className="font-medium text-[var(--color-accent)] mb-2">Información del Evento</h4>
+                    <div className="space-y-2 text-gray-700">
+                      <p><strong>Número de confirmación:</strong> {confirmationData?.numeroConfirmacion || 'Pendiente'}</p>
+                      <p><strong>Tipo de evento:</strong> {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento).titulo}</p>
+                      <p><strong>Fecha:</strong> {formData.fecha && formData.fecha.toLocaleDateString()}</p>
+                      <p><strong>Invitados:</strong> {formData.invitados}</p>
+                    </div>
+                  </div>
+
+                  {/* Información de Contacto */}
+                  <div>
+                    <h4 className="font-medium text-[var(--color-accent)] mb-2">Información de Contacto</h4>
+                    <div className="space-y-2 text-gray-700">
+                      <p><strong>Nombre:</strong> {formData.nombre}</p>
+                      <p><strong>Email:</strong> {formData.email}</p>
+                      <p><strong>Teléfono:</strong> {formData.telefono}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Servicios de Masaje */}
+                  {formData.masajesSeleccionados.length > 0 && (
+                    <div>
+                      <h4 className="font-medium text-[var(--color-accent)] mb-2">Servicios de Masaje</h4>
+                      <div className="space-y-3">
+                        {formData.masajesSeleccionados.map((masaje, index) => (
+                          <div key={index} className="p-3 bg-white rounded shadow-sm">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium">{masaje.titulo}</p>
+                                <p className="text-sm text-gray-600">Duración: {masaje.duracion}</p>
+                              </div>
+                              <p className="font-semibold">${masaje.precio}</p>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="pt-3 border-t">
+                          <div className="flex justify-between items-center">
+                            <p className="font-medium">Total Servicios de Masaje:</p>
+                            <p className="font-semibold text-[var(--color-primary)]">
+                              ${formData.masajesSeleccionados.reduce((total, masaje) => total + masaje.precio, 0)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               

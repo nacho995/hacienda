@@ -285,28 +285,36 @@ export default function AdminDashboard() {
   const handleAssignToMe = async (reserva) => {
     try {
       setIsRefreshing(true);
+      console.log('Asignando reserva:', reserva);
+      console.log('Usuario actual:', user);
+      
       let response;
       
       switch (reserva.tipo) {
         case 'evento':
-          response = await assignEventoReservation(reserva._id);
+          console.log('Asignando evento al usuario actual:', user._id);
+          response = await assignEventoReservation(reserva._id || reserva.id);
           break;
         case 'habitacion':
-          response = await assignHabitacionReservation(reserva._id);
+          console.log('Asignando habitación al usuario actual:', user._id);
+          response = await assignHabitacionReservation(reserva._id || reserva.id);
           break;
         case 'masaje':
-          response = await assignMasajeReservation(reserva._id);
+          console.log('Asignando masaje al usuario actual:', user._id);
+          response = await assignMasajeReservation(reserva._id || reserva.id);
           break;
         default:
           throw new Error('Tipo de reserva no válido');
       }
+      
+      console.log('Respuesta de asignación:', response);
 
-      if (response.success) {
+      if (response && (response.success || response.data)) {
         toast.success('Reserva asignada exitosamente');
         
         // Actualizar el estado localmente
         const updateReservation = (list) => list.map(r => {
-          if (r._id === reserva._id) {
+          if ((r._id === reserva._id) || (r.id === reserva.id)) {
             return { ...r, asignadoA: user._id };
           }
           return r;
@@ -321,7 +329,9 @@ export default function AdminDashboard() {
         await loadDashboardData(false);
         setShowAssignModal(false);
       } else {
-        toast.error(response.message || 'Error al asignar la reserva');
+        const errorMsg = response?.message || response?.mensaje || 'Error al asignar la reserva';
+        toast.error(errorMsg);
+        console.error('Error en respuesta del servidor:', errorMsg);
       }
     } catch (error) {
       console.error('Error al asignar reserva:', error);
@@ -335,29 +345,32 @@ export default function AdminDashboard() {
   const handleUnassign = async (reserva) => {
     try {
       setIsRefreshing(true);
+      console.log('Desasignando reserva:', reserva);
       let response;
       
       switch (reserva.tipo) {
         case 'evento':
-          response = await unassignEventoReservation(reserva._id);
+          response = await unassignEventoReservation(reserva._id || reserva.id);
           break;
         case 'habitacion':
-          response = await unassignHabitacionReservation(reserva._id);
+          response = await unassignHabitacionReservation(reserva._id || reserva.id);
           break;
         case 'masaje':
-          response = await unassignMasajeReservation(reserva._id);
+          response = await unassignMasajeReservation(reserva._id || reserva.id);
           break;
         default:
           throw new Error('Tipo de reserva no válido');
       }
+      
+      console.log('Respuesta de desasignación:', response);
 
-      if (response && response.success) {
+      if (response && (response.success || response.data)) {
         toast.success('Reserva desasignada exitosamente');
         
         // Actualizar el estado localmente
         const updateReservation = (list) => 
           list.map(r => {
-            if (r._id === reserva._id) {
+            if ((r._id === reserva._id) || (r.id === reserva.id)) {
               return { 
                 ...r, 
                 asignadoA: null,
@@ -375,7 +388,9 @@ export default function AdminDashboard() {
         // Recargar los datos para asegurar sincronización
         await loadDashboardData(false);
       } else {
-        toast.error(response?.message || 'Error al desasignar la reserva');
+        const errorMsg = response?.message || response?.mensaje || 'Error al desasignar la reserva';
+        toast.error(errorMsg);
+        console.error('Error en respuesta del servidor:', errorMsg);
       }
     } catch (error) {
       console.error('Error al desasignar reserva:', error);

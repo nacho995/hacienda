@@ -10,7 +10,12 @@ const userService = {
    */
   getAllUsers: async () => {
     try {
-      const response = await apiClient.get('/users');
+      // No se puede usar la cabecera Referer porque los navegadores no permiten modificarla manualmente
+      const response = await apiClient.get('/users', {
+        params: {
+          from_admin: true
+        }
+      });
       return response;
     } catch (error) {
       console.error('Error al obtener usuarios:', error);
@@ -25,7 +30,11 @@ const userService = {
    */
   getSingleUser: async (id) => {
     try {
-      const response = await apiClient.get(`/users/${id}`);
+      const response = await apiClient.get(`/users/${id}`, {
+        params: {
+          from_admin: true
+        }
+      });
       return response;
     } catch (error) {
       console.error(`Error obteniendo usuario ${id}:`, error);
@@ -70,7 +79,11 @@ const userService = {
    */
   deleteUser: async (id) => {
     try {
-      const response = await apiClient.delete(`/users/${id}`);
+      const response = await apiClient.delete(`/users/${id}`, {
+        params: {
+          from_admin: true
+        }
+      });
       return response;
     } catch (error) {
       console.error('Error al eliminar usuario:', error);
@@ -81,7 +94,10 @@ const userService = {
   // Crear un nuevo usuario
   createUser: async (userData) => {
     try {
-      const response = await apiClient.post('/users', userData);
+      const response = await apiClient.post('/users', {
+        ...userData,
+        from_admin: true
+      });
       return response;
     } catch (error) {
       console.error('Error al crear usuario:', error);
@@ -106,7 +122,11 @@ const userService = {
   // Obtener un usuario específico
   getUser: async (userId) => {
     try {
-      const response = await apiClient.get(`/users/${userId}`);
+      const response = await apiClient.get(`/users/${userId}`, {
+        params: {
+          from_admin: true
+        }
+      });
       return response;
     } catch (error) {
       console.error('Error al obtener usuario:', error);

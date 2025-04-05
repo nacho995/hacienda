@@ -103,7 +103,28 @@ export function AuthProvider({ children }) {
       }
     };
 
-    checkSession();
+    // Agregar un timeout para evitar carga infinita si el backend no responde
+    const sessionTimeout = setTimeout(() => {
+      console.log('Timeout de verificación de sesión alcanzado');
+      setLoading(false);
+      setAuthError({
+        status: 408, // Request Timeout
+        message: 'Tiempo de espera agotado al verificar la sesión'
+      });
+      // Limpiar datos de sesión por seguridad
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      setUser(null);
+    }, 8000); // 8 segundos máximo para verificar la sesión
+    
+    checkSession().finally(() => {
+      clearTimeout(sessionTimeout);
+    });
+
+    // Limpiar timeout si el componente se desmonta
+    return () => {
+      clearTimeout(sessionTimeout);
+    };
   }, []);
 
   // Funciones de autenticación
@@ -112,33 +133,43 @@ export function AuthProvider({ children }) {
       setLoading(true);
       setAuthError(null);
       
+      console.log('Iniciando login para:', email);
+      
       // Limpiar cualquier sesión anterior
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       
       const response = await authService.login(email, password);
+      console.log('Respuesta completa de login:', response);
       
-      if (response.success) {
+      if (response && response.success) {
+        console.log('Login exitoso, datos de usuario:', response.data);
         setUser(response.data);
-        // Guardar el token en localStorage
+        
+        // Guardar el token en localStorage (si no lo hizo authService)
         if (response.token) {
+          console.log('Guardando token en localStorage desde AuthContext');
           localStorage.setItem('authToken', response.token);
         }
+        
         return { success: true };
       } else {
+        const errorMsg = response?.message || 'Credenciales inválidas';
+        console.error('Error en login:', errorMsg);
         setAuthError({
           status: 401,
-          message: response.message || 'Credenciales inválidas'
+          message: errorMsg
         });
-        return { success: false, message: response.message || 'Credenciales inválidas' };
+        return { success: false, message: errorMsg };
       }
     } catch (error) {
       console.error('Error en login:', error);
+      const errorMsg = error?.message || 'Error al iniciar sesión';
       setAuthError({
-        status: error.status || 500,
-        message: error.message || 'Error al iniciar sesión'
+        status: error?.status || 500,
+        message: errorMsg
       });
-      return { success: false, message: 'Error al iniciar sesión' };
+      return { success: false, message: errorMsg };
     } finally {
       setLoading(false);
     }

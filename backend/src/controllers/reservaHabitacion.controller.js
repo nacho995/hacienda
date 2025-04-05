@@ -353,27 +353,27 @@ exports.comprobarDisponibilidadHabitacion = async (req, res) => {
   }
 };
 
-// @desc    Asignar reserva de habitación a un usuario
-// @route   PUT /api/reservas/habitaciones/:id/asignar
-// @access  Private/Admin
+/**
+ * @desc    Asignar reserva de habitación a un usuario
+ * @route   PUT /api/reservas/habitaciones/:id/asignar
+ * @access  Private/Admin
+ */
 exports.asignarReservaHabitacion = async (req, res) => {
   try {
     const { usuarioId } = req.body;
     
-    if (!usuarioId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Por favor, proporcione el ID del usuario al que se asignará la reserva'
-      });
-    }
+    // Si no se proporciona un ID de usuario, asignar al usuario actual
+    const idUsuarioAsignar = usuarioId || req.user.id;
     
-    // Verificar que el usuario existe
-    const usuario = await User.findById(usuarioId);
-    if (!usuario) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
+    // Verificar que el usuario existe (solo si se proporcionó un ID específico)
+    if (usuarioId) {
+      const usuario = await User.findById(usuarioId);
+      if (!usuario) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
     }
     
     // Buscar la reserva y actualizarla
@@ -387,15 +387,16 @@ exports.asignarReservaHabitacion = async (req, res) => {
     }
     
     // Actualizar asignación
-    reserva.asignadoA = usuarioId;
+    reserva.asignadoA = idUsuarioAsignar;
     await reserva.save();
     
     res.status(200).json({
       success: true,
-      data: reserva
+      data: reserva,
+      message: 'Reserva asignada exitosamente'
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error al asignar la reserva de habitación:', error);
     res.status(500).json({
       success: false,
       message: 'Error al asignar la reserva de habitación',

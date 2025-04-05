@@ -1,187 +1,90 @@
 const mongoose = require('mongoose');
+const baseReservaSchema = require('./BaseReserva');
 
-const ReservaHabitacionSchema = new mongoose.Schema({
-  usuario: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  asignadoA: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
-  },
-  nombre: {
-    type: String,
-    required: [true, 'Por favor, proporcione su nombre']
-  },
-  apellidos: {
-    type: String,
-    required: [true, 'Por favor, proporcione sus apellidos']
-  },
-  email: {
-    type: String,
-    required: [true, 'Por favor, proporcione un email'],
-    match: [
-      /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
-      'Por favor, proporcione un email válido'
-    ]
-  },
-  telefono: {
-    type: String,
-    required: [true, 'Por favor, proporcione un número de teléfono']
-  },
-  tipoHabitacion: {
-    type: String,
-    required: [true, 'Por favor, seleccione un tipo de habitación'],
-    enum: ['Individual', 'Doble', 'Suite', 'Premium']
-  },
+// Crear un nuevo esquema que extiende del base
+const reservaHabitacionSchema = baseReservaSchema.clone().add({
   habitacion: {
-    type: String,
-    required: [true, 'Por favor, seleccione una habitación específica']
-  },
-  numeroHabitaciones: {
-    type: Number,
-    required: [true, 'Por favor, indique el número de habitaciones'],
-    min: [1, 'Debe reservar al menos una habitación']
-  },
-  fechaEntrada: {
-    type: Date,
-    required: [true, 'Por favor, seleccione una fecha de entrada']
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Habitacion',
+    required: [true, 'Por favor, seleccione una habitación']
   },
   fechaSalida: {
     type: Date,
     required: [true, 'Por favor, seleccione una fecha de salida']
   },
-  numeroAdultos: {
+  numHuespedes: {
     type: Number,
-    required: [true, 'Por favor, indique el número de adultos'],
-    min: [1, 'Debe haber al menos un adulto']
+    required: [true, 'Por favor, indique el número de huéspedes'],
+    min: [1, 'Debe haber al menos un huésped']
   },
-  numeroNinos: {
-    type: Number,
-    default: 0
-  },
-  serviciosAdicionales: {
-    desayuno: {
-      type: Boolean,
-      default: false
-    },
-    parking: {
-      type: Boolean,
-      default: false
-    },
-    mascotas: {
-      type: Boolean,
-      default: false
-    },
-    spa: {
-      type: Boolean,
-      default: false
-    }
-  },
-  peticionesEspeciales: {
-    type: String,
-    maxlength: [500, 'Las peticiones especiales no pueden tener más de 500 caracteres']
-  },
-  precioTotal: {
-    type: Number,
-    required: true
-  },
-  estado: {
-    type: String,
-    enum: ['pendiente', 'confirmada', 'cancelada', 'completada'],
-    default: 'pendiente'
-  },
-  metodoPago: {
-    type: String,
-    enum: ['tarjeta', 'transferencia', 'efectivo', 'pendiente'],
-    default: 'pendiente'
-  },
-  numeroConfirmacion: {
-    type: String,
-    unique: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  reservaEvento: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ReservaEvento',
+    required: [true, 'La reserva de habitación debe estar asociada a un evento']
   }
 });
 
 // Método estático para comprobar disponibilidad
-ReservaHabitacionSchema.statics.comprobarDisponibilidad = async function(
-  tipoHabitacion,
-  fechaEntrada,
-  fechaSalida,
-  numeroHabitaciones = 1
-) {
-  const habitacionesDisponibles = {
-    'Individual': 10,
-    'Doble': 15,
-    'Suite': 5,
-    'Premium': 3
-  };
+reservaHabitacionSchema.statics.comprobarDisponibilidad = async function(habitacionId, fechaEntrada, fechaSalida) {
+  // Validar fechas
+  const { fechaInicioObj: fechaEntradaObj, fechaFinObj: fechaSalidaObj } = 
+    this.validarRangoFechas(fechaEntrada, fechaSalida);
 
-  const fechaInicioObj = new Date(fechaEntrada);
-  const fechaFinObj = new Date(fechaSalida);
-
-  // Comprobar que la fecha de entrada es anterior a la de salida
-  if (fechaInicioObj >= fechaFinObj) {
-    return {
-      disponible: false,
-      mensaje: 'La fecha de entrada debe ser anterior a la fecha de salida'
-    };
-  }
-
-  // Buscar reservas que se solapen con las fechas proporcionadas
-  const reservas = await this.find({
-    tipoHabitacion,
-    estado: { $ne: 'cancelada' },
+  // Buscar reservas que se solapen
+  const reservasExistentes = await this.find({
+    habitacion: habitacionId,
+    estadoReserva: { $nin: ['cancelada'] },
     $or: [
       {
-        fechaEntrada: { $lte: fechaSalida },
-        fechaSalida: { $gte: fechaEntrada }
+        fecha: { $lte: fechaSalidaObj },
+        fechaSalida: { $gt: fechaEntradaObj }
+      },
+      {
+        fecha: { $lt: fechaSalidaObj },
+        fechaSalida: { $gte: fechaEntradaObj }
       }
     ]
   });
 
-  // Calcular habitaciones totales reservadas para ese periodo
-  let habitacionesReservadas = 0;
-  reservas.forEach(reserva => {
-    habitacionesReservadas += reserva.numeroHabitaciones;
-  });
+  // Para habitaciones, consideramos que hay solapamiento si existe alguna reserva
+  // que se superponga con las fechas solicitadas
+  return reservasExistentes.length === 0;
+};
 
-  // Verificar disponibilidad
-  const habitacionesRestantes = habitacionesDisponibles[tipoHabitacion] - habitacionesReservadas;
+// Método para obtener disponibilidad por rango de fechas
+reservaHabitacionSchema.statics.obtenerDisponibilidadPorRango = async function(habitacionId, fechaInicio, fechaFin) {
+  const { fechaInicioObj, fechaFinObj } = this.validarRangoFechas(fechaInicio, fechaFin);
   
+  const reservas = await this.find({
+    habitacion: habitacionId,
+    estadoReserva: { $nin: ['cancelada'] },
+    $or: [
+      {
+        fecha: { $lte: fechaFinObj },
+        fechaSalida: { $gt: fechaInicioObj }
+      }
+    ]
+  }).sort('fecha');
+
+  const diasOcupados = [];
+  let fechaActual = new Date(fechaInicioObj);
+
+  while (fechaActual <= fechaFinObj) {
+    for (const reserva of reservas) {
+      if (fechaActual >= reserva.fecha && fechaActual < reserva.fechaSalida) {
+        diasOcupados.push(new Date(fechaActual));
+        break;
+      }
+    }
+    fechaActual.setDate(fechaActual.getDate() + 1);
+  }
+
   return {
-    disponible: habitacionesRestantes >= numeroHabitaciones,
-    habitacionesRestantes,
-    mensaje: habitacionesRestantes >= numeroHabitaciones
-      ? `Hay ${habitacionesRestantes} habitaciones disponibles`
-      : `Lo sentimos, solo quedan ${habitacionesRestantes} habitaciones disponibles`
+    disponible: diasOcupados.length === 0,
+    diasOcupados
   };
 };
 
-// Generar número de confirmación antes de guardar
-ReservaHabitacionSchema.pre('save', async function(next) {
-  if (!this.numeroConfirmacion) {
-    // Formato: H + año + mes + día + 4 dígitos aleatorios
-    const fecha = new Date();
-    const ano = fecha.getFullYear().toString().slice(-2);
-    const mes = (fecha.getMonth() + 1).toString().padStart(2, '0');
-    const dia = fecha.getDate().toString().padStart(2, '0');
-    const aleatorio = Math.floor(1000 + Math.random() * 9000);
-    
-    this.numeroConfirmacion = `H${ano}${mes}${dia}${aleatorio}`;
-  }
-  
-  this.updatedAt = Date.now();
-  next();
-});
-
-module.exports = mongoose.model('ReservaHabitacion', ReservaHabitacionSchema); 
+// Crear y exportar el modelo
+const ReservaHabitacion = mongoose.model('ReservaHabitacion', reservaHabitacionSchema);
+module.exports = ReservaHabitacion; 

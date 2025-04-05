@@ -138,10 +138,14 @@ export const getEventoReservation = async (id) => {
 
 export const createEventoReservation = async (reservationData) => {
   try {
+    console.log('Enviando datos para crear reserva:', reservationData);
     const response = await apiClient.post('/reservas/eventos', reservationData);
-    return response.data;
+    console.log('Respuesta de creación de reserva:', response);
+    
+    // La respuesta ya fue procesada por el interceptor
+    return response;
   } catch (error) {
-    console.error('Error al crear reserva de evento:', error.message || error);
+    console.error('Error al crear reserva de evento:', error);
     throw error;
   }
 };
@@ -158,10 +162,14 @@ export const updateEventoReservation = async (id, data) => {
 
 export const assignEventoReservation = async (id, usuarioId) => {
   try {
-    const response = await apiClient.put(`/reservas/eventos/${id}/asignar`, { usuarioId });
+    console.log('Asignando evento:', id, 'a usuario:', usuarioId);
+    // Si no se proporciona un ID de usuario, enviar un objeto vacío para que el backend use el usuario actual
+    const data = usuarioId ? { usuarioId } : {};
+    const response = await apiClient.put(`/reservas/eventos/${id}/asignar`, data);
+    console.log('Respuesta de asignación de evento:', response);
     return response;
   } catch (error) {
-    console.error(`Error al asignar reserva de evento ${id}:`, error.message || error);
+    console.error(`Error al asignar reserva de evento ${id}:`, error);
     throw error;
   }
 };
@@ -169,12 +177,134 @@ export const assignEventoReservation = async (id, usuarioId) => {
 // Servicios para reservas de masajes
 export const getMasajeReservations = async () => {
   try {
-    const response = await apiClient.get('/reservas/masajes');
-    return response;
+    // Obtener tanto las reservas de masajes independientes como las asociadas a eventos
+    console.log('Solicitando reservas de masajes al servidor...');
+    
+    const [masajesResponse, eventosResponse] = await Promise.all([
+      apiClient.get('/reservas/masajes'),
+      apiClient.get('/reservas/eventos')
+    ]);
+    
+    console.log('Respuesta de masajes independientes:', masajesResponse);
+    console.log('Respuesta de eventos con masajes:', eventosResponse);
+
+    let masajes = [];
+
+    // Procesar masajes independientes
+    if (masajesResponse) {
+      console.log('Procesando masajes independientes...');
+      // La respuesta ya viene transformada por el interceptor
+      const masajesData = Array.isArray(masajesResponse) 
+        ? masajesResponse 
+        : (masajesResponse.data && Array.isArray(masajesResponse.data) 
+            ? masajesResponse.data 
+            : []);
+      
+      console.log('Datos de masajes independientes:', masajesData);
+      
+      masajes = masajesData.map(m => ({
+        ...m,
+        _id: m._id || m.id, // Asegurar que siempre hay un ID
+        tipo: 'masaje',
+        tipoDisplay: 'Masaje',
+        fechaDisplay: new Date(m.fecha).toLocaleDateString(),
+        tituloDisplay: m.tipoMasaje || 'Masaje',
+        clienteDisplay: `${m.nombreContacto || ''} ${m.apellidosContacto || ''}`,
+        detallesUrl: `/admin/reservaciones/masaje/${m._id || m.id}`,
+        estado: m.estadoReserva || 'Pendiente',
+        esIndependiente: true,
+        // Campos necesarios para el renderizado en la vista de masajes
+        nombreEvento: m.tipoMasaje || 'Servicio de Masaje',
+        numeroConfirmacion: m._id || m.id,
+        fecha: m.fecha || new Date().toISOString(),
+        horaInicio: m.hora || '10:00',
+        horaFin: m.hora ? calcularHoraFin(m.hora, m.duracion || 60) : '11:00',
+        nombreContacto: m.nombreContacto || 'Cliente',
+        apellidosContacto: m.apellidosContacto || '',
+        emailContacto: m.emailContacto || '',
+        telefonoContacto: m.telefonoContacto || '',
+        precio: m.precio || 0
+      }));
+    }
+
+    // Procesar masajes asociados a eventos
+    if (eventosResponse) {
+      console.log('Procesando masajes asociados a eventos...');
+      // La respuesta ya viene transformada por el interceptor
+      const eventosData = Array.isArray(eventosResponse) 
+        ? eventosResponse 
+        : (eventosResponse.data && Array.isArray(eventosResponse.data) 
+            ? eventosResponse.data 
+            : []);
+      
+      console.log('Datos de eventos:', eventosData);
+      console.log('Eventos con masajes:', eventosData.filter(e => e.serviciosAdicionales?.masajes?.length > 0).length);
+      
+      // Crear un ID único para cada masaje basado en el ID del evento y un contador
+      let masajeCounter = 0;
+      
+      const masajesDeEventos = eventosData
+        .filter(e => e.serviciosAdicionales?.masajes?.length > 0)
+        .flatMap(evento => {
+          console.log('Evento con masajes:', evento.nombreEvento, 'Masajes:', evento.serviciosAdicionales.masajes);
+          return evento.serviciosAdicionales.masajes.map(masaje => {
+            masajeCounter++;
+            return {
+              ...masaje,
+              _id: `${evento._id || evento.id}_masaje_${masajeCounter}`,
+              tipo: 'masaje',
+              tipoDisplay: 'Masaje (Evento)',
+              fechaDisplay: new Date(evento.fecha).toLocaleDateString(),
+              tituloDisplay: masaje.titulo || masaje.tipo || 'Masaje',
+              clienteDisplay: `${evento.nombreContacto || ''} ${evento.apellidosContacto || ''}`,
+              detallesUrl: `/admin/reservaciones/evento/${evento._id || evento.id}`,
+              estado: evento.estadoReserva || evento.estado || 'Pendiente',
+              eventoAsociado: {
+                id: evento._id || evento.id,
+                nombre: evento.nombreEvento,
+                tipo: evento.tipoEvento,
+                fecha: evento.fecha,
+                numeroInvitados: evento.numInvitados
+              },
+              esIndependiente: false,
+              // Campos necesarios para el renderizado en la vista de masajes
+              nombreEvento: masaje.titulo || masaje.tipo || 'Masaje en Evento',
+              numeroConfirmacion: `${evento._id || evento.id}_masaje_${masajeCounter}`,
+              fecha: evento.fecha || new Date().toISOString(),
+              horaInicio: '10:00', // Valor predeterminado
+              horaFin: '11:00',    // Valor predeterminado
+              nombreContacto: evento.nombreContacto || 'Cliente',
+              apellidosContacto: evento.apellidosContacto || '',
+              emailContacto: evento.emailContacto || '',
+              telefonoContacto: evento.telefonoContacto || '',
+              precio: masaje.precio || 0
+            };
+          });
+        });
+
+      masajes = [...masajes, ...masajesDeEventos];
+    }
+
+    // Ordenar por fecha
+    masajes.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    
+    console.log('Total de masajes procesados:', masajes.length);
+    return { data: masajes };
   } catch (error) {
-    console.error('Error al obtener reservas de masajes:', error.message || error);
-    return { success: false, data: [], message: error.message };
+    console.error('Error al obtener reservas de masajes:', error);
+    throw error;
   }
+};
+
+// Función auxiliar para calcular la hora de fin basada en la duración
+const calcularHoraFin = (horaInicio, duracionMinutos) => {
+  const [horas, minutos] = horaInicio.split(':').map(Number);
+  const fechaHora = new Date();
+  fechaHora.setHours(horas, minutos);
+  fechaHora.setMinutes(fechaHora.getMinutes() + duracionMinutos);
+  
+  const horaFin = `${String(fechaHora.getHours()).padStart(2, '0')}:${String(fechaHora.getMinutes()).padStart(2, '0')}`;
+  return horaFin;
 };
 
 export const getMasajeReservation = async (id) => {
@@ -209,10 +339,14 @@ export const updateMasajeReservation = async (id, data) => {
 
 export const assignMasajeReservation = async (id, usuarioId) => {
   try {
-    const response = await apiClient.put(`/reservas/masajes/${id}/asignar`, { usuarioId });
+    console.log('Asignando masaje:', id, 'a usuario:', usuarioId);
+    // Si no se proporciona un ID de usuario, se asigna al usuario actual
+    const data = usuarioId ? { usuarioId } : {};
+    const response = await apiClient.put(`/reservas/masajes/${id}/asignar`, data);
+    console.log('Respuesta de asignación de masaje:', response);
     return response;
   } catch (error) {
-    console.error(`Error al asignar reserva de masaje ${id}:`, error.message || error);
+    console.error(`Error al asignar reserva de masaje ${id}:`, error);
     throw error;
   }
 };
@@ -264,36 +398,43 @@ export const checkHabitacionAvailability = async (availabilityData) => {
 
 export const checkEventoAvailability = async (availabilityData) => {
   try {
-    const response = await apiClient.post('/reservas/eventos/disponibilidad', availabilityData);
+    console.log('Enviando datos de disponibilidad:', availabilityData);
     
-    if (response && response.success === true) {
-      if (!response.disponible) {
-        return {
-          success: false,
-          disponible: {
-            disponible: false,
-            mensaje: 'Formato de respuesta incorrecto del servidor'
-          }
-        };
-      }
-      return response;
-    } 
-    
-    return {
-      success: false,
-      disponible: {
-        disponible: false,
-        mensaje: response?.message || 'Error al verificar disponibilidad'
-      }
+    // Asegurarnos de que los campos esperados estén correctamente definidos
+    const dataToSend = {
+      fecha: availabilityData.fecha,
+      espacio: availabilityData.espacio,
+      horaInicio: availabilityData.horaInicio || "09:00",
+      horaFin: availabilityData.horaFin || "21:00"
     };
+    
+    console.log('Datos formateados a enviar:', dataToSend);
+    
+    // La respuesta ya viene procesada por el interceptor de apiClient
+    const response = await apiClient.post('/reservas/eventos/disponibilidad', dataToSend);
+    
+    console.log('Respuesta del servidor (después del interceptor):', response);
+    
+    // Si la respuesta es directamente undefined o null
+    if (!response) {
+      console.error('No se recibió respuesta del servidor');
+      return {
+        success: false,
+        disponible: false,
+        mensaje: 'No se recibió respuesta del servidor'
+      };
+    }
+    
+    // Ya que la estructura de la respuesta debe ser uniforme desde el backend,
+    // podemos retornarla directamente
+    return response;
+
   } catch (error) {
-    console.error('Error al verificar disponibilidad de evento:', error.message || error);
+    console.error('Error al verificar disponibilidad:', error);
     return {
       success: false,
-      disponible: {
-        disponible: false,
-        mensaje: error.message || 'Error de conexión al verificar disponibilidad'
-      }
+      disponible: false,
+      mensaje: error.message || 'Error al verificar disponibilidad'
     };
   }
 };
@@ -318,14 +459,8 @@ export const getAllReservationsForDashboard = async () => {
     ]);
 
     let habitaciones = [];
-    if (habitacionesResponse && habitacionesResponse.data) {
-      const habitacionesData = Array.isArray(habitacionesResponse.data) 
-        ? habitacionesResponse.data 
-        : (habitacionesResponse.data.data && Array.isArray(habitacionesResponse.data.data) 
-          ? habitacionesResponse.data.data 
-          : []);
-          
-      habitaciones = habitacionesData.map(h => ({
+    if (habitacionesResponse?.success && Array.isArray(habitacionesResponse.data)) {
+      habitaciones = habitacionesResponse.data.map(h => ({
         ...h,
         tipo: 'habitacion',
         tipoDisplay: 'Habitación',
@@ -333,19 +468,13 @@ export const getAllReservationsForDashboard = async () => {
         tituloDisplay: `${h.tipoHabitacion} - ${h.numeroHabitaciones || 1} hab.`,
         clienteDisplay: `${h.nombre} ${h.apellidos || ''}`,
         detallesUrl: `/admin/reservaciones/habitacion/${h._id}`,
-        estado: h.estadoReserva || 'Pendiente'
+        estado: h.estado || 'Pendiente'
       }));
     }
 
     let eventos = [];
-    if (eventosResponse && eventosResponse.data) {
-      const eventosData = Array.isArray(eventosResponse.data) 
-        ? eventosResponse.data 
-        : (eventosResponse.data.data && Array.isArray(eventosResponse.data.data) 
-          ? eventosResponse.data.data 
-          : []);
-          
-      eventos = eventosData.map(e => ({
+    if (eventosResponse?.success && Array.isArray(eventosResponse.data)) {
+      eventos = eventosResponse.data.map(e => ({
         ...e,
         tipo: 'evento',
         tipoDisplay: 'Evento',
@@ -353,27 +482,21 @@ export const getAllReservationsForDashboard = async () => {
         tituloDisplay: `${e.tipoEvento} - ${e.nombreEvento || ''}`,
         clienteDisplay: `${e.nombreContacto} ${e.apellidosContacto || ''}`,
         detallesUrl: `/admin/reservaciones/evento/${e._id}`,
-        estado: e.estado || 'Pendiente'
+        estado: e.estadoReserva || 'Pendiente'
       }));
     }
 
     let masajes = [];
-    if (masajesResponse && masajesResponse.data) {
-      const masajesData = Array.isArray(masajesResponse.data) 
-        ? masajesResponse.data 
-        : (masajesResponse.data.data && Array.isArray(masajesResponse.data.data) 
-          ? masajesResponse.data.data 
-          : []);
-          
-      masajes = masajesData.map(m => ({
+    if (masajesResponse?.success && Array.isArray(masajesResponse.data)) {
+      masajes = masajesResponse.data.map(m => ({
         ...m,
         tipo: 'masaje',
         tipoDisplay: 'Masaje',
         fechaDisplay: new Date(m.fecha).toLocaleDateString(),
         tituloDisplay: `${m.tipoMasaje || 'Masaje'}`,
-        clienteDisplay: `${m.nombre} ${m.apellidos || ''}`,
+        clienteDisplay: `${m.nombreContacto} ${m.apellidosContacto || ''}`,
         detallesUrl: `/admin/reservaciones/masaje/${m._id}`,
-        estado: m.estado || 'Pendiente'
+        estado: m.estadoReserva || 'Pendiente'
       }));
     }
 
@@ -385,6 +508,7 @@ export const getAllReservationsForDashboard = async () => {
       return new Date(fechaB) - new Date(fechaA);
     });
 
+    console.log('Todas las reservas:', todasLasReservas);
     return todasLasReservas;
   } catch (error) {
     console.error('Error al obtener reservas para el dashboard:', error.message || error);
@@ -517,20 +641,24 @@ export const unassignHabitacionReservation = async (id) => {
 
 export const unassignEventoReservation = async (id) => {
   try {
+    console.log('Desasignando evento:', id);
     const response = await apiClient.put(`/reservas/eventos/${id}/desasignar`);
+    console.log('Respuesta de desasignación de evento:', response);
     return response;
   } catch (error) {
-    console.error(`Error al desasignar reserva de evento ${id}:`, error.message || error);
+    console.error(`Error al desasignar reserva de evento ${id}:`, error);
     throw error;
   }
 };
 
 export const unassignMasajeReservation = async (id) => {
   try {
+    console.log('Desasignando masaje:', id);
     const response = await apiClient.put(`/reservas/masajes/${id}/desasignar`);
+    console.log('Respuesta de desasignación de masaje:', response);
     return response;
   } catch (error) {
-    console.error(`Error al desasignar reserva de masaje ${id}:`, error.message || error);
+    console.error(`Error al desasignar reserva de masaje ${id}:`, error);
     throw error;
   }
 }; 

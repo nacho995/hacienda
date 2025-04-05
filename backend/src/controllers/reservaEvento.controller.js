@@ -1,5 +1,7 @@
 const ReservaEvento = require('../models/ReservaEvento');
 const User = require('../models/User');
+const TipoEvento = require('../models/TipoEvento');
+const ReservaMasaje = require('../models/ReservaMasaje');
 const mongoose = require('mongoose');
 const sendEmail = require('../utils/email');
 const confirmacionTemplate = require('../emails/confirmacionReserva');
@@ -23,40 +25,40 @@ exports.crearReservaEvento = async (req, res) => {
       horaInicio,
       horaFin,
       espacioSeleccionado,
-      numeroInvitados,
+      numInvitados,
       peticionesEspeciales,
       presupuestoEstimado
     } = req.body;
     
     // Validar campos obligatorios
-    if (!nombreEvento || !tipoEvento || !nombreContacto || !apellidosContacto || !emailContacto || !telefonoContacto || !fecha || !numeroInvitados) {
+    if (!nombreEvento || !tipoEvento || !nombreContacto || !apellidosContacto || !emailContacto || !telefonoContacto || !fecha || !numInvitados) {
       return res.status(400).json({
         success: false,
         message: 'Por favor, proporcione todos los campos obligatorios'
       });
     }
 
-    // Validar que tipoEvento tenga un valor válido
-    const tiposEventoValidos = ['Boda', 'Cumpleaños', 'Corporativo', 'Aniversario', 'Otro'];
-    if (!tiposEventoValidos.includes(tipoEvento)) {
+    // Buscar el tipo de evento por su ID
+    const tipoEventoDoc = await TipoEvento.findById(tipoEvento);
+    if (!tipoEventoDoc) {
       return res.status(400).json({
         success: false,
-        message: `El tipo de evento '${tipoEvento}' no es válido. Tipos válidos: ${tiposEventoValidos.join(', ')}`
+        message: `El tipo de evento no es válido`
       });
     }
 
     // Verificar disponibilidad para la fecha y hora solicitadas
     const disponible = await ReservaEvento.comprobarDisponibilidad(
-      espacioSeleccionado || 'Jardín Principal',
       fecha,
+      espacioSeleccionado || 'jardin',
       horaInicio || '12:00',
       horaFin || '18:00'
     );
 
-    if (!disponible.disponible) {
+    if (!disponible) {
       return res.status(400).json({
         success: false,
-        message: disponible.mensaje || 'El espacio no está disponible para la fecha y hora solicitadas'
+        message: 'El espacio no está disponible para la fecha y hora solicitadas'
       });
     }
     
@@ -65,7 +67,7 @@ exports.crearReservaEvento = async (req, res) => {
       // Solo incluir usuario si está autenticado
       ...(req.user && req.user.id ? { usuario: req.user.id } : {}),
       nombreEvento,
-      tipoEvento,
+      tipoEvento: tipoEventoDoc._id, // Usar el ObjectId del tipo de evento
       nombreContacto,
       apellidosContacto,
       emailContacto,
@@ -73,34 +75,25 @@ exports.crearReservaEvento = async (req, res) => {
       fecha,
       horaInicio: horaInicio || '12:00',
       horaFin: horaFin || '18:00',
-      espacioSeleccionado: espacioSeleccionado || 'Jardín Principal',
-      numeroInvitados,
+      espacioSeleccionado: espacioSeleccionado || 'jardin',
+      numInvitados: parseInt(numInvitados),
       peticionesEspeciales: peticionesEspeciales || '',
-      presupuestoEstimado: presupuestoEstimado || 0
+      presupuestoEstimado: presupuestoEstimado || 0,
+      serviciosAdicionales: {
+        masajes: req.body.serviciosAdicionales?.masajes?.map(masaje => ({
+          tipo: masaje.titulo,
+          duracion: parseInt(masaje.duracion),
+          precio: parseFloat(masaje.precio)
+        })) || []
+      }
     };
 
-    // Calcular precio base según el tipo de evento
-    let precioBase = 0;
-    switch (tipoEvento) {
-      case 'Boda':
-        precioBase = 50000; // Precio base para bodas
-        break;
-      case 'Cumpleaños':
-        precioBase = 25000; // Precio base para cumpleaños
-        break;
-      case 'Corporativo':
-        precioBase = 35000; // Precio base para eventos corporativos
-        break;
-      case 'Aniversario':
-        precioBase = 30000; // Precio base para aniversarios
-        break;
-      default:
-        precioBase = 20000; // Precio base para otros eventos
-    }
+    // Calcular precio base usando el precio del tipo de evento
+    const precioBase = parseFloat(tipoEventoDoc.precio) || 0;
 
     // Calcular precio por invitado
     const precioPorInvitado = 350; // $350 por invitado
-    const precioInvitados = numeroInvitados * precioPorInvitado;
+    const precioInvitados = parseInt(numInvitados) * precioPorInvitado;
 
     // Calcular precio por servicios adicionales
     let precioServicios = 0;
@@ -115,16 +108,16 @@ exports.crearReservaEvento = async (req, res) => {
     let precioMenu = 0;
     switch (req.body.menuSeleccionado) {
       case 'Premium':
-        precioMenu = numeroInvitados * 800;
+        precioMenu = parseInt(numInvitados) * 800;
         break;
       case 'Deluxe':
-        precioMenu = numeroInvitados * 1200;
+        precioMenu = parseInt(numInvitados) * 1200;
         break;
       case 'Personalizado':
-        precioMenu = numeroInvitados * 1500;
+        precioMenu = parseInt(numInvitados) * 1500;
         break;
       case 'Básico':
-        precioMenu = numeroInvitados * 500;
+        precioMenu = parseInt(numInvitados) * 500;
         break;
     }
 
@@ -134,8 +127,27 @@ exports.crearReservaEvento = async (req, res) => {
     // Actualizar el objeto de reserva con el precio total
     reservaData.precio = precioTotal;
 
-    // Crear la reserva
-    const reserva = await ReservaEvento.create(reservaData);
+    // Crear la reserva del evento
+    const reservaEvento = await ReservaEvento.create(reservaData);
+
+    // Si hay masajes seleccionados, crear las reservas de masajes
+    if (req.body.serviciosAdicionales?.masajes?.length > 0) {
+      const masajesPromises = req.body.serviciosAdicionales.masajes.map(masaje => {
+        return ReservaMasaje.create({
+          tipoMasaje: masaje.id,
+          duracion: parseInt(masaje.duracion),
+          hora: horaInicio, // Por defecto usamos la hora de inicio del evento
+          fecha: fecha,
+          nombreContacto: nombreContacto,
+          apellidosContacto: apellidosContacto,
+          emailContacto: emailContacto,
+          telefonoContacto: telefonoContacto,
+          reservaEvento: reservaEvento._id
+        });
+      });
+
+      await Promise.all(masajesPromises);
+    }
 
     // Enviar email de confirmación al usuario
     try {
@@ -150,10 +162,10 @@ exports.crearReservaEvento = async (req, res) => {
           fecha: fecha,
           horaInicio: horaInicio || '12:00',
           horaFin: horaFin || '18:00',
-          espacioSeleccionado: espacioSeleccionado || 'Jardín Principal',
-          numeroInvitados: numeroInvitados,
-          numeroConfirmacion: reserva.numeroConfirmacion,
-          estadoReserva: reserva.estadoReserva,
+          espacioSeleccionado: espacioSeleccionado || 'jardin',
+          numeroInvitados: numInvitados,
+          numeroConfirmacion: reservaEvento.numeroConfirmacion,
+          estadoReserva: reservaEvento.estadoReserva,
           presupuestoEstimado: presupuestoEstimado || 0
         })
       });
@@ -169,7 +181,7 @@ exports.crearReservaEvento = async (req, res) => {
           telefono: telefonoContacto,
           fecha: fecha,
           hora: `${horaInicio || '12:00'} - ${horaFin || '18:00'}`,
-          detalles: `Tipo de evento: ${tipoEvento}, Número de personas: ${numeroInvitados}`,
+          detalles: `Tipo de evento: ${tipoEvento}, Número de personas: ${numInvitados}`,
           comentarios: peticionesEspeciales || 'No hay comentarios adicionales'
         })
       });
@@ -180,7 +192,7 @@ exports.crearReservaEvento = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: reserva
+      data: reservaEvento
     });
   } catch (error) {
     console.error('Error al crear reserva de evento:', error);
@@ -332,17 +344,17 @@ exports.actualizarReservaEvento = async (req, res) => {
       const espacio = req.body.espacioSeleccionado || reserva.espacioSeleccionado;
       
       const disponible = await ReservaEvento.comprobarDisponibilidad(
-        espacio,
         fecha,
+        espacio,
         horaInicio,
         horaFin,
         reserva._id // Excluir la reserva actual de la verificación
       );
       
-      if (!disponible.disponible) {
+      if (!disponible) {
         return res.status(400).json({
           success: false,
-          message: disponible.mensaje || 'El espacio no está disponible para la fecha y hora solicitadas'
+          message: 'El espacio no está disponible para la fecha y hora solicitadas'
         });
       }
     }
@@ -420,37 +432,49 @@ exports.eliminarReservaEvento = async (req, res) => {
  */
 exports.comprobarDisponibilidadEvento = async (req, res) => {
   try {
-    const { fechaEvento, horaInicio, horaFin, espacioSeleccionado } = req.body;
+    const { fecha, espacio, horaInicio, horaFin } = req.body;
     
     // Verificar todos los parámetros requeridos
-    if (!fechaEvento || !horaInicio || !horaFin) {
+    if (!fecha || !horaInicio || !horaFin) {
       return res.status(400).json({
         success: false,
-        message: 'Por favor proporciona fecha, hora de inicio y hora de fin'
+        disponible: false,
+        mensaje: 'Por favor proporciona fecha, hora de inicio y hora de fin'
       });
     }
     
     // Si no se especifica el espacio, usar el predeterminado
-    const espacio = espacioSeleccionado || 'Jardín Principal';
+    const espacioSeleccionado = espacio || 'jardin';
+    
+    // Verificar que el espacio sea válido
+    if (!['salon', 'jardin', 'terraza'].includes(espacioSeleccionado)) {
+      return res.status(400).json({
+        success: false,
+        disponible: false,
+        mensaje: 'Espacio no válido. Los espacios válidos son: salon, jardin, terraza'
+      });
+    }
     
     // Verificar disponibilidad
     const disponible = await ReservaEvento.comprobarDisponibilidad(
-      espacio,
-      fechaEvento,
+      fecha,
+      espacioSeleccionado,
       horaInicio,
       horaFin
     );
     
+    // Enviar respuesta con formato consistente
     res.status(200).json({
       success: true,
-      disponible
+      disponible: disponible,
+      mensaje: disponible ? 'El espacio está disponible' : 'El espacio no está disponible para la fecha y hora seleccionadas'
     });
   } catch (error) {
     console.error('Error al comprobar disponibilidad de evento:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al comprobar disponibilidad',
-      error: error.message
+      disponible: false,
+      mensaje: error.message || 'Error al comprobar disponibilidad'
     });
   }
 };
@@ -464,20 +488,18 @@ exports.asignarReservaEvento = async (req, res) => {
   try {
     const { usuarioId } = req.body;
     
-    if (!usuarioId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Por favor, proporcione el ID del usuario al que se asignará la reserva'
-      });
-    }
+    // Si no se proporciona un ID de usuario, asignar al usuario actual
+    const idUsuarioAsignar = usuarioId || req.user.id;
     
-    // Verificar que el usuario existe
-    const usuario = await User.findById(usuarioId);
-    if (!usuario) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
+    // Verificar que el usuario existe (solo si se proporcionó un ID específico)
+    if (usuarioId) {
+      const usuario = await User.findById(usuarioId);
+      if (!usuario) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
     }
     
     // Buscar la reserva y actualizarla
@@ -491,12 +513,13 @@ exports.asignarReservaEvento = async (req, res) => {
     }
     
     // Actualizar asignación
-    reserva.asignadoA = usuarioId;
+    reserva.asignadoA = idUsuarioAsignar;
     await reserva.save();
     
     res.status(200).json({
       success: true,
-      data: reserva
+      data: reserva,
+      message: 'Reserva asignada exitosamente'
     });
   } catch (error) {
     console.error('Error al asignar la reserva de evento:', error);

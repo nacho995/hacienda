@@ -97,12 +97,13 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     }
     
     // Validar formulario
-    const { nombre, email, telefono, fechaEntrada, fechaSalida, habitacion } = {
+    const { nombre, apellidos, email, telefono, fechaEntrada, fechaSalida, habitacion } = {
       ...formData,
       [name]: value
     };
     setIsFormValid(
       nombre !== '' && 
+      apellidos !== '' &&
       email !== '' && 
       telefono !== '' && 
       fechaEntrada !== '' && 
@@ -141,7 +142,7 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
       const reservaData = {
         usuario: user?._id || null, // El usuario puede estar autenticado o no
         nombre: formData.nombre,
-        apellidos: formData.nombre.split(' ').slice(1).join(' ') || "No proporcionado", // Aproximación simple
+        apellidos: formData.apellidos,
         email: formData.email,
         telefono: formData.telefono,
         tipoHabitacion: selectedRoomData.tipo,
@@ -169,6 +170,7 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
       setTimeout(() => {
         setFormData({
           nombre: '',
+          apellidos: '',
           email: '',
           telefono: '',
           fechaEntrada: '',
@@ -297,17 +299,32 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-1">
+                    <div>
                       <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">
-                        Nombre completo
+                        Nombre
                       </label>
-                      <input 
-                        type="text" 
-                        id="nombre" 
+                      <input
+                        type="text"
+                        id="nombre"
                         name="nombre"
                         value={formData.nombre}
                         onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700">
+                        Apellidos
+                      </label>
+                      <input
+                        type="text"
+                        id="apellidos"
+                        name="apellidos"
+                        value={formData.apellidos}
+                        onChange={handleInputChange}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                         required
                       />
                     </div>

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -84,7 +85,17 @@ UserSchema.methods.getSignedJwtToken = function() {
 
 // Comprobar si la contraseña coincide
 UserSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  console.log('Ejecutando matchPassword para usuario:', this.email);
+  console.log('Contraseña ingresada (no mostrada) comparando con hash almacenado:', this.password ? this.password.substring(0, 15) + '...' : 'No disponible');
+  
+  try {
+    const isMatch = await bcrypt.compare(enteredPassword, this.password);
+    console.log('Resultado de comparación bcrypt:', isMatch);
+    return isMatch;
+  } catch (error) {
+    console.error('Error en matchPassword:', error);
+    return false;
+  }
 };
 
 // Generar token de confirmación

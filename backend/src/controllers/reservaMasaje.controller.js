@@ -347,21 +347,8 @@ exports.asignarReservaMasaje = async (req, res) => {
   try {
     const { usuarioId } = req.body;
     
-    if (!usuarioId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Por favor, proporcione el ID del usuario al que se asignará la reserva'
-      });
-    }
-    
-    // Verificar que el usuario existe
-    const usuario = await User.findById(usuarioId);
-    if (!usuario) {
-      return res.status(404).json({
-        success: false,
-        message: 'Usuario no encontrado'
-      });
-    }
+    // Si no se proporciona un ID de usuario, asignar al usuario actual
+    const idUsuarioAsignar = usuarioId || req.user.id;
     
     // Buscar la reserva y actualizarla
     const reserva = await ReservaMasaje.findById(req.params.id);
@@ -374,18 +361,90 @@ exports.asignarReservaMasaje = async (req, res) => {
     }
     
     // Actualizar asignación
-    reserva.asignadoA = usuarioId;
+    reserva.asignadoA = idUsuarioAsignar;
     await reserva.save();
     
     res.status(200).json({
       success: true,
-      data: reserva
+      data: reserva,
+      message: 'Reserva de masaje asignada exitosamente'
     });
   } catch (error) {
     console.error('Error al asignar la reserva de masaje:', error);
     res.status(500).json({
       success: false,
       message: 'Error al asignar la reserva de masaje',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Desasignar una reserva de masaje
+ * @route   PUT /api/reservas/masajes/:id/desasignar
+ * @access  Private/Admin
+ */
+exports.desasignarReservaMasaje = async (req, res) => {
+  try {
+    // Buscar la reserva
+    const reserva = await ReservaMasaje.findById(req.params.id);
+    
+    if (!reserva) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontró la reserva con ese ID'
+      });
+    }
+    
+    // Verificar que el usuario actual es quien tiene asignada la reserva o es admin
+    if (reserva.asignadoA && reserva.asignadoA.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para desasignar esta reserva'
+      });
+    }
+    
+    // Desasignar reserva
+    reserva.asignadoA = null;
+    await reserva.save();
+    
+    res.status(200).json({
+      success: true,
+      data: reserva,
+      message: 'Reserva de masaje desasignada exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al desasignar la reserva de masaje:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al desasignar la reserva de masaje',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Obtener todas las reservas de masajes (para admin)
+ * @route   GET /api/reservas/eventos/masajes/lista
+ * @access  Private/Admin
+ */
+exports.getMasajeReservations = async (req, res) => {
+  try {
+    const reservas = await ReservaMasaje.find()
+      .populate('usuario', 'nombre apellidos email telefono')
+      .populate('asignadoA', 'nombre apellidos email')
+      .sort({ fechaMasaje: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: reservas,
+      message: 'Reservas de masajes obtenidas exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener reservas de masajes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las reservas de masajes',
       error: error.message
     });
   }

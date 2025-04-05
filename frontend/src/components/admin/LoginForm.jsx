@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { FaEnvelope, FaLock, FaExclamationTriangle } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function AdminLoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,8 +26,22 @@ export default function AdminLoginForm() {
       setErrorMessage(null);
       setIsSubmitting(true);
       
+      console.log('Enviando datos de login:', {
+        email: data.email,
+        // No mostrar la contraseña completa por seguridad
+        passwordLength: data.password?.length || 0
+      });
+      
+      // Usuarios disponibles en la DB según el reporte del usuario
+      console.log('Usuarios disponibles según el reporte:');
+      console.log('- admin@desarrollo.com / admin123');
+      console.log('- admin@hacienda.com / admin123');
+      console.log('- admin@sistema.com / admin123 (sabemos que este funciona)');
+      
       // Llamar a la función de login del contexto de autenticación
       const result = await login(data.email, data.password);
+      
+      console.log('Resultado del intento de login:', result);
       
       if (result.success) {
         toast.success('Sesión iniciada correctamente');
@@ -129,6 +144,15 @@ export default function AdminLoginForm() {
       >
         {isSubmitting ? 'Iniciando sesión...' : 'Iniciar Sesión'}
       </button>
+
+      <div className="text-center mt-4">
+        <Link 
+          href="/recuperar-contrasena"
+          className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors text-sm"
+        >
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </div>
     </form>
   );
 } 

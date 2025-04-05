@@ -8,6 +8,42 @@ const emailConfirmacionReserva = (datos) => {
   else if (datosSeguro.tipoEvento) tipoReserva = 'evento';
   else if (datosSeguro.tipoMasaje) tipoReserva = 'masaje';
   
+  const formatearPrecio = (precio) => {
+    return typeof precio === 'number' ? `€${precio.toFixed(2)}` : precio;
+  };
+
+  const obtenerDetallesMasajes = () => {
+    if (!datosSeguro.serviciosAdicionales?.masajes?.length) return '';
+
+    const masajes = datosSeguro.serviciosAdicionales.masajes;
+    const totalMasajes = masajes.reduce((total, masaje) => total + (masaje.precio || 0), 0);
+
+    return `
+      <div class="masajes-section" style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+        <h4 style="color: #2c5282; margin-bottom: 15px;">Servicios de Masaje Incluidos</h4>
+        <div style="margin-bottom: 15px;">
+          ${masajes.map(masaje => `
+            <div style="padding: 10px; background-color: white; margin-bottom: 10px; border-radius: 3px;">
+              <div style="display: flex; justify-content: space-between;">
+                <div>
+                  <p style="font-weight: 600; color: #2d3748;">${masaje.tipo}</p>
+                  <p style="color: #718096; font-size: 14px;">Duración: ${masaje.duracion}</p>
+                </div>
+                <p style="font-weight: 600;">${formatearPrecio(masaje.precio)}</p>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 10px;">
+          <div style="display: flex; justify-content: space-between;">
+            <p style="font-weight: 500;">Total Servicios de Masaje:</p>
+            <p style="font-weight: 600; color: #2c5282;">${formatearPrecio(totalMasajes)}</p>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+  
   const obtenerDetallesReserva = () => {
     switch(tipoReserva) {
       case 'habitacion':
@@ -21,44 +57,48 @@ const emailConfirmacionReserva = (datos) => {
             <p><strong>Fecha de Salida:</strong> ${datosSeguro.fechaSalida ? new Date(datosSeguro.fechaSalida).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
             <p><strong>Adultos:</strong> ${datosSeguro.numeroAdultos || '0'}</p>
             <p><strong>Niños:</strong> ${datosSeguro.numeroNinos || '0'}</p>
-            <p><strong>Precio Total:</strong> €${datosSeguro.precioTotal || '0'}</p>
+            <p><strong>Precio Total:</strong> ${formatearPrecio(datosSeguro.precioTotal)}</p>
             <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
           </div>
         `;
-      
       case 'evento':
         return `
           <div class="details">
             <h3>Detalles de su Reserva de Evento</h3>
             <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
-            <p><strong>Nombre del Evento:</strong> ${datosSeguro.nombreEvento || 'No especificado'}</p>
             <p><strong>Tipo de Evento:</strong> ${datosSeguro.tipoEvento || 'No especificado'}</p>
+            <p><strong>Nombre del Evento:</strong> ${datosSeguro.nombreEvento || 'No especificado'}</p>
             <p><strong>Fecha:</strong> ${datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
-            <p><strong>Horario:</strong> De ${datosSeguro.horaInicio || '00:00'} a ${datosSeguro.horaFin || '00:00'}</p>
-            <p><strong>Espacio:</strong> ${datosSeguro.espacioSeleccionado || 'No especificado'}</p>
+            <p><strong>Hora de Inicio:</strong> ${datosSeguro.horaInicio || 'No especificada'}</p>
+            <p><strong>Hora de Fin:</strong> ${datosSeguro.horaFin || 'No especificada'}</p>
             <p><strong>Número de Invitados:</strong> ${datosSeguro.numeroInvitados || '0'}</p>
-            <p><strong>Presupuesto Estimado:</strong> €${datosSeguro.presupuestoEstimado || '0'}</p>
-            <p><strong>Estado:</strong> ${datosSeguro.estadoReserva === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
+            <p><strong>Espacio Seleccionado:</strong> ${datosSeguro.espacioSeleccionado || 'No especificado'}</p>
+            <p><strong>Presupuesto Estimado:</strong> ${formatearPrecio(datosSeguro.presupuestoEstimado)}</p>
+            <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
           </div>
+          ${obtenerDetallesMasajes()}
         `;
-      
       case 'masaje':
         return `
           <div class="details">
             <h3>Detalles de su Reserva de Masaje</h3>
             <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
             <p><strong>Tipo de Masaje:</strong> ${datosSeguro.tipoMasaje || 'No especificado'}</p>
-            <p><strong>Duración:</strong> ${datosSeguro.duracion || '0'} minutos</p>
             <p><strong>Fecha:</strong> ${datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
-            <p><strong>Hora:</strong> ${datosSeguro.hora || '00:00'}</p>
-            <p><strong>Número de Personas:</strong> ${datosSeguro.numeroPersonas || '1'}</p>
-            <p><strong>Precio Total:</strong> €${datosSeguro.precioTotal || '0'}</p>
+            <p><strong>Hora:</strong> ${datosSeguro.hora || 'No especificada'}</p>
+            <p><strong>Duración:</strong> ${datosSeguro.duracion || '0'} minutos</p>
+            <p><strong>Precio:</strong> ${formatearPrecio(datosSeguro.precio)}</p>
             <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
           </div>
         `;
-      
       default:
-        return '<p>Detalles de su reserva no disponibles.</p>';
+        return `
+          <div class="details">
+            <h3>Detalles de su Reserva</h3>
+            <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
+            <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
+          </div>
+        `;
     }
   };
   
