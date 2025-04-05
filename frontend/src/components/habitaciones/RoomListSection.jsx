@@ -4,65 +4,15 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { FaCheck, FaBed, FaUserFriends } from 'react-icons/fa';
 import { checkHabitacionAvailability } from '@/services/reservationService';
-
-// Datos de habitaciones disponibles en la hacienda
-const HABITACIONES = [
-  {
-    id: 1,
-    nombre: "Suite Hacienda Principal",
-    descripcion: "Elegante suite con vistas panorámicas a los jardines, decorada con muebles de época y detalles auténticos de hacienda mexicana.",
-    precio: 3500,
-    capacidad: 2,
-    tamaño: "45m²",
-    tipoHabitacion: "Premium",
-    camas: "1 King Size",
-    imagen: "/images/placeholder/room1.jpg.svg",
-    amenidades: ["WiFi gratis", "Desayuno incluido", "TV de pantalla plana", "Aire acondicionado", "Baño privado de lujo", "Artículos de tocador premium"]
-  },
-  {
-    id: 2,
-    nombre: "Suite Tradición Colonial",
-    descripcion: "Espaciosa habitación con elementos coloniales, techos altos y una combinación perfecta entre la comodidad moderna y el encanto histórico.",
-    precio: 2800,
-    capacidad: 2,
-    tamaño: "38m²",
-    tipoHabitacion: "Suite",
-    camas: "1 Queen Size",
-    imagen: "/images/placeholder/room2.jpg.svg",
-    amenidades: ["WiFi gratis", "Desayuno incluido", "TV de pantalla plana", "Aire acondicionado", "Baño privado", "Terraza privada"]
-  },
-  {
-    id: 3,
-    nombre: "Habitación Deluxe Jardín",
-    descripcion: "Acogedora habitación con acceso directo a los jardines, ideal para disfrutar de la tranquilidad y belleza natural de la hacienda.",
-    precio: 2400,
-    capacidad: 2,
-    tamaño: "32m²",
-    tipoHabitacion: "Doble",
-    camas: "2 Individuales o 1 King Size",
-    imagen: "/images/placeholder/room3.jpg.svg",
-    amenidades: ["WiFi gratis", "Desayuno incluido", "TV de pantalla plana", "Aire acondicionado", "Baño privado", "Vista al jardín"]
-  },
-  {
-    id: 4,
-    nombre: "Suite Familiar Hacienda",
-    descripcion: "Amplia suite diseñada para familias, con espacios separados y todas las comodidades para una estancia inolvidable en un entorno histórico.",
-    precio: 4200,
-    capacidad: 4,
-    tamaño: "60m²",
-    tipoHabitacion: "Premium",
-    camas: "1 King Size + 2 Individuales",
-    imagen: "/images/placeholder/room4.jpg.svg",
-    amenidades: ["WiFi gratis", "Desayuno incluido", "TV de pantalla plana", "Aire acondicionado", "2 Baños privados", "Sala de estar", "Minibar"]
-  }
-];
-
-export { HABITACIONES };
+import { obtenerHabitaciones } from '@/services/habitacionService';
 
 export default function RoomListSection({ onSelectRoom }) {
+  const [habitaciones, setHabitaciones] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState({});
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Inicializar las fechas por defecto al cargar el componente
   useEffect(() => {
@@ -77,6 +27,23 @@ export default function RoomListSection({ onSelectRoom }) {
     setFechaFin(formatDate(afterTomorrow));
   }, []);
 
+  // Cargar habitaciones desde la API
+  useEffect(() => {
+    const cargarHabitaciones = async () => {
+      try {
+        const data = await obtenerHabitaciones();
+        setHabitaciones(data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error al cargar habitaciones:', error);
+        setError('No se pudieron cargar las habitaciones');
+        setLoading(false);
+      }
+    };
+
+    cargarHabitaciones();
+  }, []);
+
   // Formatear fecha para input date
   const formatDate = (date) => {
     return date.toISOString().split('T')[0];
@@ -85,38 +52,64 @@ export default function RoomListSection({ onSelectRoom }) {
   // Verificar disponibilidad cuando cambien las fechas
   useEffect(() => {
     const verificarDisponibilidad = async () => {
-      if (fechaInicio && fechaFin) {
-        try {
-          // Comprobar disponibilidad para cada tipo de habitación
-          const tipos = ['Individual', 'Doble', 'Suite', 'Premium'];
-          const resultados = {};
-          
-          for (const tipo of tipos) {
-            const resultado = await checkHabitacionAvailability({
-              tipoHabitacion: tipo,
-              fechaEntrada: fechaInicio,
-              fechaSalida: fechaFin,
-              numeroHabitaciones: 1
-            });
-            
-            resultados[tipo] = resultado;
-          }
-          
-          setDisponibilidad(resultados);
-        } catch (error) {
-          console.error('Error al verificar disponibilidad:', error);
-        }
+      if (!fechaInicio || !fechaFin || habitaciones.length === 0) return;
+
+      try {
+        const disponibilidadPromises = habitaciones.map(habitacion =>
+          checkHabitacionAvailability({
+            tipoHabitacion: habitacion.tipo,
+            fechaEntrada: fechaInicio,
+            fechaSalida: fechaFin,
+            numeroHabitaciones: 1
+          })
+        );
+
+        const resultados = await Promise.all(disponibilidadPromises);
+        const nuevaDisponibilidad = {};
+        
+        habitaciones.forEach((habitacion, index) => {
+          const resultado = resultados[index];
+          nuevaDisponibilidad[habitacion.tipo] = {
+            disponible: resultado.disponible,
+            mensaje: resultado.mensaje,
+            habitacionesRestantes: resultado.habitacionesRestantes
+          };
+        });
+
+        setDisponibilidad(nuevaDisponibilidad);
+      } catch (error) {
+        console.error('Error al verificar disponibilidad:', error);
+        setError('Error al verificar disponibilidad de habitaciones');
       }
     };
-    
-    verificarDisponibilidad();
-  }, [fechaInicio, fechaFin]);
 
-  // Verificar si una habitación está disponible según su tipo
-  const estaDisponible = (tipoHabitacion) => {
-    if (!disponibilidad[tipoHabitacion]) return true; // Mientras carga, mostrar como disponible
-    return disponibilidad[tipoHabitacion].disponible;
+    verificarDisponibilidad();
+  }, [fechaInicio, fechaFin, habitaciones]);
+
+  const estaDisponible = (tipo) => {
+    return disponibilidad[tipo]?.disponible !== false;
   };
+
+  const getMensajeDisponibilidad = (tipo) => {
+    return disponibilidad[tipo]?.mensaje || 'Verificando disponibilidad...';
+  };
+
+  if (loading) return (
+    <div className="container-custom py-16">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto"></div>
+        <p className="mt-4 text-gray-600">Cargando habitaciones...</p>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="container-custom py-16">
+      <div className="text-center text-red-600">
+        <p>{error}</p>
+      </div>
+    </div>
+  );
 
   return (
     <section id="habitaciones" className="py-16">
@@ -160,19 +153,19 @@ export default function RoomListSection({ onSelectRoom }) {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          {HABITACIONES.map((habitacion) => {
-            const disponible = estaDisponible(habitacion.tipoHabitacion);
+          {habitaciones.map((habitacion) => {
+            const disponible = estaDisponible(habitacion.tipo);
             
             return (
               <div 
-                key={habitacion.id} 
+                key={habitacion._id} 
                 className={`border-decorative group transition-shadow duration-300 ${disponible ? 'hover:shadow-lg' : 'opacity-75'}`}
               >
                 <div className="relative h-80 overflow-hidden">
                   {!disponible && (
                     <div className="absolute inset-0 bg-black/50 z-20 flex items-center justify-center">
                       <div className="bg-red-600 text-white py-2 px-4 transform rotate-45 text-center font-bold w-full text-lg">
-                        No disponible
+                        {getMensajeDisponibilidad(habitacion.tipo)}
                       </div>
                     </div>
                   )}

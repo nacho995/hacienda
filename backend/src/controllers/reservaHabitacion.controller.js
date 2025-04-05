@@ -5,11 +5,16 @@ const emailConfirmacionReserva = require('../emails/confirmacionReserva');
 
 // @desc    Crear una nueva reserva de habitación
 // @route   POST /api/reservas/habitaciones
-// @access  Private
+// @access  Public
 exports.crearReservaHabitacion = async (req, res) => {
   try {
-    // Agregar usuario a req.body
-    req.body.usuario = req.user.id;
+    // Si hay un usuario autenticado, usar su ID
+    if (req.user) {
+      req.body.usuario = req.user.id;
+    } else {
+      // Si no hay usuario autenticado, crear la reserva con un ID temporal
+      req.body.usuario = process.env.GUEST_USER_ID || '65f3829ead6cc5d7c8c26e62';
+    }
     
     // Comprobar disponibilidad
     const { tipoHabitacion, fechaEntrada, fechaSalida, numeroHabitaciones } = req.body;
@@ -58,34 +63,39 @@ exports.crearReservaHabitacion = async (req, res) => {
 
 // @desc    Obtener todas las reservas de habitaciones
 // @route   GET /api/reservas/habitaciones
-// @access  Private/Admin
+// @access  Public/Private
 exports.obtenerReservasHabitacion = async (req, res) => {
   try {
-    console.log('Obteniendo reservas de habitaciones...');
-    console.log('Usuario:', req.user.id, 'Rol:', req.user.role);
+    let query = { estado: { $ne: 'cancelada' } };
     
-    let query = {};
-    
-    // Si el usuario es administrador, puede ver todas las reservas
-    if (req.user.role !== 'admin') {
-      // Ver tanto las reservas propias como las asignadas a este usuario
+    // Si el usuario está autenticado y es admin, puede ver todas las reservas
+    if (req.user && req.user.role === 'admin') {
+      // Ver todas las reservas
+      query = {};
+    } else if (req.user) {
+      // Usuario autenticado normal: ver sus propias reservas
       query = {
         $or: [
           { usuario: req.user.id },
           { asignadoA: req.user.id }
         ]
       };
+    } else {
+      // Acceso público: solo ver reservas activas y futuras
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      query = {
+        estado: { $ne: 'cancelada' },
+        fechaSalida: { $gte: today }
+      };
     }
-    
-    console.log('Query de búsqueda:', query);
     
     // Ejecutar query
     const reservas = await ReservaHabitacion.find(query)
       .populate('usuario', 'nombre apellidos email telefono')
       .populate('asignadoA', 'nombre apellidos email')
       .sort('-createdAt');
-    
-    console.log('Número de reservas encontradas:', reservas.length);
     
     res.status(200).json({
       success: true,
@@ -252,31 +262,71 @@ exports.eliminarReservaHabitacion = async (req, res) => {
 // @access  Public
 exports.comprobarDisponibilidadHabitacion = async (req, res) => {
   try {
-    const { tipoHabitacion, fechaEntrada, fechaSalida, numeroHabitaciones } = req.body;
+    const { tipoHabitacion, habitacion, fechaEntrada, fechaSalida, numeroHabitaciones } = req.body;
     
-    if (!tipoHabitacion || !fechaEntrada || !fechaSalida || !numeroHabitaciones) {
+    if (!tipoHabitacion || !habitacion || !fechaEntrada || !fechaSalida || !numeroHabitaciones) {
       return res.status(400).json({
         success: false,
-        message: 'Por favor, proporcione todos los campos requeridos'
+        disponible: false,
+        mensaje: 'Por favor, proporcione todos los campos requeridos'
       });
     }
     
-    const disponibilidad = await ReservaHabitacion.comprobarDisponibilidad(
-      tipoHabitacion,
-      fechaEntrada,
-      fechaSalida,
-      numeroHabitaciones
-    );
+    // Buscar reservas que se solapen con las fechas proporcionadas para esta habitación específica
+    const reservas = await ReservaHabitacion.find({
+      habitacion, // Filtramos por la habitación específica
+      estado: { $ne: 'cancelada' },
+      $or: [
+        {
+          fechaEntrada: { $lte: fechaSalida },
+          fechaSalida: { $gte: fechaEntrada }
+        }
+      ]
+    });
+
+    // Calcular habitaciones ocupadas
+    let habitacionesOcupadas = 0;
+    reservas.forEach(reserva => {
+      habitacionesOcupadas += reserva.numeroHabitaciones || 1;
+    });
+
+    // Obtener el total de habitaciones disponibles de la base de datos
+    const Habitacion = require('../models/Habitacion');
+    const habitacionInfo = await Habitacion.findOne({ nombre: habitacion });
+
+    if (!habitacionInfo) {
+      return res.status(404).json({
+        success: false,
+        disponible: false,
+        mensaje: 'No se encontró la habitación especificada'
+      });
+    }
+
+    // Verificar que la habitación es del tipo correcto
+    if (habitacionInfo.tipo !== tipoHabitacion) {
+      return res.status(400).json({
+        success: false,
+        disponible: false,
+        mensaje: 'El tipo de habitación no coincide con la habitación seleccionada'
+      });
+    }
+
+    const habitacionesRestantes = Math.max(0, habitacionInfo.totalDisponibles - habitacionesOcupadas);
     
     res.status(200).json({
       success: true,
-      disponibilidad
+      disponible: habitacionesRestantes >= numeroHabitaciones,
+      mensaje: habitacionesRestantes >= numeroHabitaciones
+        ? `Hay ${habitacionesRestantes} habitaciones disponibles`
+        : `Lo sentimos, solo quedan ${habitacionesRestantes} habitaciones disponibles`,
+      habitacionesRestantes
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error al comprobar disponibilidad:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al comprobar la disponibilidad'
+      disponible: false,
+      mensaje: 'Error al comprobar disponibilidad'
     });
   }
 };

@@ -36,6 +36,10 @@ const ReservaHabitacionSchema = new mongoose.Schema({
     required: [true, 'Por favor, seleccione un tipo de habitación'],
     enum: ['Individual', 'Doble', 'Suite', 'Premium']
   },
+  habitacion: {
+    type: String,
+    required: [true, 'Por favor, seleccione una habitación específica']
+  },
   numeroHabitaciones: {
     type: Number,
     required: [true, 'Por favor, indique el número de habitaciones'],

@@ -48,6 +48,9 @@ const publicRoutes = [
   '/auth/password/forgot',
   '/auth/password/reset',
   '/public',
+  '/reservas/habitaciones/disponibilidad',
+  '/habitaciones',
+  '/reservas/habitaciones/fechas-ocupadas'
 ];
 
 // Función para verificar si una ruta es pública

@@ -183,11 +183,45 @@ export const assignMasajeReservation = async (id, usuarioId) => {
 // Verificar disponibilidad
 export const checkHabitacionAvailability = async (availabilityData) => {
   try {
-    const response = await apiClient.post('/reservas/habitaciones/disponibilidad', availabilityData);
-    return response.data;
+    // Obtener la información de la habitación
+    const habitacionResponse = await apiClient.get(`/habitaciones/${availabilityData.habitacion}`);
+    if (!habitacionResponse || !habitacionResponse.data) {
+      throw new Error('No se pudo obtener la información de la habitación');
+    }
+
+    const habitacion = habitacionResponse.data;
+    
+    // Añadir el tipo de habitación a los datos de disponibilidad
+    const dataToSend = {
+      ...availabilityData,
+      tipoHabitacion: habitacion.tipo,
+      habitacion: habitacion.nombre
+    };
+
+    const response = await apiClient.post('/reservas/habitaciones/disponibilidad', dataToSend);
+    
+    // Si la respuesta es exitosa pero no tiene la estructura esperada
+    if (!response || typeof response.disponible === 'undefined') {
+      console.error('Respuesta inesperada del servidor:', response);
+      return {
+        disponible: false,
+        mensaje: 'Error al verificar disponibilidad: respuesta inválida del servidor',
+        habitacionesRestantes: 0
+      };
+    }
+
+    return {
+      disponible: response.disponible,
+      mensaje: response.mensaje,
+      habitacionesRestantes: response.habitacionesRestantes || 0
+    };
   } catch (error) {
-    console.error('Error al verificar disponibilidad de habitación:', error.message || error);
-    throw error;
+    console.error('Error al verificar disponibilidad de habitación:', error);
+    return {
+      disponible: false,
+      mensaje: error.message || 'Error al verificar disponibilidad',
+      habitacionesRestantes: 0
+    };
   }
 };
 

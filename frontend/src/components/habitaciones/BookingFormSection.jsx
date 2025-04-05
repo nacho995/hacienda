@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { FaCalendarAlt, FaCheck, FaWifi, FaCoffee, FaTv, FaSnowflake, FaUserFriends, FaDoorOpen, FaEnvelope, FaPhone, FaPen, FaSpinner } from 'react-icons/fa';
-import { HABITACIONES } from './RoomListSection';
 import { createHabitacionReservation, getHabitacionOccupiedDates } from '@/services/reservationService';
+import { obtenerHabitaciones } from '@/services/habitacionService';
 import { useAuth } from '@/context/AuthContext';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -25,6 +25,24 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
   const [fechasOcupadas, setFechasOcupadas] = useState([]);
   const [fechaEntrada, setFechaEntrada] = useState(null);
   const [fechaSalida, setFechaSalida] = useState(null);
+  const [habitaciones, setHabitaciones] = useState([]);
+  const [loadingHabitaciones, setLoadingHabitaciones] = useState(true);
+
+  // Cargar habitaciones desde la API
+  useEffect(() => {
+    const cargarHabitaciones = async () => {
+      try {
+        const data = await obtenerHabitaciones();
+        setHabitaciones(data);
+        setLoadingHabitaciones(false);
+      } catch (error) {
+        console.error('Error al cargar habitaciones:', error);
+        setLoadingHabitaciones(false);
+      }
+    };
+
+    cargarHabitaciones();
+  }, []);
 
   // Cargar fechas ocupadas desde el backend
   useEffect(() => {
@@ -33,7 +51,7 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
         // Si hay una habitación seleccionada, filtrar por tipo
         const params = {};
         if (selectedRoom) {
-          params.tipoHabitacion = selectedRoom.tipoHabitacion;
+          params.tipoHabitacion = selectedRoom.tipo;
         }
         
         const fechas = await getHabitacionOccupiedDates(params);
@@ -74,8 +92,7 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     
     // Si se selecciona una habitación desde el select, actualizar el selectedRoom
     if (name === 'habitacion' && value !== '') {
-      const roomId = parseInt(value);
-      const room = HABITACIONES.find(h => h.id === roomId);
+      const room = habitaciones.find(h => h._id === value);
       onSelectRoom(room);
     }
     
@@ -104,7 +121,7 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     
     try {
       // Preparar datos para la API
-      const selectedRoomData = HABITACIONES.find(h => h.id.toString() === formData.habitacion);
+      const selectedRoomData = habitaciones.find(h => h._id === formData.habitacion);
       
       if (!selectedRoomData) {
         throw new Error('Habitación no encontrada');
@@ -127,7 +144,8 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
         apellidos: formData.nombre.split(' ').slice(1).join(' ') || "No proporcionado", // Aproximación simple
         email: formData.email,
         telefono: formData.telefono,
-        tipoHabitacion: selectedRoomData.tipoHabitacion,
+        tipoHabitacion: selectedRoomData.tipo,
+        habitacion: selectedRoomData.nombre, // Asignamos el nombre específico de la habitación
         numeroHabitaciones: 1,
         fechaEntrada: formData.fechaEntrada,
         fechaSalida: formData.fechaSalida,
@@ -195,6 +213,15 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     return true;
   };
 
+  if (loadingHabitaciones) {
+    return (
+      <div className="py-16 text-center">
+        <FaSpinner className="animate-spin text-4xl text-[var(--color-primary)] mx-auto" />
+        <p className="mt-4 text-gray-600">Cargando habitaciones...</p>
+      </div>
+    );
+  }
+
   return (
     <section id="reserva-form" className="py-16 bg-[var(--color-cream-light)]">
       <div className="container-custom">
@@ -255,206 +282,178 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                         <div className="text-sm text-gray-600 mb-2">
                           {selectedRoom.tamaño} | {selectedRoom.camas} | Máx. {selectedRoom.capacidad} personas
                         </div>
-                        <div className="flex flex-wrap gap-x-4 text-xs text-gray-700">
-                          <div className="flex items-center">
-                            <FaWifi className="mr-1 text-[var(--color-primary)]" />
-                            WiFi
-                          </div>
-                          <div className="flex items-center">
-                            <FaCoffee className="mr-1 text-[var(--color-primary)]" />
-                            Desayuno
-                          </div>
-                          <div className="flex items-center">
-                            <FaTv className="mr-1 text-[var(--color-primary)]" />
-                            TV
-                          </div>
-                          <div className="flex items-center">
-                            <FaSnowflake className="mr-1 text-[var(--color-primary)]" />
-                            A/C
-                          </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {selectedRoom.amenidades.slice(0, 4).map((amenidad, index) => (
+                            <div key={index} className="flex items-center">
+                              <FaCheck className="mr-2 text-xs text-[var(--color-primary)]" />
+                              {amenidad}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {reservationError && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded">
-                    <p className="font-medium">Error:</p>
-                    <p>{reservationError}</p>
-                  </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Datos personales */}
-                  <div className="md:col-span-2">
-                    <h3 className="text-lg font-medium text-[var(--color-accent)] mb-4 pb-2 border-b border-gray-200">
-                      Información Personal
-                    </h3>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">
+                        Nombre completo
+                      </label>
+                      <input 
+                        type="text" 
+                        id="nombre" 
+                        name="nombre"
+                        value={formData.nombre}
+                        onChange={handleInputChange}
+                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        Correo electrónico
+                      </label>
+                      <input 
+                        type="email" 
+                        id="email" 
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label htmlFor="telefono" className="block text-sm font-medium text-gray-700">
+                        Teléfono
+                      </label>
+                      <input 
+                        type="tel" 
+                        id="telefono" 
+                        name="telefono"
+                        value={formData.telefono}
+                        onChange={handleInputChange}
+                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700">
+                        Número de huéspedes
+                      </label>
+                      <select 
+                        id="huespedes" 
+                        name="huespedes"
+                        value={formData.huespedes}
+                        onChange={handleInputChange}
+                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        required
+                      >
+                        {[...Array(selectedRoom ? selectedRoom.capacidad : 4).keys()].map(i => (
+                          <option key={i+1} value={i+1}>{i+1} {i === 0 ? 'persona' : 'personas'}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label htmlFor="habitacion" className="block text-sm font-medium text-gray-700">
+                        Habitación
+                      </label>
+                      <select 
+                        id="habitacion" 
+                        name="habitacion"
+                        value={formData.habitacion}
+                        onChange={handleInputChange}
+                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        required
+                      >
+                        <option value="">Seleccione una habitación</option>
+                        {habitaciones.map(h => (
+                          <option key={h._id} value={h.nombre}>
+                            {h.nombre} - ${h.precio}/noche
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   
                   <div className="space-y-1">
-                    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">
-                      Nombre completo
+                    <label className="block text-sm font-medium text-gray-700">
+                      Fechas de estancia
                     </label>
-                    <input 
-                      type="text" 
-                      id="nombre" 
-                      name="nombre"
-                      value={formData.nombre}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors" 
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                      Correo electrónico
-                    </label>
-                    <input 
-                      type="email" 
-                      id="email" 
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors" 
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label htmlFor="telefono" className="block text-sm font-medium text-gray-700">
-                      Teléfono de contacto
-                    </label>
-                    <input 
-                      type="tel" 
-                      id="telefono" 
-                      name="telefono"
-                      value={formData.telefono}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors" 
-                      required
-                    />
-                  </div>
-                  
-                  <div></div>
-                  
-                  {/* Datos de reserva */}
-                  <div className="md:col-span-2 mt-4">
-                    <h3 className="text-lg font-medium text-[var(--color-accent)] mb-4 pb-2 border-b border-gray-200">
-                      Detalles de Reserva
-                    </h3>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label htmlFor="fechaEntrada" className="block text-sm font-medium text-gray-700">
-                      Fecha de entrada
-                    </label>
-                    <div className="relative">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <DatePicker
                         selected={fechaEntrada}
                         onChange={date => setFechaEntrada(date)}
-                        filterDate={esDisponible}
+                        selectsStart
+                        startDate={fechaEntrada}
+                        endDate={fechaSalida}
                         minDate={new Date()}
+                        filterDate={esDisponible}
                         dateFormat="dd/MM/yyyy"
-                        locale="es"
-                        className="w-full p-2 pl-3 pr-10 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors cursor-pointer"
-                        placeholderText="Seleccione fecha de entrada"
+                        placeholderText="Fecha de entrada"
+                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                         required
                       />
-                      <div className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500 pointer-events-none">
-                        <FaCalendarAlt />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label htmlFor="fechaSalida" className="block text-sm font-medium text-gray-700">
-                      Fecha de salida
-                    </label>
-                    <div className="relative">
                       <DatePicker
                         selected={fechaSalida}
                         onChange={date => setFechaSalida(date)}
+                        selectsEnd
+                        startDate={fechaEntrada}
+                        endDate={fechaSalida}
+                        minDate={fechaEntrada}
                         filterDate={esDisponible}
-                        minDate={fechaEntrada || new Date()}
                         dateFormat="dd/MM/yyyy"
-                        locale="es"
-                        className="w-full p-2 pl-3 pr-10 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors cursor-pointer"
-                        placeholderText="Seleccione fecha de salida"
+                        placeholderText="Fecha de salida"
+                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                         required
-                        disabled={!fechaEntrada}
                       />
-                      <div className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500 pointer-events-none">
-                        <FaCalendarAlt />
-                      </div>
                     </div>
                   </div>
                   
                   <div className="space-y-1">
-                    <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700">
-                      Número de huéspedes
-                    </label>
-                    <select 
-                      id="huespedes" 
-                      name="huespedes"
-                      value={formData.huespedes}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                      required
-                    >
-                      {[...Array(selectedRoom ? selectedRoom.capacidad : 4).keys()].map(i => (
-                        <option key={i+1} value={i+1}>{i+1} {i === 0 ? 'persona' : 'personas'}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label htmlFor="habitacion" className="block text-sm font-medium text-gray-700">
-                      Tipo de habitación
-                    </label>
-                    <select 
-                      id="habitacion" 
-                      name="habitacion"
-                      value={formData.habitacion}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                      required
-                    >
-                      <option value="">Seleccione una habitación</option>
-                      {HABITACIONES.map(h => (
-                        <option key={h.id} value={h.id}>
-                          {h.nombre} - ${h.precio}/noche
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="md:col-span-2">
-                    <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700 mb-1">
-                      Peticiones especiales
+                    <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700">
+                      Peticiones especiales (opcional)
                     </label>
                     <textarea 
                       id="mensaje" 
                       name="mensaje"
                       value={formData.mensaje}
                       onChange={handleInputChange}
-                      rows="4" 
+                      rows="4"
                       className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                      placeholder="Indique cualquier petición especial, alergias, necesidades de accesibilidad, etc."
                     ></textarea>
                   </div>
                   
-                  <div className="md:col-span-2 mt-4 text-center">
-                    <button 
-                      type="submit"
-                      disabled={!isFormValid || isSubmitting}
-                      className={`btn-primary px-10 ${(!isFormValid || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {isSubmitting ? 'Procesando...' : 'Confirmar Reserva'}
-                    </button>
-                  </div>
+                  {reservationError && (
+                    <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700">
+                      <p>{reservationError}</p>
+                    </div>
+                  )}
+                  
+                  <button 
+                    type="submit"
+                    disabled={!isFormValid || isSubmitting}
+                    className={`w-full py-3 font-medium tracking-wide transition-colors duration-300 ${
+                      isFormValid && !isSubmitting
+                        ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-primary)]'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    {isSubmitting ? (
+                      <span className="flex items-center justify-center">
+                        <FaSpinner className="animate-spin mr-2" />
+                        Procesando...
+                      </span>
+                    ) : (
+                      'Confirmar Reserva'
+                    )}
+                  </button>
                 </form>
               </>
             )}

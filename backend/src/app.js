@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const reservaRoutes = require('./routes/reserva.routes');
 const configRoutes = require('./routes/config.routes');
+const habitacionRoutes = require('./routes/habitacion.routes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/reservas', reservaRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/habitaciones', habitacionRoutes);
 
 // Manejo de errores global
 app.use((err, req, res, next) => {

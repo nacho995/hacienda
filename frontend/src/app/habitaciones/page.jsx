@@ -42,7 +42,7 @@ export default function HabitacionesPage() {
     setSelectedRoom(room);
     setFormData({
       ...formData,
-      habitacion: room ? room.id.toString() : ''
+      habitacion: room ? room._id : ''
     });
     
     // Scroll al formulario con comprobación de que el elemento existe

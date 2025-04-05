@@ -1,112 +1,41 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { FaEdit, FaTrash, FaBed, FaBath, FaWifi, FaUsers, FaInfoCircle } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaBed, FaBath, FaWifi, FaUsers, FaInfoCircle, FaCalendar } from 'react-icons/fa';
 import Image from 'next/image';
-import { checkHabitacionAvailability } from '@/services/reservationService';
+import { obtenerHabitacionesConReservas } from '@/services/habitacionService';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 export default function AdminRooms() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showReservas, setShowReservas] = useState({});
+  const { isAuthenticated, isAdmin } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
+    // Verificar autenticación
+    if (!isAuthenticated || !isAdmin) {
+      router.push('/login');
+      return;
+    }
+
     const fetchRooms = async () => {
       try {
-        // Datos base de las habitaciones según el modelo
-        const habitacionesBase = [
-          {
-            tipo: 'Individual',
-            descripcion: 'Habitación individual cómoda y funcional.',
-            capacidad: 1,
-            precio: '$1,800',
-            caracteristicas: ['Cama Individual', 'Baño Privado', 'WiFi', 'Escritorio'],
-            imagen: '/images/placeholder/room1.jpg.svg',
-            totalDisponibles: 10
-          },
-          {
-            tipo: 'Doble',
-            descripcion: 'Habitación doble con espacio para dos personas.',
-            capacidad: 2,
-            precio: '$2,500',
-            caracteristicas: ['Cama Queen Size', 'Baño Privado', 'WiFi', 'Balcón'],
-            imagen: '/images/placeholder/room2.jpg.svg',
-            totalDisponibles: 15
-          },
-          {
-            tipo: 'Suite',
-            descripcion: 'Suite espaciosa con sala de estar separada.',
-            capacidad: 2,
-            precio: '$3,500',
-            caracteristicas: ['Cama King Size', 'Baño Privado', 'WiFi', 'Sala de Estar'],
-            imagen: '/images/placeholder/room3.jpg.svg',
-            totalDisponibles: 5
-          },
-          {
-            tipo: 'Premium',
-            descripcion: 'Nuestra mejor suite con todas las comodidades.',
-            capacidad: 4,
-            precio: '$4,200',
-            caracteristicas: ['Cama King Size + Sofá Cama', '2 Baños', 'WiFi', 'Terraza Privada'],
-            imagen: '/images/placeholder/room1.jpg.svg',
-            totalDisponibles: 3
-          }
-        ];
-
-        // Fecha actual para comprobar disponibilidad
-        const today = new Date();
-        const nextWeek = new Date(today);
-        nextWeek.setDate(today.getDate() + 7);
-
-        // Array para almacenar las promesas de disponibilidad
-        const availabilityPromises = habitacionesBase.map(habitacion => 
-          checkHabitacionAvailability({
-            tipoHabitacion: habitacion.tipo,
-            fechaEntrada: today.toISOString().split('T')[0],
-            fechaSalida: nextWeek.toISOString().split('T')[0],
-            numeroHabitaciones: 1
-          }).catch(err => {
-            console.error(`Error al comprobar disponibilidad para ${habitacion.tipo}:`, err);
-            // Retornamos un valor por defecto en caso de error
-            return { disponible: true, habitacionesRestantes: habitacion.totalDisponibles };
-          })
-        );
-
-        // Esperamos todas las promesas
-        const availabilityResults = await Promise.all(availabilityPromises);
-
-        // Combinamos los datos base con la información de disponibilidad
-        const roomsWithAvailability = habitacionesBase.map((habitacion, index) => {
-          const availability = availabilityResults[index] || { 
-            disponible: true, 
-            habitacionesRestantes: habitacion.totalDisponibles 
-          };
-
-          return {
-            id: index + 1,
-            nombre: habitacion.tipo,
-            descripcion: habitacion.descripcion,
-            capacidad: habitacion.capacidad,
-            precio: habitacion.precio,
-            estado: availability.disponible ? 'Disponible' : 'No disponible',
-            caracteristicas: habitacion.caracteristicas,
-            imagen: habitacion.imagen,
-            disponibles: availability.habitacionesRestantes || 0,
-            totalDisponibles: habitacion.totalDisponibles
-          };
-        });
-
-        setRooms(roomsWithAvailability);
+        const habitacionesData = await obtenerHabitacionesConReservas();
+        setRooms(habitacionesData);
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching rooms:', error);
-        setError('No se pudieron cargar las habitaciones');
+        console.error('Error al cargar habitaciones:', error);
+        setError('No se pudieron cargar las habitaciones y sus reservas');
         setLoading(false);
       }
     };
 
     fetchRooms();
-  }, []);
+  }, [isAuthenticated, isAdmin, router]);
 
   const getIconForFeature = (feature) => {
     if (feature.includes('Cama')) return FaBed;
@@ -115,39 +44,55 @@ export default function AdminRooms() {
     return FaUsers;
   };
 
-  if (loading) return <div className="text-center py-10">Cargando habitaciones...</div>;
-  if (error) return <div className="text-center py-10 text-red-500">{error}</div>;
+  const toggleReservas = (roomId) => {
+    setShowReservas(prev => ({
+      ...prev,
+      [roomId]: !prev[roomId]
+    }));
+  };
+
+  const formatFecha = (fecha) => {
+    return new Date(fecha).toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto"></div>
+        <p className="mt-4 text-gray-600">Cargando habitaciones...</p>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center text-red-500">
+        <FaInfoCircle className="text-4xl mx-auto mb-4" />
+        <p>{error}</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-6">
       <div>
         <h1 className="text-3xl font-[var(--font-display)] text-gray-800">
           Habitaciones
         </h1>
         <p className="text-gray-600 mt-2">
-          Visualiza las habitaciones y suites disponibles en la hacienda
+          Gestión de habitaciones y visualización de reservas activas
         </p>
       </div>
 
-      {/* Mensaje informativo */}
-      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-        <div className="flex">
-          <div className="flex-shrink-0">
-            <FaInfoCircle className="h-5 w-5 text-blue-500" />
-          </div>
-          <div className="ml-3">
-            <p className="text-sm text-blue-700">
-              Las habitaciones se gestionan directamente desde el sistema principal. Las reservas de habitaciones se mostrarán aquí cuando los usuarios las realicen desde la página principal.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Grid de Habitaciones */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {rooms.map((room) => (
           <div
-            key={room.id}
+            key={room._id}
             className="bg-white rounded-none shadow-lg overflow-hidden border border-gray-100"
           >
             {/* Imagen de la habitación */}
@@ -185,7 +130,7 @@ export default function AdminRooms() {
 
               {/* Características */}
               <div className="grid grid-cols-2 gap-4 mb-6">
-                {room.caracteristicas.map((feature, index) => {
+                {room.amenidades.map((feature, index) => {
                   const Icon = getIconForFeature(feature);
                   return (
                     <div
@@ -203,7 +148,7 @@ export default function AdminRooms() {
               <div className="flex justify-between items-center pt-4 border-t">
                 <div className="text-sm text-gray-600">
                   <span className="font-semibold text-gray-800">
-                    {room.precio}
+                    ${room.precio}
                   </span>{' '}
                   / noche
                 </div>
@@ -216,6 +161,56 @@ export default function AdminRooms() {
               {/* Disponibilidad */}
               <div className="mt-2 text-sm text-gray-600">
                 <span>Disponibles: {room.disponibles} de {room.totalDisponibles}</span>
+              </div>
+
+              {/* Botón para mostrar reservas */}
+              <div className="mt-4">
+                <button
+                  onClick={() => toggleReservas(room._id)}
+                  className="flex items-center space-x-2 text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
+                >
+                  <FaCalendar />
+                  <span>
+                    {showReservas[room._id] ? 'Ocultar reservas' : 
+                      room.reservasActivas?.length > 0 
+                        ? `Ver ${room.reservasActivas.length} reservas activas`
+                        : 'Sin reservas activas'
+                    }
+                  </span>
+                </button>
+
+                {/* Lista de reservas */}
+                {showReservas[room._id] && room.reservasActivas?.length > 0 && (
+                  <div className="mt-4 space-y-4">
+                    {room.reservasActivas.map((reserva) => (
+                      <div
+                        key={reserva._id}
+                        className="p-4 bg-gray-50 rounded-sm border border-gray-200"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold">
+                              {reserva.nombre} {reserva.apellidos}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {formatFecha(reserva.fechaEntrada)} - {formatFecha(reserva.fechaSalida)}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {reserva.numeroHabitaciones} habitación(es)
+                            </p>
+                          </div>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-sm ${
+                            reserva.estado === 'confirmada' ? 'bg-green-100 text-green-800' :
+                            reserva.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {reserva.estado}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
