@@ -17,7 +17,7 @@ exports.crearReservaHabitacion = async (req, res) => {
     }
     
     // Comprobar disponibilidad
-    const { tipoHabitacion, fechaEntrada, fechaSalida, numeroHabitaciones } = req.body;
+    const { tipoHabitacion, habitacion, fechaEntrada, fechaSalida, numeroHabitaciones } = req.body;
     
     const disponibilidad = await ReservaHabitacion.comprobarDisponibilidad(
       tipoHabitacion,
@@ -32,9 +32,31 @@ exports.crearReservaHabitacion = async (req, res) => {
         message: disponibilidad.mensaje
       });
     }
-    
-    // Crear la reserva
-    const reserva = await ReservaHabitacion.create(req.body);
+
+    // Obtener el precio de la habitación
+    const Habitacion = require('../models/Habitacion');
+    const habitacionInfo = await Habitacion.findOne({ nombre: habitacion });
+
+    if (!habitacionInfo) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se encontró la habitación especificada'
+      });
+    }
+
+    // Calcular la duración de la estancia en días
+    const fechaInicioObj = new Date(fechaEntrada);
+    const fechaFinObj = new Date(fechaSalida);
+    const duracionEstancia = Math.ceil((fechaFinObj - fechaInicioObj) / (1000 * 60 * 60 * 24));
+
+    // Calcular el precio total
+    const precioTotal = habitacionInfo.precio * duracionEstancia * numeroHabitaciones;
+
+    // Crear la reserva con el precio total calculado
+    const reserva = await ReservaHabitacion.create({
+      ...req.body,
+      precioTotal
+    });
     
     // Enviar email de confirmación
     try {

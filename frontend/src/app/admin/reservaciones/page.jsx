@@ -108,7 +108,7 @@ export default function AdminReservations() {
         fechaSalida: h.fechaSalida,
         invitados: h.numeroAdultos + (h.numeroNinos || 0),
         estado: h.estado || 'Pendiente',
-        total: h.precio || 0,
+        total: h.precioTotal || 0,
         datosCompletos: h,
         asignadoA: h.asignadoA
       })) : [];
@@ -119,8 +119,8 @@ export default function AdminReservations() {
         tipo: 'evento',
         fecha: e.fecha,
         invitados: e.numeroInvitados || 0,
-        estado: e.estado || 'Pendiente',
-        total: e.precio || 0,
+        estado: e.estadoReserva || 'pendiente',
+        total: e.precio,
         datosCompletos: e,
         asignadoA: e.asignadoA
       })) : [];
@@ -584,9 +584,9 @@ export default function AdminReservations() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {typeof reservation.total === 'number' ? 
+                        {typeof reservation.total === 'number' && reservation.total > 0 ? 
                           `$${reservation.total.toLocaleString('es-MX')}` : 
-                          reservation.total}
+                          '$0'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="relative">

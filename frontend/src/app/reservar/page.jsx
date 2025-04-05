@@ -911,7 +911,7 @@ export default function ReservarPage() {
               </p>
               <div className="flex justify-center mt-4">
                 <Link
-                  href="/contacto"
+                  href="/contact"
                   className="px-6 py-2 bg-[#8B0516] text-white font-medium hover:bg-[#6b0411] transition-colors rounded-lg"
                 >
                   Contáctenos

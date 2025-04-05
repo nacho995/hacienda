@@ -79,6 +79,61 @@ exports.crearReservaEvento = async (req, res) => {
       presupuestoEstimado: presupuestoEstimado || 0
     };
 
+    // Calcular precio base según el tipo de evento
+    let precioBase = 0;
+    switch (tipoEvento) {
+      case 'Boda':
+        precioBase = 50000; // Precio base para bodas
+        break;
+      case 'Cumpleaños':
+        precioBase = 25000; // Precio base para cumpleaños
+        break;
+      case 'Corporativo':
+        precioBase = 35000; // Precio base para eventos corporativos
+        break;
+      case 'Aniversario':
+        precioBase = 30000; // Precio base para aniversarios
+        break;
+      default:
+        precioBase = 20000; // Precio base para otros eventos
+    }
+
+    // Calcular precio por invitado
+    const precioPorInvitado = 350; // $350 por invitado
+    const precioInvitados = numeroInvitados * precioPorInvitado;
+
+    // Calcular precio por servicios adicionales
+    let precioServicios = 0;
+    if (req.body.serviciosAdicionales) {
+      if (req.body.serviciosAdicionales.decoracion) precioServicios += 15000;
+      if (req.body.serviciosAdicionales.musica) precioServicios += 12000;
+      if (req.body.serviciosAdicionales.fotografo) precioServicios += 8000;
+      if (req.body.serviciosAdicionales.transporte) precioServicios += 5000;
+    }
+
+    // Calcular precio por menú seleccionado
+    let precioMenu = 0;
+    switch (req.body.menuSeleccionado) {
+      case 'Premium':
+        precioMenu = numeroInvitados * 800;
+        break;
+      case 'Deluxe':
+        precioMenu = numeroInvitados * 1200;
+        break;
+      case 'Personalizado':
+        precioMenu = numeroInvitados * 1500;
+        break;
+      case 'Básico':
+        precioMenu = numeroInvitados * 500;
+        break;
+    }
+
+    // Calcular precio total
+    const precioTotal = precioBase + precioInvitados + precioServicios + precioMenu;
+
+    // Actualizar el objeto de reserva con el precio total
+    reservaData.precio = precioTotal;
+
     // Crear la reserva
     const reserva = await ReservaEvento.create(reservaData);
 

@@ -100,6 +100,10 @@ const ReservaEventoSchema = new mongoose.Schema({
   presupuestoEstimado: {
     type: Number
   },
+  precio: {
+    type: Number,
+    required: true
+  },
   estadoReserva: {
     type: String,
     enum: ['pendiente', 'confirmada', 'pagada', 'cancelada', 'completada'],

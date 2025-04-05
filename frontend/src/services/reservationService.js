@@ -82,10 +82,47 @@ export const assignHabitacionReservation = async (id, usuarioId) => {
 export const getEventoReservations = async () => {
   try {
     const response = await apiClient.get('/reservas/eventos');
-    return response;
+    console.log('Respuesta del servidor (eventos):', response);
+    
+    // Verificar si la respuesta tiene la estructura correcta
+    if (response?.data?.success && Array.isArray(response.data.data)) {
+      // Asegurarse de que cada reserva tenga un precio
+      const reservasConPrecio = response.data.data.map(reserva => ({
+        ...reserva,
+        precio: reserva.precio || reserva.presupuestoEstimado || 0
+      }));
+      return {
+        success: true,
+        data: reservasConPrecio
+      };
+    }
+    
+    // Si la respuesta es un array directamente
+    if (Array.isArray(response.data)) {
+      // Asegurarse de que cada reserva tenga un precio
+      const reservasConPrecio = response.data.map(reserva => ({
+        ...reserva,
+        precio: reserva.precio || reserva.presupuestoEstimado || 0
+      }));
+      return {
+        success: true,
+        data: reservasConPrecio
+      };
+    }
+    
+    console.error('Estructura de respuesta inesperada:', response);
+    return {
+      success: false,
+      data: [],
+      message: 'Formato de respuesta inválido del servidor'
+    };
   } catch (error) {
-    console.error('Error al obtener reservas de eventos:', error.message || error);
-    return { success: false, data: [], message: error.message };
+    console.error('Error al obtener reservas de eventos:', error.response || error);
+    return { 
+      success: false, 
+      data: [], 
+      message: error.response?.data?.message || 'Error al obtener las reservas de eventos'
+    };
   }
 };
 
