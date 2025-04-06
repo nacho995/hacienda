@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 // Determinar la URL base según el entorno
+console.log('Valor de la variable de entorno NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-console.log('API Base URL:', BASE_URL);
+console.log('API Base URL configurada:', BASE_URL);
 
 // Crear instancia de axios con configuración base
 const apiClient = axios.create({
@@ -14,6 +15,9 @@ const apiClient = axios.create({
   withCredentials: true,
   timeout: 10000 // 10 segundos de timeout
 });
+
+// Verificar la configuración de la instancia
+console.log('apiClient baseURL configurada:', apiClient.defaults.baseURL);
 
 // Función para decodificar un token Base64 de forma segura
 const safelyDecodeToken = (token) => {

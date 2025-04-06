@@ -75,7 +75,7 @@ class AuthService {
       localStorage.removeItem('user');
       
       try {
-        await apiClient.post('/auth/logout');
+        await apiClient.get('/auth/logout');
       } catch (error) {
         console.error('Error al cerrar sesión en el servidor:', error.message || error);
       }
@@ -88,7 +88,7 @@ class AuthService {
       localStorage.removeItem('user');
       return {
         success: false,
-        message: error.message || 'Error al cerrar sesión'
+        message: error.message || error
       };
     }
   }

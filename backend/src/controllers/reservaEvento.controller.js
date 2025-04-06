@@ -361,9 +361,26 @@ exports.obtenerReservasEvento = async (req, res) => {
           { asignadoA: req.user.id }
         ]
       };
+    } else {
+      // Para administradores, filtrar según los parámetros
+      if (req.query.misReservas === 'true') {
+        // Ver solo las reservas asignadas al admin actual
+        query.asignadoA = req.user.id;
+      } else if (req.query.disponibles === 'true' || req.query.sinAsignar === 'true') {
+        // Ver solo las reservas no asignadas (disponibles)
+        query.asignadoA = null;
+      } else {
+        // Sin filtros específicos, mostrar tanto las asignadas a este admin como las sin asignar
+        query = {
+          $or: [
+            { asignadoA: req.user.id },
+            { asignadoA: null }
+          ]
+        };
+      }
     }
     
-    // Filtros opcionales
+    // Añadir filtro por fecha si se proporciona
     if (req.query.fecha) {
       // Formato ISO YYYY-MM-DD
       const fechaInicio = new Date(req.query.fecha);
@@ -372,21 +389,25 @@ exports.obtenerReservasEvento = async (req, res) => {
       const fechaFin = new Date(req.query.fecha);
       fechaFin.setHours(23, 59, 59, 999);
       
-      query.fechaEvento = {
+      query.fecha = {
         $gte: fechaInicio,
         $lte: fechaFin
       };
     }
-
-    // Filtro opcional para mostrar solo reservas sin asignar
-    if (req.query.sinAsignar === 'true') {
-      query.asignadoA = null;
+    
+    // Añadir filtro por espacio/lugar si se proporciona
+    if (req.query.espacio) {
+      query.espacio = req.query.espacio;
     }
     
+    console.log('Consulta para obtener reservas de eventos:', JSON.stringify(query));
+    
+    // Ejecutar la consulta
     const reservas = await ReservaEvento.find(query)
       .populate('usuario', 'nombre apellidos email telefono')
+      .populate('tipoEvento', 'titulo descripcion imagen')
       .populate('asignadoA', 'nombre apellidos email')
-      .sort({ fechaEvento: 1, horaInicio: 1 });
+      .sort({ fecha: 1, horaInicio: 1 });
       
     res.status(200).json({
       success: true,

@@ -469,21 +469,38 @@ export default function AdminDashboard() {
     }
   };
 
-  // Función para filtrar las reservas según el usuario seleccionado
+  // Obtener filtro de usuario
+  const handleFilterUsuario = (e) => {
+    setFiltroUsuario(e.target.value);
+  };
+  
+  // Filtrar reservas según el filtro de usuario
   const getFilteredReservations = (reservations) => {
-    return reservations.filter(reserva => {
-      const reservaAsignadaId = typeof reserva.asignadoA === 'object' ? 
-        reserva.asignadoA?._id : 
-        reserva.asignadoA;
-
-      if (filtroUsuario === 'todos') {
-        return true;
-      } else if (filtroUsuario === 'sin_asignar') {
-        return !reservaAsignadaId;
-      } else {
-        return reservaAsignadaId === filtroUsuario;
-      }
-    });
+    if (!reservations) return [];
+    
+    // Si el filtro es 'todos', devolver todas las reservas
+    if (filtroUsuario === 'todos') {
+      return reservations;
+    } 
+    // Si el filtro es 'mis_reservas', mostrar solo las asignadas al usuario actual
+    else if (filtroUsuario === 'mis_reservas' && user) {
+      return reservations.filter(r => {
+        // Manejar tanto IDs como objetos
+        const asignadoId = typeof r.asignadoA === 'object' ? r.asignadoA?._id : r.asignadoA;
+        return asignadoId === user._id;
+      });
+    } 
+    // Si el filtro es 'sin_asignar', mostrar solo las reservas no asignadas
+    else if (filtroUsuario === 'sin_asignar') {
+      return reservations.filter(r => !r.asignadoA);
+    } 
+    // Si el filtro es un ID de usuario, mostrar las reservas asignadas a ese usuario
+    else {
+      return reservations.filter(r => {
+        const asignadoId = typeof r.asignadoA === 'object' ? r.asignadoA?._id : r.asignadoA;
+        return asignadoId === filtroUsuario;
+      });
+    }
   };
 
   // Aplicar filtros a cada tipo de reserva
@@ -535,11 +552,12 @@ export default function AdminDashboard() {
           {/* Filtro por usuario asignado */}
           <select 
             value={filtroUsuario}
-            onChange={(e) => setFiltroUsuario(e.target.value)}
+            onChange={handleFilterUsuario}
             className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
           >
             <option value="todos">Todas las reservas</option>
             <option value="sin_asignar">Sin asignar</option>
+            <option value="mis_reservas">Mis reservas</option>
             {usuarios.filter(u => u._id !== user?._id).map(usuario => (
               <option key={usuario._id} value={usuario._id}>
                 Asignadas a: {usuario.nombre} {usuario.apellidos || ''}

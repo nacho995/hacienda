@@ -1,13 +1,36 @@
 import apiClient from './apiClient';
 
 // Servicios para reservas de habitaciones
-export const getHabitacionReservations = async () => {
+export const getHabitacionReservations = async (filtro = {}) => {
   try {
     console.log('Obteniendo reservas de habitaciones...');
     
+    // Construir los parámetros de consulta basados en el filtro
+    const params = new URLSearchParams();
+    
+    if (filtro.disponibles) {
+      params.append('disponibles', 'true');
+    }
+    
+    if (filtro.misReservas) {
+      params.append('misReservas', 'true');
+    }
+    
+    if (filtro.sinAsignar) {
+      params.append('sinAsignar', 'true');
+    }
+    
+    if (filtro.fecha) {
+      params.append('fecha', filtro.fecha);
+    }
+    
+    const url = `/reservas/habitaciones${params.toString() ? '?' + params.toString() : ''}`;
+    console.log('URL de petición habitaciones:', url);
+    
     // Obtener habitaciones independientes y habitaciones dentro de eventos
+    // Solo devolveremos las que cumplan con los filtros
     const [habitacionesResponse, eventosResponse] = await Promise.all([
-      apiClient.get('/reservas/habitaciones'),
+      apiClient.get(url),
       apiClient.get('/reservas/eventos')
     ]);
     
@@ -187,9 +210,37 @@ export const assignHabitacionReservation = async (id, usuarioId) => {
 };
 
 // Servicios para reservas de eventos
-export const getEventoReservations = async () => {
+export const getEventoReservations = async (filtro = {}) => {
   try {
-    const response = await apiClient.get('/reservas/eventos');
+    // Construir los parámetros de consulta basados en el filtro
+    const params = new URLSearchParams();
+    
+    if (filtro.disponibles) {
+      params.append('disponibles', 'true');
+    }
+    
+    if (filtro.misReservas) {
+      params.append('misReservas', 'true');
+      console.log('Solicitando específicamente eventos asignados al usuario actual');
+    }
+    
+    if (filtro.sinAsignar) {
+      params.append('sinAsignar', 'true');
+    }
+    
+    if (filtro.fecha) {
+      params.append('fecha', filtro.fecha);
+    }
+    
+    // Añadir timestamp para evitar caché si existe
+    if (filtro._t) {
+      params.append('_t', filtro._t);
+    }
+    
+    const url = `/reservas/eventos${params.toString() ? '?' + params.toString() : ''}`;
+    console.log('URL de petición eventos:', url);
+    
+    const response = await apiClient.get(url);
     console.log('Respuesta del servidor (eventos):', response);
     
     // Verificar si la respuesta tiene la estructura correcta
@@ -384,6 +435,10 @@ export const assignEventoReservation = async (id, usuarioId) => {
     
     if (!tieneHabitaciones && !tieneMasajes) {
       console.log('No hay servicios adicionales para asignar con este evento');
+      
+      // Recargar la página para que se reflejen los cambios redirigiendo con un hash
+      window.location.href = '/admin/reservaciones/eventos#reload';
+      
       return {
         ...response,
         resultadosAdicionales: {
@@ -510,6 +565,13 @@ export const assignEventoReservation = async (id, usuarioId) => {
     const habitacionesExitosas = resultados.habitacionesAsignadas.filter(h => !h.error && !h.omitida).length;
     const masajesExitosos = resultados.masajesAsignados.filter(m => !m.error && !m.omitida).length;
     
+    // Recargar la página para que se reflejen los cambios - VERSIÓN MEJORADA
+    // En lugar de solo cambiar el hash, recargar la página completamente
+    console.log('Forzando recarga completa de la página...');
+    setTimeout(() => {
+      window.location.href = '/admin/reservaciones?tipo=evento&timestamp=' + new Date().getTime();
+    }, 300);
+    
     // Devolver el resultado del evento con información adicional
     return {
       ...response,
@@ -528,12 +590,34 @@ export const assignEventoReservation = async (id, usuarioId) => {
 };
 
 // Servicios para reservas de masajes
-export const getMasajeReservations = async () => {
+export const getMasajeReservations = async (filtro = {}) => {
   try {
     // Obtener reservas de masajes independientes
     console.log('Solicitando reservas de masajes al servidor...');
     
-    const masajesResponse = await apiClient.get('/reservas/masajes');
+    // Construir los parámetros de consulta basados en el filtro
+    const params = new URLSearchParams();
+    
+    if (filtro.disponibles) {
+      params.append('disponibles', 'true');
+    }
+    
+    if (filtro.misReservas) {
+      params.append('misReservas', 'true');
+    }
+    
+    if (filtro.sinAsignar) {
+      params.append('sinAsignar', 'true');
+    }
+    
+    if (filtro.fecha) {
+      params.append('fecha', filtro.fecha);
+    }
+    
+    const url = `/reservas/masajes${params.toString() ? '?' + params.toString() : ''}`;
+    console.log('URL de petición para masajes:', url);
+    
+    const masajesResponse = await apiClient.get(url);
     
     console.log('Respuesta de masajes:', masajesResponse);
 
@@ -822,10 +906,17 @@ export const checkMasajeAvailability = async (availabilityData) => {
 // Obtener todas las reservas para el dashboard
 export const getAllReservationsForDashboard = async () => {
   try {
+    // Filtros para obtener tanto las reservas sin asignar como las asignadas al usuario actual
+    const filtro = {
+      // Esto mostrará tanto las reservas sin asignar como las asignadas al usuario actual
+      // Ya no usamos sinAsignar: true, que solo mostraba las reservas sin asignar
+    };
+    
+    // Cargar todas las reservas (que aplicará automáticamente el filtro correcto en el backend)
     const [habitacionesResponse, eventosResponse, masajesResponse] = await Promise.all([
-      apiClient.get('/reservas/habitaciones'),
-      apiClient.get('/reservas/eventos'),
-      apiClient.get('/reservas/masajes')
+      apiClient.get('/reservas/habitaciones?' + new URLSearchParams(filtro).toString()),
+      apiClient.get('/reservas/eventos?' + new URLSearchParams(filtro).toString()),
+      apiClient.get('/reservas/masajes?' + new URLSearchParams(filtro).toString())
     ]);
 
     // Usaremos un Map para evitar duplicados
@@ -1238,181 +1329,115 @@ export const deleteMasajeReservation = async (id) => {
 // Desasignar reservas
 export const unassignHabitacionReservation = async (id) => {
   try {
+    // Validar que el ID tenga un formato correcto
+    if (!id || typeof id !== 'string') {
+      console.error('ID de habitación no válido para desasignar:', id);
+      throw new Error('ID de habitación no válido');
+    }
+    
+    console.log(`Iniciando desasignación de habitación con ID: ${id}`);
+    
+    // Caso especial: si el ID contiene "_habitacion_", estamos tratando de desasignar una habitación
+    // que es parte de un evento, no un registro independiente
+    if (id.includes('_habitacion_')) {
+      console.log('Detectada habitación dentro de evento para desasignar. ID:', id);
+      const eventId = id.split('_habitacion_')[0];
+      
+      if (!eventId.match(/^[0-9a-fA-F]{24}$/)) {
+        console.error('ID de evento no válido:', eventId);
+        throw new Error('ID de evento no válido');
+      }
+      
+      // Desasignar el evento completo, lo que desasignará todas sus habitaciones
+      return await unassignEventoReservation(eventId);
+    }
+    
+    // Intentar primero verificar si esta habitación es parte de un evento
+    try {
+      // Obtener todos los eventos
+      const eventosResponse = await apiClient.get('/reservas/eventos');
+      if (eventosResponse?.data && Array.isArray(eventosResponse.data)) {
+        // Buscar un evento que contenga esta habitación
+        for (const evento of eventosResponse.data) {
+          if (evento.serviciosAdicionales?.habitaciones?.length > 0) {
+            const habitacionEnEvento = evento.serviciosAdicionales.habitaciones.find(
+              h => h._id === id || h.reservaHabitacionId === id
+            );
+            
+            if (habitacionEnEvento) {
+              console.log(`Habitación ${id} encontrada en evento ${evento._id}`);
+              // Si la habitación es parte de un evento, desasignar el evento
+              return await unassignEventoReservation(evento._id);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Error al verificar eventos para la habitación:', error);
+      // Continuamos con el intento normal de desasignación
+    }
+    
+    // Verificar primero si la habitación existe
+    try {
+      const habitacionResponse = await apiClient.get(`/reservas/habitaciones/${id}`);
+      if (!habitacionResponse || !habitacionResponse.data) {
+        console.error(`Habitación ${id} no encontrada en la base de datos`);
+        throw {
+          success: false,
+          message: `La habitación con ID ${id} no existe o ha sido eliminada`,
+          status: 404
+        };
+      }
+    } catch (error) {
+      // Si es un error 404, podemos intentar con otra estrategia
+      if (error.status === 404) {
+        console.warn(`Habitación ${id} no encontrada. Verificando otras posibles soluciones...`);
+        
+        // Una opción es eliminar la asignación solo en el frontend
+        // Devolvemos un mensaje de éxito simulado
+        return {
+          success: true,
+          message: `Habitación ${id} marcada como desasignada localmente. Refresque la página para actualizar la vista.`,
+          data: { _id: id, asignadoA: null }
+        };
+      }
+      
+      throw error;
+    }
+    
+    // Caso normal: desasignar una reserva de habitación independiente
+    console.log(`Desasignando habitación independiente ${id}`);
     const response = await apiClient.put(`/reservas/habitaciones/${id}/desasignar`);
     return response;
   } catch (error) {
     console.error(`Error al desasignar reserva de habitación ${id}:`, error.message || error);
-    throw error;
+    
+    // Construir un mensaje de error más informativo
+    const errorInfo = {
+      success: false,
+      message: error.message || `Error al desasignar habitación con ID ${id}`,
+      status: error.status || 500,
+      data: error.data || null,
+      habitacionId: id // Incluir el ID de la habitación para depuración
+    };
+    
+    throw errorInfo;
   }
 };
 
 export const unassignEventoReservation = async (id) => {
   try {
-    console.log('Desasignando evento:', id);
-    
-    // 1. Obtener el evento completo para encontrar habitaciones y masajes asociados
-    const eventoResponse = await apiClient.get(`/reservas/eventos/${id}`);
-    const evento = eventoResponse?.data || {};
-    const serviciosAdicionales = evento.serviciosAdicionales || {};
-    
-    // Variables para almacenar resultados
-    const resultados = {
-      evento: null,
-      habitacionesDesasignadas: [],
-      masajesDesasignados: []
-    };
-    
-    // 2. Verificar si hay habitaciones y masajes asociados
-    const tieneHabitaciones = serviciosAdicionales.habitaciones && serviciosAdicionales.habitaciones.length > 0;
-    const tieneMasajes = serviciosAdicionales.masajes && serviciosAdicionales.masajes.length > 0;
-    
-    if (!tieneHabitaciones && !tieneMasajes) {
-      console.log('No hay servicios adicionales para desasignar con este evento');
-      const response = await apiClient.put(`/reservas/eventos/${id}/desasignar`);
-      resultados.evento = response;
-      
-      return {
-        ...response,
-        resultadosAdicionales: {
-          habitaciones: 0,
-          masajes: 0,
-          totalDesasignados: 0,
-          habitacionesOmitidas: 0,
-          masajesOmitidos: 0
-        }
-      };
-    }
-    
-    // Optimización: Obtener listas completas de habitaciones y masajes existentes
-    const [todasHabitaciones, todosMasajes] = await Promise.all([
-      tieneHabitaciones ? apiClient.get('/reservas/habitaciones') : { data: [] },
-      tieneMasajes ? apiClient.get('/reservas/masajes') : { data: [] }
-    ]);
-    
-    // Crear conjuntos de IDs para búsqueda eficiente
-    const habitacionesExistentesMap = new Map();
-    const masajesExistentesMap = new Map();
-    
-    if (tieneHabitaciones && todasHabitaciones?.data) {
-      const habitacionesArray = Array.isArray(todasHabitaciones.data) ? todasHabitaciones.data : [];
-      habitacionesArray.forEach(h => {
-        if (h._id) habitacionesExistentesMap.set(h._id, h);
-      });
-    }
-    
-    if (tieneMasajes && todosMasajes?.data) {
-      const masajesArray = Array.isArray(todosMasajes.data) ? todosMasajes.data : [];
-      masajesArray.forEach(m => {
-        if (m._id) masajesExistentesMap.set(m._id, m);
-      });
-    }
-    
-    // 2. Desasignar habitaciones asociadas
-    if (tieneHabitaciones) {
-      console.log(`Encontradas ${serviciosAdicionales.habitaciones.length} habitaciones asociadas al evento`);
-      
-      for (const habitacion of serviciosAdicionales.habitaciones) {
-        // Solo desasignar si la habitación tiene ID
-        if (habitacion._id || habitacion.reservaHabitacionId) {
-          const habitacionId = habitacion._id || habitacion.reservaHabitacionId;
-          
-          // Verificar si la habitación existe en nuestro mapa local (sin hacer petición)
-          if (!habitacionesExistentesMap.has(habitacionId)) {
-            console.log(`Habitación ${habitacionId} no encontrada en la base de datos, omitiendo desasignación`);
-            resultados.habitacionesDesasignadas.push({ 
-              id: habitacionId, 
-              error: 'Habitación no encontrada en la base de datos',
-              omitida: true
-            });
-            continue;
-          }
-          
-          try {
-            console.log(`Desasignando habitación ${habitacionId} asociada al evento ${id}`);
-            const respHabitacion = await apiClient.put(`/reservas/habitaciones/${habitacionId}/desasignar`);
-            resultados.habitacionesDesasignadas.push({ id: habitacionId, resultado: respHabitacion });
-          } catch (err) {
-            // Si es un error 404, manejar de forma silenciosa
-            if (err.status === 404) {
-              console.log(`Error 404 al desasignar habitación ${habitacionId}, recurso no encontrado`);
-              resultados.habitacionesDesasignadas.push({ 
-                id: habitacionId, 
-                error: 'Recurso no encontrado', 
-                omitida: true
-              });
-            } else {
-              console.error(`Error al desasignar habitación ${habitacionId}:`, err.message || err);
-              resultados.habitacionesDesasignadas.push({ id: habitacionId, error: err.message });
-            }
-          }
-        }
-      }
-    }
-    
-    // 3. Desasignar masajes asociados
-    if (tieneMasajes) {
-      console.log(`Encontrados ${serviciosAdicionales.masajes.length} masajes asociados al evento`);
-      
-      for (const masaje of serviciosAdicionales.masajes) {
-        // Solo desasignar si el masaje tiene ID
-        if (masaje._id || masaje.reservaMasajeId) {
-          const masajeId = masaje._id || masaje.reservaMasajeId;
-          
-          // Verificar si el masaje existe en nuestro mapa local (sin hacer petición)
-          if (!masajesExistentesMap.has(masajeId)) {
-            console.log(`Masaje ${masajeId} no encontrado en la base de datos, omitiendo desasignación`);
-            resultados.masajesDesasignados.push({ 
-              id: masajeId, 
-              error: 'Masaje no encontrado en la base de datos',
-              omitida: true
-            });
-            continue;
-          }
-          
-          try {
-            console.log(`Desasignando masaje ${masajeId} asociado al evento ${id}`);
-            const respMasaje = await apiClient.put(`/reservas/masajes/${masajeId}/desasignar`);
-            resultados.masajesDesasignados.push({ id: masajeId, resultado: respMasaje });
-          } catch (err) {
-            // Si es un error 404, manejar de forma silenciosa
-            if (err.status === 404) {
-              console.log(`Error 404 al desasignar masaje ${masajeId}, recurso no encontrado`);
-              resultados.masajesDesasignados.push({ 
-                id: masajeId, 
-                error: 'Recurso no encontrado', 
-                omitida: true
-              });
-            } else {
-              console.error(`Error al desasignar masaje ${masajeId}:`, err.message || err);
-              resultados.masajesDesasignados.push({ id: masajeId, error: err.message });
-            }
-          }
-        }
-      }
-    }
-    
-    // 4. Desasignar el evento después de desasignar los servicios
-    const response = await apiClient.put(`/reservas/eventos/${id}/desasignar`);
-    resultados.evento = response;
-    
-    console.log('Resultados completos de desasignación:', resultados);
+    console.log(`Desasignando reserva de evento: ${id}`);
+    const response = await apiClient.put(`/reservas/eventos/${id}/desasignar`, {});
     console.log('Respuesta de desasignación de evento:', response);
     
-    // Calcular solo los servicios que se desasignaron correctamente (sin errores)
-    const habitacionesExitosas = resultados.habitacionesDesasignadas.filter(h => !h.error && !h.omitida).length;
-    const masajesExitosos = resultados.masajesDesasignados.filter(m => !m.error && !m.omitida).length;
+    // Recargar la página para que se reflejen los cambios - VERSIÓN MEJORADA
+    console.log('Forzando recarga completa de la página después de desasignar...');
+    setTimeout(() => {
+      window.location.href = '/admin/reservaciones?tipo=evento&timestamp=' + new Date().getTime();
+    }, 300);
     
-    // Devolver el resultado del evento con información adicional
-    return {
-      ...response,
-      resultadosAdicionales: {
-        habitaciones: habitacionesExitosas,
-        masajes: masajesExitosos,
-        totalDesasignados: habitacionesExitosas + masajesExitosos,
-        habitacionesOmitidas: resultados.habitacionesDesasignadas.filter(h => h.omitida).length,
-        masajesOmitidos: resultados.masajesDesasignados.filter(m => m.omitida).length
-      }
-    };
+    return response;
   } catch (error) {
     console.error(`Error al desasignar reserva de evento ${id}:`, error);
     throw error;

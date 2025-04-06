@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaSearch, FaFilter, FaEllipsisV, FaUserCircle, FaSpinner, FaSyncAlt } from 'react-icons/fa';
+import { FaSearch, FaFilter, FaEllipsisV, FaUserCircle, FaSpinner, FaSyncAlt, FaEye } from 'react-icons/fa';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   getHabitacionReservations, 
@@ -114,11 +114,21 @@ export default function AdminReservations() {
         setTiposMasaje([]);
       }
       
+      // Preparar el filtro según la selección actual
+      const filtro = {};
+      if (filterUser === 'sin_asignar') {
+        filtro.sinAsignar = true;
+      } else if (filterUser === 'mis_reservas' || filterUser === user?.id) {
+        filtro.misReservas = true;
+      }
+      
+      console.log('Aplicando filtros para cargar reservas:', filtro);
+      
       // Cargar las reservas según el tipo seleccionado
       const [habitacionData, eventoData, masajeData] = await Promise.all([
-        filterType === 'all' || filterType === 'habitacion' ? getHabitacionReservations() : Promise.resolve({ data: [] }),
-        filterType === 'all' || filterType === 'evento' ? getEventoReservations() : Promise.resolve({ data: [] }),
-        filterType === 'all' || filterType === 'masaje' ? getMasajeReservations() : Promise.resolve({ data: [] })
+        filterType === 'all' || filterType === 'habitacion' ? getHabitacionReservations(filtro) : Promise.resolve({ data: [] }),
+        filterType === 'all' || filterType === 'evento' ? getEventoReservations(filtro) : Promise.resolve({ data: [] }),
+        filterType === 'all' || filterType === 'masaje' ? getMasajeReservations(filtro) : Promise.resolve({ data: [] })
       ]);
       
       // Formatear los datos para la tabla
@@ -140,17 +150,20 @@ export default function AdminReservations() {
         eventoAsociado: h.eventoAsociado
       })) : [];
       
-      const eventoReservations = Array.isArray(eventoData.data) ? eventoData.data.map(e => ({
-        id: e._id,
-        cliente: `${e.nombreContacto} ${e.apellidosContacto}`,
-        tipo: 'evento',
-        fecha: e.fecha,
-        invitados: e.numeroInvitados || 0,
-        estado: e.estadoReserva || 'pendiente',
-        total: e.precio,
-        datosCompletos: e,
-        asignadoA: e.asignadoA
-      })) : [];
+      const eventoReservations = Array.isArray(eventoData.data) ? eventoData.data.map(e => {
+        console.log('Procesando evento:', e._id, 'con tipo:', 'evento');
+        return {
+          id: e._id,
+          cliente: `${e.nombreContacto} ${e.apellidosContacto}`,
+          tipo: 'evento', // Asegurarse de que el tipo sea 'evento' (string)
+          fecha: e.fecha,
+          invitados: e.numeroInvitados || 0,
+          estado: e.estadoReserva || 'pendiente',
+          total: e.precio,
+          datosCompletos: e,
+          asignadoA: e.asignadoA
+        };
+      }) : [];
       
       // Formatear los datos de masajes para la tabla
       const masajeReservations = Array.isArray(masajeData.data) ? masajeData.data.map(m => {
@@ -399,9 +412,29 @@ export default function AdminReservations() {
   };
 
   const getReservationPath = (tipo, id) => {
-    if (tipo === 'habitacion') return `/admin/reservaciones/habitacion/${id}`;
-    if (tipo === 'evento') return `/admin/reservaciones/evento/${id}`;
-    if (tipo === 'masaje') return `/admin/reservaciones/masaje/${id}`;
+    // Agregar depuración para verificar los valores
+    console.log('Construyendo ruta para:', { tipo, id });
+    
+    // Asegurar que tipo sea un string y verificar su valor exacto
+    const tipoStr = String(tipo).toLowerCase().trim();
+    
+    if (tipoStr === 'habitacion') {
+      console.log('Redirigiendo a página de habitación');
+      return `/admin/reservaciones/habitacion/${id}`;
+    }
+    
+    if (tipoStr === 'evento') {
+      console.log('Redirigiendo a página de evento');
+      return `/admin/reservaciones/evento/${id}`;
+    }
+    
+    if (tipoStr === 'masaje') {
+      console.log('Redirigiendo a página de masaje');
+      return `/admin/reservaciones/masaje/${id}`;
+    }
+    
+    // Si no coincide con ninguno, mostrar advertencia y usar ruta genérica
+    console.warn('Tipo de reserva desconocido:', tipo);
     return `/admin/reservaciones/${id}`;
   };
 
@@ -586,27 +619,6 @@ export default function AdminReservations() {
     }
   };
   
-  // Función para verificar las habitaciones guardadas
-  const verificarHabitaciones = async () => {
-    try {
-      const response = await apiClient.get('/api/reservas/prueba/habitaciones-seleccionadas');
-      console.log('Datos de prueba de habitaciones:', response);
-      
-      // Mostrar notificación con resumen
-      if (response && response.data) {
-        toast.success(`Habitaciones encontradas: ${response.data.totalReservasHabitacion}, Eventos con habitaciones: ${response.data.totalEventosConHabitaciones}`);
-      } else {
-        toast.error('No se pudieron obtener datos de habitaciones');
-      }
-      
-      return response;
-    } catch (error) {
-      console.error('Error al verificar habitaciones:', error);
-      toast.error('Error al verificar habitaciones: ' + error.message);
-      return null;
-    }
-  };
-  
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -615,25 +627,6 @@ export default function AdminReservations() {
         </h1>
         
         <div className="flex items-center gap-2">
-          {/* Botón para gestionar reservas asignables */}
-          {filterType === 'evento' || filterType === 'all' ? (
-            <Link 
-              href="/admin/reservaciones/eventos" 
-              className="bg-[var(--color-primary)] text-white py-2 px-4 rounded-md hover:bg-[var(--color-primary-dark)] transition-colors flex items-center"
-            >
-              Gestionar Reservas de Eventos
-            </Link>
-          ) : null}
-          
-          {/* Botón de prueba para verificar habitaciones */}
-          <button
-            onClick={verificarHabitaciones}
-            className="flex items-center gap-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
-          >
-            <FaSyncAlt className="animate-spin" />
-            Verificar Habitaciones
-          </button>
-          
           {/* Buscador */}
           <div className="relative">
             <input
@@ -672,6 +665,7 @@ export default function AdminReservations() {
             >
               <option value="all">Todos los usuarios</option>
               <option value="sin_asignar">Sin asignar</option>
+              <option value="mis_reservas">Mis reservas</option>
               {usuarios.map(usuario => (
                 <option key={usuario._id} value={usuario._id}>
                   {usuario.nombre} {usuario.apellidos}
@@ -887,6 +881,14 @@ export default function AdminReservations() {
                                     href={getReservationPath(reservation.tipo, reservation.id)}
                                     className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 w-full text-left"
                                     role="menuitem"
+                                    onClick={(e) => {
+                                      // Depurar cuando se hace clic en el enlace
+                                      console.log('Clic en Ver detalles para:', {
+                                        id: reservation.id, 
+                                        tipo: reservation.tipo,
+                                        ruta: getReservationPath(reservation.tipo, reservation.id)
+                                      });
+                                    }}
                                   >
                                     Ver detalles
                                   </Link>

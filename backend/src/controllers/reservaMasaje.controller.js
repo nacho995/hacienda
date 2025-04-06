@@ -105,7 +105,30 @@ exports.obtenerReservasMasaje = async (req, res) => {
     
     // Si no es admin, solo ver sus propias reservas
     if (req.user.role !== 'admin') {
-      query.usuario = req.user.id;
+      // Ver tanto las reservas propias como las asignadas a este usuario
+      query = {
+        $or: [
+          { usuario: req.user.id },
+          { asignadoA: req.user.id }
+        ]
+      };
+    } else {
+      // Para administradores, filtrar según los parámetros
+      if (req.query.misReservas === 'true') {
+        // Ver solo las reservas asignadas al admin actual
+        query.asignadoA = req.user.id;
+      } else if (req.query.disponibles === 'true' || req.query.sinAsignar === 'true') {
+        // Ver solo las reservas no asignadas (disponibles)
+        query.asignadoA = null;
+      } else {
+        // Sin filtros específicos, mostrar tanto las asignadas a este admin como las sin asignar
+        query = {
+          $or: [
+            { asignadoA: req.user.id },
+            { asignadoA: null }
+          ]
+        };
+      }
     }
     
     // Filtros opcionales
@@ -127,8 +150,11 @@ exports.obtenerReservasMasaje = async (req, res) => {
       query.terapeuta = req.query.terapeuta;
     }
     
+    console.log('Consulta para obtener reservas de masajes:', JSON.stringify(query));
+    
     const reservas = await ReservaMasaje.find(query)
       .populate('usuario', 'nombre apellidos email telefono')
+      .populate('asignadoA', 'nombre apellidos email')
       .sort({ fechaMasaje: 1, horaMasaje: 1 });
       
     res.status(200).json({
@@ -442,7 +468,28 @@ exports.desasignarReservaMasaje = async (req, res) => {
  */
 exports.getMasajeReservations = async (req, res) => {
   try {
-    const reservas = await ReservaMasaje.find()
+    let query = {};
+    
+    // Filtrar según los parámetros para administradores
+    if (req.query.misReservas === 'true') {
+      // Ver solo las reservas asignadas al admin actual
+      query.asignadoA = req.user.id;
+    } else if (req.query.disponibles === 'true' || req.query.sinAsignar === 'true') {
+      // Ver solo las reservas no asignadas (disponibles)
+      query.asignadoA = null;
+    } else {
+      // Sin filtros específicos, mostrar tanto las asignadas a este admin como las sin asignar
+      query = {
+        $or: [
+          { asignadoA: req.user.id },
+          { asignadoA: null }
+        ]
+      };
+    }
+    
+    console.log('Consulta para obtener reservas de masajes (admin):', JSON.stringify(query));
+    
+    const reservas = await ReservaMasaje.find(query)
       .populate('usuario', 'nombre apellidos email telefono')
       .populate('asignadoA', 'nombre apellidos email')
       .sort({ fechaMasaje: -1 });

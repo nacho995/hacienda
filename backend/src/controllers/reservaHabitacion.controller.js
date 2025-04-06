@@ -90,13 +90,29 @@ exports.obtenerReservasHabitacion = async (req, res) => {
   try {
     let query = { estado: { $ne: 'cancelada' } };
     
-    // Si el usuario está autenticado y es admin, puede ver todas las reservas
+    // Si el usuario está autenticado y es admin, puede ver reservas según filtros
     if (req.user && req.user.role === 'admin') {
-      // Ver todas las reservas
-      query = {};
+      // Filtros para administradores
+      if (req.query.misReservas === 'true') {
+        // Ver solo las reservas asignadas al admin actual
+        query.asignadoA = req.user.id;
+      } else if (req.query.disponibles === 'true' || req.query.sinAsignar === 'true') {
+        // Ver solo las reservas no asignadas (disponibles)
+        query.asignadoA = null;
+      } else {
+        // Sin filtros específicos, mostrar tanto las asignadas a este admin como las sin asignar
+        query = {
+          estado: { $ne: 'cancelada' }, // mantener filtro de estado
+          $or: [
+            { asignadoA: req.user.id },
+            { asignadoA: null }
+          ]
+        };
+      }
     } else if (req.user) {
       // Usuario autenticado normal: ver sus propias reservas
       query = {
+        estado: { $ne: 'cancelada' }, // mantener filtro de estado
         $or: [
           { usuario: req.user.id },
           { asignadoA: req.user.id }
@@ -112,6 +128,8 @@ exports.obtenerReservasHabitacion = async (req, res) => {
         fechaSalida: { $gte: today }
       };
     }
+    
+    console.log('Consulta para obtener reservas de habitaciones:', JSON.stringify(query));
     
     // Ejecutar query
     const reservas = await ReservaHabitacion.find(query)
@@ -489,6 +507,50 @@ exports.asignarReservaHabitacion = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al asignar la reserva de habitación',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Desasignar una reserva de habitación
+ * @route   PUT /api/reservas/habitaciones/:id/desasignar
+ * @access  Private/Admin
+ */
+exports.desasignarReservaHabitacion = async (req, res) => {
+  try {
+    // Buscar la reserva
+    const reserva = await ReservaHabitacion.findById(req.params.id);
+    
+    if (!reserva) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontró la reserva con ese ID'
+      });
+    }
+    
+    // Verificar que el usuario actual es quien tiene asignada la reserva o es admin
+    if (reserva.asignadoA && reserva.asignadoA.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para desasignar esta reserva'
+      });
+    }
+    
+    // Desasignar reserva
+    reserva.asignadoA = null;
+    await reserva.save();
+    
+    res.status(200).json({
+      success: true,
+      data: reserva,
+      message: 'Reserva de habitación desasignada exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al desasignar la reserva de habitación:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al desasignar la reserva de habitación',
       error: error.message
     });
   }
