@@ -436,7 +436,7 @@ export default function Navbar() {
                 }`}
               >
                 <FaCalendarAlt className="mr-1" />
-                <span className="font-medium uppercase tracking-wider text-sm">Reservar</span>
+                <span className="font-medium uppercase tracking-wider text-sm">Cotizar</span>
               </Link>
             </div>
           </div>
@@ -500,7 +500,7 @@ export default function Navbar() {
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <FaCalendarAlt className="mr-2" />
-                <span>Reservar Evento</span>
+                <span>Cotizar Evento</span>
               </Link>
             </div>
             

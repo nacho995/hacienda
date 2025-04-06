@@ -145,6 +145,16 @@ export default function HeroSection({ scrollRef }) {
           >
             <Link
               href="#servicios"
+              onClick={(e) => {
+                e.preventDefault();
+                const serviciosSection = document.querySelector('.services-section');
+                if (serviciosSection) {
+                  serviciosSection.scrollIntoView({ 
+                    behavior: 'smooth',
+                    block: 'start'
+                  });
+                }
+              }}
               className="px-10 py-4 bg-[var(--color-primary)] text-white text-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors inline-block shadow-xl transform hover:scale-105 transition-transform duration-300"
             >
               Descubrir Experiencias

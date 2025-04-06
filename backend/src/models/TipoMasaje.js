@@ -1,11 +1,6 @@
 const mongoose = require('mongoose');
 
 const tipoMasajeSchema = new mongoose.Schema({
-  id: {
-    type: String,
-    required: true,
-    unique: true
-  },
   titulo: {
     type: String,
     required: true

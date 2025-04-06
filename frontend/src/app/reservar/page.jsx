@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { FaCalendarAlt, FaUsers, FaChevronRight, FaCheck, FaRegClock, FaExclamationTriangle } from 'react-icons/fa';
+import { FaCalendarAlt, FaUsers, FaChevronRight, FaCheck, FaRegClock, FaExclamationTriangle, FaTrash, FaCheckCircle } from 'react-icons/fa';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { createEventoReservation, checkEventoAvailability, getEventoOccupiedDates, createMasajeReservation, checkMasajeAvailability } from '@/services/reservationService';
@@ -14,10 +14,16 @@ import apiClient from '@/services/apiClient';
 import { toast } from 'sonner';
 
 // Importar componentes
-import DatePicker from 'react-datepicker';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import es from 'date-fns/locale/es';
 import "react-datepicker/dist/react-datepicker.css";
+import { useReservation } from '@/context/ReservationContext';
+
+// Registrar el locale español para DatePicker
+registerLocale('es', es);
 
 export default function ReservarPage() {
+  // Estados para el formulario
   const [formData, setFormData] = useState({
     tipoEvento: '',
     fecha: null,
@@ -27,9 +33,25 @@ export default function ReservarPage() {
     email: '',
     telefono: '',
     comentarios: '',
+    // Eliminar estos campos ya que se usan los del contexto
     masajesSeleccionados: [],
-    masajePreseleccionado: null
+    habitacionesSeleccionadas: [],
+    espacioSeleccionado: 'jardin'
   });
+  
+  // Usar el contexto de reservaciones
+  const { 
+    masajesSeleccionados, 
+    habitacionesSeleccionadas, 
+    eliminarMasaje: eliminarMasajeSeleccionado, 
+    eliminarHabitacion: eliminarHabitacionSeleccionada, 
+    calcularTotalMasajes,
+    calcularTotalHabitaciones,
+    calcularTotalReserva,
+    limpiarReserva,
+    agregarMasaje,
+    agregarHabitacion
+  } = useReservation();
 
   const [tiposEvento, setTiposEvento] = useState([]); // Estado para tipos de evento
   const [tiposMasaje, setTiposMasaje] = useState([]); // Estado para tipos de masaje
@@ -43,6 +65,20 @@ export default function ReservarPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmationData, setConfirmationData] = useState(null);
   const [fechasOcupadas, setFechasOcupadas] = useState([]);
+  const [fechasDestacadas, setFechasDestacadas] = useState([]);
+  const [espaciosDisponibles, setEspaciosDisponibles] = useState([
+    { id: 'jardin', nombre: 'Jardín Principal' },
+    { id: 'salon', nombre: 'Salón de Eventos' },
+    { id: 'terraza', nombre: 'Terraza Panorámica' }
+  ]);
+  
+  // Añadir console.log para depurar
+  useEffect(() => {
+    console.log("Estado del contexto de reservación:", { 
+      masajesSeleccionados, 
+      habitacionesSeleccionadas 
+    });
+  }, [masajesSeleccionados, habitacionesSeleccionadas]);
   
   // Cargar fechas ocupadas desde el backend al montar el componente
   useEffect(() => {
@@ -66,24 +102,122 @@ export default function ReservarPage() {
   
   // Efecto para manejar los parámetros de URL al cargar la página
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('tipo') === 'masaje') {
-      const masajePreseleccionado = {
-        id: params.get('id'),
-        titulo: params.get('nombre'),
-        duracion: params.get('duracion'),
-        precio: parseInt(params.get('precio')) || 0
-      };
-      
-      setFormData(prev => ({
-        ...prev,
-        masajePreseleccionado
-      }));
+    // Definimos una función que no dependa de agregarMasaje ni agregarHabitacion
+    const procesarParametrosURL = () => {
+      if (typeof window === 'undefined') return; // No ejecutar en SSR
 
-      // Mostrar mensaje informativo
+      const searchParams = new URLSearchParams(window.location.search);
+      const tipo = searchParams.get('tipo');
+      const masajesParam = searchParams.get('masajes');
+      const habitacionesParam = searchParams.get('habitaciones');
+      
+      console.log('Parámetros URL:', { tipo, masajesParam, habitacionesParam });
+
+      // Procesar masajes
+      if (masajesParam) {
+        try {
+          const masajesData = JSON.parse(decodeURIComponent(masajesParam));
+          console.log('Masajes decodificados:', masajesData);
+          
+          if (Array.isArray(masajesData) && masajesData.length > 0) {
+            const masajesProcesados = masajesData.map(masaje => ({
+              id: masaje.id || Math.random().toString(36).substr(2, 9),
+              titulo: masaje.titulo || masaje.nombre || 'Masaje sin nombre',
+              duracion: masaje.duracion || 0,
+              precio: typeof masaje.precio === 'number' ? masaje.precio : parseFloat(masaje.precio || 0)
+            }));
+            
+            // Añadir masajes al contexto
+            masajesProcesados.forEach(masaje => {
+              agregarMasaje(masaje);
+            });
+            
+            toast.success(`${masajesProcesados.length} masaje(s) añadido(s)`);
+            
+            // Programar un desplazamiento al elemento después de que se procesen los datos
+            setTimeout(() => {
+              const serviciosElement = document.getElementById('servicios-adicionales');
+              if (serviciosElement) {
+                serviciosElement.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 500);
+          }
+        } catch (error) {
+          console.error('Error al procesar masajes:', error);
+          toast.error('Error al procesar los masajes seleccionados');
+        }
+      } 
+      
+      // Procesar habitaciones
+      if (habitacionesParam) {
+        try {
+          const habitacionesData = JSON.parse(decodeURIComponent(habitacionesParam));
+          console.log('Habitaciones decodificadas:', habitacionesData);
+          
+          if (Array.isArray(habitacionesData) && habitacionesData.length > 0) {
+            const habitacionesProcesadas = habitacionesData.map(habitacion => ({
+              id: habitacion.id || Math.random().toString(36).substr(2, 9),
+              nombre: habitacion.nombre || 'Habitación sin nombre',
+              fechaEntrada: habitacion.fechaEntrada || new Date().toISOString().split('T')[0],
+              fechaSalida: habitacion.fechaSalida || new Date().toISOString().split('T')[0],
+              precio: typeof habitacion.precio === 'number' ? habitacion.precio : parseFloat(habitacion.precio || 0)
+            }));
+            
+            // Añadir habitaciones al contexto
+            habitacionesProcesadas.forEach(habitacion => {
+              agregarHabitacion(habitacion);
+            });
+            
+            toast.success(`${habitacionesProcesadas.length} habitación(es) añadida(s)`);
+            
+            // Programar un desplazamiento al elemento después de que se procesen los datos
+            setTimeout(() => {
+              const serviciosElement = document.getElementById('servicios-adicionales');
+              if (serviciosElement) {
+                serviciosElement.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 500);
+          }
+        } catch (error) {
+          console.error('Error al procesar habitaciones:', error);
+          toast.error('Error al procesar las habitaciones seleccionadas');
+        }
+      }
+
+      // Procesar tipo de masaje preseleccionado
+      if (tipo === 'masaje') {
+        const masajePreseleccionado = {
+          id: searchParams.get('id') || Math.random().toString(36).substr(2, 9),
+          titulo: searchParams.get('nombre') || 'Masaje',
+          duracion: searchParams.get('duracion') || '60',
+          precio: parseInt(searchParams.get('precio')) || 0
+        };
+        
+        // Añadir al contexto
+        agregarMasaje(masajePreseleccionado);
       toast.info('Seleccione un tipo de evento para continuar con la reserva del masaje');
     }
-  }, []);
+      // Procesar tipo de habitación preseleccionada
+      else if (tipo === 'habitacion') {
+        const habitacionPreseleccionada = {
+          id: searchParams.get('id') || Math.random().toString(36).substr(2, 9),
+          nombre: searchParams.get('nombre') || 'Habitación',
+          fechaEntrada: searchParams.get('fechaEntrada') || new Date().toISOString().split('T')[0],
+          fechaSalida: searchParams.get('fechaSalida') || new Date().toISOString().split('T')[0],
+          precio: parseInt(searchParams.get('precio')) || 0
+        };
+        
+        // Añadir al contexto
+        agregarHabitacion(habitacionPreseleccionada);
+        toast.info('Seleccione un tipo de evento para continuar con la reserva de la habitación');
+      }
+    };
+
+    // Llamamos a la función
+    procesarParametrosURL();
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Dejamos el array de dependencias vacío para que solo se ejecute al montar
   
   // Cargar tipos de evento al montar el componente
   useEffect(() => {
@@ -124,19 +258,58 @@ export default function ReservarPage() {
   }, []);
   
   const handleSelectTipoEvento = (tipo) => {
+    console.log('Tipo de evento seleccionado:', tipo);
+    // Buscar por id en lugar de _id
+    const tipoEventoSeleccionado = tiposEvento.find(t => t.id === tipo || t._id === tipo);
+    console.log('Objeto tipo evento completo:', tipoEventoSeleccionado);
+    
+    if (!tipoEventoSeleccionado) {
+      console.error('No se encontró el tipo de evento:', tipo);
+      toast.error('Error al seleccionar el tipo de evento');
+      return;
+    }
+    
+    // Determinar espacios disponibles según el tipo de evento
+    let espaciosPermitidos = [];
+    switch (tipoEventoSeleccionado.id) {
+      case 'boda':
+        espaciosPermitidos = ['jardin', 'salon'];
+        break;
+      case 'aniversario':
+        espaciosPermitidos = ['jardin', 'salon', 'terraza'];
+        break;
+      case 'corporativo':
+        espaciosPermitidos = ['salon', 'terraza'];
+        break;
+      case 'social':
+        espaciosPermitidos = ['jardin', 'salon', 'terraza'];
+        break;
+      default:
+        espaciosPermitidos = ['salon'];
+    }
+    
+    // Actualizar espacios disponibles
+    setEspaciosDisponibles(prevEspacios => 
+      prevEspacios.filter(espacio => espaciosPermitidos.includes(espacio.id))
+    );
+    
     setFormData(prev => {
-      const newFormData = { ...prev, tipoEvento: tipo };
-      
-      // Si hay un masaje preseleccionado, lo agregamos a masajesSeleccionados
-      if (prev.masajePreseleccionado && !prev.masajesSeleccionados.some(m => m.id === prev.masajePreseleccionado.id)) {
-        newFormData.masajesSeleccionados = [prev.masajePreseleccionado];
-      }
-      
+      const newFormData = { 
+        ...prev, 
+        tipoEvento: tipoEventoSeleccionado._id || tipoEventoSeleccionado.id,
+        espacioSeleccionado: espaciosPermitidos[0] // Seleccionar el primer espacio disponible por defecto
+      };
+      console.log('Nuevo estado del formulario:', newFormData);
       return newFormData;
     });
     
     setPaso(2);
-    document.getElementById('paso-2').scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      const elementoPaso2 = document.getElementById('paso-2');
+      if (elementoPaso2) {
+        elementoPaso2.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
   };
   
   const handleFechaChange = (date) => {
@@ -151,7 +324,13 @@ export default function ReservarPage() {
   
   const handleProceedToPaso3 = () => {
     setPaso(3);
-    document.getElementById('paso-3').scrollIntoView({ behavior: 'smooth' });
+    // Añadir comprobación de existencia para evitar errores
+    setTimeout(() => {
+      const elementoPaso3 = document.getElementById('paso-3');
+      if (elementoPaso3) {
+        elementoPaso3.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
   };
   
   const handleInputChange = (e) => {
@@ -215,120 +394,445 @@ export default function ReservarPage() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitError(null);
-    setIsSubmitting(true);
+  // Al cargar el componente, ir directamente a la sección de servicios si hay un fragmento en la URL
+  useEffect(() => {
+    // Verificar si hay un fragmento de servicios-adicionales en la URL
+    if (window.location.hash === '#servicios-adicionales') {
+      setTimeout(() => {
+        const serviciosElement = document.getElementById('servicios-adicionales');
+        if (serviciosElement) {
+          serviciosElement.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 500);
+    }
+  }, []);
+
+  // Renderizar el resumen de servicios (masajes y habitaciones)
+  const renderResumenServicios = () => {
+    console.log('Renderizando resumen de servicios (función principal):', {
+      masajes: masajesSeleccionados,
+      habitaciones: habitacionesSeleccionadas
+    });
+
+    // Verificar si los datos están vacíos
+    if (masajesSeleccionados.length === 0 && habitacionesSeleccionadas.length === 0) {
+      console.log('No hay servicios seleccionados');
+      return (
+        <section id="servicios-adicionales" className="mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h4 className="text-lg font-semibold text-[var(--color-accent)] mb-4">
+              Servicios Adicionales
+            </h4>
+            <p className="text-gray-500 italic">No hay servicios adicionales seleccionados.</p>
+            <div className="mt-4 flex gap-2">
+              <Link href="/masajes" className="text-[var(--color-primary)] hover:underline">
+                Agregar masajes
+              </Link>
+              <span className="text-gray-400">|</span>
+              <Link href="/habitaciones" className="text-[var(--color-primary)] hover:underline">
+                Agregar habitaciones
+              </Link>
+            </div>
+          </div>
+        </section>
+      );
+    }
 
     try {
-      // Validar campos obligatorios
-      if (!formData.fecha || !formData.nombre || !formData.apellidos || !formData.email || !formData.telefono) {
-        setSubmitError('Por favor, completa todos los campos obligatorios.');
-        toast.error('Faltan datos obligatorios');
-        return;
-      }
+      const totalMasajes = calcularTotalMasajes();
+      const totalHabitaciones = calcularTotalHabitaciones();
+      const totalGeneral = calcularTotalReserva();
 
-      // Validar tipo de evento
-      if (!formData.tipoEvento) {
-        setSubmitError('Por favor, seleccione un tipo de evento.');
-        toast.error('Seleccione un tipo de evento');
-        return;
-      }
-
-      // Validar número de invitados
-      if (formData.invitados < 10) {
-        setSubmitError('El número mínimo de invitados es 10.');
-        toast.error('Número de invitados inválido');
-        return;
-      }
-
-      const fechaEvento = formData.fecha instanceof Date ? formData.fecha : new Date(formData.fecha);
+      return (
+        <section id="servicios-adicionales" className="mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h4 className="text-lg font-semibold text-[var(--color-accent)] mb-4">
+              Servicios Adicionales
+            </h4>
+            
+            {masajesSeleccionados.length > 0 && (
+              <div className="mb-6">
+                <h5 className="font-medium text-gray-700 mb-2">Masajes seleccionados:</h5>
+                <div className="space-y-3">
+                  {masajesSeleccionados.map((masaje) => (
+                    <div key={masaje.id} className="flex justify-between items-center p-3 border border-gray-200 rounded-lg bg-gray-50">
+                      <div>
+                        <div className="font-medium">{masaje.titulo || masaje.nombre}</div>
+                        <div className="text-sm text-gray-600">
+                          Duración: {masaje.duracion} min | Precio: ${parseFloat(masaje.precio).toFixed(2)}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => eliminarMasajeSeleccionado(masaje.id)}
+                        className="text-red-500 hover:text-red-700"
+                        title="Eliminar masaje"
+                      >
+                        <FaTrash size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-right font-medium">
+                  Total masajes: ${totalMasajes.toFixed(2)}
+                </div>
+              </div>
+            )}
+            
+            {habitacionesSeleccionadas.length > 0 && (
+              <div className="mb-6">
+                <h5 className="font-medium text-gray-700 mb-2">Habitaciones seleccionadas:</h5>
+                <div className="space-y-3">
+                  {habitacionesSeleccionadas.map((habitacion) => (
+                    <div key={habitacion.id} className="flex justify-between items-center p-3 border border-gray-200 rounded-lg bg-gray-50">
+                      <div>
+                        <div className="font-medium">{habitacion.nombre}</div>
+                        <div className="text-sm text-gray-600">
+                          Fechas tentativas: {new Date(habitacion.fechaEntrada).toLocaleDateString()} - {new Date(habitacion.fechaSalida).toLocaleDateString()} | 
+                          Precio: ${parseFloat(habitacion.precio).toFixed(2)}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => eliminarHabitacionSeleccionada(habitacion.id)}
+                        className="text-red-500 hover:text-red-700"
+                        title="Eliminar habitación"
+                      >
+                        <FaTrash size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-right font-medium">
+                  Total habitaciones: ${totalHabitaciones.toFixed(2)}
+                </div>
+                <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                  <strong>Nota:</strong> Las fechas definitivas de hospedaje se ajustarán automáticamente según la fecha del evento seleccionada.
+                </div>
+              </div>
+            )}
+            
+            <div className="mt-4 border-t border-gray-200 pt-4">
+              <div className="flex justify-between items-center font-semibold text-lg">
+                <span>Total servicios adicionales:</span>
+                <span>${totalGeneral.toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/masajes" className="px-4 py-2 text-sm border border-[var(--color-primary)] text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/5">
+                Agregar más masajes
+              </Link>
+              <Link href="/habitaciones" className="px-4 py-2 text-sm border border-[var(--color-primary)] text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/5">
+                Agregar más habitaciones
+              </Link>
+            </div>
+          </div>
+        </section>
+      );
+    } catch (error) {
+      console.error('Error al renderizar el resumen de servicios:', error);
+      toast.error('Error al mostrar los servicios seleccionados');
       
-      // Obtener el tipo de evento seleccionado
-      const tipoEventoSeleccionado = tiposEvento.find(t => t.id === formData.tipoEvento);
+      return (
+        <section id="servicios-adicionales" className="mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            <h4 className="text-lg font-semibold text-[var(--color-accent)] mb-4">
+              Servicios Adicionales
+            </h4>
+            <p className="text-red-500">
+              Ocurrió un error al mostrar los servicios seleccionados. Por favor, intente nuevamente.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Link href="/masajes" className="text-[var(--color-primary)] hover:underline">
+                Agregar masajes
+              </Link>
+              <span className="text-gray-400">|</span>
+              <Link href="/habitaciones" className="text-[var(--color-primary)] hover:underline">
+                Agregar habitaciones
+              </Link>
+            </div>
+          </div>
+        </section>
+      );
+    }
+  };
+
+  // Función para verificar disponibilidad del espacio
+  const verificarDisponibilidadEspacio = async (espacio, fecha, horaInicio, horaFin) => {
+    try {
+      console.log('Verificando disponibilidad:', { espacio, fecha, horaInicio, horaFin });
+      
+      const response = await apiClient.post('/reservas/eventos/disponibilidad', {
+        fecha: fecha instanceof Date ? fecha.toISOString().split('T')[0] : fecha,
+        espacio,
+        horaInicio,
+        horaFin
+      });
+
+      console.log('Respuesta de disponibilidad:', response);
+      
+      // Si no hay respuesta o no tiene la propiedad disponible, asumimos que no está disponible
+      if (!response || typeof response.disponible !== 'boolean') {
+        console.error('Respuesta inválida del servidor:', response);
+        return false;
+      }
+      
+      return response.disponible;
+    } catch (error) {
+      console.error('Error al verificar disponibilidad:', error);
+      // Si hay un error 404, significa que el endpoint no existe
+      if (error.response?.status === 404) {
+        // Por ahora, asumimos que está disponible si el endpoint no existe
+        console.warn('Endpoint de disponibilidad no implementado, asumiendo disponible');
+        return true;
+      }
+      return false;
+    }
+  };
+
+  // Modificar handleSubmit para verificar disponibilidad
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      // Validaciones iniciales
+      if (!formData.fecha) {
+        throw new Error('Por favor, seleccione una fecha para el evento');
+      }
+
+      if (!formData.tipoEvento) {
+        throw new Error('Por favor, seleccione un tipo de evento');
+      }
+
+      // Formatear la fecha del evento una sola vez
+      const fechaEvento = formData.fecha.toISOString().split('T')[0];
+
+      // Informar al usuario si hay habitaciones que se ajustarán a la fecha del evento
+      if (habitacionesSeleccionadas.length > 0) {
+        // Formatear fecha para mostrar al usuario
+        const fechaEventoFormateada = formData.fecha.toLocaleDateString();
+        const fechaSalidaAux = new Date(formData.fecha);
+        fechaSalidaAux.setDate(fechaSalidaAux.getDate() + 1);
+        const fechaSalidaFormateada = fechaSalidaAux.toLocaleDateString();
+        
+        toast.info(`Las fechas de las habitaciones se ajustarán a la fecha del evento: entrada ${fechaEventoFormateada}, salida ${fechaSalidaFormateada}`);
+      }
+
+      // Verificar disponibilidad del espacio
+      console.log('Verificando disponibilidad para:', {
+        espacio: formData.espacioSeleccionado,
+        fecha: fechaEvento,
+        horaInicio: "10:00",
+        horaFin: "21:00"
+      });
+
+      const espacioDisponible = await verificarDisponibilidadEspacio(
+        formData.espacioSeleccionado,
+        fechaEvento,
+        "10:00",
+        "21:00"
+      );
+
+      if (!espacioDisponible) {
+        toast.error('El espacio seleccionado no está disponible para la fecha y hora indicadas');
+        setLoading(false);
+        return;
+      }
+
+      // Validar masajes seleccionados de forma explícita
+      const masajesValidados = [];
+      
+      for (const masaje of masajesSeleccionados) {
+        // Verificación de ID
+        const tipoMasajeId = masaje.tipoMasaje || masaje._id;
+        if (!tipoMasajeId) {
+          console.error('Masaje sin ID válido para tipoMasaje:', masaje);
+          throw new Error('Tipo de masaje no válido');
+        }
+        
+        // Verificación de precio
+        let precio;
+        try {
+          precio = parseFloat(masaje.precio);
+          if (isNaN(precio) || precio <= 0) {
+            console.error('Precio de masaje inválido:', masaje.precio);
+            throw new Error(`Precio de masaje no válido: ${masaje.precio}`);
+          }
+        } catch (err) {
+          console.error('Error al parsear precio:', err);
+          throw new Error(`Error al procesar el precio del masaje: ${masaje.precio}`);
+        }
+        
+        // Construir objeto de masaje verificado
+        const masajeValidado = {
+          tipoMasaje: tipoMasajeId,
+          titulo: masaje.titulo || masaje.nombre || 'Masaje sin nombre',
+          // Ajustar la duración a uno de los valores permitidos en el enum [30, 60, 90, 120]
+          duracion: ajustarDuracionValida(parseInt(masaje.duracion || 60)),
+          hora: masaje.hora || "10:00",
+          fecha: masaje.fecha || fechaEvento,
+          nombreContacto: formData.nombre,
+          apellidosContacto: formData.apellidos,
+          emailContacto: formData.email,
+          telefonoContacto: formData.telefono,
+          precio: precio,
+          estadoReserva: 'pendiente'
+        };
+        
+        console.log('Masaje validado:', masajeValidado);
+        masajesValidados.push(masajeValidado);
+      }
+
+      // Obtener y validar el tipo de evento
+      const tipoEventoSeleccionado = tiposEvento.find(tipo => tipo._id === formData.tipoEvento);
+      
       if (!tipoEventoSeleccionado) {
-        setSubmitError('Tipo de evento no válido');
-        toast.error('Tipo de evento inválido');
-        return;
+        throw new Error('El tipo de evento seleccionado no es válido');
       }
 
-      // Verificar disponibilidad
-      const disponibilidadData = {
-        fecha: fechaEvento.toISOString().split('T')[0],
-        horaInicio: "09:00",
-        horaFin: "21:00",
-        espacio: tipoEventoSeleccionado.espacio || 'jardin'
-      };
-
-      console.log('Verificando disponibilidad con datos:', disponibilidadData);
-      const disponibilidadResponse = await checkEventoAvailability(disponibilidadData);
-      console.log('Respuesta de verificación de disponibilidad:', disponibilidadResponse);
-
-      if (!disponibilidadResponse || !disponibilidadResponse.success || !disponibilidadResponse.disponible) {
-        const errorMsg = disponibilidadResponse?.mensaje || 'El espacio no está disponible para la fecha seleccionada.';
-        console.error('Error de disponibilidad:', errorMsg);
-        setSubmitError(errorMsg);
-        toast.error(errorMsg);
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Si llegamos aquí, el espacio está disponible
-      console.log('Espacio disponible, procediendo con la reserva');
-
-      // Crear objeto de reserva
+      // Construir el objeto de reserva
       const reservaData = {
+        nombreEvento: `${tipoEventoSeleccionado.titulo || 'Evento'} - ${formData.nombre} ${formData.apellidos}`,
         tipoEvento: tipoEventoSeleccionado._id,
-        nombreEvento: `${formData.nombre} ${formData.apellidos}`,
-        fecha: fechaEvento.toISOString().split('T')[0],
-        horaInicio: "09:00",
+        fecha: fechaEvento,
+        horaInicio: "10:00",
         horaFin: "21:00",
-        espacioSeleccionado: tipoEventoSeleccionado.espacio || 'jardin',
+        espacioSeleccionado: formData.espacioSeleccionado,
         numInvitados: parseInt(formData.invitados),
         nombreContacto: formData.nombre,
         apellidosContacto: formData.apellidos,
         emailContacto: formData.email,
         telefonoContacto: formData.telefono,
-        comentarios: formData.comentarios || '',
-        serviciosAdicionales: formData.masajesSeleccionados.map(masaje => ({
-          tipo: 'masaje',
-          id: masaje.id,
-          titulo: masaje.titulo,
-          precio: masaje.precio
-        }))
+        peticionesEspeciales: formData.comentarios || '',
+        presupuestoEstimado: parseFloat(tipoEventoSeleccionado.precio || 0),
+        serviciosAdicionales: {
+          masajes: masajesValidados.map(masaje => {
+            // Asegurarnos que el masaje tenga un ID válido y un precio válido
+            if (!masaje.tipoMasaje) {
+              console.error('Error: masaje sin tipoMasaje válido:', masaje);
+              throw new Error('Tipo de masaje no válido');
+            }
+            
+            // Validar precio
+            let precioMasaje;
+            try {
+              precioMasaje = parseFloat(masaje.precio);
+              if (isNaN(precioMasaje) || precioMasaje <= 0) {
+                console.error('Error: precio de masaje inválido:', masaje.precio);
+                throw new Error('Precio de masaje no válido');
+              }
+            } catch (error) {
+              console.error('Error al parsear precio de masaje:', error);
+              throw new Error('Error al procesar precio de masaje');
+            }
+            
+            return {
+              tipoMasaje: masaje.tipoMasaje,  // Campo obligatorio para el modelo
+              titulo: masaje.titulo || masaje.nombre,
+              duracion: ajustarDuracionValida(parseInt(masaje.duracion || 60)),
+              hora: masaje.hora || "10:00",
+              fecha: masaje.fecha || fechaEvento,
+              nombreContacto: formData.nombre,
+              apellidosContacto: formData.apellidos,
+              emailContacto: formData.email,
+              telefonoContacto: formData.telefono,
+              precio: precioMasaje,  // Campo obligatorio para el modelo
+              estadoReserva: 'pendiente'
+            };
+          }),
+          habitaciones: habitacionesSeleccionadas.map(habitacion => {
+            console.log('Procesando habitación para envío:', habitacion);
+            
+            // Usar la fecha del evento como la fecha de entrada
+            const fechaEntrada = fechaEvento;
+            
+            // Calcular la fecha de salida como el día siguiente al evento
+            const fechaSalida = new Date(fechaEvento);
+            fechaSalida.setDate(fechaSalida.getDate() + 1);
+            const fechaSalidaStr = fechaSalida.toISOString().split('T')[0];
+            
+            return {
+              tipoHabitacion: habitacion.tipoHabitacion || habitacion.id,
+              nombre: habitacion.nombre,
+              fechaEntrada: fechaEntrada, // Fecha del evento
+              fechaSalida: fechaSalidaStr, // Día después del evento
+              precio: parseFloat(habitacion.precio),
+              numeroHabitaciones: habitacion.numeroHabitaciones || 1,
+              numHuespedes: habitacion.numHuespedes || 2
+            };
+          })
+        }
       };
 
-      console.log('Enviando reserva:', reservaData);
-      const response = await createEventoReservation(reservaData);
+      console.log('Datos de reserva a enviar:', JSON.stringify(reservaData, null, 2));
+      console.log('Habitaciones seleccionadas que se enviarán:', JSON.stringify(reservaData.serviciosAdicionales.habitaciones, null, 2));
       
-      if (response && response.success) {
-        const confirmationData = {
-          ...response.data,
+      try {
+        // Hacer la petición al backend
+      const response = await createEventoReservation(reservaData);
+        console.log('Respuesta del servidor:', response);
+        
+        if (response && (response.data || response.id)) {
+          // Guardar los datos de confirmación para mostrarlos en la siguiente pantalla
+          setConfirmationData({
+            numeroReserva: response.data?.id || response.id,
           tipoEvento: tipoEventoSeleccionado.titulo,
-          fecha: fechaEvento,
+            fecha: formData.fecha.toLocaleDateString(),
           invitados: formData.invitados,
           nombre: formData.nombre,
           apellidos: formData.apellidos,
           email: formData.email,
           telefono: formData.telefono,
-          masajesSeleccionados: formData.masajesSeleccionados
-        };
-        
-        setConfirmationData(confirmationData);
-        toast.success('Reserva creada con éxito');
+            masajes: masajesSeleccionados,
+            habitaciones: habitacionesSeleccionadas,
+            totalMasajes: calcularTotalMasajes(),
+            totalHabitaciones: calcularTotalHabitaciones(),
+            total: calcularTotalReserva()
+          });
+          
+          // Limpiar el formulario después de enviar
+          setFormData({
+            tipoEvento: '',
+            fecha: null,
+            invitados: 50,
+            nombre: '',
+            apellidos: '',
+            email: '',
+            telefono: '',
+            comentarios: ''
+          });
+          
+          // Limpiar la selección en el contexto
+          limpiarReserva();
+          
+          // Mostrar mensaje de éxito
+          toast.success('¡Solicitud de cotización enviada con éxito!');
+          
+          // Avanzar al paso de confirmación
         setPaso(4);
       } else {
-        const errorMessage = response?.mensaje || response?.message || 'No se pudo procesar la reserva';
-        setSubmitError(errorMessage);
-        toast.error(errorMessage);
+          throw new Error('No se recibió confirmación del servidor');
       }
     } catch (error) {
-      console.error('Error al crear la reserva:', error);
-      const errorMessage = error.mensaje || error.message || 'Error al crear la reserva';
-      setSubmitError(errorMessage);
-      toast.error(errorMessage);
+        console.error('Error detallado:', error);
+        let mensajeError = 'Error desconocido al procesar la solicitud.';
+        
+        if (error.response?.data?.message) {
+          mensajeError = error.response.data.message;
+        } else if (error.message) {
+          mensajeError = error.message;
+        }
+        
+        setSubmitError(`Hubo un problema al enviar la solicitud: ${mensajeError}`);
+        toast.error(mensajeError);
+      }
+    } catch (error) {
+      console.error('Error al enviar la solicitud:', error);
+      setSubmitError(`Hubo un problema al enviar la solicitud: ${error.message || 'Error desconocido'}. Por favor, intente nuevamente.`);
+      toast.error('Error al enviar la solicitud');
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
   
@@ -349,21 +853,84 @@ export default function ReservarPage() {
   
   // Función para manejar la selección de masajes
   const handleMasajeSelection = (masaje) => {
-    setFormData(prev => {
-      const masajesActuales = [...prev.masajesSeleccionados];
-      const index = masajesActuales.findIndex(m => m.id === masaje.id);
-      
-      if (index >= 0) {
-        masajesActuales.splice(index, 1);
-      } else {
-        masajesActuales.push(masaje);
+    console.log('Masaje recibido para selección:', masaje);
+    
+    // Verificar que el masaje sea válido
+    if (!masaje || typeof masaje !== 'object') {
+      console.error('Masaje inválido:', masaje);
+      toast.error('Error: Masaje inválido');
+      return;
+    }
+
+    // Verificar que tenga un ID válido
+    if (!masaje._id) {
+      console.error('Error: Masaje sin ID de MongoDB:', masaje);
+      toast.error('Error: Masaje sin ID válido');
+      return;
+    }
+
+    // Verificar si ya está seleccionado
+    const estaSeleccionado = masajesSeleccionados.some(m => m._id === masaje._id);
+    
+    if (estaSeleccionado) {
+      // Si ya está seleccionado, lo removemos
+      eliminarMasajeSeleccionado(masaje._id);
+      toast.success(`${masaje.titulo || masaje.nombre} removido de la selección`);
+    } else {
+      // Validar precio
+      const precio = parseFloat(masaje.precio || 0);
+      if (isNaN(precio) || precio <= 0) {
+        console.error('Error: Precio de masaje inválido:', masaje.precio);
+        toast.error('Error: Precio de masaje inválido');
+        return;
       }
-      
-      return {
-        ...prev,
-        masajesSeleccionados: masajesActuales
+
+      // Crear el objeto del masaje con todos los campos necesarios
+      const nuevoMasaje = {
+        _id: masaje._id,
+        tipoMasaje: masaje._id, // Campo tipoMasaje debe ser el ID de MongoDB del masaje
+        titulo: masaje.titulo || masaje.nombre || 'Masaje sin nombre',
+        duracion: ajustarDuracionValida(parseInt(masaje.duracion || 60)),
+        precio: precio, // Asegurar que precio sea un número
+        hora: "10:00",
+        fecha: formData.fecha ? formData.fecha.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        estadoReserva: 'pendiente',
+        nombreContacto: formData.nombre || '',
+        apellidosContacto: formData.apellidos || '',
+        emailContacto: formData.email || '',
+        telefonoContacto: formData.telefono || ''
       };
-    });
+      
+      console.log('Agregando nuevo masaje con estructura:', nuevoMasaje);
+      agregarMasaje(nuevoMasaje);
+      toast.success(`${masaje.titulo || masaje.nombre} agregado a la selección`);
+    }
+  };
+  
+  // Función para manejar la selección de habitaciones
+  const handleHabitacionSelection = (habitacion) => {
+    console.log('Habitación seleccionada:', habitacion);
+    
+    // Verificar si ya está seleccionada
+    const estaSeleccionada = habitacionesSeleccionadas.some(h => h.id === habitacion._id);
+    
+    if (estaSeleccionada) {
+      // Si ya está seleccionada, la removemos
+      const nuevasHabitaciones = habitacionesSeleccionadas.filter(h => h.id !== habitacion._id);
+      setHabitacionesSeleccionadas(nuevasHabitaciones);
+      toast.success(`${habitacion.nombre} removida de la selección`);
+    } else {
+      // Si no está seleccionada, la agregamos
+      const nuevaHabitacion = {
+        id: habitacion._id, // Asegurarnos de usar el _id de MongoDB
+        nombre: habitacion.nombre,
+        fechaEntrada: habitacion.fechaEntrada || formData.fecha?.toISOString().split('T')[0],
+        fechaSalida: habitacion.fechaSalida || formData.fecha?.toISOString().split('T')[0],
+        precio: parseFloat(habitacion.precio || 0)
+      };
+      setHabitacionesSeleccionadas([...habitacionesSeleccionadas, nuevaHabitacion]);
+      toast.success(`${habitacion.nombre} agregada a la selección`);
+    }
   };
   
   const renderResumenMasajes = () => {
@@ -424,11 +991,57 @@ export default function ReservarPage() {
     );
   };
   
-  // Modificar el renderizado para mostrar información específica de masajes
+  // Renderizar resumen de habitaciones
+  const renderResumenHabitaciones = () => {
+    if (!formData.habitacionesSeleccionadas || formData.habitacionesSeleccionadas.length === 0) {
+      return null;
+    }
+
+    const totalHabitaciones = formData.habitacionesSeleccionadas.reduce((total, hab) => total + hab.precio, 0);
+
+    return (
+      <div className="mt-6 p-4 bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30">
+        <h4 className="text-lg font-[var(--font-display)] mb-4 text-[var(--color-primary)]">
+          Habitaciones Seleccionadas
+        </h4>
+        <div className="space-y-3">
+          {formData.habitacionesSeleccionadas.map((habitacion, index) => (
+            <div key={index} className="flex justify-between items-start p-3 bg-white/50">
+              <div>
+                <p className="font-medium text-[var(--color-accent)]">{habitacion.nombre}</p>
+                <p className="text-sm text-gray-600">
+                  Fechas tentativas: {new Date(habitacion.fechaEntrada).toLocaleDateString()} - {new Date(habitacion.fechaSalida).toLocaleDateString()} | 
+                  Precio: ${parseFloat(habitacion.precio).toFixed(2)}
+                </p>
+              </div>
+              <button
+                onClick={() => eliminarHabitacionSeleccionada(habitacion.id)}
+                className="text-red-500 hover:text-red-700"
+                title="Eliminar habitación"
+              >
+                <FaTrash size={16} />
+              </button>
+            </div>
+          ))}
+          <div className="pt-3 border-t border-[var(--color-primary)]/20">
+            <div className="flex justify-between items-center">
+              <p className="font-medium">Total Habitaciones:</p>
+              <p className="font-semibold text-[var(--color-primary)]">${totalHabitaciones}</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+          <strong>Nota:</strong> Las fechas definitivas de hospedaje se ajustarán automáticamente según la fecha del evento seleccionada.
+        </div>
+      </div>
+    );
+  };
+  
+  // Renderizar el paso 1 (tipos de evento)
   const renderPaso1 = () => {
     if (loading) {
       return (
-        <section className="container-custom mb-24">
+        <section className="w-full mb-12">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)] mx-auto"></div>
@@ -441,7 +1054,7 @@ export default function ReservarPage() {
 
     if (!tiposEvento || tiposEvento.length === 0) {
       return (
-        <section className="container-custom mb-24">
+        <section className="w-full mb-12">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
               <FaExclamationTriangle className="text-4xl text-yellow-500 mx-auto mb-4" />
@@ -454,12 +1067,12 @@ export default function ReservarPage() {
     }
 
     return (
-      <section className="container-custom mb-24">
+      <section id="paso-1" className="w-full mb-12">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="text-center mb-16"
+          className="text-center mb-8"
         >
           <h2 className="text-4xl font-bold mb-4 text-[var(--color-primary)]">
             Seleccione el tipo de evento
@@ -469,49 +1082,49 @@ export default function ReservarPage() {
           </p>
         </motion.div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
           {tiposEvento.map((tipo) => (
             <motion.div 
               key={tipo._id || tipo.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              whileHover={{ y: -5 }}
+              whileHover={{ y: -5, scale: 1.02 }}
               transition={{ duration: 0.3 }}
-              className={`relative bg-white shadow-xl cursor-pointer overflow-hidden h-[400px] border-2 transition-colors ${
-                formData.tipoEvento === tipo.id ? 'border-[var(--color-primary)]' : 'border-transparent'
+              className={`relative bg-white rounded-lg shadow-xl cursor-pointer overflow-hidden h-[380px] border-2 transition-all ${
+                formData.tipoEvento === (tipo._id || tipo.id) ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/50' : 'border-transparent hover:shadow-2xl'
               }`}
-              onClick={() => handleSelectTipoEvento(tipo.id)}
-              onMouseEnter={() => setHoveredCard(tipo.id)}
+              onClick={() => handleSelectTipoEvento(tipo._id || tipo.id)}
+              onMouseEnter={() => setHoveredCard(tipo._id || tipo.id)}
               onMouseLeave={() => setHoveredCard(null)}
             >
-              <div className="relative h-full">
+              <div className="relative h-[250px] overflow-hidden">
                 <Image
                   src={tipo.imagen || '/images/placeholder/gallery1.svg'}
                   alt={tipo.titulo}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-transform duration-700 hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-black/20"></div>
+                
+                {formData.tipoEvento === tipo.id && (
+                  <div className="absolute top-3 right-3 w-8 h-8 bg-[var(--color-primary)] rounded-full flex items-center justify-center z-10 shadow-lg">
+                    <FaCheck className="text-white text-sm" />
+                  </div>
+                )}
               </div>
               
-              <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+              <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
                 <h3 className="text-2xl font-[var(--font-display)] mb-2 shadow-text-strong">{tipo.titulo}</h3>
-                <p className="text-white/90 text-sm mb-2 shadow-text line-clamp-2">{tipo.descripcion}</p>
+                <p className="text-white/90 text-sm mb-3 shadow-text line-clamp-2">{tipo.descripcion}</p>
                 
                 <div className="flex justify-between items-center pt-2 opacity-90">
-                  <div className="flex items-center space-x-1 text-xs">
+                  <div className="flex items-center space-x-1 text-sm bg-black/30 px-2 py-1 rounded-full">
                     <FaUsers className="text-[var(--color-primary)]" />
                     <span>{tipo.capacidad} invitados</span>
                   </div>
-                  <div className="text-sm font-medium">{tipo.precio}</div>
+                  <div className="text-sm font-medium bg-[var(--color-primary)]/90 px-3 py-1 rounded-full">{tipo.precio}</div>
                 </div>
               </div>
-              
-              {formData.tipoEvento === tipo.id && (
-                <div className="absolute top-3 right-3 w-7 h-7 bg-[var(--color-primary)] rounded-full flex items-center justify-center">
-                  <FaCheck className="text-white text-sm" />
-                </div>
-              )}
             </motion.div>
           ))}
         </div>
@@ -522,180 +1135,680 @@ export default function ReservarPage() {
   // Modificar el renderizado del paso 2 para incluir la selección de masajes
   const renderPaso2 = () => {
     return (
-      <section id="paso-2" className={`container-custom mb-24 transition-opacity duration-500 ${paso >= 2 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={paso >= 2 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-16"
-        >
-          <h2 className="text-4xl font-bold mb-4 text-[var(--color-primary)]">
-            Seleccione la fecha y servicios adicionales
-          </h2>
-          <p className="text-xl max-w-3xl mx-auto text-gray-700">
-            Elija la fecha para su {formData.tipoEvento && (tiposEvento.find(t => t.id === formData.tipoEvento)?.titulo || 'evento').toLowerCase()} y los servicios que desee incluir
-          </p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Calendario y número de invitados (código existente) */}
-          <div className="bg-white p-8 shadow-xl">
-            <h3 className="text-2xl font-[var(--font-display)] text-[var(--color-accent)] mb-6 text-center">Seleccionar Fecha</h3>
+      <div id="paso-2" className="flex flex-col">
+        <h3 className="text-2xl font-semibold mb-6">Detalles del Evento</h3>
+        
+        <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <h4 className="text-lg font-semibold text-[var(--color-accent)] mb-4">Fecha y tipo de evento</h4>
             
             <div className="mb-8">
-              <div 
-                className="relative cursor-pointer border border-gray-300 p-4 rounded-lg flex items-center"
-                onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-              >
-                <FaCalendarAlt className="text-[var(--color-primary)] mr-3" />
-                <input 
-                  type="text"
-                  className="w-full border-none focus:outline-none pointer-events-none bg-transparent"
-                  value={fechaSeleccionada ? fechaSeleccionada.toLocaleDateString() : 'Seleccionar fecha'}
-                  readOnly
-                />
-                <FaChevronRight className={`transition-transform duration-300 ${isCalendarOpen ? 'rotate-90' : ''}`} />
+            <div className="text-gray-700 mb-3 font-medium">
+              Seleccione la fecha de su evento
               </div>
-              
-              <div className={`mt-2 transition-all duration-300 overflow-hidden ${isCalendarOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="p-4 border border-gray-200 rounded-lg shadow-md">
+            <div className="mt-2 transition-all">
+              <div className="p-4 border rounded-lg max-w-md mx-auto">
                   <DatePicker
-                    selected={fechaSeleccionada}
+                  selected={formData.fecha}
                     onChange={handleFechaChange}
                     inline
-                    filterDate={esDisponible}
                     minDate={new Date()}
                     className="w-full"
-                  />
-                  
-                  <div className="flex justify-between items-center mt-4 text-xs text-gray-500 border-t border-gray-200 pt-4">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-[var(--color-primary)]/20 border border-[var(--color-primary)] mr-2"></div>
-                      <span>Disponible</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-gray-200 border border-gray-300 mr-2"></div>
-                      <span>No disponible</span>
-                    </div>
-                  </div>
+                  locale="es"
+                  dateFormat="dd/MM/yyyy"
+                  excludeDates={fechasOcupadas}
+                  // Usar array vacío si fechasDestacadas no está definido
+                  highlightDates={fechasDestacadas || []}
+                  dayClassName={date => {
+                    return esDisponible(date) ? '' : 'text-red-300';
+                  }}
+                />
                 </div>
               </div>
             </div>
             
-            <div className="flex items-center justify-between mb-6 text-sm">
-              <div className="flex items-center text-[var(--color-primary)]">
-                <FaRegClock className="mr-2" />
-                <span>Horario disponible: 9:00 AM - 11:00 PM</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+            <div>
+              <label className="block text-gray-700 mb-2">Fecha seleccionada:</label>
+              <div className="flex items-center">
+                <DatePicker
+                  selected={formData.fecha}
+                  onChange={handleFechaChange}
+                  dateFormat="dd/MM/yyyy"
+                  className="w-full p-2 border border-gray-300 rounded"
+                  minDate={new Date()}
+                  locale="es"
+                  excludeDates={fechasOcupadas}
+                />
               </div>
             </div>
             
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Número de Invitados
-              </label>
-              <div className="relative">
-                <FaUsers className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-primary)]" />
+            <div>
+              <label className="block text-gray-700 mb-2">Número aproximado de invitados:</label>
                 <input 
                   type="number"
-                  name="invitados"
+                min="10"
+                max="500"
                   value={formData.invitados}
                   onChange={handleInvitadosChange}
-                  min="10"
-                  max="300"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
+                className="w-full p-2 border border-gray-300 rounded"
                 />
-              </div>
-              <div className="mt-2 flex justify-between text-xs text-gray-500">
-                <span>Mínimo: 10 invitados</span>
-                <span>Máximo: 300 invitados</span>
-              </div>
             </div>
           </div>
 
-          {/* Servicios adicionales y resumen */}
-          <div className="bg-[var(--color-accent)] text-white p-8 shadow-xl">
-            <h3 className="text-2xl font-[var(--font-display)] mb-6">Servicios de Masaje Disponibles</h3>
+          <div className="mt-8">
+            <h5 className="text-lg text-gray-700 mb-4">Seleccione el tipo de evento</h5>
             
-            <div className="space-y-4 mb-8">
-              {tiposMasaje.map((masaje) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {tiposEvento.map((tipo) => (
                 <div
-                  key={masaje.id}
-                  className={`p-4 border transition-all cursor-pointer ${
-                    formData.masajesSeleccionados.some(m => m.id === masaje.id)
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/20'
-                      : 'border-white/20 hover:border-[var(--color-primary)]/50'
+                  key={tipo.id || tipo._id}
+                  className={`border p-4 rounded-lg cursor-pointer transition-all ${
+                    formData.tipoEvento === tipo.id || formData.tipoEvento === tipo._id
+                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                      : 'border-gray-200 hover:border-[var(--color-primary)]/50'
                   }`}
-                  onClick={() => handleMasajeSelection(masaje)}
+                  onClick={() => handleSelectTipoEvento(tipo.id || tipo._id)}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-semibold">{masaje.titulo}</h4>
-                      <p className="text-sm text-white/80">{masaje.descripcion}</p>
-                      <p className="text-sm mt-2">Duración: {masaje.duracion}</p>
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                      <Image
+                        src={tipo.icono || '/images/placeholder/event.jpg'}
+                        alt={tipo.titulo}
+                        width={64}
+                        height={64}
+                        className="object-contain"
+                      />
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold">${masaje.precio}</p>
-                      {formData.masajesSeleccionados.some(m => m.id === masaje.id) && (
-                        <FaCheck className="text-[var(--color-primary)] mt-2" />
-                      )}
-                    </div>
+                    <h3 className="font-medium text-lg mb-1">{tipo.titulo}</h3>
+                    <p className="text-sm text-gray-500">{tipo.descripcionCorta}</p>
                   </div>
                 </div>
               ))}
             </div>
-
-            {/* Resumen del evento y servicios seleccionados */}
-            <div className="border-t border-white/20 pt-6 mt-6">
-              <h4 className="text-lg font-semibold mb-4">Resumen de su selección</h4>
-              
-              <div className="space-y-2">
-                <p>
-                  <span className="text-white/80">Evento:</span>{' '}
-                  {tiposEvento.find(t => t.id === formData.tipoEvento)?.titulo}
-                </p>
-                <p>
-                  <span className="text-white/80">Fecha:</span>{' '}
-                  {formData.fecha ? formData.fecha.toLocaleDateString() : 'No seleccionada'}
-                </p>
-                <p>
-                  <span className="text-white/80">Invitados:</span>{' '}
-                  {formData.invitados}
-                </p>
-                
-                {formData.masajesSeleccionados.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-white/80">Masajes seleccionados:</p>
-                    <ul className="list-disc list-inside mt-2">
-                      {formData.masajesSeleccionados.map(masaje => (
-                        <li key={masaje.id} className="text-sm">
-                          {masaje.titulo} - {masaje.duracion} - ${masaje.precio}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-2 text-sm text-gray-600">
-                      Total servicios de masaje: ${formData.masajesSeleccionados.reduce((total, masaje) => total + masaje.precio, 0)}
-                    </p>
-                  </div>
-                )}
+          </div>
+        </div>
+        
+        {/* Mostrar servicios adicionales si hay */}
+        {(masajesSeleccionados.length > 0 || habitacionesSeleccionadas.length > 0) && (
+          <div id="servicios-adicionales-resumen" className="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h3 className="text-xl font-semibold mb-4 text-[var(--color-primary)]">
+              Servicios adicionales seleccionados
+            </h3>
+            
+            {masajesSeleccionados.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-gray-700">Masajes: {masajesSeleccionados.length}</h4>
+                <div className="mt-2 text-sm text-gray-600">
+                  Total masajes: ${calcularTotalMasajes().toFixed(2)}
+                </div>
               </div>
+            )}
+            
+            {habitacionesSeleccionadas.length > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-gray-700">Habitaciones: {habitacionesSeleccionadas.length}</h4>
+                <div className="mt-2 text-sm text-gray-600">
+                  Total habitaciones: ${calcularTotalHabitaciones().toFixed(2)}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Link href="/masajes" className="text-sm text-[var(--color-primary)] hover:underline">
+                Agregar masajes
+              </Link>
+              <span className="text-gray-300">|</span>
+              <Link href="/habitaciones" className="text-sm text-[var(--color-primary)] hover:underline">
+                Agregar habitaciones
+              </Link>
+              <span className="text-gray-300">|</span>
+              <a 
+                href="#servicios-adicionales" 
+                className="text-sm text-[var(--color-primary)] hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('servicios-adicionales').scrollIntoView({behavior: 'smooth'});
+                }}
+              >
+                Ver detalles
+              </a>
             </div>
-
+          </div>
+        )}
+        
+        <div className="flex justify-end mt-4">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setPaso(1)}
+              className="px-6 py-2 border-2 border-[var(--color-primary)] text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/5"
+            >
+              Anterior
+            </button>
             <button
               onClick={handleProceedToPaso3}
-              disabled={!fechaSeleccionada}
-              className={`w-full mt-8 py-4 px-6 text-center font-medium text-lg transition-all duration-300 ${
-                fechaSeleccionada 
-                  ? 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] cursor-pointer' 
-                  : 'bg-gray-500 cursor-not-allowed opacity-70'
-              }`}
+              className="px-6 py-2 bg-[var(--color-accent)] text-white rounded hover:bg-[var(--color-accent)]/90"
+              disabled={!formData.tipoEvento || !formData.fecha}
             >
               Continuar
             </button>
           </div>
         </div>
-      </section>
+      </div>
     );
   };
+  
+  // Función para eliminar un masaje de la selección
+  const handleRemoveMasaje = (id) => {
+    console.log('Eliminando masaje con id:', id);
+    eliminarMasajeSeleccionado(id);
+    toast.success('Masaje eliminado de la selección');
+  };
+
+  // Función para eliminar una habitación de la selección
+  const handleRemoveHabitacion = (id) => {
+    console.log('Eliminando habitación con id:', id);
+    eliminarHabitacionSeleccionada(id);
+    toast.success('Habitación eliminada de la selección');
+  };
+
+  // Función para renderizar el resumen completo de servicios (masajes y habitaciones)
+  const renderResumenServiciosFormData = () => {
+    console.log('Renderizando resumen de servicios:', {
+      masajes: masajesSeleccionados,
+      habitaciones: habitacionesSeleccionadas
+    });
+
+    // Verificar si los datos están vacíos
+    if (masajesSeleccionados.length === 0 && habitacionesSeleccionadas.length === 0) {
+      console.log('No hay servicios seleccionados');
+      return (
+        <div id="servicios-adicionales" className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <h4 className="text-lg font-semibold text-[var(--color-accent)] mb-4">
+            Servicios Adicionales
+          </h4>
+          <p className="text-gray-500 italic">No hay servicios adicionales seleccionados.</p>
+          <div className="mt-4 flex gap-2">
+            <Link href="/masajes" className="text-[var(--color-primary)] hover:underline">
+              Agregar masajes
+            </Link>
+            <span className="text-gray-400">|</span>
+            <Link href="/habitaciones" className="text-[var(--color-primary)] hover:underline">
+              Agregar habitaciones
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    try {
+      const totalMasajes = calcularTotalMasajes();
+      const totalHabitaciones = calcularTotalHabitaciones();
+      const totalGeneral = calcularTotalReserva();
+
+      return (
+        <div id="servicios-adicionales" className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <h4 className="text-lg font-semibold text-[var(--color-accent)] mb-4">
+            Servicios Adicionales
+          </h4>
+          
+          {masajesSeleccionados.length > 0 && (
+            <div className="mb-6">
+              <h5 className="font-medium text-gray-700 mb-2">Masajes seleccionados:</h5>
+              <div className="space-y-3">
+                {masajesSeleccionados.map((masaje) => (
+                  <div key={masaje.id} className="flex justify-between items-center p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <div>
+                      <div className="font-medium">{masaje.titulo || masaje.nombre}</div>
+                      <div className="text-sm text-gray-600">
+                        Duración: {masaje.duracion} min | Precio: ${parseFloat(masaje.precio).toFixed(2)}
+                    </div>
+                    </div>
+                    <button
+                      onClick={() => eliminarMasajeSeleccionado(masaje.id)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Eliminar masaje"
+                    >
+                      <FaTrash size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 text-right font-medium">
+                Total masajes: ${totalMasajes.toFixed(2)}
+              </div>
+            </div>
+          )}
+          
+          {habitacionesSeleccionadas.length > 0 && (
+            <div className="mb-6">
+              <h5 className="font-medium text-gray-700 mb-2">Habitaciones seleccionadas:</h5>
+              <div className="space-y-3">
+                {habitacionesSeleccionadas.map((habitacion) => (
+                  <div key={habitacion.id} className="flex justify-between items-center p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <div>
+                      <div className="font-medium">{habitacion.nombre}</div>
+                      <div className="text-sm text-gray-600">
+                        Fechas tentativas: {new Date(habitacion.fechaEntrada).toLocaleDateString()} - {new Date(habitacion.fechaSalida).toLocaleDateString()} | 
+                        Precio: ${parseFloat(habitacion.precio).toFixed(2)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => eliminarHabitacionSeleccionada(habitacion.id)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Eliminar habitación"
+                    >
+                      <FaTrash size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 text-right font-medium">
+                Total habitaciones: ${totalHabitaciones.toFixed(2)}
+              </div>
+              <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                <strong>Nota:</strong> Las fechas definitivas de hospedaje se ajustarán automáticamente según la fecha del evento seleccionada.
+              </div>
+            </div>
+          )}
+          
+          <div className="mt-4 border-t border-gray-200 pt-4">
+            <div className="flex justify-between items-center font-semibold text-lg">
+              <span>Total servicios adicionales:</span>
+              <span>${totalGeneral.toFixed(2)}</span>
+            </div>
+          </div>
+          
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/masajes" className="px-4 py-2 text-sm border border-[var(--color-primary)] text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/5">
+              Agregar más masajes
+            </Link>
+            <Link href="/habitaciones" className="px-4 py-2 text-sm border border-[var(--color-primary)] text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/5">
+              Agregar más habitaciones
+            </Link>
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error al renderizar el resumen de servicios desde formData:', error);
+      toast.error('Error al mostrar los servicios seleccionados');
+      
+      return (
+        <div id="servicios-adicionales" className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <h4 className="text-lg font-semibold text-[var(--color-accent)] mb-4">
+            Servicios Adicionales
+          </h4>
+          <p className="text-red-500">
+            Ocurrió un error al mostrar los servicios seleccionados. Por favor, intente nuevamente.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <Link href="/masajes" className="text-[var(--color-primary)] hover:underline">
+              Agregar masajes
+            </Link>
+            <span className="text-gray-400">|</span>
+            <Link href="/habitaciones" className="text-[var(--color-primary)] hover:underline">
+              Agregar habitaciones
+            </Link>
+          </div>
+        </div>
+      );
+    }
+  };
+  
+  // Función para renderizar el paso 3 (información personal y resumen)
+  const renderPaso3 = () => {
+    return (
+      <div id="paso-3" className="mb-12">
+        <h3 className="text-2xl font-semibold text-[var(--color-accent)] mb-6">
+          Confirmar Cotización
+        </h3>
+        
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
+            Detalles del Evento
+          </h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <p className="text-gray-700 font-medium">Tipo de Evento:</p>
+              <p className="text-gray-900">
+                {tiposEvento.find(t => t.id === formData.tipoEvento || t._id === formData.tipoEvento)?.titulo || 'No seleccionado'}
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-gray-700 font-medium">Fecha:</p>
+              <p className="text-gray-900">
+                {formData.fecha ? formData.fecha.toLocaleDateString('es-MX', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric'
+                }) : 'No seleccionada'}
+              </p>
+            </div>
+            
+            <div>
+              <p className="text-gray-700 font-medium">Número de Invitados:</p>
+              <p className="text-gray-900">{formData.invitados}</p>
+            </div>
+            
+            <div>
+              <p className="text-gray-700 font-medium">Precio Base:</p>
+              <p className="text-gray-900 font-semibold">
+                ${tiposEvento.find(t => t.id === formData.tipoEvento || t._id === formData.tipoEvento)?.precio || '0.00'}
+              </p>
+            </div>
+          </div>
+          
+          {/* Servicios Adicionales */}
+          <div className="mt-8 mb-6">
+            <h4 className="text-lg font-semibold text-[var(--color-primary)] mb-4 pb-2 border-b border-gray-200">
+              Servicios Adicionales
+            </h4>
+            
+            {/* Masajes seleccionados */}
+            {masajesSeleccionados.length > 0 && (
+              <div className="mb-4">
+                <h5 className="font-medium text-gray-700 mb-2">Masajes:</h5>
+                <div className="space-y-2">
+                  {masajesSeleccionados.map((masaje) => (
+                    <div key={masaje.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                      <div className="flex-1">
+                        <span className="font-medium">{masaje.titulo || masaje.nombre}</span>
+                        <span className="text-sm text-gray-600 ml-2">({masaje.duracion} min)</span>
+                      </div>
+                      <div className="text-gray-900 font-medium">
+                        ${parseFloat(masaje.precio).toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right mt-2 font-medium">
+                  Subtotal Masajes: ${calcularTotalMasajes().toFixed(2)}
+                </div>
+                  </div>
+                )}
+            
+            {/* Habitaciones seleccionadas */}
+            {habitacionesSeleccionadas.length > 0 && (
+              <div className="mb-4">
+                <h5 className="font-medium text-gray-700 mb-2">Habitaciones:</h5>
+                <div className="space-y-2">
+                  {habitacionesSeleccionadas.map((habitacion) => (
+                    <div key={habitacion.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                      <div className="flex-1">
+                        <span className="font-medium">{habitacion.nombre}</span>
+                        <span className="text-sm text-gray-600 ml-2">
+                          ({new Date(habitacion.fechaEntrada).toLocaleDateString()} - {new Date(habitacion.fechaSalida).toLocaleDateString()})
+                        </span>
+              </div>
+                      <div className="text-gray-900 font-medium">
+                        ${parseFloat(habitacion.precio).toFixed(2)}
+            </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-right mt-2 font-medium">
+                  Subtotal Habitaciones: ${calcularTotalHabitaciones().toFixed(2)}
+                </div>
+              </div>
+            )}
+            
+            {/* Total general */}
+            {(masajesSeleccionados.length > 0 || habitacionesSeleccionadas.length > 0) && (
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <div className="flex justify-between items-center font-semibold text-lg">
+                  <span>Total Servicios Adicionales:</span>
+                  <span>${calcularTotalReserva().toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+            
+            {masajesSeleccionados.length === 0 && habitacionesSeleccionadas.length === 0 && (
+              <p className="text-gray-500 italic">No se han seleccionado servicios adicionales.</p>
+            )}
+          </div>
+        </div>
+        
+        {/* Formulario de contacto */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-4">
+            Información de Contacto
+          </h4>
+          
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">
+                Nombre*
+              </label>
+              <input
+                type="text"
+                id="nombre"
+                name="nombre"
+                value={formData.nombre}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-1">
+                Apellidos*
+              </label>
+              <input
+                type="text"
+                id="apellidos"
+                name="apellidos"
+                value={formData.apellidos}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                Correo Electrónico*
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">
+                Teléfono*
+              </label>
+              <input
+                type="tel"
+                id="telefono"
+                name="telefono"
+                value={formData.telefono}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="comentarios" className="block text-sm font-medium text-gray-700 mb-1">
+                Comentarios o Peticiones Especiales
+              </label>
+              <textarea
+                id="comentarios"
+                name="comentarios"
+                value={formData.comentarios}
+                onChange={handleInputChange}
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              ></textarea>
+            </div>
+          </div>
+          
+          {submitError && (
+            <div className="mt-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-md">
+              {submitError}
+            </div>
+          )}
+          
+          <div className="mt-6 flex justify-between">
+            <button
+              type="button"
+              onClick={() => setPaso(2)}
+              className="px-6 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+            >
+              Anterior
+            </button>
+            
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-[var(--color-primary)] text-white rounded-md hover:bg-[var(--color-primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Enviando...' : 'Enviar Solicitud de Cotización'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  // Paso 4: Confirmación - Solo se muestra cuando paso es 4
+  {paso === 4 && (
+    <section id="paso-4" className="container-custom mb-24">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, height: 0 }}
+        animate={{ opacity: 1, scale: 1, height: 'auto' }}
+        transition={{ duration: 0.8 }}
+        className="max-w-2xl mx-auto text-center bg-white p-12 shadow-xl"
+      >
+        <div className="w-20 h-20 rounded-full bg-green-100 mx-auto flex items-center justify-center mb-8">
+          <FaCheck className="text-green-600 text-3xl" />
+        </div>
+        
+        <h2 className="text-4xl font-[var(--font-display)] text-[var(--color-accent)] mb-6">
+          ¡Reserva Enviada!
+        </h2>
+        
+        <p className="text-xl text-gray-700 mb-8">
+          Gracias por su interés en la Hacienda San Carlos. Hemos recibido su solicitud de reserva y nos pondremos en contacto con usted a la brevedad.
+        </p>
+        
+        <div className="bg-gray-50 p-6 mb-8 text-left rounded-lg">
+          <h3 className="text-lg font-medium mb-4 text-[var(--color-primary)]">Detalles de su reserva:</h3>
+          
+          <div className="space-y-6">
+            {/* Detalles del Evento */}
+            <div>
+              <h4 className="font-medium text-[var(--color-accent)] mb-2">Información del Evento</h4>
+              <div className="space-y-2 text-gray-700">
+                <p><strong>Número de confirmación:</strong> {confirmationData?.numeroConfirmacion || 'Pendiente'}</p>
+                <p><strong>Tipo de evento:</strong> {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento || t._id === formData.tipoEvento).titulo}</p>
+                <p><strong>Fecha:</strong> {formData.fecha && formData.fecha.toLocaleDateString()}</p>
+                <p><strong>Invitados:</strong> {formData.invitados}</p>
+              </div>
+            </div>
+
+            {/* Información de Contacto */}
+            <div>
+              <h4 className="font-medium text-[var(--color-accent)] mb-2">Información de Contacto</h4>
+              <div className="space-y-2 text-gray-700">
+                <p><strong>Nombre:</strong> {formData.nombre}</p>
+                <p><strong>Email:</strong> {formData.email}</p>
+                <p><strong>Teléfono:</strong> {formData.telefono}</p>
+              </div>
+            </div>
+            
+            {/* Servicios de Masaje */}
+            {masajesSeleccionados.length > 0 && (
+              <div>
+                <h4 className="font-medium text-[var(--color-accent)] mb-2">Servicios de Masaje</h4>
+                <div className="space-y-3">
+                  {masajesSeleccionados.map((masaje, index) => (
+                    <div key={index} className="p-3 bg-white rounded shadow-sm">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{masaje.titulo || masaje.nombre}</p>
+                          <p className="text-sm text-gray-600">Duración: {masaje.duracion} min</p>
+                        </div>
+                        <p className="font-semibold">${parseFloat(masaje.precio).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-3 border-t">
+                    <div className="flex justify-between items-center">
+                      <p className="font-medium">Total Servicios de Masaje:</p>
+                      <p className="font-semibold text-[var(--color-primary)]">
+                        ${calcularTotalMasajes().toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Habitaciones */}
+            {habitacionesSeleccionadas.length > 0 && (
+              <div>
+                <h4 className="font-medium text-[var(--color-accent)] mb-2">Habitaciones</h4>
+                <div className="space-y-3">
+                  {habitacionesSeleccionadas.map((habitacion, index) => (
+                    <div key={index} className="p-3 bg-white rounded shadow-sm">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{habitacion.nombre}</p>
+                          <p className="text-sm text-gray-600">
+                            {new Date(habitacion.fechaEntrada).toLocaleDateString()} - 
+                            {new Date(habitacion.fechaSalida).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <p className="font-semibold">${parseFloat(habitacion.precio).toFixed(2)}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-3 border-t">
+                    <div className="flex justify-between items-center">
+                      <p className="font-medium">Total Habitaciones:</p>
+                      <p className="font-semibold text-[var(--color-primary)]">
+                        ${calcularTotalHabitaciones().toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <p className="text-gray-600 mb-8">
+          Un representante se comunicará con usted en un plazo máximo de 24 horas para confirmar la disponibilidad y proporcionarle más información.
+        </p>
+        
+        <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <Link
+            href="/"
+            className="px-8 py-3 bg-gray-100 text-gray-800 font-medium hover:bg-gray-200 transition-colors rounded-lg"
+          >
+            Volver a inicio
+          </Link>
+          
+          <button
+            onClick={() => window.print()}
+            className="px-8 py-3 bg-[var(--color-accent)] text-white font-medium hover:bg-[var(--color-accent-dark)] transition-colors rounded-lg"
+          >
+            Imprimir detalles
+          </button>
+        </div>
+      </motion.div>
+    </section>
+  )}
   
   return (  
     <>
@@ -834,7 +1947,7 @@ export default function ReservarPage() {
             transition={{ duration: 0.7, delay: 1.2 }}
           >
             <a 
-              href="#paso-1" 
+              href="#formulario-reserva" 
               className="px-10 py-4 bg-[var(--color-primary)] text-white text-lg font-medium hover:bg-[var(--color-primary-dark)] inline-block shadow-xl transform hover:scale-105 transition-transform duration-300"
             >
               Comenzar Reservación
@@ -848,330 +1961,67 @@ export default function ReservarPage() {
         <div className="absolute top-40 right-40 w-20 h-20 border border-[var(--color-primary)]/40 rounded-full animate-pulse delay-500"></div>
       </section>
       
-      {/* Sistema de reservas en pasos */}
-      <div className="py-16 relative z-10 bg-[var(--color-cream-light)]">
-        {/* Indicador de progreso */}
-        <div className="container-custom mb-16">
-          <div className="flex flex-col md:flex-row justify-between items-center max-w-4xl mx-auto">
-            {[1, 2, 3, 4].map((stepNum) => (
-              <div key={stepNum} className="flex items-center mb-4 md:mb-0">
-                <div 
-                  className={`relative w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold border-2 transition-all ${
-                    paso >= stepNum 
-                      ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' 
-                      : 'bg-white text-gray-500 border-gray-300'
-                  }`}
-                >
-                  {paso > stepNum ? <FaCheck className="text-white" /> : stepNum}
-                </div>
-                
-                <span className={`ml-3 font-medium transition-colors ${
-                  paso >= stepNum ? 'text-[var(--color-primary)]' : 'text-gray-500'
-                }`}>
-                  {stepNum === 1 ? 'Tipo de Evento' : 
-                   stepNum === 2 ? 'Fecha y Detalles' : 
-                   stepNum === 3 ? 'Sus Datos' :
-                   'Confirmación'}
-                </span>
-                
-                {stepNum < 4 && (
-                  <div className="hidden md:block w-12 border-t-2 border-gray-300 mx-4"></div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Paso 1: Selección de tipo de evento */}
-        <section id="paso-1" className={`mb-16 ${paso !== 1 ? 'opacity-50' : ''}`}>
-          <h2 className="text-3xl font-[var(--font-display)] text-center mb-8">
-            Seleccione el tipo de evento
+      {/* Formulario de reserva en formato vertical */}
+      <div id="formulario-reserva" className="py-16 relative z-10 bg-[var(--color-cream-light)]">
+        <div className="container-custom mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+          <div className="mx-auto">
+            <h2 className="text-4xl font-bold text-center mb-10 text-[var(--color-primary)]">
+              Formulario de Reserva
           </h2>
-          <p className="text-center text-gray-600 mb-12">
-            Elija el tipo de evento que desea realizar en nuestras instalaciones
-            {formData.masajePreseleccionado && (
-              <span className="block mt-2 text-[var(--color-primary)]">
-                * Se incluirá el masaje seleccionado en su reserva
-              </span>
-            )}
-          </p>
-          {renderMasajePreseleccionado()}
-          {renderPaso1()}
-        </section>
-        
-        {/* Paso 2: Selección de fecha y detalles */}
-        <section id="paso-2" className={`container-custom mb-24 transition-opacity duration-500 ${paso >= 2 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={paso >= 2 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl font-bold mb-4 text-[var(--color-primary)]">
-              Seleccione la fecha y número de invitados
-            </h2>
-            <p className="text-xl max-w-3xl mx-auto text-gray-700">
-              Elija la fecha para su {formData.tipoEvento && (tiposEvento.find(t => t.id === formData.tipoEvento)?.titulo || 'evento').toLowerCase()} y el número de invitados
-            </p>
-          </motion.div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Calendario */}
-            <div className="bg-white p-8 shadow-xl">
-              <h3 className="text-2xl font-[var(--font-display)] text-[var(--color-accent)] mb-6 text-center">Seleccionar Fecha</h3>
-              
-              <div className="mb-8">
-                <div 
-                  className="relative cursor-pointer border border-gray-300 p-4 rounded-lg flex items-center"
-                  onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                >
-                  <FaCalendarAlt className="text-[var(--color-primary)] mr-3" />
-                  <input 
-                    type="text"
-                    className="w-full border-none focus:outline-none pointer-events-none bg-transparent"
-                    value={fechaSeleccionada ? fechaSeleccionada.toLocaleDateString() : 'Seleccionar fecha'}
-                    readOnly
-                  />
-                  <FaChevronRight className={`transition-transform duration-300 ${isCalendarOpen ? 'rotate-90' : ''}`} />
+            
+            {/* Sección 1: Selección de Tipo de Evento */}
+            <div className="mb-16">
+              <div className="bg-white p-8 rounded-lg shadow-lg">
+                <h3 className="text-2xl font-semibold text-[var(--color-accent)] mb-6">
+                  1. Seleccione el tipo de evento
+                </h3>
+                <div className="w-full overflow-hidden">
+                  {renderPaso1()}
                 </div>
-                
-                <div className={`mt-2 transition-all duration-300 overflow-hidden ${isCalendarOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
-                  <div className="p-4 border border-gray-200 rounded-lg shadow-md">
-                    <DatePicker
-                      selected={fechaSeleccionada}
-                      onChange={handleFechaChange}
-                      inline
-                      filterDate={esDisponible}
-                      minDate={new Date()}
-                      className="w-full"
-                    />
-                    
-                    <div className="flex justify-between items-center mt-4 text-xs text-gray-500 border-t border-gray-200 pt-4">
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 bg-[var(--color-primary)]/20 border border-[var(--color-primary)] mr-2"></div>
-                        <span>Disponible</span>
-                      </div>
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 bg-gray-200 border border-gray-300 mr-2"></div>
-                        <span>No disponible</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
               
-              <div className="flex items-center justify-between mb-6 text-sm">
-                <div className="flex items-center text-[var(--color-primary)]">
-                  <FaRegClock className="mr-2" />
-                  <span>Horario disponible: 9:00 AM - 11:00 PM</span>
+            {/* Sección 2: Detalles del Evento */}
+            <div className="mb-16">
+              <div className="bg-white p-8 rounded-lg shadow-lg">
+                <h3 className="text-2xl font-semibold text-[var(--color-accent)] mb-6">
+                  2. Detalles del Evento
+                </h3>
+                {renderPaso2()}
                 </div>
               </div>
               
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Número de Invitados
-                </label>
-                <div className="relative">
-                  <FaUsers className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-primary)]" />
-                  <input 
-                    type="number"
-                    name="invitados"
-                    value={formData.invitados}
-                    onChange={handleInvitadosChange}
-                    min="10"
-                    max="300"
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
-                  />
-                </div>
-                <div className="mt-2 flex justify-between text-xs text-gray-500">
-                  <span>Mínimo: 10 invitados</span>
-                  <span>Máximo: 300 invitados</span>
-                </div>
+            {/* Sección 3: Servicios Adicionales */}
+            <div className="mb-16">
+              <div className="bg-white p-8 rounded-lg shadow-lg">
+                <h3 className="text-2xl font-semibold text-[var(--color-accent)] mb-6">
+                  3. Servicios Adicionales
+                </h3>
+                {renderResumenServicios()}
               </div>
             </div>
             
-            {/* Resumen */}
-            <div className="bg-[var(--color-accent)] text-white p-8 shadow-xl">
-              <h3 className="text-2xl font-[var(--font-display)] mb-6 text-center">Resumen de su Evento</h3>
-              
-              {formData.tipoEvento && (
-                <div className="space-y-6">
-                  <div className="p-4 border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/10">
-                    <h4 className="text-xl font-[var(--font-display)] mb-4">
-                      {tiposEvento.find(t => t.id === formData.tipoEvento)?.titulo || 'Evento'}
-                    </h4>
-                    <p className="text-white/80 mb-4">
-                      {tiposEvento.find(t => t.id === formData.tipoEvento)?.descripcion || 'Descripción no disponible'}
-                    </p>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-[var(--color-primary)]">Precio:</span>
-                        <p className="font-medium">{tiposEvento.find(t => t.id === formData.tipoEvento)?.precio || 'A consultar'}</p>
-                      </div>
-                      <div>
-                        <span className="text-[var(--color-primary)]">Capacidad:</span>
-                        <p className="font-medium">{tiposEvento.find(t => t.id === formData.tipoEvento)?.capacidad || '1'} invitados</p>
-                      </div>
+            {/* Sección 4: Información Personal y Confirmación */}
+            <div className="mb-16">
+              <div className="bg-white p-8 rounded-lg shadow-lg">
+                <h3 className="text-2xl font-semibold text-[var(--color-accent)] mb-6">
+                  4. Información de Contacto y Confirmación
+                </h3>
+                {renderPaso3()}
                     </div>
                   </div>
                   
-                  <div className="space-y-4 p-4 border border-white/20">
-                    <div className="flex justify-between">
-                      <span className="text-white/80">Fecha seleccionada:</span>
-                      <span className="font-medium">{fechaSeleccionada ? fechaSeleccionada.toLocaleDateString() : 'No seleccionada'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/80">Número de invitados:</span>
-                      <span className="font-medium">{formData.invitados}</span>
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={handleProceedToPaso3}
-                    disabled={!fechaSeleccionada}
-                    className={`w-full py-4 px-6 text-center font-medium text-lg transition-all duration-300 ${
-                      fechaSeleccionada 
-                        ? 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] cursor-pointer' 
-                        : 'bg-gray-500 cursor-not-allowed opacity-70'
-                    }`}
-                  >
-                    Continuar
-                  </button>
-                  
-                  {!fechaSeleccionada && (
-                    <p className="text-center text-sm text-[var(--color-primary)]/80 mt-2">
-                      Por favor, seleccione una fecha para continuar.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-        
-        {/* Paso 3: Información personal */}
-        <section id="paso-3" className={`container-custom mb-24 transition-opacity duration-500 ${paso >= 3 ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={paso >= 3 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-[var(--font-display)] text-[var(--color-accent)] mb-6">
-              Complete sus <span className="text-[var(--color-primary)] font-semibold">Datos</span>
-            </h2>
-            <p className="text-xl max-w-3xl mx-auto text-gray-700">
-              Proporcione su información de contacto para confirmar su reserva
-            </p>
-          </motion.div>
-          
-          <div className="max-w-2xl mx-auto bg-white p-8 shadow-xl">
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div>
-                <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre completo
-                </label>
-                <input
-                  type="text"
-                  id="nombre"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-2">
-                  Apellidos
-                </label>
-                <input
-                  type="text"
-                  id="apellidos"
-                  name="apellidos"
-                  value={formData.apellidos}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Correo electrónico
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-2">
-                  Teléfono
-                </label>
-                <input
-                  type="tel"
-                  id="telefono"
-                  name="telefono"
-                  value={formData.telefono}
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="comentarios" className="block text-sm font-medium text-gray-700 mb-2">
-                  Comentarios o peticiones especiales
-                </label>
-                <textarea
-                  id="comentarios"
-                  name="comentarios"
-                  value={formData.comentarios}
-                  onChange={handleInputChange}
-                  rows="4"
-                  className="w-full px-4 py-3 border border-gray-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent rounded-lg"
-                ></textarea>
-              </div>
-              
-              <div className="mt-10">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`w-full bg-[var(--color-primary)] text-white py-4 text-lg font-medium transition-colors rounded-lg shadow-lg ${
-                    isSubmitting 
-                      ? 'opacity-70 cursor-not-allowed' 
-                      : 'hover:bg-[var(--color-primary-dark)]'
-                  }`}
-                >
-                  {isSubmitting ? 'Procesando...' : 'Confirmar Reserva'}
-                </button>
-                
-                {submitError && (
-                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-start">
-                    <FaExclamationTriangle className="flex-shrink-0 mt-1 mr-2" />
-                    <p>{submitError}</p>
-                  </div>
-                )}
-              </div>
-            </form>
-          </div>
-        </section>
-        
-        {/* Paso 4: Confirmación - Solo se muestra cuando paso es 4 */}
+            {/* Sección de Confirmación (Solo visible cuando se envía correctamente) */}
         {paso === 4 && (
-          <section id="paso-4" className="container-custom mb-24">
+              <div className="mb-16">
+                <div className="bg-white p-8 rounded-lg shadow-lg">
+                  <h3 className="text-2xl font-semibold text-[var(--color-accent)] mb-6">
+                    5. Confirmación de Reserva
+                  </h3>
+                  <section id="paso-4" className="container-custom mb-12">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, height: 0 }}
-              animate={{ opacity: 1, scale: 1, height: 'auto' }}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8 }}
               className="max-w-2xl mx-auto text-center bg-white p-12 shadow-xl"
             >
@@ -1196,7 +2046,7 @@ export default function ReservarPage() {
                     <h4 className="font-medium text-[var(--color-accent)] mb-2">Información del Evento</h4>
                     <div className="space-y-2 text-gray-700">
                       <p><strong>Número de confirmación:</strong> {confirmationData?.numeroConfirmacion || 'Pendiente'}</p>
-                      <p><strong>Tipo de evento:</strong> {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento).titulo}</p>
+                      <p><strong>Tipo de evento:</strong> {formData.tipoEvento && tiposEvento.find(t => t.id === formData.tipoEvento || t._id === formData.tipoEvento).titulo}</p>
                       <p><strong>Fecha:</strong> {formData.fecha && formData.fecha.toLocaleDateString()}</p>
                       <p><strong>Invitados:</strong> {formData.invitados}</p>
                     </div>
@@ -1213,18 +2063,18 @@ export default function ReservarPage() {
                   </div>
                   
                   {/* Servicios de Masaje */}
-                  {formData.masajesSeleccionados.length > 0 && (
+                          {masajesSeleccionados.length > 0 && (
                     <div>
                       <h4 className="font-medium text-[var(--color-accent)] mb-2">Servicios de Masaje</h4>
                       <div className="space-y-3">
-                        {formData.masajesSeleccionados.map((masaje, index) => (
+                                {masajesSeleccionados.map((masaje, index) => (
                           <div key={index} className="p-3 bg-white rounded shadow-sm">
                             <div className="flex justify-between items-start">
                               <div>
-                                <p className="font-medium">{masaje.titulo}</p>
-                                <p className="text-sm text-gray-600">Duración: {masaje.duracion}</p>
+                                        <p className="font-medium">{masaje.titulo || masaje.nombre}</p>
+                                        <p className="text-sm text-gray-600">Duración: {masaje.duracion} min</p>
                               </div>
-                              <p className="font-semibold">${masaje.precio}</p>
+                                      <p className="font-semibold">${parseFloat(masaje.precio).toFixed(2)}</p>
                             </div>
                           </div>
                         ))}
@@ -1232,13 +2082,44 @@ export default function ReservarPage() {
                           <div className="flex justify-between items-center">
                             <p className="font-medium">Total Servicios de Masaje:</p>
                             <p className="font-semibold text-[var(--color-primary)]">
-                              ${formData.masajesSeleccionados.reduce((total, masaje) => total + masaje.precio, 0)}
+                                      ${calcularTotalMasajes().toFixed(2)}
                             </p>
                           </div>
                         </div>
                       </div>
                     </div>
                   )}
+                          
+                          {/* Habitaciones */}
+                          {habitacionesSeleccionadas.length > 0 && (
+                            <div>
+                              <h4 className="font-medium text-[var(--color-accent)] mb-2">Habitaciones</h4>
+                              <div className="space-y-3">
+                                {habitacionesSeleccionadas.map((habitacion, index) => (
+                                  <div key={index} className="p-3 bg-white rounded shadow-sm">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <p className="font-medium">{habitacion.nombre}</p>
+                                        <p className="text-sm text-gray-600">
+                                          {new Date(habitacion.fechaEntrada).toLocaleDateString()} - 
+                                          {new Date(habitacion.fechaSalida).toLocaleDateString()}
+                                        </p>
+                                      </div>
+                                      <p className="font-semibold">${parseFloat(habitacion.precio).toFixed(2)}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="pt-3 border-t">
+                                  <div className="flex justify-between items-center">
+                                    <p className="font-medium">Total Habitaciones:</p>
+                                    <p className="font-semibold text-[var(--color-primary)]">
+                                      ${calcularTotalHabitaciones().toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                 </div>
               </div>
               
@@ -1263,138 +2144,32 @@ export default function ReservarPage() {
               </div>
             </motion.div>
           </section>
-        )}
       </div>
-      
-      {/* Sección decorativa con flores SVG */}
-      <section className="relative py-16 bg-[var(--color-cream-light)] overflow-hidden">
-        {/* Fondo con gradiente suave */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#F8F4F1] via-[#F5EDE8] to-[#F8F4F1] opacity-90"></div>
-        
-        <div className="relative z-10 container-custom">
-          {/* Estructura SVG - texto - SVG */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-8">
-            {/* Primer bloque SVG (izquierda) */}
-            <div className="w-full md:w-1/3">
-              <svg version="1.1" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 800 600" className="w-full h-auto" style={{ fill: '#8B0516' }}>
-                <g>
-                  <path d="M538.281,369.396c0.44,1.499,0.856,2.917,1.062,4.382c0.091,0.637,0.556,1.159,1.181,1.324
-                    c0.134,0.034,0.27,0.05,0.403,0.05c0.492,0,0.967-0.228,1.274-0.631c4.145-5.46,7.293-14.29,7.832-21.977
-                    c0.289-4.123-0.492-7.178-2.386-9.336c-0.995-1.143-2.261-1.556-3.401-1.118c-0.679,0.272-1.082,0.778-1.295,1.043
-                    c-5.488,6.831-7.443,16.32-5.102,24.763L538.281,369.396z"/>
-                  <path d="M529.447,366.941c0.07,0.003,0.141,0.006,0.209,0.006c0.851,0,1.634-0.325,2.274-0.946
-                    c1.682-1.637,2.363-5.407,2.143-11.86c-0.225-6.606-2.8-12.397-7.07-15.892c-0.286-0.234-0.95-0.703-1.907-0.771
-                    c-0.754,0.012-1.805,0.372-2.529,1.999c-2.068,4.685-2.246,10.435-0.429,16.42C523.749,361.234,525.878,366.725,529.447,366.941z"/>
-                  <path d="M683.893,405.378c0.931,0.54,1.723,1.003,2.276,1.359c2.549,1.649,5.546,3.504,8.858,4.648
-                    c0.525,0.181,1.701,0.587,3.031,0.587c0.859,0,1.784-0.169,2.638-0.678c2.41-1.431,2.811-4.588,2.14-7.087
-                    c-1.424-5.307-6.18-8.764-10.162-11.182c-0.002,0-0.002,0-0.002,0c-5.38-3.258-12.197-6.828-17.193-5.544
-                    c-1.802,0.465-3.186,1.521-4.112,3.133C668.149,396.217,678.003,401.952,683.893,405.378z"/>
-                  <path d="M580.707,420.193c0.597-1.568,0.437-3.258-0.462-4.888c-3.551-6.447-17.974-3.842-22.309-2.892
-                    c-9,1.968-17.301,6.872-23.368,13.809c-0.326,0.372-0.461,0.875-0.365,1.362c0.097,0.487,0.412,0.9,0.854,1.121
-                    c4.192,2.093,9.016,3.139,14.34,3.139c5.781,0,12.149-1.234,18.928-3.695l0.8-0.284
-                    C572.622,426.627,579.135,424.325,580.707,420.193z"/>
-                  <path d="M497.768,394.808c0.8,2.243,3.161,3.876,6.016,4.16c0.35,0.037,0.7,0.053,1.048,0.053
-                    c2.789,0,5.433-1.062,7.484-2.027c4.437-2.083,8.549-4.782,12.342-8.121c2.494-2.196,7.685-6.766,6.359-10.795
-                    c-1.259-3.823-6.314-3.408-9.659-3.117c-0.593,0.05-1.132,0.094-1.571,0.106c-2.772,0.072-5.086,0.259-7.37,0.95
-                    c-5.093,1.534-9.542,5.469-13.226,11.694c-0.896,1.513-1.949,3.669-1.691,5.883c-0.008,0.047-0.038,0.086-0.028,0.136
-                    c0.006,0.031,0.033,0.048,0.044,0.075C497.567,394.14,497.648,394.474,497.768,394.808z"/>
-                  <path d="M629.254,380.031c-0.67,2.196-1.126,14.377,2.988,16.776c0.386,0.225,0.94,0.447,1.632,0.447
-                    c0.984,0,2.246-0.447,3.689-1.965c5.867-6.181,2.11-23.22,0.782-27.443c-0.189-0.603-0.712-1.034-1.337-1.109
-                    c-0.625-0.094-1.234,0.222-1.559,0.762C633.086,371.417,630.642,375.471,629.254,380.031z"/>
-                  <path d="M654.018,353.107c0.37,0.072,0.751,0.106,1.137,0.106c1.585,0,3.258-0.59,4.737-1.696
-                    c0.954-0.715,1.609-1.477,1.997-2.327c0.829-1.802,0.476-4.089-0.967-6.266c-0.679-1.025-1.402-1.777-2.21-2.302
-                    c-0.002,0-0.002-0.003-0.003-0.003c-2.799-1.812-6.208-0.275-8.463,1.765c-0.395,0.356-0.965,0.918-1.348,1.677
-                    c-0.673,1.334-0.65,2.999,0.065,4.691C649.928,351.027,651.865,352.695,654.018,353.107z"/>
-                  <path d="M678.834,481.791c0.497,0.325,1.206,0.634,2.101,0.634c0.475,0,1.004-0.087,1.581-0.306
-                    c4.69-1.771,9.2-6.047,12.606-9.573c2.408-2.493,4.204-4.866,5.49-7.262c2.492-4.648,3.347-9.836,4.174-14.855
-                    c0.518-3.158,1.057-6.425,2.001-9.452c0.212-0.681-0.055-1.424-0.653-1.815c-0.601-0.393-1.387-0.331-1.926,0.134
-                    c-2.73,2.383-5.83,4.535-8.83,6.616c-5.683,3.945-11.56,8.024-15.472,13.987c-1.571,2.396-2.827,5.11-3.732,8.071
-                    c-0.404,1.327-0.859,3.089-0.767,4.913C675.489,474.5,675.979,479.923,678.834,481.791z"/>
-                  <path d="M466.502,351.144c0.37,0.072,0.751,0.106,1.137,0.106c1.585,0,3.258-0.59,4.737-1.696
-                    c0.954-0.715,1.609-1.477,1.997-2.327c0.829-1.802,0.476-4.089-0.967-6.266c-0.679-1.025-1.402-1.777-2.21-2.302
-                    c-0.002,0-0.002-0.003-0.003-0.003c-2.799-1.812-6.208-0.275-8.463,1.765c-0.395,0.356-0.965,0.918-1.348,1.677
-                    c-0.673,1.334-0.65,2.999,0.065,4.691C462.412,349.064,464.349,350.732,466.502,351.144z"/>
-                  <path d="M553.742,371.433c0.44,1.499,0.856,2.917,1.062,4.382c0.091,0.637,0.556,1.159,1.181,1.324
-                    c0.134,0.034,0.27,0.05,0.403,0.05c0.492,0,0.967-0.228,1.274-0.631c4.145-5.46,7.293-14.29,7.832-21.977
-                    c0.289-4.123-0.492-7.178-2.386-9.336c-0.995-1.143-2.261-1.556-3.401-1.118c-0.679,0.272-1.082,0.778-1.295,1.043
-                    c-5.488,6.831-7.443,16.32-5.102,24.763L553.742,371.433z"/>
-                  <path d="M644.908,435.23c0.597-1.568,0.437-3.258-0.462-4.888c-3.551-6.447-17.974-3.842-22.309-2.892
-                    c-9,1.968-17.301,6.872-23.368,13.809c-0.326,0.372-0.461,0.875-0.365,1.362c0.097,0.487,0.412,0.9,0.854,1.121
-                    c4.192,2.093,9.016,3.139,14.34,3.139c5.781,0,12.149-1.234,18.928-3.695l0.8-0.284
-                    C636.823,441.664,643.336,439.362,644.908,435.23z"/>
-                  <path d="M589.167,477.792c0.497,0.325,1.206,0.634,2.101,0.634c0.475,0,1.004-0.087,1.581-0.306
-                    c4.69-1.771,9.2-6.047,12.606-9.573c2.408-2.493,4.204-4.866,5.49-7.262c2.492-4.648,3.347-9.836,4.174-14.855
-                    c0.518-3.158,1.057-6.425,2.001-9.452c0.212-0.681-0.055-1.424-0.653-1.815c-0.601-0.393-1.387-0.331-1.926,0.134
-                    c-2.73,2.383-5.83,4.535-8.83,6.616c-5.683,3.945-11.56,8.024-15.472,13.987c-1.571,2.396-2.827,5.11-3.732,8.071
-                    c-0.404,1.327-0.859,3.089-0.767,4.913C585.822,470.501,586.312,475.924,589.167,477.792z"/>
-                </g>
-              </svg>
             </div>
-            
-            {/* Texto central */}
-            <div className="w-full md:w-1/3 bg-white/80 px-6 py-6 rounded-xl shadow-md backdrop-blur-sm">
-              <h2 className="text-3xl md:text-4xl font-[var(--font-display)] text-[#8B0516] mb-4 text-center">
-                Su Evento <span className="font-semibold">Perfecto</span>
-              </h2>
-              <p className="text-lg text-[#3A3330] mb-4 text-center">
-                Reserve su fecha especial y déjenos crear una experiencia inolvidable 
-                diseñada exclusivamente para usted
-              </p>
-              <div className="flex justify-center mt-4">
-                <Link
-                  href="/contact"
-                  className="px-6 py-2 bg-[#8B0516] text-white font-medium hover:bg-[#6b0411] transition-colors rounded-lg"
-                >
-                  Contáctenos
-                </Link>
+            )}
               </div>
             </div>
-            
-            {/* Segundo bloque SVG (derecha) */}
-            <div className="w-full md:w-1/3">
-              <svg version="1.1" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 800 600" className="w-full h-auto" style={{ fill: '#8B0516' }}>
-                <g>
-                  <path d="M654.018,353.107c0.37,0.072,0.751,0.106,1.137,0.106c1.585,0,3.258-0.59,4.737-1.696
-                    c0.954-0.715,1.609-1.477,1.997-2.327c0.829-1.802,0.476-4.089-0.967-6.266c-0.679-1.025-1.402-1.777-2.21-2.302
-                    c-0.002,0-0.002-0.003-0.003-0.003c-2.799-1.812-6.208-0.275-8.463,1.765c-0.395,0.356-0.965,0.918-1.348,1.677
-                    c-0.673,1.334-0.65,2.999,0.065,4.691C649.928,351.027,651.865,352.695,654.018,353.107z"/>
-                  <path d="M683.893,405.378c0.931,0.54,1.723,1.003,2.276,1.359c2.549,1.649,5.546,3.504,8.858,4.648
-                    c0.525,0.181,1.701,0.587,3.031,0.587c0.859,0,1.784-0.169,2.638-0.678c2.41-1.431,2.811-4.588,2.14-7.087
-                    c-1.424-5.307-6.18-8.764-10.162-11.182c-0.002,0-0.002,0-0.002,0c-5.38-3.258-12.197-6.828-17.193-5.544
-                    c-1.802,0.465-3.186,1.521-4.112,3.133C668.149,396.217,678.003,401.952,683.893,405.378z"/>
-                  <path d="M629.254,380.031c-0.67,2.196-1.126,14.377,2.988,16.776c0.386,0.225,0.94,0.447,1.632,0.447
-                    c0.984,0,2.246-0.447,3.689-1.965c5.867-6.181,2.11-23.22,0.782-27.443c-0.189-0.603-0.712-1.034-1.337-1.109
-                    c-0.625-0.094-1.234,0.222-1.559,0.762C633.086,371.417,630.642,375.471,629.254,380.031z"/>
-                  <path d="M678.834,481.791c0.497,0.325,1.206,0.634,2.101,0.634c0.475,0,1.004-0.087,1.581-0.306
-                    c4.69-1.771,9.2-6.047,12.606-9.573c2.408-2.493,4.204-4.866,5.49-7.262c2.492-4.648,3.347-9.836,4.174-14.855
-                    c0.518-3.158,1.057-6.425,2.001-9.452c0.212-0.681-0.055-1.424-0.653-1.815c-0.601-0.393-1.387-0.331-1.926,0.134
-                    c-2.73,2.383-5.83,4.535-8.83,6.616c-5.683,3.945-11.56,8.024-15.472,13.987c-1.571,2.396-2.827,5.11-3.732,8.071
-                    c-0.404,1.327-0.859,3.089-0.767,4.913C675.489,474.5,675.979,479.923,678.834,481.791z"/>
-                  <path d="M466.502,351.144c0.37,0.072,0.751,0.106,1.137,0.106c1.585,0,3.258-0.59,4.737-1.696
-                    c0.954-0.715,1.609-1.477,1.997-2.327c0.829-1.802,0.476-4.089-0.967-6.266c-0.679-1.025-1.402-1.777-2.21-2.302
-                    c-0.002,0-0.002-0.003-0.003-0.003c-2.799-1.812-6.208-0.275-8.463,1.765c-0.395,0.356-0.965,0.918-1.348,1.677
-                    c-0.673,1.334-0.65,2.999,0.065,4.691C462.412,349.064,464.349,350.732,466.502,351.144z"/>
-                  <path d="M553.742,371.433c0.44,1.499,0.856,2.917,1.062,4.382c0.091,0.637,0.556,1.159,1.181,1.324
-                    c0.134,0.034,0.27,0.05,0.403,0.05c0.492,0,0.967-0.228,1.274-0.631c4.145-5.46,7.293-14.29,7.832-21.977
-                    c0.289-4.123-0.492-7.178-2.386-9.336c-0.995-1.143-2.261-1.556-3.401-1.118c-0.679,0.272-1.082,0.778-1.295,1.043
-                    c-5.488,6.831-7.443,16.32-5.102,24.763L553.742,371.433z"/>
-                  <path d="M644.908,435.23c0.597-1.568,0.437-3.258-0.462-4.888c-3.551-6.447-17.974-3.842-22.309-2.892
-                    c-9,1.968-17.301,6.872-23.368,13.809c-0.326,0.372-0.461,0.875-0.365,1.362c0.097,0.487,0.412,0.9,0.854,1.121
-                    c4.192,2.093,9.016,3.139,14.34,3.139c5.781,0,12.149-1.234,18.928-3.695l0.8-0.284
-                    C636.823,441.664,643.336,439.362,644.908,435.23z"/>
-                  <path d="M589.167,477.792c0.497,0.325,1.206,0.634,2.101,0.634c0.475,0,1.004-0.087,1.581-0.306
-                    c4.69-1.771,9.2-6.047,12.606-9.573c2.408-2.493,4.204-4.866,5.49-7.262c2.492-4.648,3.347-9.836,4.174-14.855
-                    c0.518-3.158,1.057-6.425,2.001-9.452c0.212-0.681-0.055-1.424-0.653-1.815c-0.601-0.393-1.387-0.331-1.926,0.134
-                    c-2.73,2.383-5.83,4.535-8.83,6.616c-5.683,3.945-11.56,8.024-15.472,13.987c-1.571,2.396-2.827,5.11-3.732,8.071
-                    c-0.404,1.327-0.859,3.089-0.767,4.913C585.822,470.501,586.312,475.924,589.167,477.792z"/>
-                </g>
-              </svg>
             </div>
-          </div>
-        </div>
-      </section>
     </main>
     <Footer />
     </>
   );
 } 
+
+// Función para ajustar la duración al valor permitido más cercano
+const ajustarDuracionValida = (duracion) => {
+  const duracionesValidas = [30, 60, 90, 120];
+  
+  // Si la duración ya es válida, la devolvemos tal cual
+  if (duracionesValidas.includes(duracion)) {
+    return duracion;
+  }
+  
+  // Si no, encontramos el valor más cercano
+  let duracionAjustada = duracionesValidas.reduce((prev, curr) => {
+    return (Math.abs(curr - duracion) < Math.abs(prev - duracion) ? curr : prev);
+  });
+  
+  console.log(`Ajustando duración inválida: ${duracion} min → ${duracionAjustada} min (valor permitido más cercano)`);
+  return duracionAjustada;
+};

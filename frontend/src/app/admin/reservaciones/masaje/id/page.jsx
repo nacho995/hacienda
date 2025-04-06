@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getMasajeReservation, updateMasajeReservation } from '@/services/reservationService';
+import { getTiposMasaje } from '@/services/masajeService';
 import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaSpa, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock } from 'react-icons/fa';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -18,16 +19,35 @@ export default function MasajeReservationDetail() {
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [statusUpdated, setStatusUpdated] = useState(false);
+  const [tiposMasaje, setTiposMasaje] = useState([]);
   
   useEffect(() => {
-    const fetchReservation = async () => {
+    const fetchData = async () => {
       if (!id) return;
       
       setLoading(true);
       setError(null);
       try {
-        const data = await getMasajeReservation(id);
-        setReservation(data);
+        // Cargar tipos de masaje y detalles de la reserva en paralelo
+        const [tiposResponse, reservationData] = await Promise.all([
+          getTiposMasaje(),
+          getMasajeReservation(id)
+        ]);
+        
+        // Guardar tipos de masaje
+        setTiposMasaje(tiposResponse || []);
+        
+        // Si la reserva tiene un ID como tipoMasaje, buscar su nombre real
+        if (reservationData && reservationData.tipoMasaje && typeof reservationData.tipoMasaje === 'string' && 
+            reservationData.tipoMasaje.length === 24 && /^[0-9a-f]{24}$/i.test(reservationData.tipoMasaje)) {
+          // Buscar el tipo de masaje por ID
+          const tipoMasajeObj = tiposResponse.find(tipo => tipo._id === reservationData.tipoMasaje);
+          if (tipoMasajeObj) {
+            reservationData.nombreTipoMasaje = tipoMasajeObj.titulo;
+          }
+        }
+        
+        setReservation(reservationData);
       } catch (err) {
         console.error('Error fetching reservation:', err);
         setError('No se pudo cargar la información de la reserva. Por favor, intenta de nuevo más tarde.');
@@ -36,8 +56,18 @@ export default function MasajeReservationDetail() {
       }
     };
     
-    fetchReservation();
+    fetchData();
   }, [id]);
+  
+  // Función para obtener el nombre del tipo de masaje desde su ID
+  const getTipoMasajeNombre = (masajeId) => {
+    // Si no tenemos ID o tipos de masaje, devolver valor por defecto
+    if (!masajeId || !tiposMasaje || tiposMasaje.length === 0) return 'Masaje';
+    
+    // Buscar el tipo de masaje por ID
+    const tipoMasaje = tiposMasaje.find(tipo => tipo._id === masajeId);
+    return tipoMasaje ? tipoMasaje.titulo : 'Masaje';
+  };
   
   const handleStatusChange = async (newStatus) => {
     setUpdating(true);
@@ -163,7 +193,14 @@ export default function MasajeReservationDetail() {
                   <FaSpa className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Tipo de Masaje</p>
-                    <p className="font-medium">{reservation.tipoMasaje}</p>
+                    <p className="font-medium">
+                      {reservation.nombreTipoMasaje ? reservation.nombreTipoMasaje :
+                       typeof reservation.tipoMasaje === 'object' && reservation.tipoMasaje?.titulo 
+                        ? reservation.tipoMasaje.titulo 
+                        : (typeof reservation.tipoMasaje === 'string' && reservation.tipoMasaje.length === 24 && /^[0-9a-f]{24}$/i.test(reservation.tipoMasaje))
+                          ? getTipoMasajeNombre(reservation.tipoMasaje)
+                          : reservation.tipoMasaje || 'Masaje'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">

@@ -3,7 +3,6 @@ const TipoMasaje = require('../models/TipoMasaje');
 
 const tiposMasaje = [
   {
-    id: 'relajante',
     titulo: 'Masaje Relajante',
     descripcion: 'Perfecto para aliviar el estrés y la tensión',
     duracion: '60 minutos',
@@ -11,7 +10,6 @@ const tiposMasaje = [
     activo: true
   },
   {
-    id: 'descontracturante',
     titulo: 'Masaje Descontracturante',
     descripcion: 'Ideal para dolores musculares específicos',
     duracion: '60 minutos',
@@ -19,7 +17,6 @@ const tiposMasaje = [
     activo: true
   },
   {
-    id: 'piedras-calientes',
     titulo: 'Masaje con Piedras Calientes',
     descripcion: 'Terapia con piedras volcánicas calientes',
     duracion: '90 minutos',
@@ -37,6 +34,14 @@ const seedTiposMasaje = async () => {
     // Eliminar tipos de masaje existentes
     await TipoMasaje.deleteMany({});
     console.log('Tipos de masaje eliminados');
+
+    // Eliminar el índice del campo id si existe
+    try {
+      await mongoose.connection.db.collection('tipomasajes').dropIndex('id_1');
+      console.log('Índice id_1 eliminado');
+    } catch (error) {
+      console.log('El índice id_1 no existía o no se pudo eliminar');
+    }
 
     // Insertar nuevos tipos de masaje
     await TipoMasaje.insertMany(tiposMasaje);

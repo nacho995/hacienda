@@ -1,5 +1,6 @@
 import './globals.css';
 import { AuthProvider } from '@/context/AuthContext';
+import { ReservationProvider } from '@/context/ReservationContext';
 import AnimatedBackground from '@/components/layout/AnimatedBackground';
 import { Toaster } from 'sonner';
 
@@ -17,7 +18,9 @@ export default function RootLayout({ children }) {
       <body suppressHydrationWarning={true}>
         <AnimatedBackground />
         <AuthProvider>
-          {children}
+          <ReservationProvider>
+            {children}
+          </ReservationProvider>
         </AuthProvider>
         <Toaster richColors position="bottom-right" />
       </body>

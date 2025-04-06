@@ -2,6 +2,7 @@ const ReservaEvento = require('../models/ReservaEvento');
 const User = require('../models/User');
 const TipoEvento = require('../models/TipoEvento');
 const ReservaMasaje = require('../models/ReservaMasaje');
+const ReservaHabitacion = require('../models/ReservaHabitacion');
 const mongoose = require('mongoose');
 const sendEmail = require('../utils/email');
 const confirmacionTemplate = require('../emails/confirmacionReserva');
@@ -84,6 +85,15 @@ exports.crearReservaEvento = async (req, res) => {
           tipo: masaje.titulo,
           duracion: parseInt(masaje.duracion),
           precio: parseFloat(masaje.precio)
+        })) || [],
+        habitaciones: req.body.serviciosAdicionales?.habitaciones?.map(habitacion => ({
+          tipoHabitacion: habitacion.tipoHabitacion,
+          nombre: habitacion.nombre,
+          fechaEntrada: habitacion.fechaEntrada,
+          fechaSalida: habitacion.fechaSalida,
+          numeroHabitaciones: habitacion.numeroHabitaciones,
+          numHuespedes: habitacion.numHuespedes,
+          precio: parseFloat(habitacion.precio)
         })) || []
       }
     };
@@ -132,21 +142,150 @@ exports.crearReservaEvento = async (req, res) => {
 
     // Si hay masajes seleccionados, crear las reservas de masajes
     if (req.body.serviciosAdicionales?.masajes?.length > 0) {
-      const masajesPromises = req.body.serviciosAdicionales.masajes.map(masaje => {
-        return ReservaMasaje.create({
-          tipoMasaje: masaje.id,
-          duracion: parseInt(masaje.duracion),
-          hora: horaInicio, // Por defecto usamos la hora de inicio del evento
-          fecha: fecha,
-          nombreContacto: nombreContacto,
-          apellidosContacto: apellidosContacto,
-          emailContacto: emailContacto,
-          telefonoContacto: telefonoContacto,
-          reservaEvento: reservaEvento._id
-        });
-      });
+      console.log('Procesando masajes:', JSON.stringify(req.body.serviciosAdicionales.masajes));
+      
+      try {
+        // Procesar los masajes uno por uno en secuencia con mejor manejo de errores
+        for (const masaje of req.body.serviciosAdicionales.masajes) {
+          try {
+            // Validar que tipoMasaje y precio estén presentes y sean válidos
+            if (!masaje.tipoMasaje) {
+              console.error('Error: masaje sin tipoMasaje', masaje);
+              throw new Error('El tipo de masaje es requerido');
+            }
+            
+            // Asegurarse que el precio es un número válido
+            let precio;
+            try {
+              precio = parseFloat(masaje.precio);
+              if (isNaN(precio) || precio <= 0) {
+                precio = 0; // Valor por defecto para evitar error
+                console.error('Error: precio del masaje inválido, estableciendo default', { 
+                  precio: masaje.precio,
+                  parseado: precio,
+                  masaje: JSON.stringify(masaje)
+                });
+              }
+            } catch (error) {
+              precio = 0; // Valor por defecto para evitar error
+              console.error('Error al parsear precio:', error);
+            }
+            
+            console.log('Creando reserva de masaje con datos:', {
+              tipoMasaje: masaje.tipoMasaje,
+              duracion: ajustarDuracionValida(parseInt(masaje.duracion || 60)),
+              hora: masaje.hora || horaInicio,
+              fecha: masaje.fecha || fecha,
+              precio
+            });
+            
+            // Crear el documento de reserva de masaje
+            const nuevoMasaje = {
+              tipoMasaje: masaje.tipoMasaje,
+              duracion: ajustarDuracionValida(parseInt(masaje.duracion || 60)),
+              hora: masaje.hora || horaInicio || '10:00',
+              fecha: masaje.fecha || fecha || new Date().toISOString().split('T')[0],
+              nombreContacto: nombreContacto || '',
+              apellidosContacto: apellidosContacto || '',
+              emailContacto: emailContacto || '',
+              telefonoContacto: telefonoContacto || '',
+              precio: precio || 0, // Usar precio validado o 0 como fallback
+              reservaEvento: reservaEvento._id,
+              tipoReserva: 'Masaje' // Establecer explícitamente el discriminador
+            };
+            
+            // Verificar que todos los campos de texto necesarios estén definidos para evitar errores de charAt()
+            Object.keys(nuevoMasaje).forEach(key => {
+              // Si el valor es undefined o null y esperamos una cadena, asignar una cadena vacía
+              if ((nuevoMasaje[key] === undefined || nuevoMasaje[key] === null) && 
+                 (key === 'hora' || key === 'fecha' || key === 'nombreContacto' || 
+                  key === 'apellidosContacto' || key === 'emailContacto' || key === 'telefonoContacto')) {
+                console.log(`Campo ${key} indefinido, asignando valor por defecto`);
+                nuevoMasaje[key] = '';
+              }
+            });
+            
+            console.log('Objeto masaje validado antes de crear:', nuevoMasaje);
+            
+            // Crear el masaje y esperar a que se complete antes de continuar con el siguiente
+            await ReservaMasaje.create(nuevoMasaje);
+            console.log('✅ Masaje creado correctamente');
+            
+          } catch (masajeError) {
+            console.error('Error al procesar masaje individual:', masajeError);
+            console.error('Stack trace:', masajeError.stack);
+            // Continuar con el siguiente masaje en lugar de detener todo el proceso
+            // pero registramos un error detallado para diagnóstico
+          }
+        }
+      } catch (masajesError) {
+        console.error('Error al procesar grupo de masajes:', masajesError);
+        console.error('Stack trace:', masajesError.stack);
+        throw new Error(`Error al crear masajes: ${masajesError.message}`);
+      }
+    }
 
-      await Promise.all(masajesPromises);
+    // Si hay habitaciones seleccionadas, crear las reservas de habitaciones
+    if (req.body.serviciosAdicionales?.habitaciones?.length > 0) {
+      console.log('[DEBUG] Procesando habitaciones:', JSON.stringify(req.body.serviciosAdicionales.habitaciones, null, 2));
+      console.log('[DEBUG] Total de habitaciones a procesar:', req.body.serviciosAdicionales.habitaciones.length);
+      
+      try {
+        // Usar el método estático del modelo para procesar las habitaciones
+        const datosEvento = {
+          nombreContacto, 
+          apellidosContacto, 
+          emailContacto, 
+          telefonoContacto,
+          fecha
+        };
+        
+        // Procesar las habitaciones una por una en secuencia con manejo de errores
+        for (const habitacion of req.body.serviciosAdicionales.habitaciones) {
+          try {
+            console.log('[DEBUG] Procesando habitación individual:', JSON.stringify(habitacion, null, 2));
+            
+            // Validar que tipoHabitacion y precio estén presentes y sean válidos
+            if (!habitacion.tipoHabitacion) {
+              console.error('[ERROR] Habitación sin tipoHabitacion:', habitacion);
+              throw new Error('El tipo de habitación es requerido');
+            }
+            
+            // Asegurarse que el precio es un número válido
+            let precio;
+            try {
+              precio = parseFloat(habitacion.precio);
+              if (isNaN(precio) || precio <= 0) {
+                precio = 0; // Valor por defecto para evitar error
+                console.warn('[WARN] Precio de habitación inválido, estableciendo default:', { 
+                  precio: habitacion.precio,
+                  parseado: precio
+                });
+              }
+            } catch (error) {
+              precio = 0; // Valor por defecto para evitar error
+              console.error('[ERROR] Error al parsear precio de habitación:', error);
+            }
+
+            // Crear la habitación usando el método estático del modelo
+            const nuevaHabitacion = await ReservaHabitacion.crearDesdeReservaEvento(
+              habitacion, 
+              datosEvento, 
+              reservaEvento._id
+            );
+            
+            console.log('[DEBUG] Habitación creada correctamente:', nuevaHabitacion._id);
+          } catch (habitacionError) {
+            console.error('[ERROR] Error al procesar habitación individual:', habitacionError);
+            console.error('[ERROR] Stack trace:', habitacionError.stack);
+            // Continuar con la siguiente habitación en lugar de detener todo el proceso
+          }
+        }
+      } catch (habitacionesError) {
+        console.error('[ERROR] Error al procesar grupo de habitaciones:', habitacionesError);
+        console.error('[ERROR] Stack trace:', habitacionesError.stack);
+        throw new Error(`Error al crear habitaciones: ${habitacionesError.message}`);
+      }
     }
 
     // Enviar email de confirmación al usuario
@@ -331,31 +470,55 @@ exports.actualizarReservaEvento = async (req, res) => {
     //   });
     // }
     
-    // Si se cambia la fecha u hora, verificar disponibilidad
-    if (
-      (req.body.fecha && req.body.fecha !== reserva.fecha.toISOString().split('T')[0]) ||
-      (req.body.horaInicio && req.body.horaInicio !== reserva.horaInicio) ||
-      (req.body.horaFin && req.body.horaFin !== reserva.horaFin) ||
-      (req.body.espacioSeleccionado && req.body.espacioSeleccionado !== reserva.espacioSeleccionado)
-    ) {
-      const fecha = req.body.fecha || reserva.fecha;
-      const horaInicio = req.body.horaInicio || reserva.horaInicio;
-      const horaFin = req.body.horaFin || reserva.horaFin;
-      const espacio = req.body.espacioSeleccionado || reserva.espacioSeleccionado;
+    // Detectar si es una operación de eliminación de habitación por la bandera especial
+    const esOperacionEliminacionHabitacion = req.body._operacion_eliminacion_habitacion === true;
+    
+    if (esOperacionEliminacionHabitacion) {
+      console.log('Detectada operación de eliminación de habitación. Omitiendo verificación de disponibilidad.');
       
-      const disponible = await ReservaEvento.comprobarDisponibilidad(
-        fecha,
-        espacio,
-        horaInicio,
-        horaFin,
-        reserva._id // Excluir la reserva actual de la verificación
-      );
+      // Eliminar la bandera especial antes de guardar
+      delete req.body._operacion_eliminacion_habitacion;
+    } else {
+      // Verificación normal de disponibilidad si se cambia fecha/hora/espacio
+      if (
+        (req.body.fecha && req.body.fecha !== reserva.fecha.toISOString().split('T')[0]) ||
+        (req.body.horaInicio && req.body.horaInicio !== reserva.horaInicio) ||
+        (req.body.horaFin && req.body.horaFin !== reserva.horaFin) ||
+        (req.body.espacioSeleccionado && req.body.espacioSeleccionado !== reserva.espacioSeleccionado)
+      ) {
+        const fecha = req.body.fecha || reserva.fecha;
+        const horaInicio = req.body.horaInicio || reserva.horaInicio;
+        const horaFin = req.body.horaFin || reserva.horaFin;
+        const espacio = req.body.espacioSeleccionado || reserva.espacioSeleccionado;
+        
+        const disponible = await ReservaEvento.comprobarDisponibilidad(
+          fecha,
+          espacio,
+          horaInicio,
+          horaFin,
+          reserva._id // Excluir la reserva actual de la verificación
+        );
+        
+        if (!disponible) {
+          return res.status(400).json({
+            success: false,
+            message: 'El espacio no está disponible para la fecha y hora solicitadas'
+          });
+        }
+      }
+    }
+    
+    // Detectar si se están modificando las habitaciones
+    if (req.body.serviciosAdicionales?.habitaciones) {
+      console.log('Actualizando habitaciones del evento:', req.params.id);
+      console.log('Habitaciones actuales:', reserva.serviciosAdicionales?.habitaciones?.length || 0);
+      console.log('Nuevas habitaciones:', req.body.serviciosAdicionales.habitaciones.length);
       
-      if (!disponible) {
-        return res.status(400).json({
-          success: false,
-          message: 'El espacio no está disponible para la fecha y hora solicitadas'
-        });
+      // Si se están eliminando habitaciones, mostrar detalle
+      if (reserva.serviciosAdicionales?.habitaciones?.length > req.body.serviciosAdicionales.habitaciones.length) {
+        console.log('Eliminando habitaciones:');
+        console.log('  - Antes:', JSON.stringify(reserva.serviciosAdicionales.habitaciones));
+        console.log('  - Después:', JSON.stringify(req.body.serviciosAdicionales.habitaciones));
       }
     }
     
@@ -369,6 +532,8 @@ exports.actualizarReservaEvento = async (req, res) => {
       }
     ).populate('usuario', 'nombre apellidos email telefono')
      .populate('asignadoA', 'nombre apellidos email');
+    
+    console.log('Evento actualizado correctamente:', req.params.id);
     
     res.status(200).json({
       success: true,
@@ -677,4 +842,22 @@ exports.obtenerFechasOcupadas = async (req, res) => {
       error: error.message
     });
   }
+};
+
+// Función para ajustar la duración al valor permitido más cercano
+const ajustarDuracionValida = (duracion) => {
+  const duracionesValidas = [30, 60, 90, 120];
+  
+  // Si la duración ya es válida, la devolvemos tal cual
+  if (duracionesValidas.includes(duracion)) {
+    return duracion;
+  }
+  
+  // Si no, encontramos el valor más cercano
+  let duracionAjustada = duracionesValidas.reduce((prev, curr) => {
+    return (Math.abs(curr - duracion) < Math.abs(prev - duracion) ? curr : prev);
+  });
+  
+  console.log(`Ajustando duración inválida: ${duracion} min → ${duracionAjustada} min (valor permitido más cercano)`);
+  return duracionAjustada;
 }; 

@@ -18,7 +18,7 @@ import {
   FaUserPlus,
   FaSpinner
 } from 'react-icons/fa';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 import { 
   asignarHabitacionReservation,

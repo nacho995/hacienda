@@ -164,7 +164,7 @@ exports.obtenerReservaMasaje = async (req, res) => {
     }
     
     // Verificar que el usuario tenga acceso a esta reserva
-    if (reserva.usuario._id.toString() !== req.user.id && req.user.role !== 'admin') {
+    if ((reserva.usuario && reserva.usuario._id && reserva.usuario._id.toString() !== req.user.id) && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'No tienes permiso para ver esta reserva'
@@ -202,7 +202,7 @@ exports.actualizarReservaMasaje = async (req, res) => {
     }
     
     // Verificar que el usuario tenga acceso a esta reserva
-    if (reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') {
+    if ((reserva.usuario && reserva.usuario.toString() !== req.user.id) && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'No tienes permiso para actualizar esta reserva'
@@ -268,17 +268,28 @@ exports.actualizarReservaMasaje = async (req, res) => {
  */
 exports.eliminarReservaMasaje = async (req, res) => {
   try {
+    console.log('Intentando eliminar reserva de masaje con ID:', req.params.id);
     const reserva = await ReservaMasaje.findById(req.params.id);
     
     if (!reserva) {
+      console.log('Reserva no encontrada con ID:', req.params.id);
       return res.status(404).json({
         success: false,
         message: 'Reserva no encontrada'
       });
     }
     
+    console.log('Datos de la reserva:', {
+      id: reserva._id,
+      usuario: reserva.usuario,
+      tipoReserva: reserva.tipoReserva,
+      estadoReserva: reserva.estadoReserva
+    });
+    
     // Verificar que el usuario tenga acceso a esta reserva
-    if (reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') {
+    // Agregamos verificación adicional para evitar el error "Cannot read properties of undefined (reading 'toString')"
+    if ((reserva.usuario && reserva.usuario.toString() !== req.user.id) && req.user.role !== 'admin') {
+      console.log('Sin permiso para eliminar. Usuario actual:', req.user.id, 'Usuario de la reserva:', reserva.usuario);
       return res.status(403).json({
         success: false,
         message: 'No tienes permiso para eliminar esta reserva'
@@ -286,6 +297,7 @@ exports.eliminarReservaMasaje = async (req, res) => {
     }
     
     await reserva.deleteOne();
+    console.log('Reserva eliminada exitosamente');
     
     res.status(200).json({
       success: true,

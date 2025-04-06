@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { FaCalendar, FaClock, FaUser, FaEnvelope, FaPhone, FaMoneyBillWave } from 'react-icons/fa';
+import { FaCalendar, FaClock, FaUser, FaEnvelope, FaPhone, FaMoneyBillWave, FaTrash, FaEdit, FaSearch } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { getMasajeReservations } from '@/services/reservationService';
+import { getMasajeReservations, deleteMasajeReservation } from '@/services/reservationService';
+import { getTiposMasaje } from '@/services/masajeService';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 export default function AdminMasajes() {
   const [masajes, setMasajes] = useState([]);
@@ -13,33 +15,63 @@ export default function AdminMasajes() {
   const [error, setError] = useState(null);
   const { isAuthenticated, isAdmin } = useAuth();
   const router = useRouter();
-
-  const fetchMasajes = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('Solicitando datos de masajes...');
-      const response = await getMasajeReservations();
-      console.log('Respuesta de masajes recibida:', response);
-      setMasajes(response.data || []);
-      console.log('Masajes cargados:', response.data?.length || 0);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error al cargar reservas de masajes:', error);
-      setError('No se pudieron cargar las reservas de masajes: ' + (error.message || 'Error desconocido'));
-      toast.error('Error al cargar las reservas de masajes');
-      setLoading(false);
-    }
-  };
+  const [tiposMasaje, setTiposMasaje] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        console.log('Solicitando datos de masajes...');
+        
+        // Cargar tipos de masaje y reservas de masaje en paralelo
+        const [tiposResponse, reservasResponse] = await Promise.all([
+          getTiposMasaje(),
+          getMasajeReservations()
+        ]);
+        
+        console.log('Tipos de masaje cargados:', tiposResponse);
+        // Guardar tipos de masaje
+        setTiposMasaje(tiposResponse || []);
+        
+        if (reservasResponse && reservasResponse.data) {
+          // Procesar reservas para asignar nombres reales de los masajes
+          const masajesProcesados = reservasResponse.data.map(masaje => {
+            // Si el masaje tiene un ID como tipoMasaje, buscar su nombre real
+            if (masaje.tipoMasaje && typeof masaje.tipoMasaje === 'string' && 
+                masaje.tipoMasaje.length === 24 && /^[0-9a-f]{24}$/i.test(masaje.tipoMasaje)) {
+              // Buscar el tipo de masaje por ID
+              const tipoMasajeObj = tiposResponse.find(tipo => tipo._id === masaje.tipoMasaje);
+              if (tipoMasajeObj) {
+                masaje.nombreTipoMasaje = tipoMasajeObj.titulo;
+              }
+            }
+            return masaje;
+          });
+          
+          setMasajes(masajesProcesados);
+          console.log('Masajes procesados con nombres reales:', masajesProcesados);
+        } else {
+          console.error('Formato de respuesta inválido en masajes:', reservasResponse);
+          setMasajes([]);
+        }
+      } catch (error) {
+        console.error('Error al cargar masajes:', error);
+        toast.error('Error al cargar las reservas de masajes');
+        setMasajes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     // Verificar autenticación
     if (!isAuthenticated || !isAdmin) {
       router.push('/login');
       return;
     }
 
-    fetchMasajes();
+    fetchData();
   }, [isAuthenticated, isAdmin, router]);
 
   const formatFecha = (fecha) => {
@@ -54,6 +86,52 @@ export default function AdminMasajes() {
       console.error('Error al formatear fecha:', e);
       return 'Fecha inválida';
     }
+  };
+
+  const getTipoMasajeNombre = (masajeId) => {
+    // Si no tenemos ID o tipos de masaje, devolver valor por defecto
+    if (!masajeId || !tiposMasaje || tiposMasaje.length === 0) return 'Masaje';
+    
+    // Buscar el tipo de masaje por ID
+    const tipoMasaje = tiposMasaje.find(tipo => tipo._id === masajeId);
+    return tipoMasaje ? tipoMasaje.titulo : 'Masaje';
+  };
+
+  const getMasajeDisplayName = (masaje) => {
+    // Si tenemos un nombre de tipo de masaje ya procesado, usarlo
+    if (masaje.nombreTipoMasaje) {
+      return masaje.nombreTipoMasaje;
+    }
+    
+    // Si tenemos un nombreEvento, usamos ese
+    if (masaje.nombreEvento) {
+      return masaje.nombreEvento;
+    }
+    
+    // Verificar si tipoMasaje es un valor válido
+    if (masaje.tipoMasaje) {
+      // Si es un objeto, intentar usar el título
+      if (typeof masaje.tipoMasaje === 'object' && masaje.tipoMasaje.titulo) {
+        return masaje.tipoMasaje.titulo;
+      }
+      
+      // Si es una cadena, verificar si es un ID de MongoDB (24 caracteres hexadecimales)
+      if (typeof masaje.tipoMasaje === 'string') {
+        if (masaje.tipoMasaje.length === 24 && /^[0-9a-f]{24}$/i.test(masaje.tipoMasaje)) {
+          // Buscar el nombre real del tipo de masaje
+          return getTipoMasajeNombre(masaje.tipoMasaje);
+        }
+        return masaje.tipoMasaje;
+      }
+    }
+    
+    // Si tenemos el título del masaje
+    if (masaje.titulo) {
+      return masaje.titulo;
+    }
+    
+    // Valor por defecto
+    return 'Masaje';
   };
 
   if (loading) {
@@ -79,7 +157,53 @@ export default function AdminMasajes() {
           </p>
         </div>
         <button 
-          onClick={fetchMasajes} 
+          onClick={() => {
+            const fetchData = async () => {
+              try {
+                setLoading(true);
+                setError(null);
+                
+                // Cargar tipos de masaje y reservas de masaje en paralelo
+                const [tiposResponse, reservasResponse] = await Promise.all([
+                  getTiposMasaje(),
+                  getMasajeReservations()
+                ]);
+                
+                // Guardar tipos de masaje
+                setTiposMasaje(tiposResponse || []);
+                
+                if (reservasResponse && reservasResponse.data) {
+                  // Procesar reservas para asignar nombres reales de los masajes
+                  const masajesProcesados = reservasResponse.data.map(masaje => {
+                    // Si el masaje tiene un ID como tipoMasaje, buscar su nombre real
+                    if (masaje.tipoMasaje && typeof masaje.tipoMasaje === 'string' && 
+                        masaje.tipoMasaje.length === 24 && /^[0-9a-f]{24}$/i.test(masaje.tipoMasaje)) {
+                      // Buscar el tipo de masaje por ID
+                      const tipoMasajeObj = tiposResponse.find(tipo => tipo._id === masaje.tipoMasaje);
+                      if (tipoMasajeObj) {
+                        masaje.nombreTipoMasaje = tipoMasajeObj.titulo;
+                      }
+                    }
+                    return masaje;
+                  });
+                  
+                  setMasajes(masajesProcesados);
+                } else {
+                  console.error('Formato de respuesta inválido en masajes:', reservasResponse);
+                  setMasajes([]);
+                }
+              } catch (error) {
+                console.error('Error al cargar masajes:', error);
+                toast.error('Error al cargar las reservas de masajes');
+                setMasajes([]);
+              } finally {
+                setLoading(false);
+              }
+            };
+            
+            fetchData();
+            toast.success('Actualizando datos...');
+          }}
           className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
         >
           Actualizar
@@ -108,11 +232,8 @@ export default function AdminMasajes() {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-xl font-semibold text-[var(--color-accent)]">
-                    {masaje.nombreEvento || masaje.tipoMasaje || 'Masaje'}
+                    {getMasajeDisplayName(masaje)}
                   </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    ID: {masaje._id || 'No disponible'}
-                  </p>
                 </div>
                 <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
                   masaje.estado === 'confirmada' ? 'bg-green-100 text-green-800' :
@@ -209,4 +330,4 @@ export default function AdminMasajes() {
       </div>
     </div>
   );
-} 
+}

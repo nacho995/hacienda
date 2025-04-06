@@ -41,21 +41,17 @@ const safelyDecodeToken = (token) => {
   }
 };
 
-// Rutas que son públicas y no necesitan token
-const publicRoutes = [
-  '/auth/login',
-  '/auth/register',
-  '/auth/confirm',
-  '/auth/password/forgot',
-  '/auth/password/reset',
-  '/public',
-  '/reservas/habitaciones/disponibilidad',
-  '/habitaciones',
-  '/reservas/habitaciones/fechas-ocupadas'
-];
-
-// Función para verificar si una ruta es pública
+// Determinar si la ruta es pública (no requiere autenticación)
 const isPublicRoute = (url) => {
+  const publicRoutes = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/password-reset',
+    '/auth/verify-email',
+    '/eventos/disponibilidad',
+    '/reservas/eventos/disponibilidad'
+  ];
+  
   return publicRoutes.some(route => url.includes(route));
 };
 
@@ -117,7 +113,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Interceptor para manejar respuestas y errores
+// Configurar interceptor de respuesta para manejar transformación de datos y errores
 apiClient.interceptors.response.use(
   (response) => {
     console.log('Respuesta exitosa de:', response.config.url);
@@ -132,45 +128,99 @@ apiClient.interceptors.response.use(
       data: null
     };
     
+    // No mostrar ciertos errores en la consola para silenciar mensajes repetitivos
+    const silentPaths = [
+      /\/reservas\/habitaciones\/[a-zA-Z0-9]+$/,
+      /\/reservas\/masajes\/[a-zA-Z0-9]+$/
+    ];
+     
+    // Comprobar si la URL coincide con alguno de los patrones silenciosos
+    const shouldSilence = error.config && silentPaths.some(pattern => 
+      pattern.test(error.config.url) && error.response && error.response.status === 404
+    );
+    
     if (error.response) {
       errorResponse.status = error.response.status;
       errorResponse.message = error.response.data?.message || 'Error en la petición';
       errorResponse.data = error.response.data;
       
-      console.error(`Error ${error.response.status} en petición a: ${error.config?.url}`);
-      console.error('Detalles del error:', error.response.data);
-      
-      // Log adicional para errores 401 en login
-      if (error.response.status === 401 && error.config?.url.includes('/auth/login')) {
-        console.error('Error 401 en login. Datos enviados:', error.config.data);
-        try {
-          const sentData = JSON.parse(error.config.data);
-          console.log('Email utilizado:', sentData.email);
-        } catch (e) {
-          console.error('No se pudo parsear los datos enviados:', e);
-        }
+      // Solo mostrar errores en la consola si no deben ser silenciados
+      if (!shouldSilence) {
+        console.error(`Error ${error.response.status} en petición a: ${error.config?.url}`);
+        console.error('Detalles del error:', error.response.data);
+        console.error('Headers de la solicitud:', error.config?.headers);
+        console.error('Datos enviados:', error.config?.data);
       }
       
-      if (error.response.status === 401) {
-        if (!error.config?.url || !isPublicRoute(error.config.url)) {
-          console.log('Error de autenticación, limpiando localStorage');
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
+      // Manejo específico por código de error
+      switch (error.response.status) {
+        case 400:
+          if (!shouldSilence) {
+            console.error('Error 400 - Datos inválidos:', error.config?.data);
+            try {
+              const sentData = JSON.parse(error.config.data);
+              console.log('Datos enviados en detalle:', sentData);
+            } catch (e) {
+              console.error('No se pudo parsear los datos enviados:', e);
+            }
+          }
+          break;
           
-          const authErrorEvent = new CustomEvent('auth-error', { 
-            detail: { 
-              status: 401, 
-              message: error.response.data?.message || 'Sesión expirada o no autorizada'
-            } 
-          });
-          window.dispatchEvent(authErrorEvent);
-        }
+        case 401:
+          if (!error.config?.url || !isPublicRoute(error.config.url)) {
+            console.log('Error de autenticación, limpiando localStorage');
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            
+            const authErrorEvent = new CustomEvent('auth-error', { 
+              detail: { 
+                status: 401, 
+                message: error.response.data?.message || 'Sesión expirada o no autorizada'
+              } 
+            });
+            window.dispatchEvent(authErrorEvent);
+          }
+          break;
+          
+        case 403:
+          if (!shouldSilence) {
+            console.error('Error 403 - No autorizado para esta acción');
+          }
+          errorResponse.message = 'No tienes permiso para realizar esta acción';
+          break;
+          
+        case 404:
+          if (!shouldSilence) {
+            console.error('Error 404 - Recurso no encontrado:', error.config?.url);
+          }
+          errorResponse.message = 'El recurso solicitado no existe';
+          break;
+          
+        case 500:
+          if (!shouldSilence) {
+            console.error('Error 500 - Error del servidor:', error.response?.data);
+            // Mostrar detalles adicionales si están disponibles
+            if (error.response?.data?.error) {
+              console.error('Detalles técnicos del error:', error.response.data.error);
+            }
+          }
+          errorResponse.message = 'Error interno del servidor. Por favor, contacte al administrador.';
+          if (error.response?.data?.error) {
+            errorResponse.details = error.response.data.error;
+          }
+          break;
+          
+        default:
+          if (!shouldSilence) {
+            console.error(`Error ${error.response.status} no manejado específicamente`);
+          }
       }
     } else if (error.code === 'ECONNABORTED') {
       errorResponse.message = 'La petición ha tardado demasiado tiempo. Por favor, inténtelo de nuevo.';
       console.error('Timeout en la petición:', error);
     } else {
       console.error('Error de red:', error.message);
+      console.error('Error completo:', error);
     }
     
     return Promise.reject(errorResponse);

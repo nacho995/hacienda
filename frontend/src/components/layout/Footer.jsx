@@ -196,7 +196,7 @@ export default function Footer() {
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
                     <FaChevronRight className="text-white text-[10px]" />
                   </div>
-                  <span className="font-medium">Reservar</span>
+                  <span className="font-medium">Cotizar</span>
                 </Link>
               </li>
             </ul>

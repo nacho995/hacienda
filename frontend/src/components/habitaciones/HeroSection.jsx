@@ -66,7 +66,7 @@ export default function HeroSection({ scrollY }) {
           <div className="mt-8">
             <button 
               onClick={() => {
-                const element = document.getElementById('habitaciones');
+                const element = document.querySelector('.room-list-section');
                 if (element) {
                   element.scrollIntoView({ 
                     behavior: 'smooth',

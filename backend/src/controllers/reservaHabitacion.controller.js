@@ -247,17 +247,39 @@ exports.actualizarReservaHabitacion = async (req, res) => {
 // @access  Private
 exports.eliminarReservaHabitacion = async (req, res) => {
   try {
+    console.log('Intentando eliminar reserva de habitación con ID:', req.params.id);
+    
+    // Validar que el ID sea válido para MongoDB
+    if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      console.log('ID de reserva no válido:', req.params.id);
+      return res.status(400).json({
+        success: false,
+        message: 'ID de reserva no válido'
+      });
+    }
+    
     const reserva = await ReservaHabitacion.findById(req.params.id);
     
     if (!reserva) {
+      console.log('Reserva no encontrada con ID:', req.params.id);
       return res.status(404).json({
         success: false,
         message: 'No se encontró la reserva con ese ID'
       });
     }
     
+    console.log('Datos de la reserva encontrada:', {
+      id: reserva._id,
+      habitacion: reserva.habitacion,
+      usuario: reserva.usuario,
+      fechaEntrada: reserva.fechaEntrada,
+      fechaSalida: reserva.fechaSalida
+    });
+    
     // Asegurarse de que el usuario es propietario de la reserva o es admin
-    if (reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') {
+    // Verificación segura para evitar error "Cannot read properties of undefined"
+    if ((reserva.usuario && reserva.usuario.toString() !== req.user.id) && req.user.role !== 'admin') {
+      console.log('Usuario sin autorización. Usuario actual:', req.user.id, 'Usuario de la reserva:', reserva.usuario);
       return res.status(403).json({
         success: false,
         message: 'No está autorizado para eliminar esta reserva'
@@ -265,13 +287,14 @@ exports.eliminarReservaHabitacion = async (req, res) => {
     }
     
     await reserva.deleteOne();
+    console.log('Reserva eliminada exitosamente');
     
     res.status(200).json({
       success: true,
       data: {}
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error al eliminar reserva de habitación:', error);
     res.status(500).json({
       success: false,
       message: 'Error al eliminar la reserva de habitación'
@@ -284,71 +307,137 @@ exports.eliminarReservaHabitacion = async (req, res) => {
 // @access  Public
 exports.comprobarDisponibilidadHabitacion = async (req, res) => {
   try {
-    const { tipoHabitacion, habitacion, fechaEntrada, fechaSalida, numeroHabitaciones } = req.body;
+    console.log('Comprobando disponibilidad de habitación:', req.body);
     
-    if (!tipoHabitacion || !habitacion || !fechaEntrada || !fechaSalida || !numeroHabitaciones) {
+    const { 
+      tipoHabitacion, 
+      habitacion,
+      fechaEntrada, 
+      fechaSalida,
+      numeroHabitaciones = 1
+    } = req.body;
+    
+    if (!tipoHabitacion && !habitacion) {
       return res.status(400).json({
         success: false,
         disponible: false,
-        mensaje: 'Por favor, proporcione todos los campos requeridos'
+        mensaje: 'Debe proporcionar un tipo de habitación o una habitación específica'
       });
     }
     
-    // Buscar reservas que se solapen con las fechas proporcionadas para esta habitación específica
-    const reservas = await ReservaHabitacion.find({
-      habitacion, // Filtramos por la habitación específica
-      estado: { $ne: 'cancelada' },
-      $or: [
-        {
-          fechaEntrada: { $lte: fechaSalida },
-          fechaSalida: { $gte: fechaEntrada }
-        }
-      ]
-    });
-
-    // Calcular habitaciones ocupadas
-    let habitacionesOcupadas = 0;
-    reservas.forEach(reserva => {
-      habitacionesOcupadas += reserva.numeroHabitaciones || 1;
-    });
-
-    // Obtener el total de habitaciones disponibles de la base de datos
+    if (!fechaEntrada || !fechaSalida) {
+      return res.status(400).json({
+        success: false,
+        disponible: false,
+        mensaje: 'Debe proporcionar fechas de entrada y salida'
+      });
+    }
+    
+    // Buscar la habitación en la base de datos, ya sea por tipo o por nombre específico
+    let habitacionQuery = {};
+    
+    if (habitacion) {
+      // Buscar por número de habitación o nombre
+      habitacionQuery = {
+        $or: [
+          { nombre: habitacion },
+          { numeroHabitacion: habitacion }
+        ]
+      };
+    } else if (tipoHabitacion) {
+      // Buscar por tipo de habitación
+      habitacionQuery = { tipo: tipoHabitacion };
+    }
+    
     const Habitacion = require('../models/Habitacion');
-    const habitacionInfo = await Habitacion.findOne({ nombre: habitacion });
-
-    if (!habitacionInfo) {
+    const habitaciones = await Habitacion.find(habitacionQuery);
+    
+    console.log(`Encontradas ${habitaciones.length} habitaciones que coinciden con la consulta`);
+    
+    if (habitaciones.length === 0) {
       return res.status(404).json({
         success: false,
         disponible: false,
-        mensaje: 'No se encontró la habitación especificada'
+        mensaje: habitacion 
+          ? `No se encontró la habitación ${habitacion}` 
+          : `No se encontraron habitaciones de tipo ${tipoHabitacion}`
       });
     }
-
-    // Verificar que la habitación es del tipo correcto
-    if (habitacionInfo.tipo !== tipoHabitacion) {
-      return res.status(400).json({
-        success: false,
-        disponible: false,
-        mensaje: 'El tipo de habitación no coincide con la habitación seleccionada'
-      });
-    }
-
-    const habitacionesRestantes = Math.max(0, habitacionInfo.totalDisponibles - habitacionesOcupadas);
     
-    res.status(200).json({
+    // Si tenemos un habitación específica, verificar solo esa
+    const habitacionesAVerificar = habitacion ? [habitaciones[0]] : habitaciones;
+    
+    const habitacionesDisponibles = [];
+    
+    // Para cada habitación que coincide con el criterio, verificar si está disponible
+    for (const habitacionInfo of habitacionesAVerificar) {
+      const ReservaHabitacion = require('../models/ReservaHabitacion');
+      
+      // Buscar reservas que se solapan con las fechas solicitadas
+      const reservas = await ReservaHabitacion.find({
+        $or: [
+          // Reservas que tienen esta habitación específica asignada
+          { habitacion: habitacionInfo.nombre },
+          { habitacion: habitacionInfo.numeroHabitacion },
+          
+          // O reservas que son del mismo tipo y no tienen una habitación específica asignada
+          { 
+            tipoHabitacion: habitacionInfo.tipo,
+            habitacion: { $exists: false }
+          },
+          {
+            tipoHabitacion: habitacionInfo.tipo,
+            habitacion: null
+          }
+        ],
+        // No incluir reservas canceladas
+        estado: { $ne: 'cancelada' },
+        // Verificar solapamiento de fechas
+        $or: [
+          {
+            fechaEntrada: { $lte: new Date(fechaSalida) },
+            fechaSalida: { $gte: new Date(fechaEntrada) }
+          }
+        ]
+      });
+      
+      console.log(`Habitación ${habitacionInfo.nombre} (${habitacionInfo.numeroHabitacion}): ${reservas.length} reservas encontradas para las fechas solicitadas`);
+      
+      // Si no hay reservas que se solapen, esta habitación está disponible
+      if (reservas.length === 0) {
+        habitacionesDisponibles.push(habitacionInfo);
+      }
+    }
+    
+    console.log(`Total de habitaciones disponibles: ${habitacionesDisponibles.length}`);
+    
+    // Verificar si tenemos suficientes habitaciones disponibles
+    const hayDisponibilidad = habitacionesDisponibles.length >= numeroHabitaciones;
+    
+    const respuesta = {
       success: true,
-      disponible: habitacionesRestantes >= numeroHabitaciones,
-      mensaje: habitacionesRestantes >= numeroHabitaciones
-        ? `Hay ${habitacionesRestantes} habitaciones disponibles`
-        : `Lo sentimos, solo quedan ${habitacionesRestantes} habitaciones disponibles`,
-      habitacionesRestantes
-    });
+      disponible: hayDisponibilidad,
+      mensaje: hayDisponibilidad
+        ? `Hay ${habitacionesDisponibles.length} habitaciones disponibles`
+        : `Lo sentimos, solo quedan ${habitacionesDisponibles.length} habitaciones disponibles`,
+      habitacionesRestantes: habitacionesDisponibles.length,
+      // Incluir información de las habitaciones disponibles
+      habitacionesDisponibles: habitacionesDisponibles.map(h => ({
+        id: h._id,
+        nombre: h.nombre,
+        tipo: h.tipo,
+        numero: h.numeroHabitacion
+      }))
+    };
+    
+    console.log('Enviando respuesta:', respuesta);
+    res.status(200).json(respuesta);
   } catch (error) {
     console.error('Error al comprobar disponibilidad:', error);
     res.status(500).json({
       success: false,
       disponible: false,
-      mensaje: 'Error al comprobar disponibilidad'
+      mensaje: 'Error al comprobar disponibilidad: ' + error.message
     });
   }
 };

@@ -46,9 +46,46 @@ router.get('/habitaciones', obtenerReservasHabitacion);
 router.post('/habitaciones', crearReservaHabitacion);
 router.get('/habitaciones/:id', obtenerReservaHabitacion);
 
+// Ruta de prueba para verificar la selección de habitaciones
+router.get('/prueba/habitaciones-seleccionadas', async (req, res) => {
+  try {
+    // Obtener últimas reservas de eventos que tengan habitaciones
+    const ReservaEvento = require('../models/ReservaEvento');
+    const eventos = await ReservaEvento.find({
+      'serviciosAdicionales.habitaciones': { $exists: true, $ne: [] }
+    }).sort({ createdAt: -1 }).limit(10);
+    
+    // Obtener reservas de habitaciones directas
+    const ReservaHabitacion = require('../models/ReservaHabitacion');
+    const habitaciones = await ReservaHabitacion.find().sort({ createdAt: -1 }).limit(10);
+    
+    res.status(200).json({
+      totalEventosConHabitaciones: eventos.length,
+      totalReservasHabitacion: habitaciones.length,
+      eventos: eventos.map(evento => ({
+        id: evento._id,
+        nombreEvento: evento.nombreEvento,
+        fecha: evento.fecha,
+        habitaciones: evento.serviciosAdicionales?.habitaciones || []
+      })),
+      habitacionesIndependientes: habitaciones.map(h => ({
+        id: h._id,
+        nombre: h.habitacion,
+        tipo: h.tipoHabitacion,
+        fechaEntrada: h.fechaEntrada,
+        fechaSalida: h.fechaSalida,
+        reservaEvento: h.reservaEvento
+      }))
+    });
+  } catch (error) {
+    console.error('Error en ruta de prueba:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Rutas protegidas para habitaciones (solo admin)
 router.put('/habitaciones/:id', protectRoute, authorize('admin'), actualizarReservaHabitacion);
-router.delete('/habitaciones/:id', protectRoute, authorize('admin'), eliminarReservaHabitacion);
+router.delete('/habitaciones/:id', protectRoute, eliminarReservaHabitacion);
 router.put('/habitaciones/:id/asignar', protectRoute, authorize('admin'), asignarReservaHabitacion);
 
 // Rutas públicas para eventos

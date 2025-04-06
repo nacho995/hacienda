@@ -25,41 +25,35 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
   const [fechasOcupadas, setFechasOcupadas] = useState([]);
   const [fechaEntrada, setFechaEntrada] = useState(null);
   const [fechaSalida, setFechaSalida] = useState(null);
-  const [habitaciones, setHabitaciones] = useState([]);
-  const [loadingHabitaciones, setLoadingHabitaciones] = useState(true);
 
-  // Cargar habitaciones desde la API
+  // Efecto para actualizar formData cuando se selecciona una habitación
   useEffect(() => {
-    const cargarHabitaciones = async () => {
-      try {
-        const data = await obtenerHabitaciones();
-        setHabitaciones(data);
-        setLoadingHabitaciones(false);
-      } catch (error) {
-        console.error('Error al cargar habitaciones:', error);
-        setLoadingHabitaciones(false);
-      }
-    };
-
-    cargarHabitaciones();
-  }, []);
+    if (selectedRoom) {
+      setFormData(prev => ({
+        ...prev,
+        habitacion: selectedRoom._id,
+        tipoHabitacion: selectedRoom.tipo
+      }));
+    }
+  }, [selectedRoom, setFormData]);
 
   // Cargar fechas ocupadas desde el backend
   useEffect(() => {
     const cargarFechasOcupadas = async () => {
+      if (!selectedRoom) return;
+
       try {
-        // Si hay una habitación seleccionada, filtrar por tipo
-        const params = {};
-        if (selectedRoom) {
-          params.tipoHabitacion = selectedRoom.tipo;
-        }
+        const params = {
+          tipoHabitacion: selectedRoom.tipo,
+          habitacion: selectedRoom.nombre
+        };
         
         const fechas = await getHabitacionOccupiedDates(params);
         if (Array.isArray(fechas) && fechas.length > 0) {
           setFechasOcupadas(fechas);
         }
       } catch (error) {
-        console.error("Error al cargar fechas ocupadas de habitaciones:", error);
+        console.error("Error al cargar fechas ocupadas:", error);
       }
     };
     
@@ -90,14 +84,8 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
       [name]: value
     });
     
-    // Si se selecciona una habitación desde el select, actualizar el selectedRoom
-    if (name === 'habitacion' && value !== '') {
-      const room = habitaciones.find(h => h._id === value);
-      onSelectRoom(room);
-    }
-    
     // Validar formulario
-    const { nombre, apellidos, email, telefono, fechaEntrada, fechaSalida, habitacion } = {
+    const { nombre, apellidos, email, telefono, fechaEntrada, fechaSalida } = {
       ...formData,
       [name]: value
     };
@@ -108,7 +96,7 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
       telefono !== '' && 
       fechaEntrada !== '' && 
       fechaSalida !== '' && 
-      habitacion !== ''
+      selectedRoom !== null
     );
   };
 
@@ -122,7 +110,7 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     
     try {
       // Preparar datos para la API
-      const selectedRoomData = habitaciones.find(h => h._id === formData.habitacion);
+      const selectedRoomData = selectedRoom;
       
       if (!selectedRoomData) {
         throw new Error('Habitación no encontrada');
@@ -215,26 +203,21 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     return true;
   };
 
-  if (loadingHabitaciones) {
-    return (
-      <div className="py-16 text-center">
-        <FaSpinner className="animate-spin text-4xl text-[var(--color-primary)] mx-auto" />
-        <p className="mt-4 text-gray-600">Cargando habitaciones...</p>
-      </div>
-    );
-  }
-
   return (
     <section id="reserva-form" className="py-16 bg-[var(--color-cream-light)]">
       <div className="container-custom">
         <div className="max-w-4xl mx-auto">
           <h2 className="font-[var(--font-display)] text-3xl text-center mb-4">
-            Haga su Reservación
+            {selectedRoom ? `Reservar ${selectedRoom.nombre}` : 'Haga su Reservación'}
           </h2>
           <div className="w-16 h-[1px] bg-[var(--color-primary)] mx-auto mb-8"></div>
           
           <div className="bg-white shadow-lg p-8 md:p-10 border border-gray-100">
-            {showReservationSuccess ? (
+            {!selectedRoom ? (
+              <div className="text-center py-10">
+                <p className="text-gray-600">Por favor, seleccione una habitación para continuar.</p>
+              </div>
+            ) : showReservationSuccess ? (
               <div className="text-center py-10">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <FaCheck className="text-green-600 text-2xl" />
@@ -261,144 +244,103 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                 </button>
               </div>
             ) : (
-              <>
-                {selectedRoom && (
-                  <div className="mb-8 p-4 bg-[var(--color-primary-5)] border border-[var(--color-primary-20)] rounded-sm">
-                    <div className="flex flex-col md:flex-row gap-6">
-                      <div className="relative w-full md:w-1/3 h-40 overflow-hidden">
-                        <Image 
-                          src={selectedRoom.imagen}
-                          alt={selectedRoom.nombre}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, 33vw"
-                        />
+              <form onSubmit={handleSubmit} className="space-y-8">
+                <div className="mb-8 p-4 bg-[var(--color-primary-5)] border border-[var(--color-primary-20)] rounded-sm">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    <div className="relative w-full md:w-1/3 h-40 overflow-hidden">
+                      <Image 
+                        src={selectedRoom.imagen}
+                        alt={selectedRoom.nombre}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                      />
+                    </div>
+                    <div className="md:w-2/3">
+                      <h3 className="font-[var(--font-display)] text-xl mb-2">
+                        {selectedRoom.nombre}
+                      </h3>
+                      <div className="text-[var(--color-primary)] font-semibold mb-2">
+                        ${selectedRoom.precio} <span className="text-sm font-normal text-gray-500">/ noche</span>
                       </div>
-                      <div className="md:w-2/3">
-                        <h3 className="font-[var(--font-display)] text-xl mb-2">
-                          {selectedRoom.nombre}
-                        </h3>
-                        <div className="text-[var(--color-primary)] font-semibold mb-2">
-                          ${selectedRoom.precio} <span className="text-sm font-normal text-gray-500">/ noche</span>
-                        </div>
-                        <div className="text-sm text-gray-600 mb-2">
-                          {selectedRoom.tamaño} | {selectedRoom.camas} | Máx. {selectedRoom.capacidad} personas
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          {selectedRoom.amenidades.slice(0, 4).map((amenidad, index) => (
-                            <div key={index} className="flex items-center">
-                              <FaCheck className="mr-2 text-xs text-[var(--color-primary)]" />
-                              {amenidad}
-                            </div>
-                          ))}
-                        </div>
+                      <div className="text-sm text-gray-600 mb-2">
+                        {selectedRoom.tamaño} | {selectedRoom.camas} | Máx. {selectedRoom.capacidad} personas
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        {selectedRoom.amenidades.slice(0, 4).map((amenidad, index) => (
+                          <div key={index} className="flex items-center">
+                            <FaCheck className="mr-2 text-xs text-[var(--color-primary)]" />
+                            {amenidad}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">
-                        Nombre
-                      </label>
-                      <input
-                        type="text"
-                        id="nombre"
-                        name="nombre"
-                        value={formData.nombre}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                        required
-                      />
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">
+                      Nombre
+                    </label>
+                    <input
+                      type="text"
+                      id="nombre"
+                      name="nombre"
+                      value={formData.nombre}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                      required
+                    />
+                  </div>
 
-                    <div>
-                      <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700">
-                        Apellidos
-                      </label>
-                      <input
-                        type="text"
-                        id="apellidos"
-                        name="apellidos"
-                        value={formData.apellidos}
-                        onChange={handleInputChange}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                        Correo electrónico
-                      </label>
-                      <input 
-                        type="email" 
-                        id="email" 
-                        name="email"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <label htmlFor="telefono" className="block text-sm font-medium text-gray-700">
-                        Teléfono
-                      </label>
-                      <input 
-                        type="tel" 
-                        id="telefono" 
-                        name="telefono"
-                        value={formData.telefono}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700">
-                        Número de huéspedes
-                      </label>
-                      <select 
-                        id="huespedes" 
-                        name="huespedes"
-                        value={formData.huespedes}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                        required
-                      >
-                        {[...Array(selectedRoom ? selectedRoom.capacidad : 4).keys()].map(i => (
-                          <option key={i+1} value={i+1}>{i+1} {i === 0 ? 'persona' : 'personas'}</option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <label htmlFor="habitacion" className="block text-sm font-medium text-gray-700">
-                        Habitación
-                      </label>
-                      <select 
-                        id="habitacion" 
-                        name="habitacion"
-                        value={formData.habitacion}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                        required
-                      >
-                        <option value="">Seleccione una habitación</option>
-                        {habitaciones.map(h => (
-                          <option key={h._id} value={h.nombre}>
-                            {h.nombre} - ${h.precio}/noche
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700">
+                      Apellidos
+                    </label>
+                    <input
+                      type="text"
+                      id="apellidos"
+                      name="apellidos"
+                      value={formData.apellidos}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                      required
+                    />
                   </div>
                   
+                  <div className="space-y-1">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                      Correo electrónico
+                    </label>
+                    <input 
+                      type="email" 
+                      id="email" 
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label htmlFor="telefono" className="block text-sm font-medium text-gray-700">
+                      Teléfono
+                    </label>
+                    <input 
+                      type="tel" 
+                      id="telefono" 
+                      name="telefono"
+                      value={formData.telefono}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-1">
                     <label className="block text-sm font-medium text-gray-700">
                       Fechas de estancia
@@ -432,47 +374,65 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                       />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1">
-                    <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700">
-                      Peticiones especiales (opcional)
+                    <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700">
+                      Número de huéspedes
                     </label>
-                    <textarea 
-                      id="mensaje" 
-                      name="mensaje"
-                      value={formData.mensaje}
+                    <select 
+                      id="huespedes" 
+                      name="huespedes"
+                      value={formData.huespedes}
                       onChange={handleInputChange}
-                      rows="4"
                       className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                    ></textarea>
+                      required
+                    >
+                      {[...Array(selectedRoom.capacidad)].map((_, i) => (
+                        <option key={i+1} value={i+1}>{i+1} {i === 0 ? 'persona' : 'personas'}</option>
+                      ))}
+                    </select>
                   </div>
-                  
-                  {reservationError && (
-                    <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700">
-                      <p>{reservationError}</p>
-                    </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700">
+                    Peticiones especiales (opcional)
+                  </label>
+                  <textarea
+                    id="mensaje"
+                    name="mensaje"
+                    rows="4"
+                    value={formData.mensaje}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                  ></textarea>
+                </div>
+
+                {reservationError && (
+                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded">
+                    {reservationError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!isFormValid || isSubmitting}
+                  className={`w-full py-4 font-medium tracking-wide transition-colors duration-300 ${
+                    isFormValid && !isSubmitting
+                      ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-primary)]'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center">
+                      <FaSpinner className="animate-spin mr-2" />
+                      Procesando...
+                    </span>
+                  ) : (
+                    'Confirmar Reserva'
                   )}
-                  
-                  <button 
-                    type="submit"
-                    disabled={!isFormValid || isSubmitting}
-                    className={`w-full py-3 font-medium tracking-wide transition-colors duration-300 ${
-                      isFormValid && !isSubmitting
-                        ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-primary)]'
-                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    {isSubmitting ? (
-                      <span className="flex items-center justify-center">
-                        <FaSpinner className="animate-spin mr-2" />
-                        Procesando...
-                      </span>
-                    ) : (
-                      'Confirmar Reserva'
-                    )}
-                  </button>
-                </form>
-              </>
+                </button>
+              </form>
             )}
           </div>
         </div>

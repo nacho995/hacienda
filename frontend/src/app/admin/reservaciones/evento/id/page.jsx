@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { getEventoReservation, updateEventoReservation } from '@/services/reservationService';
-import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaGlassCheers, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaUtensils } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaGlassCheers, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaUtensils, FaSpa, FaBed, FaUser, FaWarehouse, FaComment } from 'react-icons/fa';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
@@ -97,13 +97,98 @@ export default function EventoReservationDetail() {
   }
   
   const formatDate = (dateString) => {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString('es-ES', options);
+    if (!dateString) return 'Fecha no disponible';
+    
+    try {
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const fecha = new Date(dateString);
+      
+      // Verificar si la fecha es válida
+      if (isNaN(fecha.getTime())) {
+        return 'Fecha inválida';
+      }
+      
+      return fecha.toLocaleDateString('es-ES', options);
+    } catch (error) {
+      console.error('Error al formatear fecha:', error);
+      return 'Error en fecha';
+    }
   };
   
-  const formatDateTime = (dateString) => {
-    const options = { hour: '2-digit', minute: '2-digit' };
-    return new Date(dateString).toLocaleTimeString('es-ES', options);
+  const formatTime = (timeString) => {
+    if (!timeString) return 'Hora no especificada';
+    
+    try {
+      const [hours, minutes] = timeString.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes));
+      
+      return date.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      console.error('Error al formatear hora:', error);
+      return timeString;
+    }
+  };
+  
+  const formatCurrency = (amount) => {
+    if (amount === undefined || amount === null) return '$0.00';
+    if (isNaN(parseFloat(amount))) return '$0.00';
+    
+    return `$${parseFloat(amount).toLocaleString('es-MX', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
+  };
+  
+  const formatText = (text, defaultText = 'No disponible') => {
+    if (!text || text.trim() === '') return defaultText;
+    return text;
+  };
+  
+  const getTipoEventoNombre = () => {
+    const tipoEvento = reservation.tipoEvento;
+    
+    if (!tipoEvento) return 'Tipo de evento no especificado';
+    
+    // Si tipoEvento es un objeto (populado), usar su título
+    if (typeof tipoEvento === 'object' && tipoEvento !== null) {
+      return tipoEvento.titulo || 'Evento sin título';
+    }
+    
+    // Si es un string, podría ser un ID o un nombre
+    return tipoEvento;
+  };
+  
+  const formatearServiciosAdicionales = () => {
+    const servicios = reservation.serviciosAdicionales;
+    
+    if (!servicios) return [];
+    
+    const listaServicios = [];
+    
+    // Verificar masajes
+    if (servicios.masajes && servicios.masajes.length > 0) {
+      listaServicios.push({
+        nombre: 'Masajes',
+        cantidad: servicios.masajes.length,
+        detalle: `${servicios.masajes.length} masaje(s) reservado(s)`
+      });
+    }
+    
+    // Verificar habitaciones
+    if (servicios.habitaciones && servicios.habitaciones.length > 0) {
+      listaServicios.push({
+        nombre: 'Habitaciones',
+        cantidad: servicios.habitaciones.length,
+        detalle: `${servicios.habitaciones.length} habitación(es) reservada(s)`
+      });
+    }
+    
+    return listaServicios;
   };
   
   return (
@@ -169,7 +254,15 @@ export default function EventoReservationDetail() {
                 <div className="flex items-start gap-3">
                   <FaCalendarAlt className="text-gray-500 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Fecha</p>
+                    <p className="text-sm text-gray-500">Nombre del Evento</p>
+                    <p className="font-medium">{formatText(reservation.nombreEvento)}</p>
+                    <p className="text-xs text-gray-500">{getTipoEventoNombre()}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <FaCalendarAlt className="text-gray-500 mt-1" />
+                  <div>
+                    <p className="text-sm text-gray-500">Fecha del Evento</p>
                     <p className="font-medium">{formatDate(reservation.fecha)}</p>
                   </div>
                 </div>
@@ -178,7 +271,7 @@ export default function EventoReservationDetail() {
                   <div>
                     <p className="text-sm text-gray-500">Horario</p>
                     <p className="font-medium">
-                      {formatDateTime(reservation.horaInicio)} - {formatDateTime(reservation.horaFin)}
+                      {formatTime(reservation.horaInicio)} a {formatTime(reservation.horaFin)}
                     </p>
                   </div>
                 </div>
@@ -186,7 +279,7 @@ export default function EventoReservationDetail() {
                   <FaUserFriends className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Número de Invitados</p>
-                    <p className="font-medium">{reservation.numeroInvitados}</p>
+                    <p className="font-medium">{reservation.numInvitados || reservation.numeroInvitados || 'No especificado'}</p>
                   </div>
                 </div>
                 {reservation.tematica && (

@@ -19,6 +19,11 @@ export const obtenerHabitacionesConReservas = async () => {
     // Obtener todas las habitaciones
     const habitaciones = await obtenerHabitaciones();
     
+    // Verificar que tengamos exactamente 14 habitaciones
+    if (habitaciones.length !== 14) {
+      console.warn(`Se esperaban 14 habitaciones pero se encontraron ${habitaciones.length}`);
+    }
+    
     // Obtener todas las reservas activas
     const reservasResponse = await apiClient.get('/reservas/habitaciones');
     
@@ -39,33 +44,23 @@ export const obtenerHabitacionesConReservas = async () => {
       // Filtrar reservas activas para esta habitación específica
       const reservasHabitacion = reservas.filter(
         reserva => {
-          // Si la reserva tiene una habitación específica asignada, usar esa
-          if (reserva.habitacion) {
-            return reserva.habitacion === habitacion.nombre;
-          }
+          // Verificar si esta habitación específica está reservada
+          // Comparamos tanto por número de habitación como por tipo
+          const coincideNumeroHabitacion = 
+            reserva.habitacion === habitacion.numeroHabitacion ||
+            reserva.habitacion === habitacion.nombre;
           
-          // Si no tiene habitación asignada, asignarla a la primera habitación disponible del tipo correcto
-          // pero solo si esta es la primera habitación de ese tipo que encontramos
-          const esLaPrimeraHabitacionDelTipo = habitaciones
-            .filter(h => h.tipo === habitacion.tipo)
-            .findIndex(h => h.nombre === habitacion.nombre) === 0;
+          const coincideTipoHabitacion = reserva.tipoHabitacion === habitacion.tipo;
           
-          return reserva.tipoHabitacion === habitacion.tipo && esLaPrimeraHabitacionDelTipo;
+          // Debe coincidir el número de habitación o el tipo, y no estar cancelada
+          return (coincideNumeroHabitacion || coincideTipoHabitacion) && 
+                 reserva.estado !== 'cancelada' &&
+                 new Date(reserva.fechaSalida) >= today;
         }
-      ).filter(
-        reserva => 
-          reserva.estado !== 'cancelada' &&
-          new Date(reserva.fechaSalida) >= today
       );
 
-      // Calcular habitaciones ocupadas
-      const habitacionesOcupadas = reservasHabitacion.reduce(
-        (total, reserva) => total + (reserva.numeroHabitaciones || 1),
-        0
-      );
-
-      // Calcular disponibilidad usando el número total de habitaciones de la base de datos
-      const disponibles = Math.max(0, habitacion.totalDisponibles - habitacionesOcupadas);
+      // Cada habitación solo puede tener 0 o 1 de disponibilidad (ya que son habitaciones únicas)
+      const disponibles = reservasHabitacion.length > 0 ? 0 : 1;
 
       return {
         ...habitacion,
@@ -75,6 +70,9 @@ export const obtenerHabitacionesConReservas = async () => {
       };
     });
 
+    console.log(`Total de habitaciones procesadas: ${habitacionesConEstado.length}`);
+    console.log(`Habitaciones disponibles: ${habitacionesConEstado.filter(h => h.disponibles > 0).length}`);
+    
     return habitacionesConEstado;
   } catch (error) {
     console.error('Error al obtener habitaciones con reservas:', error);

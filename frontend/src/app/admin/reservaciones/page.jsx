@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaSearch, FaFilter, FaEllipsisV, FaUserCircle, FaSpinner } from 'react-icons/fa';
+import { FaSearch, FaFilter, FaEllipsisV, FaUserCircle, FaSpinner, FaSyncAlt } from 'react-icons/fa';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   getHabitacionReservations, 
@@ -17,7 +17,9 @@ import {
   unassignEventoReservation,
   unassignMasajeReservation
 } from '@/services/reservationService';
+import apiClient from '@/services/apiClient';
 import userService from '@/services/userService';
+import { getTiposMasaje } from '@/services/masajeService';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -38,6 +40,17 @@ export default function AdminReservations() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeDropdown, setActiveDropdown] = useState(null);
+  const [tiposMasaje, setTiposMasaje] = useState([]);
+  
+  // Función para obtener el nombre del tipo de masaje desde su ID
+  const getTipoMasajeNombre = (masajeId) => {
+    // Si no tenemos ID o tipos de masaje, devolver valor por defecto
+    if (!masajeId || !tiposMasaje || tiposMasaje.length === 0) return 'Masaje';
+    
+    // Buscar el tipo de masaje por ID
+    const tipoMasaje = tiposMasaje.find(tipo => tipo._id === masajeId);
+    return tipoMasaje ? tipoMasaje.titulo : 'Masaje';
+  };
   
   // Cargar reservaciones al montar el componente
   useEffect(() => {
@@ -92,6 +105,15 @@ export default function AdminReservations() {
         setUsuarios([]);
       }
       
+      // Cargar los tipos de masaje
+      try {
+        const tiposResponse = await getTiposMasaje();
+        setTiposMasaje(tiposResponse || []);
+      } catch (tiposError) {
+        console.error('Error al cargar tipos de masaje:', tiposError);
+        setTiposMasaje([]);
+      }
+      
       // Cargar las reservas según el tipo seleccionado
       const [habitacionData, eventoData, masajeData] = await Promise.all([
         filterType === 'all' || filterType === 'habitacion' ? getHabitacionReservations() : Promise.resolve({ data: [] }),
@@ -102,15 +124,20 @@ export default function AdminReservations() {
       // Formatear los datos para la tabla
       const habitacionReservations = Array.isArray(habitacionData.data) ? habitacionData.data.map(h => ({
         id: h._id,
-        cliente: `${h.nombre} ${h.apellidos}`,
+        cliente: `${h.nombreContacto || h.nombre || ''} ${h.apellidosContacto || h.apellidos || ''}`,
         tipo: 'habitacion',
-        fecha: h.fechaEntrada,
-        fechaSalida: h.fechaSalida,
-        invitados: h.numeroAdultos + (h.numeroNinos || 0),
-        estado: h.estado || 'Pendiente',
-        total: h.precioTotal || 0,
+        fecha: h.fechaEntrada || h.fecha,
+        fechaSalida: h.fechaSalida || h.fecha,
+        invitados: h.numHuespedes || h.numeroHabitaciones || 1,
+        estado: h.estadoReserva || h.estado || 'Pendiente',
+        total: h.precioTotal || h.precio || 0,
         datosCompletos: h,
-        asignadoA: h.asignadoA
+        asignadoA: h.asignadoA,
+        // Añadir información adicional que puede ser útil para el renderizado
+        tipoHabitacion: h.tipoHabitacion || '',
+        habitacionNombre: h.habitacion || '',
+        esIndependiente: h.esIndependiente,
+        eventoAsociado: h.eventoAsociado
       })) : [];
       
       const eventoReservations = Array.isArray(eventoData.data) ? eventoData.data.map(e => ({
@@ -125,17 +152,34 @@ export default function AdminReservations() {
         asignadoA: e.asignadoA
       })) : [];
       
-      const masajeReservations = Array.isArray(masajeData.data) ? masajeData.data.map(m => ({
-        id: m._id,
-        cliente: `${m.nombre} ${m.apellidos}`,
-        tipo: 'masaje',
-        fecha: m.fecha,
-        invitados: 1,
-        estado: m.estado || 'Pendiente',
-        total: m.precio || 0,
-        datosCompletos: m,
-        asignadoA: m.asignadoA
-      })) : [];
+      // Formatear los datos de masajes para la tabla
+      const masajeReservations = Array.isArray(masajeData.data) ? masajeData.data.map(m => {
+        // Buscar el nombre real del tipo de masaje si es un ID
+        let nombreTipoMasaje = null;
+        if (m.tipoMasaje && typeof m.tipoMasaje === 'string' &&
+            m.tipoMasaje.length === 24 && /^[0-9a-f]{24}$/i.test(m.tipoMasaje)) {
+          // Buscar en los tipos de masaje cargados
+          const tipoMasajeObj = tiposMasaje.find(tipo => tipo._id === m.tipoMasaje);
+          if (tipoMasajeObj) {
+            nombreTipoMasaje = tipoMasajeObj.titulo;
+          }
+        }
+        
+        return {
+          id: m._id,
+          cliente: `${m.nombreContacto || m.nombre || 'Cliente'} ${m.apellidosContacto || m.apellidos || ''}`.trim(),
+          tipo: 'masaje',
+          fecha: m.fecha,
+          invitados: 1,
+          estado: m.estado || 'Pendiente',
+          total: m.precio || 0,
+          datosCompletos: {
+            ...m,
+            nombreTipoMasaje // Agregar el nombre real del tipo de masaje
+          },
+          asignadoA: m.asignadoA
+        };
+      }) : [];
       
       // Combinar y ordenar por fecha (más reciente primero)
       const combinedReservations = [
@@ -193,15 +237,78 @@ export default function AdminReservations() {
   
   // Function to get appropriate status badge
   const getStatusBadge = (status) => {
+    if (!status) return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Sin estado</span>;
+    
     const statusLower = status.toLowerCase();
     if (statusLower === 'confirmada' || statusLower === 'confirmado') {
-      return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Confirmada</span>;
+      return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 flex items-center justify-center space-x-1">
+        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+        <span>Confirmada</span>
+      </span>;
     } else if (statusLower === 'pendiente') {
-      return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>;
+      return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 flex items-center justify-center space-x-1">
+        <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+        <span>Pendiente</span>
+      </span>;
     } else if (statusLower === 'cancelada' || statusLower === 'cancelado') {
-      return <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Cancelada</span>;
+      return <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 flex items-center justify-center space-x-1">
+        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+        <span>Cancelada</span>
+      </span>;
+    } else if (statusLower === 'completada' || statusLower === 'completado') {
+      return <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 flex items-center justify-center space-x-1">
+        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+        <span>Completada</span>
+      </span>;
     }
     return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{status}</span>;
+  };
+  
+  // Función para formatear fechas en español
+  const formatearFecha = (fecha) => {
+    if (!fecha) return 'Fecha no disponible';
+    
+    try {
+      const opciones = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        timeZone: 'UTC'
+      };
+      
+      const fechaObj = new Date(fecha);
+      
+      // Verificar si la fecha es válida
+      if (isNaN(fechaObj.getTime())) {
+        return 'Fecha inválida';
+      }
+      
+      return fechaObj.toLocaleDateString('es-ES', opciones);
+    } catch (error) {
+      console.error('Error al formatear fecha:', error);
+      return 'Error en fecha';
+    }
+  };
+  
+  // Función para formatear hora en 12 horas
+  const formatearHora = (horaStr) => {
+    if (!horaStr) return '';
+    
+    try {
+      // Convertir formato "HH:MM" a un objeto Date
+      const [horas, minutos] = horaStr.split(':').map(Number);
+      const fecha = new Date();
+      fecha.setHours(horas, minutos, 0);
+      
+      return fecha.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      return horaStr;
+    }
   };
   
   // Function to get badges for reservation types
@@ -217,10 +324,78 @@ export default function AdminReservations() {
   };
   
   const getTipoReservacionLabel = (tipo, detalles) => {
-    if (tipo === 'habitacion') return `Habitación ${detalles.tipoHabitacion || ''}`;
-    if (tipo === 'evento') return `Evento: ${detalles.tipoEvento || ''}`;
-    if (tipo === 'masaje') return `Masaje ${detalles.tipoMasaje || ''}`;
-    return tipo;
+    if (tipo === 'habitacion') {
+      // Verificar si es una habitación asociada a un evento
+      if (detalles.eventoAsociado) {
+        const nombreEvento = detalles.eventoAsociado.nombreEvento || detalles.eventoAsociado.nombre || 'Evento sin nombre';
+        return `Habitación para: ${nombreEvento}`;
+      }
+      
+      // Combinar información de tipo y nombre
+      let tipoHabitacion = 'Estándar';
+      if (detalles.tipoHabitacion) {
+        // Verificar si es un ID de MongoDB o un nombre descriptivo
+        if (detalles.tipoHabitacion.length === 24 && /^[0-9a-f]{24}$/i.test(detalles.tipoHabitacion)) {
+          tipoHabitacion = detalles.nombre || 'Habitación';
+        } else {
+          tipoHabitacion = detalles.tipoHabitacion;
+        }
+      }
+      
+      let nombreHabitacion = detalles.habitacionNombre || detalles.nombre || '';
+      
+      if (tipoHabitacion && nombreHabitacion && tipoHabitacion !== nombreHabitacion) {
+        return `${tipoHabitacion} - ${nombreHabitacion}`;
+      } else {
+        return tipoHabitacion || nombreHabitacion || 'Habitación';
+      }
+    }
+    
+    if (tipo === 'evento') {
+      const nombreEvento = detalles.nombreEvento || '(Sin nombre)';
+      const tipoEvento = detalles.tipoEvento ? 
+        (typeof detalles.tipoEvento === 'object' ? 
+          detalles.tipoEvento.titulo || 'Evento' : 
+          'Evento'
+        ) : 'Evento';
+      
+      return `${nombreEvento}${tipoEvento !== 'Evento' ? ` (${tipoEvento})` : ''}`;
+    }
+    
+    if (tipo === 'masaje') {
+      // Extraer información significativa del masaje
+      let nombreMasaje = 'Masaje';
+      
+      // Primero verificar si tenemos un nombre real ya resuelto
+      if (detalles.nombreTipoMasaje) {
+        nombreMasaje = detalles.nombreTipoMasaje;
+      }
+      // Verificar si tenemos un nombre de masaje válido
+      else if (detalles.tipoMasaje) {
+        if (typeof detalles.tipoMasaje === 'object' && detalles.tipoMasaje?.titulo) {
+          nombreMasaje = detalles.tipoMasaje.titulo;
+        } else if (typeof detalles.tipoMasaje === 'string') {
+          // Si es un ID de MongoDB, buscar el nombre real
+          if (detalles.tipoMasaje.length === 24 && /^[0-9a-f]{24}$/i.test(detalles.tipoMasaje)) {
+            nombreMasaje = getTipoMasajeNombre(detalles.tipoMasaje);
+          } else {
+            nombreMasaje = detalles.tipoMasaje;
+          }
+        }
+      } else if (detalles.tituloDisplay) {
+        nombreMasaje = detalles.tituloDisplay;
+      } else if (detalles.titulo) {
+        nombreMasaje = detalles.titulo;
+      } else if (detalles.nombre) {
+        nombreMasaje = detalles.nombre;
+      }
+      
+      let duracion = detalles.duracion ? `${detalles.duracion} min` : '';
+      
+      return `${nombreMasaje}${duracion ? ` (${duracion})` : ''}`;
+    }
+    
+    return tipo || 'Reserva';
   };
 
   const getReservationPath = (tipo, id) => {
@@ -411,6 +586,27 @@ export default function AdminReservations() {
     }
   };
   
+  // Función para verificar las habitaciones guardadas
+  const verificarHabitaciones = async () => {
+    try {
+      const response = await apiClient.get('/api/reservas/prueba/habitaciones-seleccionadas');
+      console.log('Datos de prueba de habitaciones:', response);
+      
+      // Mostrar notificación con resumen
+      if (response && response.data) {
+        toast.success(`Habitaciones encontradas: ${response.data.totalReservasHabitacion}, Eventos con habitaciones: ${response.data.totalEventosConHabitaciones}`);
+      } else {
+        toast.error('No se pudieron obtener datos de habitaciones');
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('Error al verificar habitaciones:', error);
+      toast.error('Error al verificar habitaciones: ' + error.message);
+      return null;
+    }
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -428,6 +624,15 @@ export default function AdminReservations() {
               Gestionar Reservas de Eventos
             </Link>
           ) : null}
+          
+          {/* Botón de prueba para verificar habitaciones */}
+          <button
+            onClick={verificarHabitaciones}
+            className="flex items-center gap-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"
+          >
+            <FaSyncAlt className="animate-spin" />
+            Verificar Habitaciones
+          </button>
           
           {/* Buscador */}
           <div className="relative">
@@ -549,44 +754,113 @@ export default function AdminReservations() {
                 {filteredReservations.length > 0 ? (
                   filteredReservations.map((reservation) => (
                     <tr key={reservation.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {reservation.cliente}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {getTipoReservacionLabel(reservation.tipo, reservation.datosCompletos)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {new Date(reservation.fecha).toLocaleDateString()}
-                          {reservation.fechaSalida && (
-                            <span className="block text-xs">
-                              hasta {new Date(reservation.fechaSalida).toLocaleDateString()}
-                            </span>
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          <p className="font-medium text-gray-900">{reservation.cliente}</p>
+                          {reservation.datosCompletos.emailContacto && (
+                            <p className="text-xs text-gray-600 truncate max-w-[200px]">
+                              {reservation.datosCompletos.emailContacto}
+                            </p>
+                          )}
+                          {reservation.datosCompletos.telefonoContacto && (
+                            <p className="text-xs text-gray-600">
+                              {reservation.datosCompletos.telefonoContacto}
+                            </p>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {reservation.invitados}
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          {getTipoBadge(reservation.tipo)}
+                          <p className="mt-1 text-gray-700 font-medium">
+                            {getTipoReservacionLabel(reservation.tipo, reservation.datosCompletos)}
+                          </p>
+                          {reservation.tipo === 'evento' && reservation.datosCompletos.tipoEvento && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {typeof reservation.datosCompletos.tipoEvento === 'object' 
+                                ? reservation.datosCompletos.tipoEvento.titulo || '-' 
+                                : reservation.datosCompletos.tipoEvento}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          <p className="text-gray-700 font-medium capitalize">
+                            {formatearFecha(reservation.fecha).split(',')[0]}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {formatearFecha(reservation.fecha).split(',').slice(1).join(',')}
+                          </p>
+                          
+                          {reservation.fechaSalida && (
+                            <div className="mt-1 pt-1 border-t border-gray-200">
+                              <p className="text-xs text-gray-700">Salida:</p>
+                              <p className="text-xs text-gray-600">
+                                {formatearFecha(reservation.fechaSalida)}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {reservation.datosCompletos.horaInicio && (
+                            <div className="mt-1 text-xs text-gray-600">
+                              {formatearHora(reservation.datosCompletos.horaInicio)}
+                              {reservation.datosCompletos.horaFin && (
+                                <span> - {formatearHora(reservation.datosCompletos.horaFin)}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {reservation.tipo === 'evento' ? (
+                          <span className="font-medium">{reservation.invitados} invitados</span>
+                        ) : reservation.tipo === 'habitacion' ? (
+                          <div>
+                            <p>{reservation.invitados} {reservation.invitados > 1 ? 'huéspedes' : 'huésped'}</p>
+                            {reservation.datosCompletos.numeroHabitaciones && reservation.datosCompletos.numeroHabitaciones > 1 && (
+                              <p className="text-xs text-gray-600">{reservation.datosCompletos.numeroHabitaciones} habitaciones</p>
+                            )}
+                          </div>
+                        ) : (
+                          <span>{reservation.invitados}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(reservation.estado)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {reservation.asignadoA ? 
-                            getUsuarioAsignado(reservation) : 
-                            <span className="text-gray-400">Sin asignar</span>
-                          }
+                        <div className="text-sm">
+                          {reservation.asignadoA ? (
+                            <div className="flex items-center">
+                              <FaUserCircle className="text-gray-400 mr-2" />
+                              <span className="text-gray-700">{getUsuarioAsignado(reservation)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 flex items-center">
+                              <FaUserCircle className="mr-2" />
+                              Sin asignar
+                            </span>
+                          )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {typeof reservation.total === 'number' && reservation.total > 0 ? 
-                          `$${reservation.total.toLocaleString('es-MX')}` : 
-                          '$0'}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          {typeof reservation.total === 'number' && reservation.total > 0 ? (
+                            <>
+                              <p className="text-sm font-semibold text-gray-900">
+                                ${reservation.total.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              </p>
+                              {reservation.tipo === 'evento' && reservation.datosCompletos.presupuestoEstimado && (
+                                <p className="text-xs text-gray-500">
+                                  Presupuesto inicial: ${parseFloat(reservation.datosCompletos.presupuestoEstimado).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-gray-400">$0.00</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="relative">

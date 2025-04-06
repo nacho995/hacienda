@@ -17,6 +17,7 @@ import {
   unassignHabitacionReservation,
   unassignMasajeReservation
 } from '@/services/reservationService';
+import { obtenerHabitaciones } from '@/services/habitacionService';
 import userService from '@/services/userService';
 import { toast } from 'sonner';
 
@@ -27,7 +28,7 @@ export default function AdminDashboard() {
     totalReservations: 0,
     pendingReservations: 0,
     confirmedReservations: 0,
-    totalRooms: 24,
+    totalRooms: 14,
     occupiedRooms: 0,
     totalUsers: 0
   });
@@ -107,15 +108,29 @@ export default function AdminDashboard() {
           r => r.estado && r.estado.toLowerCase() === 'confirmada'
         ).length;
         
-        const occupiedRooms = habitaciones.reduce((total, h) => {
-          return total + (h.numeroHabitaciones || 1);
-        }, 0);
+        // Calcular habitaciones ocupadas solo por eventos (no independientes)
+        const occupiedRooms = habitaciones.filter(h => h.eventoAsociado || h.eventoId).length;
+        
+        // Obtener el número real de habitaciones desde la base de datos
+        let totalRooms = 14; // Valor por defecto de habitaciones disponibles
+        try {
+          const habitacionesData = await obtenerHabitaciones();
+          if (Array.isArray(habitacionesData.data)) {
+            totalRooms = habitacionesData.data.length;
+            console.log(`Número total de habitaciones obtenido: ${totalRooms}`);
+          } else if (Array.isArray(habitacionesData)) {
+            totalRooms = habitacionesData.length;
+            console.log(`Número total de habitaciones obtenido: ${totalRooms}`);
+          }
+        } catch (err) {
+          console.error('Error al obtener el número total de habitaciones:', err);
+        }
         
         setStats({
           totalReservations,
           pendingReservations,
           confirmedReservations,
-          totalRooms: 24,
+          totalRooms, // Usar el valor obtenido dinámicamente
           occupiedRooms,
           totalUsers: usuarios.length
         });
@@ -289,11 +304,25 @@ export default function AdminDashboard() {
       console.log('Usuario actual:', user);
       
       let response;
+      let serviciosAdicionales = 0;
       
       switch (reserva.tipo) {
         case 'evento':
           console.log('Asignando evento al usuario actual:', user._id);
           response = await assignEventoReservation(reserva._id || reserva.id);
+          // Actualizar también servicios adicionales si hay
+          if (response.resultadosAdicionales) {
+            const ra = response.resultadosAdicionales;
+            let mensaje = `Evento asignado con ${ra.habitaciones} habitaciones y ${ra.masajes} masajes`;
+            
+            // Añadir información sobre elementos omitidos si los hay
+            if ((ra.habitacionesOmitidas || 0) + (ra.masajesOmitidos || 0) > 0) {
+              mensaje += `. Se omitieron ${ra.habitacionesOmitidas || 0} habitaciones y ${ra.masajesOmitidos || 0} masajes por no encontrarse en la base de datos.`;
+            }
+            
+            toast.success(mensaje);
+            serviciosAdicionales = ra.totalAsignados;
+          }
           break;
         case 'habitacion':
           console.log('Asignando habitación al usuario actual:', user._id);
@@ -310,13 +339,24 @@ export default function AdminDashboard() {
       console.log('Respuesta de asignación:', response);
 
       if (response && (response.success || response.data)) {
-        toast.success('Reserva asignada exitosamente');
+        if (serviciosAdicionales === 0) {
+          toast.success('Reserva asignada exitosamente');
+        }
         
         // Actualizar el estado localmente
         const updateReservation = (list) => list.map(r => {
+          // Actualizar el elemento principal
           if ((r._id === reserva._id) || (r.id === reserva.id)) {
             return { ...r, asignadoA: user._id };
           }
+          
+          // Si se asignó un evento, actualizar también las habitaciones y masajes asociados
+          if (reserva.tipo === 'evento' && 
+              ((r.tipo === 'habitacion' && r.eventoId === reserva._id) || 
+               (r.tipo === 'masaje' && r.eventoId === reserva._id))) {
+            return { ...r, asignadoA: user._id };
+          }
+          
           return r;
         });
 
@@ -347,10 +387,24 @@ export default function AdminDashboard() {
       setIsRefreshing(true);
       console.log('Desasignando reserva:', reserva);
       let response;
+      let serviciosAdicionales = 0;
       
       switch (reserva.tipo) {
         case 'evento':
           response = await unassignEventoReservation(reserva._id || reserva.id);
+          // Actualizar también servicios adicionales si hay
+          if (response.resultadosAdicionales) {
+            const ra = response.resultadosAdicionales;
+            let mensaje = `Evento desasignado con ${ra.habitaciones} habitaciones y ${ra.masajes} masajes`;
+            
+            // Añadir información sobre elementos omitidos si los hay
+            if ((ra.habitacionesOmitidas || 0) + (ra.masajesOmitidos || 0) > 0) {
+              mensaje += `. Se omitieron ${ra.habitacionesOmitidas || 0} habitaciones y ${ra.masajesOmitidos || 0} masajes por no encontrarse en la base de datos.`;
+            }
+            
+            toast.success(mensaje);
+            serviciosAdicionales = ra.totalDesasignados;
+          }
           break;
         case 'habitacion':
           response = await unassignHabitacionReservation(reserva._id || reserva.id);
@@ -365,11 +419,14 @@ export default function AdminDashboard() {
       console.log('Respuesta de desasignación:', response);
 
       if (response && (response.success || response.data)) {
-        toast.success('Reserva desasignada exitosamente');
+        if (serviciosAdicionales === 0) {
+          toast.success('Reserva desasignada exitosamente');
+        }
         
         // Actualizar el estado localmente
         const updateReservation = (list) => 
           list.map(r => {
+            // Actualizar el elemento principal
             if ((r._id === reserva._id) || (r.id === reserva.id)) {
               return { 
                 ...r, 
@@ -377,6 +434,18 @@ export default function AdminDashboard() {
                 estado: 'Pendiente' // Actualizar también el estado
               };
             }
+            
+            // Si se desasignó un evento, actualizar también las habitaciones y masajes asociados
+            if (reserva.tipo === 'evento' && 
+                ((r.tipo === 'habitacion' && r.eventoId === reserva._id) || 
+                 (r.tipo === 'masaje' && r.eventoId === reserva._id))) {
+              return { 
+                ...r, 
+                asignadoA: null,
+                estado: 'Pendiente'
+              };
+            }
+            
             return r;
           });
 
@@ -617,7 +686,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-sm text-gray-600 flex justify-between">
                       <span>{formatDate(reserva.fechaEntrada)} - {formatDate(reserva.fechaSalida)}</span>
-                      <span>{reserva.tipoHabitacion}</span>
+                      <span>{reserva.tituloDisplay || 'Habitación'}</span>
                     </div>
                     <div className="text-sm text-gray-500 mt-1 flex justify-between">
                       <span className={`flex items-center ${
@@ -737,7 +806,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-sm text-gray-600 flex justify-between">
                       <span>{formatDate(reserva.fecha)} - {reserva.hora}</span>
-                      <span>{reserva.tipoMasaje}</span>
+                      <span>{reserva.tituloDisplay || 'Masaje'}</span>
                     </div>
                     <div className="text-sm text-gray-500 mt-1 flex justify-between">
                       <span className={`flex items-center ${

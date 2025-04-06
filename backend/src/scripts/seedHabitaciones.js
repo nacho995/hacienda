@@ -4,10 +4,10 @@ const Habitacion = require('../models/Habitacion');
 
 // Mapeo de tipos de habitación a cantidad total disponible
 const tiposHabitacion = {
-  'Individual': 2,
-  'Doble': 4,
-  'Suite': 4,
-  'Premium': 4
+  'Individual': 1,
+  'Doble': 1,
+  'Suite': 1,
+  'Premium': 1
 };
 
 const habitaciones = [
@@ -30,8 +30,8 @@ const habitaciones = [
       "Vista panorámica",
       "Sala de estar"
     ],
-    numeroHabitacion: "P101",
-    totalDisponibles: 4
+    numeroHabitacion: "101",
+    totalDisponibles: 1
   },
   {
     nombre: "Suite Tradición Colonial",
@@ -50,8 +50,8 @@ const habitaciones = [
       "Baño privado",
       "Terraza privada"
     ],
-    numeroHabitacion: "S201",
-    totalDisponibles: 4
+    numeroHabitacion: "102",
+    totalDisponibles: 1
   },
   {
     nombre: "Habitación Deluxe Jardín",
@@ -70,8 +70,8 @@ const habitaciones = [
       "Baño privado",
       "Vista al jardín"
     ],
-    numeroHabitacion: "D301",
-    totalDisponibles: 4
+    numeroHabitacion: "103",
+    totalDisponibles: 1
   },
   {
     nombre: "Suite Familiar Hacienda",
@@ -91,8 +91,8 @@ const habitaciones = [
       "Sala de estar",
       "Minibar"
     ],
-    numeroHabitacion: "P102",
-    totalDisponibles: 4
+    numeroHabitacion: "104",
+    totalDisponibles: 1
   },
   // Habitaciones adicionales para llegar a 14
   {
@@ -113,8 +113,8 @@ const habitaciones = [
       "Pétalos de rosa",
       "Terraza privada"
     ],
-    numeroHabitacion: "P103",
-    totalDisponibles: 4
+    numeroHabitacion: "105",
+    totalDisponibles: 1
   },
   {
     nombre: "Habitación Doble Superior",
@@ -133,8 +133,8 @@ const habitaciones = [
       "Baño privado",
       "Escritorio"
     ],
-    numeroHabitacion: "D302",
-    totalDisponibles: 4
+    numeroHabitacion: "106",
+    totalDisponibles: 1
   },
   {
     nombre: "Suite Ejecutiva",
@@ -153,8 +153,8 @@ const habitaciones = [
       "Cafetera Nespresso",
       "Caja fuerte laptop"
     ],
-    numeroHabitacion: "S202",
-    totalDisponibles: 4
+    numeroHabitacion: "107",
+    totalDisponibles: 1
   },
   {
     nombre: "Habitación Individual Confort",
@@ -173,8 +173,8 @@ const habitaciones = [
       "Baño privado",
       "Escritorio"
     ],
-    numeroHabitacion: "I401",
-    totalDisponibles: 2
+    numeroHabitacion: "108",
+    totalDisponibles: 1
   },
   {
     nombre: "Suite Vista Jardín",
@@ -193,8 +193,8 @@ const habitaciones = [
       "Área de estar",
       "Minibar"
     ],
-    numeroHabitacion: "S203",
-    totalDisponibles: 4
+    numeroHabitacion: "109",
+    totalDisponibles: 1
   },
   {
     nombre: "Habitación Doble Clásica",
@@ -212,8 +212,8 @@ const habitaciones = [
       "Aire acondicionado",
       "Baño privado"
     ],
-    numeroHabitacion: "D303",
-    totalDisponibles: 4
+    numeroHabitacion: "110",
+    totalDisponibles: 1
   },
   {
     nombre: "Suite Premium Plus",
@@ -233,8 +233,8 @@ const habitaciones = [
       "Servicio de mayordomo",
       "Minibar premium"
     ],
-    numeroHabitacion: "P104",
-    totalDisponibles: 4
+    numeroHabitacion: "111",
+    totalDisponibles: 1
   },
   {
     nombre: "Habitación Individual Superior",
@@ -253,8 +253,8 @@ const habitaciones = [
       "Sillón de lectura",
       "Cafetera"
     ],
-    numeroHabitacion: "I402",
-    totalDisponibles: 2
+    numeroHabitacion: "112",
+    totalDisponibles: 1
   },
   {
     nombre: "Suite Colonial Deluxe",
@@ -273,8 +273,8 @@ const habitaciones = [
       "Balcón colonial",
       "Bañera antigua"
     ],
-    numeroHabitacion: "S204",
-    totalDisponibles: 4
+    numeroHabitacion: "113",
+    totalDisponibles: 1
   },
   {
     nombre: "Habitación Doble Premium",
@@ -293,27 +293,33 @@ const habitaciones = [
       "Baño de lujo",
       "Vista panorámica"
     ],
-    numeroHabitacion: "D304",
-    totalDisponibles: 4
+    numeroHabitacion: "114",
+    totalDisponibles: 1
   }
 ];
 
 const seedHabitaciones = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGODB_URI);
     console.log('Conexión a MongoDB establecida');
 
     await Habitacion.deleteMany();
     console.log('Habitaciones eliminadas');
 
-    // Asignar totalDisponibles según el tipo de habitación
+    // Establecer totalDisponibles=1 para cada habitación (una instancia de cada una)
     const habitacionesConTotal = habitaciones.map(habitacion => ({
       ...habitacion,
-      totalDisponibles: tiposHabitacion[habitacion.tipo]
+      totalDisponibles: 1 // Cada habitación tiene solo una instancia
     }));
 
+    // Verificar que tenemos exactamente 14 habitaciones
+    console.log(`Creando ${habitacionesConTotal.length} habitaciones`);
+    if (habitacionesConTotal.length !== 14) {
+      throw new Error(`Se esperaban 14 habitaciones pero se encontraron ${habitacionesConTotal.length}`);
+    }
+
     await Habitacion.insertMany(habitacionesConTotal);
-    console.log('Habitaciones creadas exitosamente');
+    console.log('14 habitaciones creadas exitosamente');
 
     await mongoose.connection.close();
     console.log('Conexión a MongoDB cerrada');

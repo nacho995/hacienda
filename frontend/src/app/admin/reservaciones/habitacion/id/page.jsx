@@ -97,8 +97,51 @@ export default function HabitacionReservationDetail() {
   }
   
   const formatDate = (dateString) => {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString('es-ES', options);
+    if (!dateString) return 'Fecha no disponible';
+    
+    try {
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const fecha = new Date(dateString);
+      
+      // Verificar si la fecha es válida
+      if (isNaN(fecha.getTime())) {
+        return 'Fecha inválida';
+      }
+      
+      return fecha.toLocaleDateString('es-ES', options);
+    } catch (error) {
+      console.error('Error al formatear fecha:', error);
+      return 'Error en fecha';
+    }
+  };
+  
+  // Función para formatear montos con formato de moneda mexicana
+  const formatCurrency = (amount) => {
+    if (amount === undefined || amount === null) return '$0.00';
+    if (isNaN(parseFloat(amount))) return '$0.00';
+    
+    return `$${parseFloat(amount).toLocaleString('es-MX', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
+  };
+  
+  // Función para manejar campos de texto potencialmente vacíos
+  const formatText = (text, defaultText = 'No disponible') => {
+    if (!text || text.trim() === '') return defaultText;
+    return text;
+  };
+  
+  // Función para obtener el nombre completo del cliente
+  const getClientName = () => {
+    const nombre = formatText(reservation.nombre || reservation.nombreContacto || '');
+    const apellido = formatText(reservation.apellido || reservation.apellidosContacto || '');
+    
+    if (nombre === 'No disponible' && apellido === 'No disponible') {
+      return 'Cliente sin nombre registrado';
+    }
+    
+    return `${nombre} ${apellido}`;
   };
   
   return (
@@ -158,7 +201,10 @@ export default function HabitacionReservationDetail() {
                   <FaBed className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Tipo de Habitación</p>
-                    <p className="font-medium">{reservation.tipoHabitacion}</p>
+                    <p className="font-medium">{formatText(reservation.tipoHabitacion)}</p>
+                    {reservation.habitacion && (
+                      <p className="text-xs text-gray-500">{formatText(reservation.habitacion)}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -173,20 +219,32 @@ export default function HabitacionReservationDetail() {
                   <div>
                     <p className="text-sm text-gray-500">Fecha de Salida</p>
                     <p className="font-medium">{formatDate(reservation.fechaSalida)}</p>
+                    {reservation.fechaEntrada && reservation.fechaSalida && (
+                      <p className="text-xs text-gray-500">
+                        {Math.ceil((new Date(reservation.fechaSalida) - new Date(reservation.fechaEntrada)) / (1000 * 60 * 60 * 24))} noche(s)
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <FaUserFriends className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Número de Personas</p>
-                    <p className="font-medium">{reservation.numeroPersonas}</p>
+                    <p className="font-medium">
+                      {reservation.numeroPersonas || reservation.numHuespedes || 'No especificado'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <FaMoneyBillWave className="text-gray-500 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Precio</p>
-                    <p className="font-medium">${reservation.precio.toLocaleString('es-MX')}</p>
+                    <p className="text-sm text-gray-500">Precio Total</p>
+                    <p className="font-medium">{formatCurrency(reservation.precio || reservation.precioTotal)}</p>
+                    {reservation.precioNoche && (
+                      <p className="text-xs text-gray-500">
+                        {formatCurrency(reservation.precioNoche)} por noche
+                      </p>
+                    )}
                   </div>
                 </div>
                 {reservation.serviciosAdicionales && reservation.serviciosAdicionales.length > 0 && (
@@ -211,29 +269,27 @@ export default function HabitacionReservationDetail() {
                   <FaUserFriends className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Nombre</p>
-                    <p className="font-medium">{reservation.nombre} {reservation.apellido}</p>
+                    <p className="font-medium">{getClientName()}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <FaEnvelope className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-medium">{reservation.email}</p>
+                    <p className="font-medium">{formatText(reservation.email || reservation.emailContacto)}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <FaPhone className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Teléfono</p>
-                    <p className="font-medium">{reservation.telefono}</p>
+                    <p className="font-medium">{formatText(reservation.telefono || reservation.telefonoContacto)}</p>
                   </div>
                 </div>
-                {reservation.solicitudesEspeciales && (
-                  <div>
-                    <p className="text-sm text-gray-500">Solicitudes Especiales</p>
-                    <p className="font-medium">{reservation.solicitudesEspeciales || 'Ninguna'}</p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-sm text-gray-500">Solicitudes Especiales</p>
+                  <p className="font-medium">{formatText(reservation.solicitudesEspeciales || reservation.peticionesEspeciales, 'Ninguna')}</p>
+                </div>
               </div>
             </div>
             
