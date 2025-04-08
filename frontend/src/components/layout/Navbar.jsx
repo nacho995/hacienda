@@ -64,6 +64,7 @@ export default function Navbar() {
     { href: 'events', label: 'Eventos' },
     { href: 'gallery', label: 'Galería' },
     { href: '/habitaciones', label: 'Hotel', isPage: true },
+    { href: '/servicios', label: 'Servicios', isPage: true },
     { href: '/contact', label: 'Contacto', isPage: true }
   ];
 

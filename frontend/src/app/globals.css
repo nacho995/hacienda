@@ -19,6 +19,7 @@
   --color-brown-medium: #D1B59B;    /* Marrón pastel */
   --color-brown-dark: #A5856A;     /* Marrón más profundo */
   --color-brown-deep: #7B5C44;     /* Marrón oscuro */
+  --color-brown-text: #8A6E52;     /* Marrón pastel más oscuro para texto de párrafos */
   
   /* Degradados elegantes */
   --gradient-primary: linear-gradient(135deg, var(--color-brown-light) 0%, var(--color-brown-medium) 100%);
