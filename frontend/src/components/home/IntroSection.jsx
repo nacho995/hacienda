@@ -512,7 +512,7 @@ export default function IntroSection() {
           </h2>
           <div className="gold-divider fade-in animate-delay-100"></div>
           <p className="text-xl md:text-2xl font-light fade-in animate-delay-200 mt-10 max-w-4xl mx-auto leading-relaxed">
-            Hacienda San Carlos Borromeo no es solo un lugar, es la <span className="italic text-[var(--color-primary)]">manifestación de la elegancia clásica mexicana</span> donde los momentos especiales cobran vida en un entorno de incomparable belleza.
+            Hacienda San Carlos Borromeo no es solo un lugar, es la <span className="italic text-[#8B7355]">manifestación de la elegancia clásica mexicana</span> donde los momentos especiales cobran vida en un entorno de incomparable belleza.
           </p>
         </div>
         
@@ -669,8 +669,8 @@ export default function IntroSection() {
         {/* Historia de la Hacienda - Formato renovado */}
         <div className="my-20 fade-in animate-delay-300">
           <div className="text-center mb-12">
-            <h3 className="text-4xl font-[var(--font-display)] text-[var(--color-accent-dark)] mb-6 perspective-[1000px] transform-style-preserve-3d">
-              <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px var(--color-brown-dark), -1px -1px 0px var(--color-brown-light)"}}>
+            <h3 className="text-4xl font-[var(--font-display)] text-[var(--color-accent-dark)] mb-6">
+              <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#8B7355"}}>
                 Historia y Tradición
               </span>
             </h3>
@@ -688,8 +688,8 @@ export default function IntroSection() {
                 />
               </div>
               <div className="bg-white/80 p-6 rounded-lg shadow-sm border border-[var(--color-accent)]/10">
-                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3 perspective-[1000px] transform-style-preserve-3d">
-                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px var(--color-brown-dark), -0.5px -0.5px 0px var(--color-brown-light)"}}>
+                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3">
+                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#8B7355"}}>
                     Orígenes Virreinales
                   </span>
                 </h4>
@@ -699,8 +699,8 @@ export default function IntroSection() {
               </div>
               
               <div className="bg-[var(--color-primary-light)]/5 p-6 rounded-lg shadow-sm border border-[var(--color-primary)]/10">
-                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3 perspective-[1000px] transform-style-preserve-3d">
-                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px var(--color-brown-dark), -0.5px -0.5px 0px var(--color-brown-light)"}}>
+                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3">
+                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#8B7355"}}>
                     Testigo de la Independencia
                   </span>
                 </h4>
@@ -713,8 +713,8 @@ export default function IntroSection() {
             {/* Segunda columna con texto e imagen */}
             <div className="space-y-6">
               <div className="bg-[var(--color-accent-light)]/5 p-6 rounded-lg shadow-sm border border-[var(--color-accent)]/10">
-                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3 perspective-[1000px] transform-style-preserve-3d">
-                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px var(--color-brown-dark), -0.5px -0.5px 0px var(--color-brown-light)"}}>
+                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3">
+                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#8B7355"}}>
                     Época Revolucionaria
                   </span>
                 </h4>
@@ -732,8 +732,8 @@ export default function IntroSection() {
               </div>
               
               <div className="bg-white/80 p-6 rounded-lg shadow-sm border border-[var(--color-accent)]/10">
-                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3 perspective-[1000px] transform-style-preserve-3d">
-                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px var(--color-brown-dark), -0.5px -0.5px 0px var(--color-brown-light)"}}>
+                <h4 className="text-xl font-semibold text-[var(--color-primary)] mb-3">
+                  <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#8B7355"}}>
                     Renacimiento Cultural
                   </span>
                 </h4>
@@ -756,7 +756,7 @@ export default function IntroSection() {
           
           <div className="space-y-4 text-lg leading-relaxed max-w-4xl mx-auto">
             <p>
-              Hoy, la <span className="font-semibold perspective-[1000px] transform-style-preserve-3d inline-block" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 2px rgba(0,0,0,0.7), 0px 0px 4px rgba(0,0,0,0.5), 1px 1px 0px var(--color-brown-dark), -0.5px -0.5px 0px var(--color-brown-light)"}}>Hacienda San Carlos Borromeo</span> se alza como un símbolo de elegancia atemporal y preservación cultural. Sus jardines centenarios, con árboles que han sido testigos silenciosos de la historia, crean un ambiente de serenidad mágica inigualable.
+              Hoy, la <span className="font-semibold" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#8B7355"}}>Hacienda San Carlos Borromeo</span> se alza como un símbolo de elegancia atemporal y preservación cultural. Sus jardines centenarios, con árboles que han sido testigos silenciosos de la historia, crean un ambiente de serenidad mágica inigualable.
             </p>
             <p>
               Cada celebración que tiene lugar entre sus muros continúa la tradición de momentos significativos que han definido a esta hacienda a lo largo de los siglos, permitiendo a sus visitantes:

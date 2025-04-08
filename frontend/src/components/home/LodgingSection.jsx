@@ -299,7 +299,7 @@ export default function LodgingSection() {
                   whileHover={{ scale: 1.1 }}
                   className="w-12 h-12 rounded-full bg-[var(--color-primary-5)] flex items-center justify-center shadow-md"
                 >
-                  <FaBed className="text-[var(--color-primary)] text-lg" />
+                  <FaBed className="text-black text-lg" />
                 </motion.div>
                 <span className="text-gray-700">{rooms[activeRoom].sqm} m²</span>
               </div>
@@ -308,7 +308,7 @@ export default function LodgingSection() {
                   whileHover={{ scale: 1.1 }}
                   className="w-12 h-12 rounded-full bg-[var(--color-primary-5)] flex items-center justify-center shadow-md"
                 >
-                  <FaUsers className="text-[var(--color-primary)] text-lg" />
+                  <FaUsers className="text-black text-lg" />
                 </motion.div>
                 <span className="text-gray-700">Máx. {rooms[activeRoom].capacity} personas</span>
               </div>
@@ -321,15 +321,15 @@ export default function LodgingSection() {
                   onClick={() => setActiveTab('features')}
                   className={`pb-3 transition-all duration-300 relative ${
                     activeTab === 'features' 
-                      ? 'text-[var(--color-primary)] font-medium' 
-                      : 'text-gray-500 hover:text-[var(--color-primary)]'
+                      ? 'text-black font-medium' 
+                      : 'text-black hover:text-black'
                   }`}
                 >
                   Características
                   {activeTab === 'features' && (
                     <motion.div 
                       layoutId="activeFeaturesIndicator"
-                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--color-primary)]"
+                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-black"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.5 }}
@@ -340,15 +340,15 @@ export default function LodgingSection() {
                   onClick={() => setActiveTab('amenities')}
                   className={`pb-3 transition-all duration-300 relative ${
                     activeTab === 'amenities' 
-                      ? 'text-[var(--color-primary)] font-medium' 
-                      : 'text-gray-500 hover:text-[var(--color-primary)]'
+                      ? 'text-black font-medium' 
+                      : 'text-black hover:text-black'
                   }`}
                 >
                   Servicios
                   {activeTab === 'amenities' && (
                     <motion.div 
                       layoutId="activeFeaturesIndicator"
-                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--color-primary)]"
+                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-black"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.5 }}
@@ -379,7 +379,7 @@ export default function LodgingSection() {
                           transition={{ delay: featureIndex * 0.1 }}
                           className="flex items-center space-x-3 text-gray-700 p-3 border-l-2 border-[var(--color-primary-20)] bg-[var(--color-primary-5)] rounded-r-md"
                         >
-                          <Icon className="text-[var(--color-primary)] text-lg" />
+                          <Icon className="text-black text-lg" />
                           <span className="font-medium">{feature}</span>
                         </motion.div>
                       );
@@ -406,7 +406,7 @@ export default function LodgingSection() {
                           transition={{ delay: amenityIndex * 0.1 }}
                           className="flex items-center space-x-3 text-gray-700 p-3 border-l-2 border-[var(--color-primary-20)] bg-[var(--color-primary-5)] rounded-r-md"
                         >
-                          <Icon className="text-[var(--color-primary)] text-lg" />
+                          <Icon className="text-black text-lg" />
                           <span className="font-medium">{amenity}</span>
                         </motion.div>
                       );
@@ -419,10 +419,10 @@ export default function LodgingSection() {
             <motion.button 
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.98 }}
-              className="group flex items-center space-x-2 px-10 py-4 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-all duration-300 shadow-lg"
+              className="group flex items-center space-x-2 px-10 py-4 bg-[var(--color-primary)] text-black hover:bg-[var(--color-primary-dark)] transition-all duration-300 shadow-lg"
             >
-              <span>Reservar esta habitación</span>
-              <FaAngleRight className="group-hover:translate-x-1 transition-transform duration-300" />
+              <span className="text-black">Reservar esta habitación</span>
+              <FaAngleRight className="group-hover:translate-x-1 transition-transform duration-300 text-black" />
             </motion.button>
           </motion.div>
         </div>
@@ -469,18 +469,18 @@ export default function LodgingSection() {
               </div>
               <div className="p-8 bg-white border-t border-gray-100">
                 <h3 className={`text-2xl font-[var(--font-display)] mb-4 transition-colors duration-300 ${
-                  activeRoom === index ? 'text-[var(--color-primary)]' : 'text-[var(--color-accent)]'
+                  activeRoom === index ? 'text-black' : 'text-black'
                 }`}>
                   {room.name}
                 </h3>
                 <div className={`w-20 h-[1px] ${
-                  activeRoom === index ? 'bg-[var(--color-primary)]' : 'bg-gray-200'
+                  activeRoom === index ? 'bg-black' : 'bg-gray-200'
                 } mb-4 transition-colors duration-300`}></div>
                 <p className="text-gray-600 mb-6 line-clamp-2 leading-relaxed">
                   {room.description}
                 </p>
                 <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                  <div className="text-[var(--color-primary)] font-semibold text-lg">
+                  <div className="text-black font-semibold text-lg">
                     {room.price} <span className="text-sm font-normal text-gray-500">/ noche</span>
                   </div>
                   <div className="text-sm text-gray-600 flex items-center space-x-2">
@@ -493,7 +493,7 @@ export default function LodgingSection() {
                     layoutId="selectedRoomIndicator"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--color-primary)]"
+                    className="absolute bottom-0 left-0 right-0 h-1 bg-black"
                   />
                 )}
               </div>

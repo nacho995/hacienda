@@ -217,7 +217,7 @@ export default function Footer() {
               className="px-8 py-4 bg-gradient-to-r from-[var(--color-brown-medium)] to-[var(--color-brown-dark)] text-black font-bold uppercase tracking-wider text-sm hover:from-[var(--color-brown-dark)] hover:to-[var(--color-brown-medium)] border border-white/10 hover:border-white/30 transition-all duration-300 transform hover:scale-105 shadow-lg rounded-sm flex items-center group"
             >
               <span className="mr-2">Contáctanos</span>
-              <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 text-black transform group-hover:translate-x-1 transition-transform duration-300" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </Link>

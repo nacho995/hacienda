@@ -248,7 +248,7 @@ export default function GallerySection() {
             <FaHeart className="text-[var(--color-primary)] text-lg absolute -top-1 -right-5 transform rotate-12 opacity-60" />
           </div>
           
-          <h2 className="text-5xl md:text-6xl font-[var(--font-display)] text-[var(--color-accent)] mb-6 font-light">
+          <h2 className="text-5xl md:text-6xl font-[var(--font-display)] text-[var(--color-accent)] mb-6 ">
             Bodas de <span className="text-[var(--color-primary)] font-semibold">Ensueño</span>
           </h2>
           
@@ -275,7 +275,7 @@ export default function GallerySection() {
                 }}
                 className={`px-4 py-2 mx-2 my-1 rounded-full transition-all duration-300 ${
                   currentCategory === category.id 
-                    ? 'bg-[var(--color-primary)] text-white' 
+                    ? 'bg-[var(--color-primary)] text-black' 
                     : 'bg-white/80 text-[var(--color-accent-dark)] hover:bg-[var(--color-primary-10)]'
                 }`}
                 whileHover={{ scale: 1.05 }}
@@ -292,7 +292,7 @@ export default function GallerySection() {
               onClick={() => setViewMode('slider')}
               className={`flex items-center px-4 py-2 rounded-l-full border ${
                 viewMode === 'slider'
-                  ? 'bg-[var(--color-primary-10)] border-[var(--color-primary)] text-[var(--color-primary)]'
+                  ? 'bg-[var(--color-primary-10)] border-[var(--color-primary)] text-black'
                   : 'bg-white/80 border-gray-300 text-gray-600 hover:bg-gray-100'
               }`}
               whileHover={viewMode !== 'slider' ? { scale: 1.05 } : {}}
@@ -431,14 +431,14 @@ export default function GallerySection() {
               
               {/* Botones de navegación */}
               <button 
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white w-12 h-12 rounded-full flex items-center justify-center z-30 transition-colors backdrop-blur-sm"
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center z-30 transition-all duration-300 backdrop-blur-sm"
                 onClick={() => setCurrentSlide((currentSlide - 1 + filteredPhotos.length) % filteredPhotos.length)}
               >
                 <FaAngleLeft className="text-2xl" />
               </button>
               
               <button 
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/40 text-white w-12 h-12 rounded-full flex items-center justify-center z-30 transition-colors backdrop-blur-sm"
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center z-30 transition-all duration-300 backdrop-blur-sm"
                 onClick={() => setCurrentSlide((currentSlide + 1) % filteredPhotos.length)}
               >
                 <FaAngleRight className="text-2xl" />
@@ -499,7 +499,7 @@ export default function GallerySection() {
           >
             {/* Botón para cerrar */}
             <button 
-              className="absolute top-6 right-6 text-white/80 hover:text-white z-50 text-4xl"
+              className="absolute top-6 right-6 text-white/80 hover:text-black z-50 text-4xl transition-all duration-300"
               onClick={() => setSelectedItem(null)}
             >
               <FaTimes />
@@ -539,7 +539,7 @@ export default function GallerySection() {
             
             {/* Botones de navegación */}
             <button 
-              className="absolute left-5 top-1/2 transform -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white w-12 h-12 rounded-full flex items-center justify-center z-50 transition-colors"
+              className="absolute left-5 top-1/2 transform -translate-y-1/2 bg-white/10 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center z-50 transition-all duration-300"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePrevItem();
@@ -549,7 +549,7 @@ export default function GallerySection() {
             </button>
             
             <button 
-              className="absolute right-5 top-1/2 transform -translate-y-1/2 bg-white/10 hover:bg-white/20 text-white w-12 h-12 rounded-full flex items-center justify-center z-50 transition-colors"
+              className="absolute right-5 top-1/2 transform -translate-y-1/2 bg-white/10 hover:bg-black/90 text-white w-12 h-12 rounded-full flex items-center justify-center z-50 transition-all duration-300"
               onClick={(e) => {
                 e.stopPropagation();
                 handleNextItem();

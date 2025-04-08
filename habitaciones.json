@@ -1,0 +1,185 @@
+[
+  {
+    "numero": 1,
+    "letra": "A",
+    "tipo": "sencilla",
+    "tipoHabitacion": "Habitación Sencilla",
+    "descripcion": "1 cama king size",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 0
+    },
+    "precio": 2400.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 2,
+    "letra": "B",
+    "tipo": "sencilla",
+    "tipoHabitacion": "Habitación Sencilla",
+    "descripcion": "1 cama king size",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 0
+    },
+    "precio": 2400.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 3,
+    "letra": "C",
+    "tipo": "doble",
+    "tipoHabitacion": "Habitación Doble",
+    "descripcion": "Dos matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 4,
+    "letra": "D",
+    "tipo": "doble",
+    "tipoHabitacion": "Habitación Doble",
+    "descripcion": "Dos matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 5,
+    "letra": "E",
+    "tipo": "doble",
+    "tipoHabitacion": "Habitación Doble",
+    "descripcion": "Dos matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 6,
+    "letra": "F",
+    "tipo": "doble",
+    "tipoHabitacion": "Habitación Doble",
+    "descripcion": "Dos matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 7,
+    "letra": "G",
+    "tipo": "doble",
+    "tipoHabitacion": "Habitación Doble",
+    "descripcion": "Dos matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 8,
+    "letra": "H",
+    "tipo": "doble",
+    "tipoHabitacion": "Habitación Doble",
+    "descripcion": "Dos matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 9,
+    "letra": "I",
+    "tipo": "doble",
+    "tipoHabitacion": "Habitación Doble",
+    "descripcion": "Dos matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 10,
+    "letra": "J",
+    "tipo": "doble",
+    "tipoHabitacion": "Habitación Doble",
+    "descripcion": "Dos matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 11,
+    "letra": "K",
+    "tipo": "sencilla",
+    "tipoHabitacion": "Habitación Sencilla",
+    "descripcion": "1 cama king size",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 0
+    },
+    "precio": 2400.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 12,
+    "letra": "L",
+    "tipo": "sencilla",
+    "tipoHabitacion": "Habitación Sencilla",
+    "descripcion": "1 cama king size",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 0
+    },
+    "precio": 2400.00,
+    "estado": "disponible"
+  },
+  {
+    "numero": 13,
+    "letra": "M",
+    "tipo": "sencilla",
+    "tipoHabitacion": "Habitación Sencilla",
+    "descripcion": "1 cama king size",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 0
+    },
+    "precio": 2400.00,
+    "estado": "disponible",
+    "especificaciones": "1 noche en cortesía en hab. Nupcial"
+  },
+  {
+    "numero": 14,
+    "letra": "O",
+    "tipo": "sencilla",
+    "tipoHabitacion": "Habitación Sencilla",
+    "descripcion": "1 cama king size",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 0
+    },
+    "precio": 2400.00,
+    "estado": "disponible"
+  }
+] 

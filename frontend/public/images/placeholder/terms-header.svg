@@ -1,6 +1,0 @@
-<svg width="1920" height="500" viewBox="0 0 1920 500" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1920" height="500" fill="#f3f0ea"/>
-  <path d="M0,250 Q480,150 960,250 T1920,250" fill="none" stroke="#C89E76" stroke-width="2"/>
-  <path d="M0,260 Q480,360 960,260 T1920,260" fill="none" stroke="#C89E76" stroke-width="2"/>
-  <text x="960" y="250" font-family="serif" font-size="24" text-anchor="middle" fill="#7D6E68">Términos de Uso</text>
-</svg> 

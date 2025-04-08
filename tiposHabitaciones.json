@@ -1,0 +1,32 @@
+[
+  {
+    "nombre": "Habitación Sencilla",
+    "tipo": "sencilla",
+    "descripcion": "Habitación con 1 cama king size",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 0
+    },
+    "precio": 2400.00,
+    "precioExtra": 300.00,
+    "caracteristicas": [
+      "1 cama king size",
+      "Capacidad máxima: 2 personas adultas"
+    ]
+  },
+  {
+    "nombre": "Habitación Doble",
+    "tipo": "doble",
+    "descripcion": "Habitación con dos camas matrimoniales",
+    "capacidad": {
+      "adultos": 2,
+      "ninos": 2
+    },
+    "precio": 2450.00,
+    "precioExtra": 300.00,
+    "caracteristicas": [
+      "2 camas matrimoniales",
+      "Capacidad máxima: 2 adultos y 2 niños"
+    ]
+  }
+] 

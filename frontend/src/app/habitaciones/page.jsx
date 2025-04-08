@@ -254,7 +254,11 @@ export default function HotelPage() {
                             <div key={room._id} className="p-4 flex justify-between items-center hover:bg-[var(--color-brown-light-10)]">
                               <div>
                                 <h4 className="font-medium text-[var(--color-brown-medium)]">{room.nombre}</h4>
-                                <p className="text-sm text-[var(--color-brown-medium)]">{room.tipo} - {room.capacidad} huéspedes</p>
+                                <p className="text-sm text-[var(--color-brown-medium)]">
+                                  {room.tipo} - {typeof room.capacidad === 'object' ? 
+                                    `${room.capacidad.adultos + room.capacidad.ninos} huéspedes (${room.capacidad.adultos} adultos, ${room.capacidad.ninos} niños)` : 
+                                    `${room.capacidad || 2} huéspedes`}
+                                </p>
                               </div>
                               <div className="flex items-center space-x-4">
                                 <span className="text-sm text-[var(--color-brown-medium)]">Incluido en paquete</span>

@@ -81,19 +81,19 @@ export default function RoomListSection({ onSelectRoom, selectedRoom, selectedRo
 
       try {
         const disponibilidadPromises = habitaciones.map(async (habitacion) => {
-          // Aseguramos que tipoHabitacion esté definido correctamente
-          // Si habitacion.tipo no existe o es null/undefined, usamos habitacion._id como respaldo
+          // Aseguramos que tipoHabitacion y habitacion estén definidos correctamente
           const tipoHabitacion = habitacion.tipo || habitacion._id;
+          const nombreHabitacion = habitacion.nombre || habitacion.letraHabitacion || `Habitación ${habitacion._id}`;
           
           const requestData = {
             tipoHabitacion: tipoHabitacion,
-            habitacion: habitacion.nombre,
+            habitacion: nombreHabitacion,
             fechaEntrada: fechaInicio,
             fechaSalida: fechaFin,
             numeroHabitaciones: 1
           };
           
-          console.log(`Verificando disponibilidad para habitación ${habitacion.nombre || '(sin nombre)'}:`, requestData);
+          console.log(`Verificando disponibilidad para habitación ${nombreHabitacion}:`, requestData);
           
           return await checkHabitacionAvailability(requestData);
         });
@@ -593,7 +593,9 @@ export default function RoomListSection({ onSelectRoom, selectedRoom, selectedRo
                       <FaBed className="mr-1" /> {habitacion.camas || '1 King Size'}
                     </span>
                     <span className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
-                      <FaUserFriends className="mr-1" /> {habitacion.capacidad || '2'} Adultos
+                      <FaUserFriends className="mr-1" /> {typeof habitacion.capacidad === 'object' ? 
+                        `${habitacion.capacidad.adultos} adultos, ${habitacion.capacidad.ninos} niños` : 
+                        `${habitacion.capacidad || 2} adultos`}
                     </span>
                     <span className="inline-flex items-center px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
                       <FaRuler className="mr-1" /> {habitacion.tamano || '30m²'}

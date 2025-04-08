@@ -107,20 +107,60 @@ export default function Navbar() {
       }`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
-            {/* Logo con fondo difuminado rectangular */}
+            {/* Logo con diseño de castillo */}
             <div className="hidden lg:flex items-center mr-8">
-              <div className="relative p-4" style={{ 
-                background: 'linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0) 100%), linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0) 100%)',
-                borderRadius: '30px',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)'
-              }}>
+              <div className="relative w-48 h-32">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  {/* Puerta principal */}
+                  <div className="absolute w-40 h-28 bg-white/80 backdrop-blur-sm rounded-t-[100px] shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                    {/* Líneas decorativas superiores */}
+                    <div className="absolute top-3 left-4 right-4 h-[2px] bg-slate-200"></div>
+                    <div className="absolute top-6 left-4 right-4 h-[2px] bg-slate-200"></div>
+                    {/* Líneas verticales */}
+                    <div className="absolute top-9 left-4 w-[2px] h-6 bg-slate-200"></div>
+                    <div className="absolute top-9 right-4 w-[2px] h-6 bg-slate-200"></div>
+                    {/* Líneas decorativas inferiores */}
+                    <div className="absolute bottom-6 left-4 right-4 h-[2px] bg-slate-200"></div>
+                    <div className="absolute bottom-3 left-4 right-4 h-[2px] bg-slate-200"></div>
+                  </div>
+                  {/* Torre izquierda */}
+                  <div className="absolute w-8 h-32 bg-white/80 backdrop-blur-sm left-4 rounded-t-lg shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                    {/* Líneas decorativas torre izquierda */}
+                    <div className="absolute top-3 left-1 right-1 h-[2px] bg-slate-200"></div>
+                    <div className="absolute top-6 left-1 right-1 h-[2px] bg-slate-200"></div>
+                    <div className="absolute bottom-6 left-1 right-1 h-[2px] bg-slate-200"></div>
+                  </div>
+                  {/* Torre derecha */}
+                  <div className="absolute w-8 h-32 bg-white/80 backdrop-blur-sm right-4 rounded-t-lg shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                    {/* Líneas decorativas torre derecha */}
+                    <div className="absolute top-3 left-1 right-1 h-[2px] bg-slate-200"></div>
+                    <div className="absolute top-6 left-1 right-1 h-[2px] bg-slate-200"></div>
+                    <div className="absolute bottom-6 left-1 right-1 h-[2px] bg-slate-200"></div>
+                  </div>
+                  {/* Almenas superiores con líneas */}
+                  <div className="absolute top-0 w-full flex justify-center space-x-2">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="relative w-4 h-4 bg-white/80 backdrop-blur-sm rounded-t-lg shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                        <div className="absolute top-1 left-1 right-1 h-[1px] bg-slate-200"></div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Arco decorativo */}
+                  <div className="absolute top-9 left-1/2 transform -translate-x-1/2 w-24 h-24 border-t-2 border-slate-200 rounded-full"></div>
+                </div>
                 <Image 
                   src="/logo.png" 
                   alt="Hacienda San Carlos" 
-                  width={120} 
-                  height={120} 
-                  className="object-contain"
-                  style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+                  width={160} 
+                  height={160} 
+                  className="relative z-10 object-contain"
+                  style={{ 
+                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)'
+                  }}
                 />
               </div>
             </div>

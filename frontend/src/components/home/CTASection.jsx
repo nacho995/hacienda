@@ -71,8 +71,8 @@ export default function CTASection() {
                 
                 <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6 mb-12">
                   <div className="flex items-center space-x-4 group hover:transform hover:scale-105 transition-all duration-300">
-                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white shadow-lg transform group-hover:rotate-3 transition-all duration-300 ring-2 ring-white/10 group-hover:ring-white/30">
-                      <FaCalendarAlt className="w-6 h-6" />
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-black shadow-lg transform group-hover:rotate-3 transition-all duration-300 ring-2 ring-white/10 group-hover:ring-white/30">
+                      <FaCalendarAlt className="w-6 h-6 text-black" />
                     </div>
                     <div>
                       <h3 className="text-white font-medium text-lg group-hover:translate-x-1 transition-transform duration-300">Agenda una visita</h3>
@@ -81,8 +81,8 @@ export default function CTASection() {
                   </div>
                   <div className="border-l border-white/20 pl-6 hidden sm:block"></div>
                   <div className="flex items-center space-x-4 group hover:transform hover:scale-105 transition-all duration-300">
-                    <div className="w-14 h-14 rounded-full border-2 border-[var(--color-primary)] flex items-center justify-center text-white bg-black/20 backdrop-blur-sm shadow-lg transform group-hover:rotate-3 transition-all duration-300">
-                      <span className="text-xl font-semibold">15+</span>
+                    <div className="w-14 h-14 rounded-full border-2 border-[var(--color-primary)] flex items-center justify-center text-black bg-[var(--color-primary)] backdrop-blur-sm shadow-lg transform group-hover:rotate-3 transition-all duration-300">
+                      <span className="text-xl font-semibold text-black">15+</span>
                     </div>
                     <div>
                       <h3 className="text-white font-medium text-lg group-hover:translate-x-1 transition-transform duration-300">Años de experiencia</h3>
@@ -93,10 +93,10 @@ export default function CTASection() {
                 
                 <Link 
                   href="/contact" 
-                  className="group inline-flex items-center bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-dark)] text-white px-8 py-4 uppercase tracking-wider text-sm font-medium hover:from-[var(--color-primary-dark)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-105 rounded-sm border border-white/10 hover:border-white/30"
+                  className="group inline-flex items-center bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-dark)] text-black px-8 py-4 uppercase tracking-wider text-sm font-medium hover:from-[var(--color-primary-dark)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-105 rounded-sm border border-white/10 hover:border-white/30"
                 >
-                  <span>Reserva tu fecha</span>
-                  <FaArrowRight className="ml-3 group-hover:translate-x-2 transition-transform duration-300" />
+                  <span className="text-black">Reserva tu fecha</span>
+                  <FaArrowRight className="ml-3 group-hover:translate-x-2 transition-transform duration-300 text-black" />
                 </Link>
               </div>
               
@@ -156,11 +156,11 @@ export default function CTASection() {
                   </div>
                   
                   <div>
-                    <button 
-                      type="submit" 
-                      className="w-full py-4 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors tracking-wider uppercase text-sm font-medium"
+                    <button
+                      type="submit"
+                      className="w-full py-4 bg-[var(--color-primary)] text-black hover:bg-[var(--color-primary-dark)] transition-colors tracking-wider uppercase text-sm font-medium"
                     >
-                      Enviar Solicitud
+                      <span className="text-black">Enviar Solicitud</span>
                     </button>
                   </div>
                 </form>

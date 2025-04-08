@@ -90,7 +90,7 @@ export default function ServiciosPage() {
                     className={({ selected }) =>
                       `w-full sm:w-auto whitespace-nowrap rounded-lg py-3 px-6 text-sm font-medium leading-5 transition-all duration-300 flex items-center justify-center space-x-2
                       ${selected 
-                        ? 'bg-[var(--color-brown-medium)] text-white shadow'
+                        ? 'bg-[var(--color-brown-medium)] text-black shadow'
                         : 'text-[var(--color-brown-dark)] hover:bg-[var(--color-brown-light-20)] hover:text-[var(--color-brown-dark)]'
                       }`
                     }

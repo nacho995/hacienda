@@ -83,7 +83,7 @@ const BodasSection = () => {
         <div className="text-center">
           <a 
             href="/reservar?tipo=boda" 
-            className="inline-flex items-center space-x-2 bg-[var(--color-brown-medium)] text-white px-8 py-4 rounded-lg hover:bg-[var(--color-brown-dark)] transition-colors"
+            className="inline-flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-8 py-4 rounded-lg hover:bg-[var(--color-brown-dark)] transition-colors"
           >
             <FaHeart />
             <span>Cotiza tu boda ahora</span>
@@ -100,11 +100,11 @@ const serviciosBoda = [
   "Recepción: canapés a elección y cocktaleria acorde al menú seleccionado (No incluye alcohol, se agrega en caso de adquirir barra libre)",
   "Aguas frescas",
   "Menú tres tiempos pollo o cerdo o 4 tiempos res o pescado",
-  "1 Mesero cada 10 pax",
+  "1 Mesero cada 10 packs",
   "Refrescos, hielos, agua quina, agua de garrafon, ilimitado",
   "Pan Artesanal",
   "Café Americano",
-  "Prueba de menú para 4 pax (Persona extra tiene un costo de $500)",
+  "Prueba de menú para 4 packs (Persona extra tiene un costo de $500)",
   "Plato base a elegir",
   "Cubiertos plata (Oro, cobre tiene un costo adicional)",
   "Cristalería necesaria para bebidas",

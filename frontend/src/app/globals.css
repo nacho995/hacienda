@@ -128,13 +128,13 @@
   }
   
   .btn-brown {
-    @apply px-6 py-3 bg-[var(--color-brown-medium)] text-white rounded-none font-medium hover:bg-[var(--color-brown-dark)] transition-colors duration-300 inline-block;
+    @apply px-6 py-3 bg-[var(--color-brown-medium)] text-black rounded-none font-medium hover:bg-[var(--color-brown-dark)] transition-colors duration-300 inline-block;
     font-family: var(--font-body);
     letter-spacing: 0.05em;
   }
 
   .btn-brown-outline {
-    @apply px-6 py-3 border border-[var(--color-brown-medium)] text-[var(--color-brown-medium)] rounded-none font-medium hover:bg-[var(--color-brown-light)] transition-colors duration-300 inline-block;
+    @apply px-6 py-3 border border-[var(--color-brown-medium)] text-black rounded-none font-medium hover:bg-[var(--color-brown-light)] transition-colors duration-300 inline-block;
     font-family: var(--font-body);
     letter-spacing: 0.05em;
   }

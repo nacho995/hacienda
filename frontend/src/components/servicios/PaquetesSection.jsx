@@ -184,9 +184,9 @@ const PaquetesSection = () => {
         <div className="text-center">
           <a 
             href="/reservar?tipo=evento" 
-            className="inline-flex items-center space-x-2 bg-[var(--color-brown-medium)] text-white px-8 py-4 rounded-lg hover:bg-[var(--color-brown-dark)] transition-colors"
+            className="inline-flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-8 py-4 rounded-lg hover:bg-[var(--color-brown-dark)] transition-colors"
           >
-            <FaGlassCheers />
+            <FaGlassCheers className="text-black" />
             <span>Cotiza tu evento ahora</span>
           </a>
         </div>
@@ -228,15 +228,15 @@ const paqueteBasico = [
 ];
 
 const preciosBasico = [
-  "DE 100 A 149 PAX $4045.00",
-  "DE 150 A 199 PAX: $3083.00",
-  "DE 200 A 249 PAX: $2602.00",
-  "DE 250 A 299 PAX: $2314.00",
-  "DE 300 A 349 PAX: $2125.00",
-  "DE 350 A 399 PAX: $1987.00",
-  "DE 400 A 449 PAX: $1889.00",
-  "DE 450 A 499 PAX: $1808.00",
-  "DE 500 A 549 PAX: $1747.00"
+  "DE 100 A 149 packs $4045.00",
+  "DE 150 A 199 packs: $3083.00",
+  "DE 200 A 249 packs: $2602.00",
+  "DE 250 A 299 packs: $2314.00",
+  "DE 300 A 349 packs: $2125.00",
+  "DE 350 A 399 packs: $1987.00",
+  "DE 400 A 449 packs: $1889.00",
+  "DE 450 A 499 packs: $1808.00",
+  "DE 500 A 549 packs: $1747.00"
 ];
 
 const paquetePlatinum = [
@@ -272,15 +272,15 @@ const paquetePlatinum = [
 ];
 
 const preciosPlatinum = [
-  "DE 100 A 149 PAX $4355.00",
-  "DE 150 A 199 PAX: $3293.00",
-  "DE 200 A 249 PAX: $2762.00",
-  "DE 250 A 299 PAX: $2444.00",
-  "DE 300 A 349 PAX: $2235.00",
-  "DE 350 A 399 PAX: $2082.00",
-  "DE 400 A 449 PAX: $1974.00",
-  "DE 450 A 499 PAX: $1884.00",
-  "DE 500 A 549 PAX: $1817.00"
+  "DE 100 A 149 packs $4355.00",
+  "DE 150 A 199 packs: $3293.00",
+  "DE 200 A 249 packs: $2762.00",
+  "DE 250 A 299 packs: $2444.00",
+  "DE 300 A 349 packs: $2235.00",
+  "DE 350 A 399 packs: $2082.00",
+  "DE 400 A 449 packs: $1974.00",
+  "DE 450 A 499 packs: $1884.00",
+  "DE 500 A 549 packs: $1817.00"
 ];
 
 const paqueteOro = [
@@ -328,15 +328,15 @@ const barraLibreOro = [
 ];
 
 const preciosOro = [
-  "DE 100 A 149 PAX $5135.00",
-  "DE 150 A 199 PAX: $3940.00",
-  "DE 200 A 249 PAX: $3342.00",
-  "DE 250 A 299 PAX: $2984.00",
-  "DE 300 A 349 PAX: $2748.00",
-  "DE 350 A 399 PAX: $2577.00",
-  "DE 400 A 449 PAX: $2454.00",
-  "DE 450 A 499 PAX: $2353.00",
-  "DE 500 A 549 PAX: $2284.00"
+  "DE 100 A 149 packs $5135.00",
+  "DE 150 A 199 packs: $3940.00",
+  "DE 200 A 249 packs: $3342.00",
+  "DE 250 A 299 packs: $2984.00",
+  "DE 300 A 349 packs: $2748.00",
+  "DE 350 A 399 packs: $2577.00",
+  "DE 400 A 449 packs: $2454.00",
+  "DE 450 A 499 packs: $2353.00",
+  "DE 500 A 549 packs: $2284.00"
 ];
 
 export default PaquetesSection;
