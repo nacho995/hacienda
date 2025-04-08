@@ -150,7 +150,8 @@ export default function RoomListSection({ onSelectRoom, selectedRoom, selectedRo
           accion: 'deseleccionar'
         };
         onSelectRoom(habitacionConSenal);
-        toast.success(`${habitacion.nombre} eliminada de la selección`);
+        const nombreHabitacion = habitacion.nombre || habitacion.tipo || 'Habitación';
+      toast.success(`${nombreHabitacion} eliminada de la selección`);
       }
       return;
     }
@@ -170,7 +171,8 @@ export default function RoomListSection({ onSelectRoom, selectedRoom, selectedRo
       onSelectRoom(habitacion);
       
       // Mostrar notificación de éxito
-      toast.success(`${habitacion.nombre} añadida a la selección`);
+      const nombreHabitacion = habitacion.nombre || habitacion.tipo || 'Habitación';
+      toast.success(`${nombreHabitacion} añadida a la selección`);
     }
   };
 

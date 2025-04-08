@@ -323,7 +323,7 @@ export default function BookingFormSection({
       <div className="container-custom">
         <div className="max-w-4xl mx-auto">
           <h2 className="font-[var(--font-display)] text-3xl text-center mb-4">
-            {selectedRoom ? `Reservar ${selectedRoom.nombre}` : 'Haga su Reservación'}
+            {selectedRoom && selectedRoom.nombre ? `Reservar ${selectedRoom.nombre}` : selectedRooms.length > 0 ? `Reservar Habitaciones (${selectedRooms.length})` : 'Haga su Reservación'}
           </h2>
           <div className="w-16 h-[1px] bg-[var(--color-primary)] mx-auto mb-8"></div>
           
@@ -560,21 +560,74 @@ export default function BookingFormSection({
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700 mb-1">Número de Huéspedes</label>
-                    <input
-                      type="number"
-                      id="huespedes"
-                      name="huespedes"
-                      min="1"
-                      max="4"
-                      value={formData.huespedes}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                    />
-                  </div>
+                  {selectedRooms.length > 0 ? (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Huéspedes por Habitación</label>
+                      <div className={`space-y-3 ${selectedRooms.length > 4 ? 'max-h-40 overflow-y-auto pr-2' : ''}`}>
+                        {selectedRooms.map((room, index) => {
+                          // Determinar la capacidad máxima de la habitación
+                          const maxCapacidad = typeof room.capacidad === 'object' 
+                            ? (room.capacidad.adultos + room.capacidad.ninos) 
+                            : (room.capacidad || 4);
+                            
+                          // Obtener el valor actual de huéspedes para esta habitación o usar 1 como valor predeterminado
+                          const huespedesActuales = formData.huespedesPorHabitacion && 
+                            formData.huespedesPorHabitacion[room._id] ? 
+                            formData.huespedesPorHabitacion[room._id] : 1;
+                            
+                          return (
+                            <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded-md border border-gray-200">
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-700">{room.nombre || room.tipo || `Habitación ${index + 1}`}</p>
+                                <p className="text-xs text-gray-500">Máx. {maxCapacidad} huéspedes</p>
+                              </div>
+                              <div className="w-24">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={maxCapacidad}
+                                  value={huespedesActuales}
+                                  onChange={(e) => {
+                                    const value = parseInt(e.target.value) || 1;
+                                    const newHuespedesPorHabitacion = {
+                                      ...formData.huespedesPorHabitacion || {},
+                                      [room._id]: Math.min(Math.max(1, value), maxCapacidad)
+                                    };
+                                    
+                                    // Calcular el total de huéspedes
+                                    const totalHuespedes = Object.values(newHuespedesPorHabitacion).reduce((sum, val) => sum + val, 0);
+                                    
+                                    setFormData({
+                                      ...formData,
+                                      huespedesPorHabitacion: newHuespedesPorHabitacion,
+                                      huespedes: totalHuespedes
+                                    });
+                                  }}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)] text-center"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700 mb-1">Número de Huéspedes</label>
+                      <input
+                        type="number"
+                        id="huespedes"
+                        name="huespedes"
+                        min="1"
+                        max="8"
+                        value={formData.huespedes}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                      />
+                    </div>
+                  )}
                   
-                  {!ocultarOpcionesCategoriaHabitacion ? (
+                  {!ocultarOpcionesCategoriaHabitacion && selectedRooms.length === 0 ? (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Categoría de Habitación</label>
                       <div className="flex space-x-4">
@@ -605,23 +658,36 @@ export default function BookingFormSection({
                   ) : (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Habitaciones Seleccionadas</label>
-                      <div className="px-4 py-2 border border-gray-200 rounded-md bg-gray-50">
-                        <p className="font-medium">{selectedRooms.length} habitación(es)</p>
-                        <p className="text-sm text-gray-600">
-                          Total: ${selectedRooms.reduce((total, room) => total + parseFloat(room.precio || 0), 0).toFixed(2)}
-                        </p>
+                      <div className="px-4 py-3 border border-gray-200 rounded-md bg-gray-50">
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="font-medium text-[var(--color-brown-medium)]">{selectedRooms.length} habitación(es) seleccionada(s)</p>
+                          <p className="text-[var(--color-brown-medium)] font-semibold">
+                            Total: ${selectedRooms.reduce((total, room) => total + parseFloat(room.precio || 0), 0).toFixed(2)}
+                          </p>
+                        </div>
                         {selectedRooms.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-gray-200">
-                            <div className="max-h-24 overflow-y-auto text-sm">
+                            <div className={`${selectedRooms.length > 4 ? 'max-h-40 overflow-y-auto' : ''}`}>
                               {selectedRooms.map((room, index) => (
-                                <div key={index} className="flex justify-between py-1">
-                                  <div className="text-gray-700">{room.nombre}</div>
-                                  <div className="text-gray-900 font-medium">${parseFloat(room.precio || 0).toFixed(2)}</div>
+                                <div key={index} className="py-2 border-b border-gray-100 last:border-b-0">
+                                  <div className="flex justify-between items-center mb-1">
+                                    <div className="font-medium text-gray-800">{room.nombre || room.tipo || `Habitación ${index + 1}`}</div>
+                                    <div className="text-[var(--color-brown-medium)] font-semibold">${parseFloat(room.precio || 0).toFixed(2)}</div>
+                                  </div>
+                                  <div className="flex justify-between text-xs text-gray-500">
+                                    <div>
+                                      {typeof room.capacidad === 'object' 
+                                        ? `${room.capacidad.adultos + room.capacidad.ninos} huéspedes (${room.capacidad.adultos} adultos, ${room.capacidad.ninos} niños)` 
+                                        : `${room.capacidad || 2} huéspedes`}
+                                    </div>
+                                    <div>{room.tipo || 'Estándar'}</div>
+                                  </div>
                                 </div>
                               ))}
                             </div>
                           </div>
                         )}
+                        <p className="text-xs text-gray-500 mt-2">Las habitaciones ya están pre-seleccionadas según su elección anterior</p>
                       </div>
                     </div>
                   )}
