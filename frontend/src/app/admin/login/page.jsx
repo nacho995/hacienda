@@ -3,8 +3,8 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import AdminLoginForm from '@/components/admin/LoginForm';
-import { useAuth } from '@/context/AuthContext';
+import AdminLoginForm from '../../../components/admin/LoginForm';
+import { useAuth } from '../../../context/AuthContext';
 import Image from 'next/image';
 
 export default function AdminLogin() {

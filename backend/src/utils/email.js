@@ -1,38 +1,22 @@
-const nodemailer = require('nodemailer');
-
+/**
+ * Función de utilidad para enviar emails
+ * Es un placeholder que debería reemplazarse con una implementación real como nodemailer
+ */
 const sendEmail = async (options) => {
-  try {
-    // Verificar si las credenciales de correo están configuradas
-    if (!process.env.EMAIL_USERNAME || !process.env.EMAIL_PASSWORD || !process.env.EMAIL_SERVICE) {
-      console.warn('Configuración de email incompleta. No se enviará el correo.');
-      return { sent: false, reason: 'missing_config' };
-    }
-    
-    // Crear el transporte para nodemailer
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE,
-      auth: {
-        user: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+  // Por ahora solo registramos en consola que se enviaría un email
+  console.log('---------------- EMAIL MOCK ----------------');
+  console.log(`To: ${options.email}`);
+  console.log(`Subject: ${options.subject}`);
+  console.log(`Content: ${options.html ? '[HTML Content]' : options.text}`);
+  console.log('------------------------------------------');
 
-    // Opciones del email
-    const mailOptions = {
-      from: `Hacienda San Carlos Borromeo <${process.env.EMAIL_USERNAME}>`,
-      to: options.email,
-      subject: options.subject,
-      html: options.html
-    };
+  // En un entorno real, aquí se implementaría el envío de email 
+  // usando nodemailer u otra librería
 
-    // Enviar el email
-    const info = await transporter.sendMail(mailOptions);
-    
-    return { sent: true, info };
-  } catch (error) {
-    console.error('Error al enviar el email:', error);
-    return { sent: false, error: error.message };
-  }
+  return { 
+    success: true, 
+    message: 'Email logged to console (mock)' 
+  };
 };
 
 module.exports = sendEmail; 

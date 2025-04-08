@@ -10,22 +10,15 @@ const habitacionSchema = new mongoose.Schema({
     type: String,
     required: [true, 'La descripción de la habitación es requerida']
   },
-  tipo: {
+  tipoHabitacion: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TipoHabitacion',
+    required: [true, 'El tipo de habitación es requerido']
+  },
+  letra: {
     type: String,
-    required: [true, 'El tipo de habitación es requerido'],
-    enum: ['Individual', 'Doble', 'Suite', 'Premium']
-  },
-  precio: {
-    type: Number,
-    required: [true, 'El precio de la habitación es requerido']
-  },
-  capacidad: {
-    type: Number,
-    required: [true, 'La capacidad de la habitación es requerida']
-  },
-  tamaño: {
-    type: String,
-    required: [true, 'El tamaño de la habitación es requerido']
+    required: [true, 'La letra de identificación de la habitación es requerida'],
+    unique: true
   },
   camas: {
     type: String,
@@ -46,18 +39,31 @@ const habitacionSchema = new mongoose.Schema({
     enum: ['Disponible', 'No Disponible', 'Mantenimiento'],
     default: 'Disponible'
   },
-  numeroHabitacion: {
-    type: String,
-    required: [true, 'El número de habitación es requerido'],
-    unique: true
-  },
-  totalDisponibles: {
+  noches: {
     type: Number,
-    required: [true, 'El número total de habitaciones disponibles es requerido'],
-    min: [1, 'Debe haber al menos una habitación disponible']
+    default: 2
+  },
+  precioPorNoche: {
+    type: Number,
+    required: [true, 'El precio por noche es requerido']
+  },
+  totalHabitacion: {
+    type: Number,
+    required: [true, 'El precio total de la habitación es requerido']
+  },
+  especificaciones: {
+    type: String
   }
 }, {
   timestamps: true
+});
+
+// Método para calcular el total de la habitación
+habitacionSchema.pre('save', function(next) {
+  if (this.precioPorNoche && this.noches) {
+    this.totalHabitacion = this.precioPorNoche * this.noches;
+  }
+  next();
 });
 
 module.exports = mongoose.model('Habitacion', habitacionSchema); 

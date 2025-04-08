@@ -1,7 +1,8 @@
 import './globals.css';
-import { AuthProvider } from '@/context/AuthContext';
-import { ReservationProvider } from '@/context/ReservationContext';
-import AnimatedBackground from '@/components/layout/AnimatedBackground';
+import { AuthProvider } from '../context/AuthContext';
+import { ReservationSyncProvider } from '../context/ReservationSyncContext';
+import { SimpleReservationProvider } from '../context/SimpleReservationContext';
+import AnimatedBackground from '../components/layout/AnimatedBackground';
 import { Toaster } from 'sonner';
 
 export const metadata = {
@@ -18,9 +19,11 @@ export default function RootLayout({ children }) {
       <body suppressHydrationWarning={true}>
         <AnimatedBackground />
         <AuthProvider>
-          <ReservationProvider>
-            {children}
-          </ReservationProvider>
+          <SimpleReservationProvider>
+            <ReservationSyncProvider>
+              {children}
+            </ReservationSyncProvider>
+          </SimpleReservationProvider>
         </AuthProvider>
         <Toaster richColors position="bottom-right" />
       </body>

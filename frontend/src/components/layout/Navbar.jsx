@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { FaBars, FaTimes, FaPhoneAlt, FaRegEnvelope, FaSearch, FaCalendarAlt } from 'react-icons/fa';
+import { FaBars, FaTimes, FaPhoneAlt, FaRegEnvelope, FaSearch, FaCalendarAlt, FaChevronRight } from 'react-icons/fa';
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -63,8 +63,7 @@ export default function Navbar() {
     { href: 'intro', label: 'Inicio' },
     { href: 'events', label: 'Eventos' },
     { href: 'gallery', label: 'Galería' },
-    { href: '/habitaciones', label: 'Habitaciones', isPage: true },
-    { href: '/masajes', label: 'Bienestar', isPage: true },
+    { href: '/habitaciones', label: 'Hotel', isPage: true },
     { href: '/contact', label: 'Contacto', isPage: true }
   ];
 
@@ -107,6 +106,24 @@ export default function Navbar() {
       }`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
+            {/* Logo con fondo difuminado rectangular */}
+            <div className="hidden lg:flex items-center mr-8">
+              <div className="relative p-4" style={{ 
+                background: 'linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0) 100%), linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.3) 75%, rgba(255,255,255,0) 100%)',
+                borderRadius: '30px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)'
+              }}>
+                <Image 
+                  src="/logo.png" 
+                  alt="Hacienda San Carlos" 
+                  width={120} 
+                  height={120} 
+                  className="object-contain"
+                  style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
+                />
+              </div>
+            </div>
+            
             {/* Navegación izquierda */}
             <div className="hidden lg:flex flex-1 items-center justify-end space-x-8">
               {navLinks.slice(0, 3).map((link) => (
@@ -431,12 +448,12 @@ export default function Navbar() {
               {/* Botón de reserva destacado */}
               <Link
                 href="/reservar"
-                className={`flex items-center space-x-2 bg-[var(--color-primary)] text-white px-6 py-3 transition-all duration-300 hover:bg-[var(--color-primary-dark)] shadow-lg transform hover:scale-105 ${
+                className={`flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-6 py-3 transition-all duration-300 hover:bg-[var(--color-brown-dark)] shadow-lg transform hover:scale-105 ${
                   isScrolled ? 'opacity-100' : 'opacity-95 shadow-[0_4px_8px_rgba(0,0,0,0.3)]'
                 }`}
               >
                 <FaCalendarAlt className="mr-1" />
-                <span className="font-medium uppercase tracking-wider text-sm">Cotizar</span>
+                <span className="font-bold uppercase tracking-wider text-sm">Cotizar</span>
               </Link>
             </div>
           </div>
@@ -468,7 +485,7 @@ export default function Navbar() {
         isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
       }`}>
         {/* Fondo con gradiente elegante */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-primary)] via-[#990026] to-[var(--color-primary-dark)] opacity-95 backdrop-blur-md"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-brown-light)] via-[var(--color-brown-medium)] to-[var(--color-brown-dark)] opacity-95 backdrop-blur-md"></div>
         
         {/* Elementos decorativos */}
         <div className="absolute top-0 left-0 w-64 h-64 border-l-2 border-t-2 border-white/10 opacity-30"></div>
@@ -496,7 +513,7 @@ export default function Navbar() {
             <div className="mt-12 text-center">
               <Link
                 href="/reservar"
-                className="inline-flex items-center justify-center space-x-2 bg-white text-[var(--color-primary)] hover:bg-[var(--color-cream-light)] transition-colors px-8 py-4 uppercase tracking-wider font-semibold shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                className="inline-flex items-center justify-center space-x-2 bg-[var(--color-brown-medium)] text-black hover:bg-[var(--color-brown-dark)] transition-colors px-8 py-4 uppercase tracking-wider font-bold shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <FaCalendarAlt className="mr-2" />

@@ -6,20 +6,42 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --color-primary: #800020;     /* Vino tinto más profundo */
-  --color-primary-light: #A30025;
-  --color-primary-dark: #600010;
-  --color-primary-lighter: #E0C0C0; /* Color más claro para texto sobre fondo oscuro */
+  --color-primary: #D1B59B;     /* Marrón pastel como color principal */
+  --color-primary-light: #E6DCC6;
+  --color-primary-dark: #A5856A;
+  --color-primary-lighter: #F0E8DC; /* Color más claro para texto sobre fondo oscuro */
   --color-accent: #0F0F0F;      /* Negro elegante más oscuro */
   --color-accent-dark: #000000;
   --color-cream-light: #FFFAF0; /* Blanco crema elegante */
+  
+  /* Nuevos colores marrones pastel */
+  --color-brown-light: #E6DCC6;     /* Beige suave */
+  --color-brown-medium: #D1B59B;    /* Marrón pastel */
+  --color-brown-dark: #A5856A;     /* Marrón más profundo */
+  --color-brown-deep: #7B5C44;     /* Marrón oscuro */
+  
+  /* Degradados elegantes */
+  --gradient-primary: linear-gradient(135deg, var(--color-brown-light) 0%, var(--color-brown-medium) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--color-brown-medium) 0%, var(--color-brown-dark) 100%);
+  --gradient-accent: linear-gradient(135deg, var(--color-brown-dark) 0%, var(--color-brown-deep) 100%);
+  
   --font-display: 'Cormorant Garamond', serif;  /* Fuente más elegante para títulos */
   --font-body: 'Montserrat', sans-serif;  /* Fuente secundaria para texto normal */
-  --color-primary-5: rgba(128, 0, 32, 0.05); /* Vino tinto con 5% de opacidad */
-  --color-primary-10: rgba(128, 0, 32, 0.1); /* Vino tinto con 10% de opacidad */
-  --color-primary-20: rgba(128, 0, 32, 0.2); /* Vino tinto con 20% de opacidad */
-  --color-primary-30: rgba(128, 0, 32, 0.3); /* Vino tinto con 30% de opacidad */
-  --color-primary-50: rgba(128, 0, 32, 0.5); /* Vino tinto con 50% de opacidad */
+  
+  /* Opacidades para los colores principales */
+  --color-primary-5: rgba(209, 181, 155, 0.05); /* Marrón pastel con 5% de opacidad */
+  --color-primary-10: rgba(209, 181, 155, 0.1); /* Marrón pastel con 10% de opacidad */
+  --color-primary-20: rgba(209, 181, 155, 0.2); /* Marrón pastel con 20% de opacidad */
+  --color-primary-30: rgba(209, 181, 155, 0.3); /* Marrón pastel con 30% de opacidad */
+  --color-primary-50: rgba(209, 181, 155, 0.5); /* Marrón pastel con 50% de opacidad */
+  
+  /* Opacidades para los nuevos colores marrones */
+  --color-brown-light-10: rgba(230, 220, 198, 0.1);
+  --color-brown-light-20: rgba(230, 220, 198, 0.2);
+  --color-brown-light-30: rgba(230, 220, 198, 0.3);
+  --color-brown-medium-10: rgba(209, 181, 155, 0.1);
+  --color-brown-medium-20: rgba(209, 181, 155, 0.2);
+  --color-brown-medium-30: rgba(209, 181, 155, 0.3);
 }
 
 @layer base {
@@ -44,7 +66,7 @@
   
   /* Selección de texto elegante */
   ::selection {
-    @apply bg-[var(--color-primary)] text-white;
+    @apply bg-[var(--color-brown-medium)] text-white;
   }
 }
 
@@ -75,6 +97,11 @@
     @apply bg-white rounded-none shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl border border-gray-100;
   }
 
+  .elegant-card-brown {
+    @apply bg-[var(--color-brown-light)] rounded-none shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl;
+    border: 1px solid var(--color-brown-medium);
+  }
+
   .shadow-text {
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
   }
@@ -88,13 +115,25 @@
   }
   
   .btn-primary {
-    @apply px-6 py-3 bg-[var(--color-primary)] text-white rounded-none font-medium hover:bg-[var(--color-primary-dark)] transition-colors duration-300 inline-block;
+    @apply px-6 py-3 bg-[var(--color-primary)] text-black rounded-none font-bold hover:bg-[var(--color-primary-dark)] transition-colors duration-300 inline-block;
     font-family: var(--font-body);
     letter-spacing: 0.05em;
   }
   
   .btn-secondary {
-    @apply px-6 py-3 border border-[var(--color-accent)] text-[var(--color-accent)] rounded-none font-medium hover:bg-[var(--color-accent)] hover:text-white transition-colors duration-300 inline-block;
+    @apply px-6 py-3 border border-[var(--color-accent)] text-black rounded-none font-bold hover:bg-[var(--color-accent)] hover:text-white transition-colors duration-300 inline-block;
+    font-family: var(--font-body);
+    letter-spacing: 0.05em;
+  }
+  
+  .btn-brown {
+    @apply px-6 py-3 bg-[var(--color-brown-medium)] text-white rounded-none font-medium hover:bg-[var(--color-brown-dark)] transition-colors duration-300 inline-block;
+    font-family: var(--font-body);
+    letter-spacing: 0.05em;
+  }
+
+  .btn-brown-outline {
+    @apply px-6 py-3 border border-[var(--color-brown-medium)] text-[var(--color-brown-medium)] rounded-none font-medium hover:bg-[var(--color-brown-light)] transition-colors duration-300 inline-block;
     font-family: var(--font-body);
     letter-spacing: 0.05em;
   }
@@ -107,6 +146,16 @@
   .section-elegant::before {
     content: '';
     @apply absolute top-0 left-1/2 w-1 h-10 bg-[var(--color-primary)] transform -translate-x-1/2;
+  }
+  
+  .section-gradient {
+    @apply relative;
+    background: var(--gradient-primary);
+  }
+
+  .section-gradient::before {
+    content: '';
+    @apply absolute inset-0 bg-[var(--gradient-secondary)] opacity-30;
   }
   
   /* Bordes decorativos */
@@ -127,7 +176,29 @@
   
   /* Patrones de fondo elegantes */
   .bg-pattern-subtle {
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23800020' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D1B59B' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  
+  .bg-brown-pattern {
+    background-image: url('/patterns/brown-pattern.svg');
+    background-size: 100px 100px;
+    background-repeat: repeat;
+  }
+  
+  .text-brown {
+    color: var(--color-brown-medium);
+  }
+
+  .text-brown-light {
+    color: var(--color-brown-light);
+  }
+
+  .border-brown {
+    border-color: var(--color-brown-medium);
+  }
+
+  .hover:bg-brown {
+    @apply hover:bg-[var(--color-brown-light)];
   }
 }
 

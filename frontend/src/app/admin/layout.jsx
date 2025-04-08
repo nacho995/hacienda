@@ -12,10 +12,9 @@ import {
   FaSignOutAlt,
   FaBars,
   FaTimes,
-  FaChartPie,
-  FaSpa
+  FaChartPie
 } from 'react-icons/fa';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 
 export default function AdminLayout({ children }) {
@@ -112,7 +111,6 @@ export default function AdminLayout({ children }) {
     { name: 'Dashboard', href: '/admin/dashboard', icon: <FaChartPie /> },
     { name: 'Reservaciones', href: '/admin/reservaciones', icon: <FaCalendarAlt /> },
     { name: 'Habitaciones', href: '/admin/habitaciones', icon: <FaBed /> },
-    { name: 'Masajes', href: '/admin/masajes', icon: <FaSpa /> },
     { name: 'Usuarios', href: '/admin/usuarios', icon: <FaUsers /> },
     { name: 'Configuración', href: '/admin/configuracion', icon: <FaCog /> },
   ];

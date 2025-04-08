@@ -240,8 +240,19 @@ export default function EventoReservationDetail({ params }) {
                 <div className="flex items-start gap-3">
                   <FaGlassCheers className="text-gray-500 mt-1" />
                   <div>
+                    <p className="text-sm text-gray-500">Nombre del Evento</p>
+                    <p className="font-medium">{reservation.nombreEvento || 'No especificado'}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <FaGlassCheers className="text-gray-500 mt-1" />
+                  <div>
                     <p className="text-sm text-gray-500">Tipo de Evento</p>
-                    <p className="font-medium">{reservation.tipoEvento}</p>
+                    <p className="font-medium">
+                      {typeof reservation.tipoEvento === 'object' 
+                        ? reservation.tipoEvento?.titulo || 'No especificado'
+                        : reservation.tipoEvento || 'No especificado'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">

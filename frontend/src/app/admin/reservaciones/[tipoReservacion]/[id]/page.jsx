@@ -1,17 +1,23 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getMasajeReservation, updateMasajeReservation, deleteMasajeReservation } from '@/services/reservationService';
-import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaHandPaper, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock } from 'react-icons/fa';
-import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
-import React from 'react';
+import Link from 'next/link';
+import { FaArrowLeft, FaSpinner } from 'react-icons/fa';
+import apiClient from '@/services/apiClient';
+import { 
+  updateHabitacionReservation, 
+  updateEventoReservation, 
+  updateMasajeReservation,
+  deleteHabitacionReservation,
+  deleteEventoReservation,
+  deleteMasajeReservation
+} from '@/services/reservationService';
 
-export default function MasajeReservationDetail({ params }) {
+export default function ReservationDetail({ params }) {
   const router = useRouter();
-  const id = React.use(params).id;
+  const { id, tipoReservacion } = params;
   const { user } = useAuth();
   
   const [reservation, setReservation] = useState(null);
@@ -22,39 +28,69 @@ export default function MasajeReservationDetail({ params }) {
   
   useEffect(() => {
     const fetchReservation = async () => {
-      if (!id) return;
+      if (!id || !tipoReservacion) return;
       
       setLoading(true);
       setError(null);
       try {
-        const response = await getMasajeReservation(id);
-        if (response && response.success && response.data) {
+        // Determinar el endpoint basado en el tipo de reservación
+        let endpoint;
+        switch (tipoReservacion) {
+          case 'habitacion':
+            endpoint = `/reservas/habitaciones/${id}`;
+            break;
+          case 'evento':
+            endpoint = `/reservas/eventos/${id}`;
+            break;
+          case 'masaje':
+            endpoint = `/reservas/masajes/${id}`;
+            break;
+          default:
+            throw new Error(`Tipo de reserva '${tipoReservacion}' no soportado`);
+        }
+        
+        // Hacer la petición
+        const response = await apiClient.get(endpoint);
+        
+        // Verificar la respuesta y establecer los datos
+        if (response?.data?.success && response.data.data) {
+          setReservation(response.data.data);
+        } else if (response?.data) {
           setReservation(response.data);
-        } else if (response && !response.error) {
-          if (response.data) {
-            setReservation(response.data);
-          } else {
-            setReservation(response);
-          }
         } else {
-          throw new Error(response?.message || 'Error al cargar los datos de la reserva');
+          throw new Error('Respuesta del servidor inesperada');
         }
       } catch (err) {
         console.error('Error fetching reservation:', err);
-        setError('No se pudo cargar la información de la reserva. Por favor, intenta de nuevo más tarde.');
+        setError(`No se pudo cargar la información de la reserva de ${tipoReservacion}. Por favor, intenta de nuevo más tarde.`);
       } finally {
         setLoading(false);
       }
     };
     
     fetchReservation();
-  }, [id]);
+  }, [id, tipoReservacion]);
   
   const handleStatusChange = async (newStatus) => {
     setUpdating(true);
     setStatusUpdated(false);
     try {
-      const response = await updateMasajeReservation(id, { estado: newStatus });
+      let response;
+      
+      switch (tipoReservacion) {
+        case 'habitacion':
+          response = await updateHabitacionReservation(id, { estado: newStatus });
+          break;
+        case 'evento':
+          response = await updateEventoReservation(id, { estado: newStatus });
+          break;
+        case 'masaje':
+          response = await updateMasajeReservation(id, { estado: newStatus });
+          break;
+        default:
+          throw new Error(`Tipo de reserva '${tipoReservacion}' no soportado para actualización`);
+      }
+      
       if (response && response.success) {
         toast.success(`Estado de la reserva cambiado a: ${newStatus}`);
         if (response.data) {
@@ -85,7 +121,22 @@ export default function MasajeReservationDetail({ params }) {
     
     setUpdating(true);
     try {
-      const response = await deleteMasajeReservation(id);
+      let response;
+      
+      switch (tipoReservacion) {
+        case 'habitacion':
+          response = await deleteHabitacionReservation(id);
+          break;
+        case 'evento':
+          response = await deleteEventoReservation(id);
+          break;
+        case 'masaje':
+          response = await deleteMasajeReservation(id);
+          break;
+        default:
+          throw new Error(`Tipo de reserva '${tipoReservacion}' no soportado para eliminación`);
+      }
+      
       if (response && response.success) {
         toast.success('Reserva eliminada exitosamente');
         router.push('/admin/reservaciones');
@@ -144,10 +195,65 @@ export default function MasajeReservationDetail({ params }) {
     return new Date(dateString).toLocaleDateString('es-ES', options);
   };
   
-  const formatTime = (timeString) => {
-    if (!timeString) return 'N/A';
-    
-    return timeString;
+  const getTipoReservacionTitle = () => {
+    switch (tipoReservacion) {
+      case 'habitacion':
+        return 'Habitación';
+      case 'evento':
+        return 'Evento';
+      case 'masaje':
+        return 'Masaje';
+      default:
+        return 'Reservación';
+    }
+  };
+  
+  // Función para renderizar detalles específicos según el tipo de reserva
+  const renderTipoDetails = () => {
+    switch (tipoReservacion) {
+      case 'habitacion':
+        return (
+          <div className="space-y-3">
+            <p><span className="font-medium">Tipo de Habitación:</span> {reservation.tipoHabitacion || 'No especificado'}</p>
+            <p><span className="font-medium">Fecha de Entrada:</span> {formatDate(reservation.fechaEntrada)}</p>
+            <p><span className="font-medium">Fecha de Salida:</span> {formatDate(reservation.fechaSalida)}</p>
+            <p><span className="font-medium">Número de Huéspedes:</span> {reservation.numHuespedes || 'No especificado'}</p>
+          </div>
+        );
+      case 'evento':
+        return (
+          <div className="space-y-3">
+            <p><span className="font-medium">Nombre del Evento:</span> {reservation.nombreEvento || 'No especificado'}</p>
+            <p><span className="font-medium">Tipo de Evento:</span> {
+              typeof reservation.tipoEvento === 'object' 
+                ? reservation.tipoEvento?.titulo || 'No especificado' 
+                : reservation.tipoEvento || 'No especificado'
+            }</p>
+            <p><span className="font-medium">Fecha del Evento:</span> {formatDate(reservation.fecha)}</p>
+            <p><span className="font-medium">Número de Invitados:</span> {reservation.numInvitados || 'No especificado'}</p>
+          </div>
+        );
+      case 'masaje':
+        return (
+          <div className="space-y-3">
+            <p><span className="font-medium">Tipo de Masaje:</span> {
+              typeof reservation.tipoMasaje === 'object' 
+                ? reservation.tipoMasaje?.titulo || 'No especificado' 
+                : reservation.tipoMasaje || 'No especificado'
+            }</p>
+            <p><span className="font-medium">Fecha del Masaje:</span> {formatDate(reservation.fecha)}</p>
+            <p><span className="font-medium">Duración:</span> {reservation.duracion || 'No especificado'} minutos</p>
+          </div>
+        );
+      default:
+        return (
+          <div className="space-y-3">
+            <p><span className="font-medium">Tipo de Reserva:</span> {tipoReservacion}</p>
+            <p><span className="font-medium">ID de Reserva:</span> {id}</p>
+            <p className="text-yellow-600">Esta reserva es de un tipo no estándar. Se muestran detalles limitados.</p>
+          </div>
+        );
+    }
   };
   
   return (
@@ -161,7 +267,7 @@ export default function MasajeReservationDetail({ params }) {
             <FaArrowLeft /> Volver
           </button>
           <h1 className="text-3xl font-[var(--font-display)] text-gray-800">
-            Detalles de la Reservación de Masaje
+            Detalles de la Reserva de {getTipoReservacionTitle()}
           </h1>
         </div>
         
@@ -234,84 +340,29 @@ export default function MasajeReservationDetail({ params }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-6">
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Información del Masaje</h3>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-start gap-3">
-                  <FaHandPaper className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Tipo de Masaje</p>
-                    <p className="font-medium">
-                      {typeof reservation.tipoMasaje === 'object' 
-                        ? reservation.tipoMasaje.titulo || 'No especificado' 
-                        : reservation.tipoMasaje || 'No especificado'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FaCalendarAlt className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Fecha</p>
-                    <p className="font-medium">{formatDate(reservation.fecha)}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FaClock className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Hora</p>
-                    <p className="font-medium">{formatTime(reservation.hora)}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FaClock className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Duración</p>
-                    <p className="font-medium">{reservation.duracion || 'No especificado'} minutos</p>
-                  </div>
-                </div>
+              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Información de la Reserva</h3>
+              <div className="mt-4 space-y-3">
+                {renderTipoDetails()}
               </div>
             </div>
             
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Información Financiera</h3>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-start gap-3">
-                  <FaMoneyBillWave className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Precio</p>
-                    <p className="font-medium">
-                      ${reservation.precio ? reservation.precio.toLocaleString('es-MX') : 'No especificado'}
-                    </p>
-                  </div>
+            {reservation.precio && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Información Financiera</h3>
+                <div className="mt-4 space-y-3">
+                  <p><span className="font-medium">Precio:</span> ${reservation.precio.toLocaleString('es-MX')}</p>
                 </div>
               </div>
-            </div>
+            )}
           </div>
           
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Información del Cliente</h3>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-start gap-3">
-                  <FaUserFriends className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Nombre</p>
-                    <p className="font-medium">{reservation.nombreContacto || reservation.nombre || ''} {reservation.apellidosContacto || reservation.apellidos || ''}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FaEnvelope className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-medium">{reservation.emailContacto || reservation.email || 'No especificado'}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FaPhone className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Teléfono</p>
-                    <p className="font-medium">{reservation.telefonoContacto || reservation.telefono || 'No especificado'}</p>
-                  </div>
-                </div>
+              <div className="mt-4 space-y-3">
+                <p><span className="font-medium">Nombre:</span> {reservation.nombreContacto || reservation.nombre || ''} {reservation.apellidosContacto || reservation.apellidos || ''}</p>
+                <p><span className="font-medium">Email:</span> {reservation.emailContacto || reservation.email || 'No especificado'}</p>
+                <p><span className="font-medium">Teléfono:</span> {reservation.telefonoContacto || reservation.telefono || 'No especificado'}</p>
               </div>
             </div>
             
@@ -319,10 +370,10 @@ export default function MasajeReservationDetail({ params }) {
               <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Acciones</h3>
               <div className="mt-4 space-y-3">
                 <Link 
-                  href={`/admin/reservaciones`}
+                  href={`/admin/reservaciones?tipo=${tipoReservacion}`}
                   className="block w-full bg-gray-200 text-gray-800 text-center py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
                 >
-                  Ver todas las reservaciones
+                  Ver todas las reservaciones de {getTipoReservacionTitle()}
                 </Link>
                 
                 <Link 

@@ -140,7 +140,7 @@ export default function ContactForm() {
           
           <ul className="space-y-8">
             <motion.li variants={itemAnimation} className="flex items-start space-x-4">
-              <div className="bg-[var(--color-primary)] text-white p-3 rounded-full">
+              <div className="bg-[var(--color-brown-medium)] text-white p-3 rounded-full">
                 <FaPhoneAlt />
               </div>
               <div>
@@ -151,7 +151,7 @@ export default function ContactForm() {
             </motion.li>
             
             <motion.li variants={itemAnimation} className="flex items-start space-x-4">
-              <div className="bg-[var(--color-primary)] text-white p-3 rounded-full">
+              <div className="bg-[var(--color-brown-medium)] text-white p-3 rounded-full">
                 <FaRegEnvelope />
               </div>
               <div>
@@ -162,7 +162,7 @@ export default function ContactForm() {
             </motion.li>
             
             <motion.li variants={itemAnimation} className="flex items-start space-x-4">
-              <div className="bg-[var(--color-primary)] text-white p-3 rounded-full">
+              <div className="bg-[var(--color-brown-medium)] text-white p-3 rounded-full">
                 <FaMapMarkerAlt />
               </div>
               <div>
@@ -173,7 +173,7 @@ export default function ContactForm() {
             </motion.li>
             
             <motion.li variants={itemAnimation} className="flex items-start space-x-4">
-              <div className="bg-[var(--color-primary)] text-white p-3 rounded-full">
+              <div className="bg-[var(--color-brown-medium)] text-white p-3 rounded-full">
                 <FaClock />
               </div>
               <div>
@@ -293,7 +293,7 @@ export default function ContactForm() {
                         name="fecha"
                         value={formState.fecha}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] outline-none transition-colors duration-300"
+                        className="w-full px-4 py-3 border border-gray-300 focus:border-[var(--color-brown-medium)] focus:ring-1 focus:ring-[var(--color-brown-medium)] outline-none transition-colors duration-300"
                       />
                     </div>
                   </div>
@@ -306,7 +306,7 @@ export default function ContactForm() {
                         name="tipoEvento"
                         value={formState.tipoEvento}
                         onChange={handleChange}
-                        className={`w-full px-4 py-3 border ${errors.tipoEvento ? 'border-red-500' : 'border-gray-300'} focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] outline-none transition-colors duration-300 bg-white`}
+                        className={`w-full px-4 py-3 border ${errors.tipoEvento ? 'border-red-500' : 'border-gray-300'} focus:border-[var(--color-brown-medium)] focus:ring-1 focus:ring-[var(--color-brown-medium)] outline-none transition-colors duration-300 bg-white`}
                       >
                         <option value="">Seleccionar tipo</option>
                         <option value="boda">Boda</option>
@@ -325,7 +325,7 @@ export default function ContactForm() {
                         name="invitados"
                         value={formState.invitados}
                         onChange={handleChange}
-                        className="w-full px-4 py-3 border border-gray-300 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] outline-none transition-colors duration-300 bg-white"
+                        className="w-full px-4 py-3 border border-gray-300 focus:border-[var(--color-brown-medium)] focus:ring-1 focus:ring-[var(--color-brown-medium)] outline-none transition-colors duration-300 bg-white"
                       >
                         <option value="">Seleccionar cantidad</option>
                         <option value="1-50">1-50 personas</option>
@@ -345,7 +345,7 @@ export default function ContactForm() {
                       value={formState.mensaje}
                       onChange={handleChange}
                       rows="4"
-                      className="w-full px-4 py-3 border border-gray-300 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] outline-none transition-colors duration-300"
+                      className="w-full px-4 py-3 border border-gray-300 focus:border-[var(--color-brown-medium)] focus:ring-1 focus:ring-[var(--color-brown-medium)] outline-none transition-colors duration-300"
                       placeholder="Cuéntanos más detalles sobre tu evento..."
                     ></textarea>
                   </div>
@@ -354,7 +354,7 @@ export default function ContactForm() {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className={`w-full px-8 py-4 bg-[var(--color-primary)] text-white font-medium text-lg uppercase tracking-wider hover:bg-[var(--color-primary-dark)] transition-colors duration-300 flex items-center justify-center ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                      className={`w-full px-8 py-4 bg-[var(--color-brown-medium)] text-black font-bold text-lg uppercase tracking-wider hover:bg-[var(--color-brown-dark)] transition-colors duration-300 flex items-center justify-center ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
                       {isSubmitting ? (
                         <>

@@ -1,6 +1,8 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Habitacion = require('../models/Habitacion');
+const { exec } = require('child_process');
+const path = require('path');
 
 // Mapeo de tipos de habitación a cantidad total disponible
 const tiposHabitacion = {
@@ -330,4 +332,41 @@ const seedHabitaciones = async () => {
   }
 };
 
-seedHabitaciones(); 
+console.log('Iniciando la carga de datos de habitaciones...');
+
+// Ruta a los archivos de seeder
+const tiposHabitacionSeeder = path.join(__dirname, '../seeders/tiposHabitacion.seeder.js');
+const habitacionesSeeder = path.join(__dirname, '../seeders/habitaciones.seeder.js');
+
+// Ejecutar el seeder de tipos de habitaciones
+console.log('Ejecutando seeder de tipos de habitaciones...');
+exec(`node ${tiposHabitacionSeeder}`, (error, stdout, stderr) => {
+  if (error) {
+    console.error(`Error al ejecutar el seeder de tipos de habitaciones: ${error.message}`);
+    return;
+  }
+  if (stderr) {
+    console.error(`stderr: ${stderr}`);
+    return;
+  }
+  
+  console.log(stdout);
+  console.log('Seeder de tipos de habitaciones ejecutado correctamente.');
+  
+  // Una vez que el seeder de tipos se ha ejecutado, ejecutar el seeder de habitaciones
+  console.log('Ejecutando seeder de habitaciones...');
+  exec(`node ${habitacionesSeeder}`, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error al ejecutar el seeder de habitaciones: ${error.message}`);
+      return;
+    }
+    if (stderr) {
+      console.error(`stderr: ${stderr}`);
+      return;
+    }
+    
+    console.log(stdout);
+    console.log('Seeder de habitaciones ejecutado correctamente.');
+    console.log('¡Carga de datos completada con éxito!');
+  });
+}); 

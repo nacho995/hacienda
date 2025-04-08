@@ -35,12 +35,6 @@ export const ENDPOINTS = {
     ASIGNAR: (id) => `/api/reservas/eventos/${id}/asignar`,
     DESASIGNAR: (id) => `/api/reservas/eventos/${id}/desasignar`,
   },
-  // Reservas de Masajes
-  RESERVAS_MASAJES: {
-    ALL: '/api/reservas/masajes',
-    SINGLE: (id) => `/api/reservas/masajes/${id}`,
-    DISPONIBILIDAD: '/api/reservas/masajes/disponibilidad',
-  },
 };
 
 // Opciones por defecto para fetch

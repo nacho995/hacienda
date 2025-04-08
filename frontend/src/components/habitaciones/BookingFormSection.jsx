@@ -15,7 +15,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 registerLocale('es', es);
 setDefaultLocale('es');
 
-export default function BookingFormSection({ selectedRoom, onSelectRoom, formData, setFormData }) {
+export default function BookingFormSection({ 
+  selectedRoom, 
+  selectedRooms = [], 
+  onSelectRoom, 
+  formData, 
+  setFormData, 
+  tipoReservacionForzado = null,
+  esReservaMultiple = false,
+  onTipoReservaChange = null,
+  ocultarOpcionesCategoriaHabitacion = false
+}) {
   const { user } = useAuth();
   const [isFormValid, setIsFormValid] = useState(false);
   const [showReservationSuccess, setShowReservationSuccess] = useState(false);
@@ -25,17 +35,55 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
   const [fechasOcupadas, setFechasOcupadas] = useState([]);
   const [fechaEntrada, setFechaEntrada] = useState(null);
   const [fechaSalida, setFechaSalida] = useState(null);
+  const [tipoReservacion, setTipoReservacion] = useState(tipoReservacionForzado || 'individual');
+  const [categoriaHabitacion, setCategoriaHabitacion] = useState('doble');
+  const [metodoPago, setMetodoPago] = useState('');
+  const [mostrarPago, setMostrarPago] = useState(false);
+  
+  // Precios predeterminados según categoría
+  const precioSencilla = 2400;
+  const precioDoble = 2600;
 
+  // Estado adicional para la confirmación de reserva múltiple
+  const [multipleReservationConfirmations, setMultipleReservationConfirmations] = useState([]);
+  const [currentRoomIndex, setCurrentRoomIndex] = useState(0);
+  const [processingMultipleRooms, setProcessingMultipleRooms] = useState(false);
+  
   // Efecto para actualizar formData cuando se selecciona una habitación
   useEffect(() => {
     if (selectedRoom) {
       setFormData(prev => ({
         ...prev,
         habitacion: selectedRoom._id,
-        tipoHabitacion: selectedRoom.tipo
+        tipoHabitacion: selectedRoom.tipo,
+        precioPorNoche: categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble
       }));
     }
-  }, [selectedRoom, setFormData]);
+  }, [selectedRoom, categoriaHabitacion, setFormData]);
+  
+  // Efecto para actualizar el precio cuando cambia la categoría
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      precioPorNoche: categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble,
+      categoriaHabitacion
+    }));
+  }, [categoriaHabitacion]);
+  
+  // Efecto para actualizar el tipo de reservación
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      tipoReservacion
+    }));
+  }, [tipoReservacion]);
+
+  // Efecto para forzar el tipo de reservación si se proporciona
+  useEffect(() => {
+    if (tipoReservacionForzado) {
+      setTipoReservacion(tipoReservacionForzado);
+    }
+  }, [tipoReservacionForzado]);
 
   // Cargar fechas ocupadas desde el backend
   useEffect(() => {
@@ -100,75 +148,128 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     );
   };
 
+  // Modificar handleSubmit para mostrar opciones de pago
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!isFormValid || isSubmitting) return;
     
+    // Validar que se ingresaron fechas de entrada y salida
+    if (!formData.fechaEntrada || !formData.fechaSalida) {
+      setReservationError('Por favor, seleccione fechas de entrada y salida');
+      return;
+    }
+    
+    // Si es reserva de tipo hotel, mostrar opciones de pago
+    if (tipoReservacion === 'individual') {
+      // Verificar que se ha seleccionado una habitación
+      if (esReservaMultiple && selectedRooms.length === 0) {
+        setReservationError('Por favor, seleccione al menos una habitación para reservar');
+        return;
+      } else if (!esReservaMultiple && !selectedRoom) {
+        setReservationError('Por favor, seleccione una habitación para reservar');
+        return;
+      }
+      
+      setMostrarPago(true);
+    } else {
+      // Para tipo evento, redirigir a la página de eventos con parámetros
+      const selectedRoomData = selectedRoom;
+      
+      if (!selectedRoomData) {
+        setReservationError('Habitación no encontrada');
+        return;
+      }
+      
+      // Crear datos de habitación para pasar a la página de eventos
+      const habitacionData = {
+        id: selectedRoomData._id || Math.random().toString(36).substr(2, 9),
+        nombre: selectedRoomData.nombre,
+        tipo: selectedRoomData.tipo,
+        fechaEntrada: formData.fechaEntrada,
+        fechaSalida: formData.fechaSalida,
+        precio: selectedRoomData.precio || (categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble),
+        numHuespedes: parseInt(formData.huespedes) || 1
+      };
+      
+      console.log('Datos de habitación para evento:', habitacionData);
+      
+      // Codificar datos para URL
+      const habitacionesParam = encodeURIComponent(JSON.stringify([habitacionData]));
+      
+      // Redirigir a la página de eventos
+      window.location.href = `/reservar?tipo=evento&habitaciones=${habitacionesParam}`;
+    }
+  };
+
+  // Procesar pago de la reserva
+  const procesarPago = async (metodo) => {
+    if (!formData.fechaEntrada || !formData.fechaSalida) {
+      setReservationError('Por favor, seleccione fechas de entrada y salida');
+      return;
+    }
+    
+    setMetodoPago(metodo);
     setIsSubmitting(true);
     setReservationError(null);
     
     try {
-      // Preparar datos para la API
-      const selectedRoomData = selectedRoom;
-      
-      if (!selectedRoomData) {
-        throw new Error('Habitación no encontrada');
-      }
-      
-      const fechaEntrada = new Date(formData.fechaEntrada);
-      const fechaSalida = new Date(formData.fechaSalida);
-      
-      // Calcular número de noches
-      const diferenciaMs = fechaSalida - fechaEntrada;
-      const numeroNoches = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
-      
-      // Calcular precio total
-      const precioTotal = selectedRoomData.precio * numeroNoches;
-      
-      // Crear objeto de reserva
-      const reservaData = {
-        usuario: user?._id || null, // El usuario puede estar autenticado o no
-        nombre: formData.nombre,
-        apellidos: formData.apellidos,
-        email: formData.email,
-        telefono: formData.telefono,
-        tipoHabitacion: selectedRoomData.tipo,
-        habitacion: selectedRoomData.nombre, // Asignamos el nombre específico de la habitación
-        numeroHabitaciones: 1,
-        fechaEntrada: formData.fechaEntrada,
-        fechaSalida: formData.fechaSalida,
-        numeroAdultos: parseInt(formData.huespedes) || 1,
-        numeroNinos: 0,
-        peticionesEspeciales: formData.mensaje || '',
-        precioTotal: precioTotal,
-        // Otros campos se completarán con valores por defecto en el backend
+      console.log('Procesando reserva con método:', metodo);
+      // Preparar los datos para enviar al backend
+      let reservaData = {
+        ...formData,
+        habitacion: selectedRoom?._id,
+        tipoHabitacion: selectedRoom?.tipo,
+        metodoPago: metodo,
+        tipoReservacion: tipoReservacion,
+        categoriaHabitacion: categoriaHabitacion,
+        precioPorNoche: categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble
       };
       
-      // Enviar a la API
-      const response = await createHabitacionReservation(reservaData);
-      
-      // Guardar confirmación
-      setReservationConfirmation(response);
-      
-      // Mostrar mensaje de éxito
-      setShowReservationSuccess(true);
-      
-      // Reset del formulario después de unos segundos
-      setTimeout(() => {
-        setFormData({
-          nombre: '',
-          apellidos: '',
-          email: '',
-          telefono: '',
-          fechaEntrada: '',
-          fechaSalida: '',
-          huespedes: 1,
-          habitacion: '',
-          mensaje: ''
-        });
-        onSelectRoom(null);
-      }, 5000);
+      // Si es reserva múltiple, preparar datos de todas las habitaciones
+      if (esReservaMultiple && selectedRooms.length > 0) {
+        console.log('Procesando reserva múltiple con', selectedRooms.length, 'habitaciones');
+        const reservas = [];
+        
+        for (const room of selectedRooms) {
+          const reservaIndividual = {
+            ...formData,
+            habitacion: room._id,
+            tipoHabitacion: room.tipo,
+            numeroHabitaciones: 1,
+            metodoPago: metodo,
+            tipoReservacion: tipoReservacion,
+            categoriaHabitacion: room.categoriaHabitacion || categoriaHabitacion,
+            precioPorNoche: room.precio || (room.categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble)
+          };
+          reservas.push(reservaIndividual);
+        }
+        
+        console.log('Datos de reservas múltiples:', reservas);
+        const response = await createMultipleReservaciones(reservas);
+        
+        if (response.success) {
+          setMultipleReservationConfirmations(response.data);
+          setShowReservationSuccess(true);
+          toast.success('Sus habitaciones han sido reservadas con éxito');
+        } else {
+          console.error('Error en la respuesta:', response);
+          setReservationError(response.message || 'Error al procesar su reserva');
+        }
+      } else {
+        // Reserva individual
+        console.log('Datos de reserva individual:', reservaData);
+        const response = await createReservacion(reservaData);
+        
+        if (response.success) {
+          setReservationConfirmation(response.data);
+          setShowReservationSuccess(true);
+          toast.success('Su habitación ha sido reservada con éxito');
+        } else {
+          console.error('Error en la respuesta:', response);
+          setReservationError(response.message || 'Error al procesar su reserva');
+        }
+      }
     } catch (error) {
       console.error('Error al crear la reserva:', error);
       setReservationError(error.message || 'Error al procesar su reserva. Por favor, inténtelo de nuevo.');
@@ -203,6 +304,20 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
     return true;
   };
 
+  // Nuevo manejador para sincronizar el tipo de reserva con el componente padre
+  const handleTipoReservacionChange = (tipo) => {
+    setTipoReservacion(tipo);
+    // Notificar al componente padre del cambio
+    if (typeof onTipoReservaChange === 'function') {
+      onTipoReservaChange(tipo);
+    }
+    // Actualizar formData
+    setFormData(prev => ({
+      ...prev,
+      tipoReservacion: tipo
+    }));
+  };
+
   return (
     <section id="reserva-form" className="py-16 bg-[var(--color-cream-light)]">
       <div className="container-custom">
@@ -215,137 +330,197 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
           <div className="bg-white shadow-lg p-8 md:p-10 border border-gray-100">
             {!selectedRoom ? (
               <div className="text-center py-10">
-                <p className="text-gray-600">Por favor, seleccione una habitación para continuar.</p>
+                <p className="text-gray-500">Seleccione una habitación para continuar con la reserva.</p>
               </div>
             ) : showReservationSuccess ? (
               <div className="text-center py-10">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <FaCheck className="text-green-600 text-2xl" />
+                <div className="flex justify-center mb-4">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-500">
+                    <FaCheck size={24} />
+                  </div>
                 </div>
-                <h3 className="text-2xl font-[var(--font-display)] text-[var(--color-accent)] mb-4">
-                  ¡Reserva Confirmada!
-                </h3>
-                {reservationConfirmation && (
-                  <div className="mb-6 p-4 bg-[var(--color-primary-5)] border border-[var(--color-primary-20)] rounded">
-                    <p className="font-medium mb-2">Número de confirmación:</p>
-                    <p className="text-xl font-bold text-[var(--color-primary)]">
-                      {reservationConfirmation.numeroConfirmacion || 'Pendiente'}
-                    </p>
+                <h3 className="text-2xl font-semibold text-[var(--color-primary)] mb-3">¡Reserva Confirmada!</h3>
+                <p className="text-gray-700 mb-6">Su reserva ha sido realizada con éxito.</p>
+                
+                {esReservaMultiple && multipleReservationConfirmations.length > 0 ? (
+                  <div className="mb-6">
+                    <h4 className="font-semibold mb-3 text-[var(--color-accent)]">Detalle de habitaciones reservadas</h4>
+                    <div className="space-y-4">
+                      {multipleReservationConfirmations.map((confirmacion, index) => (
+                        <div key={index} className="bg-gray-50 p-4 rounded-lg text-left">
+                          <p><span className="font-semibold">Habitación {index + 1}:</span> {selectedRooms[index]?.nombre || 'Habitación'}</p>
+                          <p><span className="font-semibold">Número de reserva:</span> {confirmacion?.numeroConfirmacion || confirmacion?._id || 'N/A'}</p>
+                          <p><span className="font-semibold">Fechas:</span> {new Date(formData.fechaEntrada).toLocaleDateString()} - {new Date(formData.fechaSalida).toLocaleDateString()}</p>
+                        </div>
+                      ))}
+                      <div className="bg-[var(--color-primary)]/10 p-4 rounded-lg text-left">
+                        <p className="font-semibold">Total habitaciones: {multipleReservationConfirmations.length}</p>
+                        <p><span className="font-semibold">Método de pago:</span> {metodoPago === 'tarjeta' ? 'Tarjeta de crédito/débito' : 'Efectivo al llegar'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4 text-left">
+                    <p><span className="font-semibold">Número de reserva:</span> {reservationConfirmation?.numeroConfirmacion || reservationConfirmation?._id || 'N/A'}</p>
+                    <p><span className="font-semibold">Habitación:</span> {selectedRoom?.nombre}</p>
+                    <p><span className="font-semibold">Fechas:</span> {new Date(formData.fechaEntrada).toLocaleDateString()} - {new Date(formData.fechaSalida).toLocaleDateString()}</p>
+                    <p><span className="font-semibold">Método de pago:</span> {metodoPago === 'tarjeta' ? 'Tarjeta de crédito/débito' : 'Efectivo al llegar'}</p>
                   </div>
                 )}
-                <p className="text-gray-600 max-w-md mx-auto mb-8">
-                  Gracias por su reserva. Hemos recibido su solicitud y nos pondremos en contacto con usted a la brevedad para confirmar los detalles.
+                
+                <p className="text-gray-600 text-sm">
+                  Hemos enviado un correo electrónico con los detalles de su reserva.
                 </p>
-                <button 
-                  onClick={() => setShowReservationSuccess(false)}
-                  className="btn-primary"
+              </div>
+            ) : mostrarPago ? (
+              <div className="py-10">
+                <h3 className="text-2xl font-semibold text-[var(--color-primary)] mb-6 text-center">Seleccione método de pago</h3>
+                
+                <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4 mb-6">
+                  <button
+                    onClick={() => procesarPago('tarjeta')}
+                    disabled={isSubmitting}
+                    className="flex-1 bg-white border border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-colors rounded-lg p-6 flex flex-col items-center"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="2" y="5" width="20" height="14" rx="2" />
+                      <line x1="2" y1="10" x2="22" y2="10" />
+                    </svg>
+                    <span className="font-semibold text-lg">Tarjeta de Crédito/Débito</span>
+                    <span className="text-sm mt-2">Pago seguro en línea</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => procesarPago('efectivo')}
+                    disabled={isSubmitting}
+                    className="flex-1 bg-white border border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-colors rounded-lg p-6 flex flex-col items-center"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="2" y="6" width="20" height="12" rx="2" />
+                      <circle cx="12" cy="12" r="4" />
+                    </svg>
+                    <span className="font-semibold text-lg">Pago en Efectivo</span>
+                    <span className="text-sm mt-2">Pago al llegar a la hacienda</span>
+                  </button>
+                </div>
+                
+                {isSubmitting && (
+                  <div className="text-center py-4">
+                    <FaSpinner className="mx-auto animate-spin text-[var(--color-brown-medium)]" size={30} />
+                    <p className="mt-2 text-gray-600">Procesando su reserva...</p>
+                  </div>
+                )}
+                
+                {reservationError && (
+                  <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+                    <p>{reservationError}</p>
+                  </div>
+                )}
+                
+                <button
+                  onClick={() => setMostrarPago(false)}
+                  className="text-gray-600 hover:text-[var(--color-primary)] text-center w-full mt-4"
                 >
-                  Realizar otra reserva
+                  Volver al formulario
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="mb-8 p-4 bg-[var(--color-primary-5)] border border-[var(--color-primary-20)] rounded-sm">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="relative w-full md:w-1/3 h-40 overflow-hidden">
-                      <Image 
-                        src={selectedRoom.imagen}
-                        alt={selectedRoom.nombre}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 100vw, 33vw"
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Tipo de Reservación */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Reservación</label>
+                  <div className="flex space-x-4">
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio text-[var(--color-primary)]"
+                        name="tipoReservacion"
+                        value="individual"
+                        checked={tipoReservacion === 'individual'}
+                        onChange={() => handleTipoReservacionChange('individual')}
                       />
-                    </div>
-                    <div className="md:w-2/3">
-                      <h3 className="font-[var(--font-display)] text-xl mb-2">
-                        {selectedRoom.nombre}
-                      </h3>
-                      <div className="text-[var(--color-primary)] font-semibold mb-2">
-                        ${selectedRoom.precio} <span className="text-sm font-normal text-gray-500">/ noche</span>
-                      </div>
-                      <div className="text-sm text-gray-600 mb-2">
-                        {selectedRoom.tamaño} | {selectedRoom.camas} | Máx. {selectedRoom.capacidad} personas
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        {selectedRoom.amenidades.slice(0, 4).map((amenidad, index) => (
-                          <div key={index} className="flex items-center">
-                            <FaCheck className="mr-2 text-xs text-[var(--color-primary)]" />
-                            {amenidad}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                      <span className="ml-2">Estancia Hotel</span>
+                    </label>
+                    <label className="inline-flex items-center">
+                      <input
+                        type="radio"
+                        className="form-radio text-[var(--color-primary)]"
+                        name="tipoReservacion"
+                        value="evento"
+                        checked={tipoReservacion === 'evento'}
+                        onChange={() => handleTipoReservacionChange('evento')}
+                      />
+                      <span className="ml-2">Con Evento</span>
+                    </label>
                   </div>
+                  {tipoReservacion === 'evento' && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Al reservar con evento, será redirigido a nuestro formulario de eventos.
+                    </p>
+                  )}
                 </div>
 
+                {/* Resto del formulario */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700">
-                      Nombre
-                    </label>
+                    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
                     <input
                       type="text"
                       id="nombre"
                       name="nombre"
                       value={formData.nombre}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
                       required
                     />
                   </div>
-
+                  
                   <div>
-                    <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700">
-                      Apellidos
-                    </label>
+                    <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
                     <input
                       type="text"
                       id="apellidos"
                       name="apellidos"
                       value={formData.apellidos}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                      Correo electrónico
-                    </label>
-                    <input 
-                      type="email" 
-                      id="email" 
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <label htmlFor="telefono" className="block text-sm font-medium text-gray-700">
-                      Teléfono
-                    </label>
-                    <input 
-                      type="tel" 
-                      id="telefono" 
-                      name="telefono"
-                      value={formData.telefono}
-                      onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
                       required
                     />
                   </div>
                 </div>
-
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Fechas de estancia
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      id="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                    <input
+                      type="tel"
+                      id="telefono"
+                      name="telefono"
+                      value={formData.telefono}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Entrada</label>
+                    <div className="relative">
                       <DatePicker
                         selected={fechaEntrada}
                         onChange={date => setFechaEntrada(date)}
@@ -355,83 +530,144 @@ export default function BookingFormSection({ selectedRoom, onSelectRoom, formDat
                         minDate={new Date()}
                         filterDate={esDisponible}
                         dateFormat="dd/MM/yyyy"
-                        placeholderText="Fecha de entrada"
-                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                        placeholderText="Seleccione fecha de entrada"
                         required
                       />
+                      <FaCalendarAlt className="absolute right-3 top-3 text-gray-400" />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Salida</label>
+                    <div className="relative">
                       <DatePicker
                         selected={fechaSalida}
                         onChange={date => setFechaSalida(date)}
                         selectsEnd
                         startDate={fechaEntrada}
                         endDate={fechaSalida}
-                        minDate={fechaEntrada}
+                        minDate={fechaEntrada || new Date()}
                         filterDate={esDisponible}
                         dateFormat="dd/MM/yyyy"
-                        placeholderText="Fecha de salida"
-                        className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                        placeholderText="Seleccione fecha de salida"
                         required
                       />
+                      <FaCalendarAlt className="absolute right-3 top-3 text-gray-400" />
                     </div>
                   </div>
-
-                  <div className="space-y-1">
-                    <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700">
-                      Número de huéspedes
-                    </label>
-                    <select 
-                      id="huespedes" 
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700 mb-1">Número de Huéspedes</label>
+                    <input
+                      type="number"
+                      id="huespedes"
                       name="huespedes"
+                      min="1"
+                      max="4"
                       value={formData.huespedes}
                       onChange={handleInputChange}
-                      className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
-                      required
-                    >
-                      {[...Array(selectedRoom.capacidad)].map((_, i) => (
-                        <option key={i+1} value={i+1}>{i+1} {i === 0 ? 'persona' : 'personas'}</option>
-                      ))}
-                    </select>
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                    />
                   </div>
+                  
+                  {!ocultarOpcionesCategoriaHabitacion ? (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Categoría de Habitación</label>
+                      <div className="flex space-x-4">
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            className="form-radio text-[var(--color-brown-medium)]"
+                            name="categoriaHabitacion"
+                            value="sencilla"
+                            checked={categoriaHabitacion === 'sencilla'}
+                            onChange={() => setCategoriaHabitacion('sencilla')}
+                          />
+                          <span className="ml-2">Sencilla (${precioSencilla}/noche)</span>
+                        </label>
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            className="form-radio text-[var(--color-brown-medium)]"
+                            name="categoriaHabitacion"
+                            value="doble"
+                            checked={categoriaHabitacion === 'doble'}
+                            onChange={() => setCategoriaHabitacion('doble')}
+                          />
+                          <span className="ml-2">Doble (${precioDoble}/noche)</span>
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Habitaciones Seleccionadas</label>
+                      <div className="px-4 py-2 border border-gray-200 rounded-md bg-gray-50">
+                        <p className="font-medium">{selectedRooms.length} habitación(es)</p>
+                        <p className="text-sm text-gray-600">
+                          Total: ${selectedRooms.reduce((total, room) => total + parseFloat(room.precio || 0), 0).toFixed(2)}
+                        </p>
+                        {selectedRooms.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <div className="max-h-24 overflow-y-auto text-sm">
+                              {selectedRooms.map((room, index) => (
+                                <div key={index} className="flex justify-between py-1">
+                                  <div className="text-gray-700">{room.nombre}</div>
+                                  <div className="text-gray-900 font-medium">${parseFloat(room.precio || 0).toFixed(2)}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700">
-                    Peticiones especiales (opcional)
-                  </label>
+                
+                <div>
+                  <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700 mb-1">Solicitudes Especiales</label>
                   <textarea
                     id="mensaje"
                     name="mensaje"
-                    rows="4"
+                    rows="3"
                     value={formData.mensaje}
                     onChange={handleInputChange}
-                    className="w-full p-2 border border-gray-300 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                    placeholder="Indique cualquier solicitud especial o comentario"
                   ></textarea>
                 </div>
-
-                {reservationError && (
-                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded">
-                    {reservationError}
+                
+                <div className="mt-4">
+                  <button
+                    type="submit"
+                    disabled={!isFormValid || isSubmitting}
+                    className={`w-full py-3 px-6 rounded-lg text-black font-bold transition-colors ${
+                      isFormValid ? 'bg-[var(--color-brown-medium)] hover:bg-[var(--color-brown-dark)]' : 'bg-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {tipoReservacion === 'individual' ? (
+                      'Continuar a Pago'
+                    ) : (
+                      'Continuar a Reserva de Evento'
+                    )}
+                  </button>
+                </div>
+                
+                {isSubmitting && (
+                  <div className="text-center py-4">
+                    <FaSpinner className="mx-auto animate-spin text-[var(--color-brown-medium)]" size={30} />
+                    <p className="mt-2 text-gray-600">Procesando su solicitud...</p>
                   </div>
                 )}
-
-                <button
-                  type="submit"
-                  disabled={!isFormValid || isSubmitting}
-                  className={`w-full py-4 font-medium tracking-wide transition-colors duration-300 ${
-                    isFormValid && !isSubmitting
-                      ? 'bg-[var(--color-accent)] text-white hover:bg-[var(--color-primary)]'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center">
-                      <FaSpinner className="animate-spin mr-2" />
-                      Procesando...
-                    </span>
-                  ) : (
-                    'Confirmar Reserva'
-                  )}
-                </button>
+                
+                {reservationError && (
+                  <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
+                    <p>{reservationError}</p>
+                  </div>
+                )}
               </form>
             )}
           </div>

@@ -233,10 +233,35 @@ export default function HabitacionReservationDetail({ params }) {
                 <div className="flex items-start gap-3">
                   <FaBed className="text-gray-500 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Tipo de Habitación</p>
-                    <p className="font-medium">{reservation.tipoHabitacion || 'No especificado'}</p>
+                    <p className="text-sm text-gray-500">Descripción de Habitación</p>
+                    <p className="font-medium">
+                      {[
+                        typeof reservation.tipoHabitacion === 'object' 
+                          ? reservation.tipoHabitacion?.nombre 
+                          : reservation.tipoHabitacion,
+                        reservation.habitacion?.nombre || reservation.habitacion
+                      ].filter(Boolean).join(' - ') || 'No especificado'}
+                    </p>
                   </div>
                 </div>
+                {reservation.nombre && (
+                  <div className="flex items-start gap-3">
+                    <FaBed className="text-gray-500 mt-1" />
+                    <div>
+                      <p className="text-sm text-gray-500">Nombre de la Habitación</p>
+                      <p className="font-medium">{reservation.nombre}</p>
+                    </div>
+                  </div>
+                )}
+                {reservation.numeroHabitaciones && reservation.numeroHabitaciones > 1 && (
+                  <div className="flex items-start gap-3">
+                    <FaBed className="text-gray-500 mt-1" />
+                    <div>
+                      <p className="text-sm text-gray-500">Número de Habitaciones</p>
+                      <p className="font-medium">{reservation.numeroHabitaciones}</p>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-start gap-3">
                   <FaCalendarAlt className="text-gray-500 mt-1" />
                   <div>

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import authService from '@/services/authService';
+import authService from '../services/authService';
 
 // Crear el contexto
 const AuthContext = createContext();

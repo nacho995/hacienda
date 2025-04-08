@@ -7,9 +7,9 @@ const errorHandler = require('./middleware/error');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const tipoEventoRoutes = require('./routes/tipoEvento.routes');
-const tipoMasajeRoutes = require('./routes/tipoMasaje.routes');
 const reservaRoutes = require('./routes/reserva.routes');
 const habitacionRoutes = require('./routes/habitacion.routes');
+const tipoHabitacionRoutes = require('./routes/tipoHabitacion.routes');
 const configRoutes = require('./routes/config.routes');
 
 const app = express();
@@ -37,9 +37,9 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tipos-evento', tipoEventoRoutes);
-app.use('/api/tipos-masaje', tipoMasajeRoutes);
 app.use('/api/reservas', reservaRoutes);
 app.use('/api/habitaciones', habitacionRoutes);
+app.use('/api/tipos-habitacion', tipoHabitacionRoutes);
 app.use('/api/config', configRoutes);
 
 // Ruta para comprobar estado del servidor

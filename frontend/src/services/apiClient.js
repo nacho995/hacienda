@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Determinar la URL base según el entorno
 console.log('Valor de la variable de entorno NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 console.log('API Base URL configurada:', BASE_URL);
 

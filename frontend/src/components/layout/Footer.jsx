@@ -131,15 +131,7 @@ export default function Footer() {
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
                     <FaChevronRight className="text-white text-[10px]" />
                   </div>
-                  <span className="font-medium">Habitaciones</span>
-                </Link>
-              </li>
-              <li className="text-white/90 hover:text-white transition-all duration-200 group">
-                <Link href="/masajes" className="flex items-center group-hover:translate-x-2 transition-transform duration-300">
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center mr-3 shadow-md ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
-                    <FaChevronRight className="text-white text-[10px]" />
-                  </div>
-                  <span className="font-medium">Bienestar</span>
+                  <span className="font-medium">Hotel</span>
                 </Link>
               </li>
               <li className="text-white/90 hover:text-white transition-all duration-200 group">
@@ -218,11 +210,11 @@ export default function Footer() {
           
           <div className="flex flex-col md:flex-row items-center justify-center md:justify-between relative z-10">
             <div className="text-2xl md:text-3xl font-[var(--font-display)] font-light mb-8 md:mb-0 text-center md:text-left perspective-[1000px] transform-style-preserve-3d">
-              ¿Planeas un <span className="font-bold transform-style-preserve-3d" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-primary)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px #8B0000, -1px -1px 0px #FFDBDB", transform: "translateZ(20px)", display: "inline-block"}}>evento inolvidable</span>?
+              ¿Planeas un <span className="font-bold transform-style-preserve-3d" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px var(--color-brown-dark), -1px -1px 0px var(--color-brown-light)", transform: "translateZ(20px)", display: "inline-block"}}>evento inolvidable</span>?
             </div>
             <Link 
               href="/contact" 
-              className="px-8 py-4 bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-dark)] text-white uppercase tracking-wider text-sm hover:from-[var(--color-primary-dark)] hover:to-[var(--color-primary)] border border-white/10 hover:border-white/30 transition-all duration-300 transform hover:scale-105 shadow-lg rounded-sm flex items-center group"
+              className="px-8 py-4 bg-gradient-to-r from-[var(--color-brown-medium)] to-[var(--color-brown-dark)] text-black font-bold uppercase tracking-wider text-sm hover:from-[var(--color-brown-dark)] hover:to-[var(--color-brown-medium)] border border-white/10 hover:border-white/30 transition-all duration-300 transform hover:scale-105 shadow-lg rounded-sm flex items-center group"
             >
               <span className="mr-2">Contáctanos</span>
               <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform duration-300" fill="currentColor" viewBox="0 0 20 20">

@@ -5,7 +5,10 @@ const Habitacion = require('../models/Habitacion');
 // @access  Public
 exports.obtenerHabitaciones = async (req, res) => {
   try {
-    const habitaciones = await Habitacion.find();
+    const habitaciones = await Habitacion.find().populate({
+      path: 'tipoHabitacion',
+      strictPopulate: false
+    });
     
     res.status(200).json({
       success: true,
@@ -26,7 +29,10 @@ exports.obtenerHabitaciones = async (req, res) => {
 // @access  Public
 exports.obtenerHabitacion = async (req, res) => {
   try {
-    const habitacion = await Habitacion.findById(req.params.id);
+    const habitacion = await Habitacion.findById(req.params.id).populate({
+      path: 'tipoHabitacion',
+      strictPopulate: false
+    });
     
     if (!habitacion) {
       return res.status(404).json({
@@ -80,7 +86,10 @@ exports.actualizarHabitacion = async (req, res) => {
         new: true,
         runValidators: true
       }
-    );
+    ).populate({
+      path: 'tipoHabitacion',
+      strictPopulate: false
+    });
     
     if (!habitacion) {
       return res.status(404).json({

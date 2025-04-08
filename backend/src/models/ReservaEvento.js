@@ -1,8 +1,79 @@
 const mongoose = require('mongoose');
 const baseReservaSchema = require('./BaseReserva');
 
-// Crear un nuevo esquema que extiende del base
-const reservaEventoSchema = baseReservaSchema.clone().add({
+// Definir el esquema de ReservaEvento directamente, incorporando los campos del esquema base
+const reservaEventoSchema = new mongoose.Schema({
+  // Campos del esquema base
+  usuario: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false
+  },
+  asignadoA: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  nombreContacto: {
+    type: String,
+    required: [true, 'Por favor, proporcione un nombre de contacto']
+  },
+  apellidosContacto: {
+    type: String,
+    required: [true, 'Por favor, proporcione los apellidos del contacto']
+  },
+  emailContacto: {
+    type: String,
+    required: [true, 'Por favor, proporcione un email de contacto'],
+    match: [
+      /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
+      'Por favor, proporcione un email válido'
+    ]
+  },
+  telefonoContacto: {
+    type: String,
+    required: [true, 'Por favor, proporcione un teléfono de contacto']
+  },
+  fecha: {
+    type: Date,
+    required: [true, 'Por favor, seleccione una fecha']
+  },
+  estadoReserva: {
+    type: String,
+    enum: ['pendiente', 'confirmada', 'pagada', 'cancelada', 'completada'],
+    default: 'pendiente'
+  },
+  numeroConfirmacion: {
+    type: String,
+    unique: true
+  },
+  precio: {
+    type: Number,
+    required: true
+  },
+  metodoPago: {
+    type: String,
+    enum: ['tarjeta', 'transferencia', 'efectivo', 'pendiente'],
+    default: 'pendiente'
+  },
+  adelanto: {
+    type: Number,
+    default: 0
+  },
+  peticionesEspeciales: {
+    type: String,
+    maxlength: [500, 'Las peticiones especiales no pueden tener más de 500 caracteres']
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  },
+
+  // Campos específicos de ReservaEvento
   tipoReserva: {
     type: String,
     default: 'Evento',
@@ -44,10 +115,36 @@ const reservaEventoSchema = baseReservaSchema.clone().add({
     habitaciones: [{
       tipo: String,
       noches: Number,
-      precio: Number
+      precio: Number,
+      reservaHabitacionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ReservaHabitacion'
+      }
     }]
   }
+}, {
+  timestamps: true
 });
+
+// Método para generar número de confirmación
+reservaEventoSchema.pre('save', async function(next) {
+  if (!this.numeroConfirmacion) {
+    const prefix = 'E'; // E para Evento
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    this.numeroConfirmacion = `${prefix}${timestamp}${random}`;
+    console.log(`Número de confirmación generado: ${this.numeroConfirmacion}`);
+  }
+  next();
+});
+
+// Copiar métodos estáticos del BaseReserva
+reservaEventoSchema.statics.validarFecha = baseReservaSchema.statics.validarFecha;
+reservaEventoSchema.statics.validarRangoFechas = baseReservaSchema.statics.validarRangoFechas;
+reservaEventoSchema.statics.convertirHoraAMinutos = baseReservaSchema.statics.convertirHoraAMinutos;
+reservaEventoSchema.statics.haySolapamiento = baseReservaSchema.statics.haySolapamiento;
+reservaEventoSchema.statics.obtenerReservasEnFecha = baseReservaSchema.statics.obtenerReservasEnFecha;
+reservaEventoSchema.statics.validarHorarioComercial = baseReservaSchema.statics.validarHorarioComercial;
 
 // Método estático para comprobar disponibilidad
 reservaEventoSchema.statics.comprobarDisponibilidad = async function(fecha, espacio, horaInicio, horaFin) {

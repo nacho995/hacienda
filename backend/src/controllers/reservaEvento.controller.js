@@ -1,7 +1,6 @@
 const ReservaEvento = require('../models/ReservaEvento');
 const User = require('../models/User');
 const TipoEvento = require('../models/TipoEvento');
-const ReservaMasaje = require('../models/ReservaMasaje');
 const ReservaHabitacion = require('../models/ReservaHabitacion');
 const mongoose = require('mongoose');
 const sendEmail = require('../utils/email');
@@ -81,11 +80,6 @@ exports.crearReservaEvento = async (req, res) => {
       peticionesEspeciales: peticionesEspeciales || '',
       presupuestoEstimado: presupuestoEstimado || 0,
       serviciosAdicionales: {
-        masajes: req.body.serviciosAdicionales?.masajes?.map(masaje => ({
-          tipo: masaje.titulo,
-          duracion: parseInt(masaje.duracion),
-          precio: parseFloat(masaje.precio)
-        })) || [],
         habitaciones: req.body.serviciosAdicionales?.habitaciones?.map(habitacion => ({
           tipoHabitacion: habitacion.tipoHabitacion,
           nombre: habitacion.nombre,
@@ -139,91 +133,6 @@ exports.crearReservaEvento = async (req, res) => {
 
     // Crear la reserva del evento
     const reservaEvento = await ReservaEvento.create(reservaData);
-
-    // Si hay masajes seleccionados, crear las reservas de masajes
-    if (req.body.serviciosAdicionales?.masajes?.length > 0) {
-      console.log('Procesando masajes:', JSON.stringify(req.body.serviciosAdicionales.masajes));
-      
-      try {
-        // Procesar los masajes uno por uno en secuencia con mejor manejo de errores
-        for (const masaje of req.body.serviciosAdicionales.masajes) {
-          try {
-            // Validar que tipoMasaje y precio estén presentes y sean válidos
-            if (!masaje.tipoMasaje) {
-              console.error('Error: masaje sin tipoMasaje', masaje);
-              throw new Error('El tipo de masaje es requerido');
-            }
-            
-            // Asegurarse que el precio es un número válido
-            let precio;
-            try {
-              precio = parseFloat(masaje.precio);
-              if (isNaN(precio) || precio <= 0) {
-                precio = 0; // Valor por defecto para evitar error
-                console.error('Error: precio del masaje inválido, estableciendo default', { 
-                  precio: masaje.precio,
-                  parseado: precio,
-                  masaje: JSON.stringify(masaje)
-                });
-              }
-            } catch (error) {
-              precio = 0; // Valor por defecto para evitar error
-              console.error('Error al parsear precio:', error);
-            }
-            
-            console.log('Creando reserva de masaje con datos:', {
-              tipoMasaje: masaje.tipoMasaje,
-              duracion: ajustarDuracionValida(parseInt(masaje.duracion || 60)),
-              hora: masaje.hora || horaInicio,
-              fecha: masaje.fecha || fecha,
-              precio
-            });
-            
-            // Crear el documento de reserva de masaje
-            const nuevoMasaje = {
-              tipoMasaje: masaje.tipoMasaje,
-              duracion: ajustarDuracionValida(parseInt(masaje.duracion || 60)),
-              hora: masaje.hora || horaInicio || '10:00',
-              fecha: masaje.fecha || fecha || new Date().toISOString().split('T')[0],
-              nombreContacto: nombreContacto || '',
-              apellidosContacto: apellidosContacto || '',
-              emailContacto: emailContacto || '',
-              telefonoContacto: telefonoContacto || '',
-              precio: precio || 0, // Usar precio validado o 0 como fallback
-              reservaEvento: reservaEvento._id,
-              tipoReserva: 'Masaje' // Establecer explícitamente el discriminador
-            };
-            
-            // Verificar que todos los campos de texto necesarios estén definidos para evitar errores de charAt()
-            Object.keys(nuevoMasaje).forEach(key => {
-              // Si el valor es undefined o null y esperamos una cadena, asignar una cadena vacía
-              if ((nuevoMasaje[key] === undefined || nuevoMasaje[key] === null) && 
-                 (key === 'hora' || key === 'fecha' || key === 'nombreContacto' || 
-                  key === 'apellidosContacto' || key === 'emailContacto' || key === 'telefonoContacto')) {
-                console.log(`Campo ${key} indefinido, asignando valor por defecto`);
-                nuevoMasaje[key] = '';
-              }
-            });
-            
-            console.log('Objeto masaje validado antes de crear:', nuevoMasaje);
-            
-            // Crear el masaje y esperar a que se complete antes de continuar con el siguiente
-            await ReservaMasaje.create(nuevoMasaje);
-            console.log('✅ Masaje creado correctamente');
-            
-          } catch (masajeError) {
-            console.error('Error al procesar masaje individual:', masajeError);
-            console.error('Stack trace:', masajeError.stack);
-            // Continuar con el siguiente masaje en lugar de detener todo el proceso
-            // pero registramos un error detallado para diagnóstico
-          }
-        }
-      } catch (masajesError) {
-        console.error('Error al procesar grupo de masajes:', masajesError);
-        console.error('Stack trace:', masajesError.stack);
-        throw new Error(`Error al crear masajes: ${masajesError.message}`);
-      }
-    }
 
     // Si hay habitaciones seleccionadas, crear las reservas de habitaciones
     if (req.body.serviciosAdicionales?.habitaciones?.length > 0) {
@@ -404,9 +313,20 @@ exports.obtenerReservasEvento = async (req, res) => {
     
     // Ejecutar la consulta
     const reservas = await ReservaEvento.find(query)
-      .populate('usuario', 'nombre apellidos email telefono')
-      .populate('tipoEvento', 'titulo descripcion imagen')
-      .populate('asignadoA', 'nombre apellidos email')
+      .populate({
+        path: 'usuario',
+        select: 'nombre apellidos email telefono',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'asignadoA',
+        select: 'nombre apellidos email',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'tipoEvento',
+        strictPopulate: false
+      })
       .sort({ fecha: 1, horaInicio: 1 });
       
     res.status(200).json({
@@ -432,8 +352,20 @@ exports.obtenerReservasEvento = async (req, res) => {
 exports.obtenerReservaEvento = async (req, res) => {
   try {
     const reserva = await ReservaEvento.findById(req.params.id)
-      .populate('usuario', 'nombre apellidos email telefono')
-      .populate('asignadoA', 'nombre apellidos email');
+      .populate({
+        path: 'usuario',
+        select: 'nombre apellidos email telefono',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'asignadoA',
+        select: 'nombre apellidos email',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'tipoEvento',
+        strictPopulate: false
+      });
       
     if (!reserva) {
       return res.status(404).json({
@@ -551,8 +483,18 @@ exports.actualizarReservaEvento = async (req, res) => {
         new: true,
         runValidators: true
       }
-    ).populate('usuario', 'nombre apellidos email telefono')
-     .populate('asignadoA', 'nombre apellidos email');
+    ).populate({
+      path: 'usuario',
+      select: 'nombre apellidos email telefono',
+      strictPopulate: false
+    }).populate({
+      path: 'asignadoA',
+      select: 'nombre apellidos email',
+      strictPopulate: false
+    }).populate({
+      path: 'tipoEvento',
+      strictPopulate: false
+    });
     
     console.log('Evento actualizado correctamente:', req.params.id);
     
@@ -612,55 +554,100 @@ exports.eliminarReservaEvento = async (req, res) => {
 };
 
 /**
- * @desc    Comprobar disponibilidad de espacios para eventos
+ * @desc    Comprobar disponibilidad de eventos
  * @route   POST /api/reservas/eventos/disponibilidad
  * @access  Public
  */
-exports.comprobarDisponibilidadEvento = async (req, res) => {
+exports.checkEventoAvailability = async (req, res) => {
   try {
-    const { fecha, espacio, horaInicio, horaFin } = req.body;
+    const { fecha, espacioSeleccionado, horaInicio, horaFin } = req.body;
     
-    // Verificar todos los parámetros requeridos
-    if (!fecha || !horaInicio || !horaFin) {
+    if (!fecha || !espacioSeleccionado) {
       return res.status(400).json({
         success: false,
         disponible: false,
-        mensaje: 'Por favor proporciona fecha, hora de inicio y hora de fin'
+        mensaje: 'Debe proporcionar fecha y espacio seleccionado'
       });
     }
     
-    // Si no se especifica el espacio, usar el predeterminado
-    const espacioSeleccionado = espacio || 'jardin';
-    
-    // Verificar que el espacio sea válido
-    if (!['salon', 'jardin', 'terraza'].includes(espacioSeleccionado)) {
-      return res.status(400).json({
-        success: false,
-        disponible: false,
-        mensaje: 'Espacio no válido. Los espacios válidos son: salon, jardin, terraza'
-      });
-    }
-    
-    // Verificar disponibilidad
+    // Comprobar disponibilidad
     const disponible = await ReservaEvento.comprobarDisponibilidad(
       fecha,
       espacioSeleccionado,
-      horaInicio,
-      horaFin
+      horaInicio || '12:00',
+      horaFin || '18:00'
     );
     
-    // Enviar respuesta con formato consistente
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      disponible: disponible,
-      mensaje: disponible ? 'El espacio está disponible' : 'El espacio no está disponible para la fecha y hora seleccionadas'
+      disponible,
+      mensaje: disponible 
+        ? 'El espacio está disponible para la fecha y hora seleccionadas'
+        : 'El espacio no está disponible para la fecha y hora seleccionadas'
     });
   } catch (error) {
     console.error('Error al comprobar disponibilidad de evento:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       disponible: false,
-      mensaje: error.message || 'Error al comprobar disponibilidad'
+      mensaje: 'Error al comprobar disponibilidad: ' + error.message
+    });
+  }
+};
+
+/**
+ * @desc    Obtener fechas ocupadas para eventos
+ * @route   GET /api/reservas/eventos/fechas-ocupadas
+ * @access  Public
+ */
+exports.getEventoOccupiedDates = async (req, res) => {
+  try {
+    // Parámetros opcionales para filtrar por espacio y fechas
+    const { espacioSeleccionado, fechaInicio, fechaFin } = req.query;
+    
+    // Construir el query
+    const query = {
+      estadoReserva: { $ne: 'cancelada' }
+    };
+    
+    // Si se especifica un espacio, filtrar por él
+    if (espacioSeleccionado) {
+      query.espacioSeleccionado = espacioSeleccionado;
+    }
+    
+    // Si hay fechas de inicio y fin, filtrar el rango
+    if (fechaInicio && fechaFin) {
+      const fechaInicioObj = new Date(fechaInicio);
+      const fechaFinObj = new Date(fechaFin);
+      
+      query.fecha = {
+        $gte: fechaInicioObj,
+        $lte: fechaFinObj
+      };
+    }
+    
+    // Proyectar solo los campos necesarios
+    const reservas = await ReservaEvento.find(query, 'fecha horaInicio horaFin espacioSeleccionado')
+      .sort({ fecha: 1, horaInicio: 1 });
+    
+    // Preparar datos para el frontend
+    const fechasOcupadas = reservas.map(reserva => ({
+      fecha: reserva.fecha,
+      horaInicio: reserva.horaInicio,
+      horaFin: reserva.horaFin,
+      espacioSeleccionado: reserva.espacioSeleccionado
+    }));
+    
+    res.status(200).json({
+      success: true,
+      data: fechasOcupadas
+    });
+  } catch (error) {
+    console.error('Error al obtener fechas ocupadas de eventos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'No se pudieron obtener las fechas ocupadas',
+      error: error.message
     });
   }
 };
@@ -668,9 +655,9 @@ exports.comprobarDisponibilidadEvento = async (req, res) => {
 /**
  * @desc    Asignar reserva de evento a un usuario
  * @route   PUT /api/reservas/eventos/:id/asignar
- * @access  Private/Admin
+ * @access  Private
  */
-exports.asignarReservaEvento = async (req, res) => {
+exports.assignReservaEvento = async (req, res) => {
   try {
     const { usuarioId } = req.body;
     
@@ -718,148 +705,312 @@ exports.asignarReservaEvento = async (req, res) => {
 };
 
 /**
- * @desc    Asignar una reserva a un usuario
- * @route   PUT /api/reservas/eventos/:id/asignar
- * @access  Private
- */
-exports.asignarReserva = async (req, res) => {
-  try {
-    const reserva = await ReservaEvento.findById(req.params.id);
-
-    if (!reserva) {
-      return res.status(404).json({
-        success: false,
-        message: 'Reserva no encontrada'
-      });
-    }
-
-    // Asignar al usuario actual
-    reserva.asignadoA = req.user.id;
-    await reserva.save();
-
-    res.status(200).json({
-      success: true,
-      data: reserva,
-      message: 'Reserva asignada exitosamente'
-    });
-  } catch (error) {
-    console.error('Error al asignar reserva:', error);
-    res.status(500).json({
-      success: false,
-      message: 'No se pudo asignar la reserva',
-      error: error.message
-    });
-  }
-};
-
-/**
- * @desc    Desasignar una reserva
+ * @desc    Desasignar una reserva de evento
  * @route   PUT /api/reservas/eventos/:id/desasignar
  * @access  Private
  */
-exports.desasignarReserva = async (req, res) => {
+exports.unassignReservaEvento = async (req, res) => {
   try {
+    // Buscar la reserva
     const reserva = await ReservaEvento.findById(req.params.id);
-
+    
     if (!reserva) {
       return res.status(404).json({
         success: false,
-        message: 'Reserva no encontrada'
+        message: 'No se encontró la reserva con ese ID'
       });
     }
-
-    // Verificar que el usuario actual es quien tiene asignada la reserva
-    if (reserva.asignadoA && reserva.asignadoA.toString() !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permiso para desasignar esta reserva'
-      });
-    }
-
+    
     // Desasignar reserva
     reserva.asignadoA = null;
     await reserva.save();
-
+    
     res.status(200).json({
       success: true,
       data: reserva,
-      message: 'Reserva desasignada exitosamente'
+      message: 'Reserva de evento desasignada exitosamente'
     });
   } catch (error) {
-    console.error('Error al desasignar reserva:', error);
+    console.error('Error al desasignar la reserva de evento:', error);
     res.status(500).json({
       success: false,
-      message: 'No se pudo desasignar la reserva',
+      message: 'Error al desasignar la reserva de evento',
       error: error.message
     });
   }
 };
 
 /**
- * @desc    Obtener fechas ocupadas para eventos
- * @route   GET /api/reservas/eventos/fechas-ocupadas
- * @access  Public
+ * @desc    Obtener todas las habitaciones asignadas a un evento
+ * @route   GET /api/reservas/eventos/:id/habitaciones
+ * @access  Private
  */
-exports.obtenerFechasOcupadas = async (req, res) => {
+exports.obtenerHabitacionesEvento = async (req, res) => {
   try {
-    // Parámetros opcionales para filtrar por espacio y fechas
-    const { espacioSeleccionado, fechaInicio, fechaFin } = req.query;
+    const eventoId = req.params.id;
     
-    // Construir el query
-    const query = {
-      estadoReserva: { $ne: 'cancelada' }
-    };
-    
-    // Si se especifica un espacio, filtrar por él
-    if (espacioSeleccionado) {
-      query.espacioSeleccionado = espacioSeleccionado;
+    // Validar que el ID sea válido para MongoDB
+    if (!eventoId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de evento no válido'
+      });
     }
     
-    // Si hay fechas de inicio y fin, filtrar el rango
-    if (fechaInicio && fechaFin) {
-      query.fecha = {
-        $gte: new Date(fechaInicio),
-        $lte: new Date(fechaFin)
-      };
-    } else if (fechaInicio) {
-      // Solo hay fecha de inicio
-      query.fecha = { $gte: new Date(fechaInicio) };
-    } else if (fechaFin) {
-      // Solo hay fecha de fin
-      query.fecha = { $lte: new Date(fechaFin) };
-    } else {
-      // Si no hay fechas, establecer un rango por defecto (próximos 12 meses)
-      const hoy = new Date();
-      const finPeriodo = new Date();
-      finPeriodo.setFullYear(hoy.getFullYear() + 1);
+    // Verificar que el evento existe
+    const evento = await ReservaEvento.findById(eventoId)
+      .populate({
+        path: 'usuario',
+        select: 'nombre apellidos email telefono',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'tipoEvento',
+        strictPopulate: false
+      });
+    
+    if (!evento) {
+      return res.status(404).json({
+        success: false,
+        message: 'Evento no encontrado'
+      });
+    }
+    
+    // Verificar que el usuario es propietario del evento o admin
+    if (
+      evento.usuario && 
+      evento.usuario.toString() !== req.user.id && 
+      (!evento.asignadoA || evento.asignadoA.toString() !== req.user.id) && 
+      req.user.role !== 'admin'
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'No está autorizado para ver las habitaciones de este evento'
+      });
+    }
+    
+    // Obtener todas las habitaciones asociadas a este evento
+    const ReservaHabitacion = require('../models/ReservaHabitacion');
+    const habitaciones = await ReservaHabitacion.find({ reservaEvento: eventoId })
+      .sort('letraHabitacion');
+    
+    // Si no hay habitaciones, crear la lista según el formulario proporcionado
+    if (habitaciones.length === 0) {
+      // Crear 14 habitaciones predeterminadas según el formato de la tabla
+      const habitacionesPredeterminadas = [];
       
-      query.fecha = {
-        $gte: hoy,
-        $lte: finPeriodo
-      };
+      // Crear 6 habitaciones sencillas (con cama king size)
+      for (let i = 0; i < 6; i++) {
+        let letra;
+        switch (i) {
+          case 0: letra = 'A'; break;
+          case 1: letra = 'B'; break;
+          case 2: letra = 'K'; break;
+          case 3: letra = 'L'; break;
+          case 4: letra = 'M'; break;
+          case 5: letra = 'O'; break;
+          default: letra = String.fromCharCode(65 + i); // A, B, C, etc.
+        }
+        
+        habitacionesPredeterminadas.push({
+          tipoHabitacion: '1 cama king size',
+          categoriaHabitacion: 'sencilla',
+          precioPorNoche: 2400,
+          letraHabitacion: letra,
+          numHuespedes: 2,
+          infoHuespedes: { nombres: [], detalles: '' },
+          tipoReservacion: 'evento',
+          reservaEvento: eventoId,
+          numeroHabitaciones: 1,
+          fechaEntrada: evento.fecha,
+          fechaSalida: new Date(evento.fecha.getTime() + 24 * 60 * 60 * 1000), // +1 día
+          habitacion: `Habitación ${letra}`,
+          estado: 'pendiente',
+          nombreContacto: evento.nombreContacto,
+          apellidosContacto: evento.apellidosContacto,
+          emailContacto: evento.emailContacto,
+          telefonoContacto: evento.telefonoContacto,
+          fecha: evento.fecha,
+          precio: 0, // El precio se maneja a nivel de evento
+          precioTotal: 0
+        });
+      }
+      
+      // Crear 8 habitaciones dobles (con dos camas matrimoniales)
+      for (let i = 0; i < 8; i++) {
+        let letra;
+        switch (i) {
+          case 0: letra = 'C'; break;
+          case 1: letra = 'D'; break;
+          case 2: letra = 'E'; break;
+          case 3: letra = 'F'; break;
+          case 4: letra = 'G'; break;
+          case 5: letra = 'H'; break;
+          case 6: letra = 'I'; break;
+          case 7: letra = 'J'; break;
+          default: letra = String.fromCharCode(67 + i); // C, D, E, etc.
+        }
+        
+        habitacionesPredeterminadas.push({
+          tipoHabitacion: 'Dos matrimoniales',
+          categoriaHabitacion: 'doble',
+          precioPorNoche: 2600,
+          letraHabitacion: letra,
+          numHuespedes: 2,
+          infoHuespedes: { nombres: [], detalles: '' },
+          tipoReservacion: 'evento',
+          reservaEvento: eventoId,
+          numeroHabitaciones: 1,
+          fechaEntrada: evento.fecha,
+          fechaSalida: new Date(evento.fecha.getTime() + 24 * 60 * 60 * 1000), // +1 día
+          habitacion: `Habitación ${letra}`,
+          estado: 'pendiente',
+          nombreContacto: evento.nombreContacto,
+          apellidosContacto: evento.apellidosContacto,
+          emailContacto: evento.emailContacto,
+          telefonoContacto: evento.telefonoContacto,
+          fecha: evento.fecha,
+          precio: 0, // El precio se maneja a nivel de evento
+          precioTotal: 0
+        });
+      }
+      
+      return res.status(200).json({
+        success: true,
+        count: habitacionesPredeterminadas.length,
+        data: habitacionesPredeterminadas
+      });
     }
-    
-    // Proyectar solo los campos necesarios: fecha, horaInicio, horaFin, espacioSeleccionado
-    const reservas = await ReservaEvento.find(query, 'fecha horaInicio horaFin espacioSeleccionado')
-      .sort({ fecha: 1, horaInicio: 1 });
-    
-    // Agrupar por fechas para enviar un formato más simple al frontend
-    const fechasOcupadas = reservas.map(reserva => ({
-      fecha: reserva.fecha,
-      espacioSeleccionado: reserva.espacioSeleccionado,
-      horaInicio: reserva.horaInicio,
-      horaFin: reserva.horaFin
-    }));
     
     res.status(200).json({
       success: true,
-      data: fechasOcupadas
+      count: habitaciones.length,
+      data: habitaciones
     });
   } catch (error) {
-    console.error('Error al obtener fechas ocupadas de eventos:', error);
+    console.error('Error al obtener habitaciones del evento:', error);
     res.status(500).json({
       success: false,
-      message: 'No se pudieron obtener las fechas ocupadas',
+      message: 'Error al obtener las habitaciones del evento',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * @desc    Actualizar información de huéspedes para una habitación de evento
+ * @route   PUT /api/reservas/eventos/:eventoId/habitaciones/:letraHabitacion
+ * @access  Private
+ */
+exports.actualizarHabitacionEvento = async (req, res) => {
+  try {
+    const { eventoId, letraHabitacion } = req.params;
+    const { infoHuespedes } = req.body;
+    
+    // Validar que el ID sea válido para MongoDB
+    if (!eventoId.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de evento no válido'
+      });
+    }
+    
+    // Verificar que el evento existe
+    const evento = await ReservaEvento.findById(eventoId)
+      .populate({
+        path: 'usuario',
+        select: 'nombre apellidos email telefono',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'tipoEvento',
+        strictPopulate: false
+      });
+    
+    if (!evento) {
+      return res.status(404).json({
+        success: false,
+        message: 'Evento no encontrado'
+      });
+    }
+    
+    // Verificar que el usuario es propietario del evento o admin
+    if (
+      evento.usuario && 
+      evento.usuario.toString() !== req.user.id && 
+      (!evento.asignadoA || evento.asignadoA.toString() !== req.user.id) && 
+      req.user.role !== 'admin'
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'No está autorizado para actualizar las habitaciones de este evento'
+      });
+    }
+    
+    // Buscar la habitación por letra y evento
+    const ReservaHabitacion = require('../models/ReservaHabitacion');
+    let habitacion = await ReservaHabitacion.findOne({ 
+      reservaEvento: eventoId,
+      letraHabitacion: letraHabitacion
+    });
+    
+    // Si no existe la habitación, crearla
+    if (!habitacion) {
+      // Determinar el tipo de habitación y precio según la letra
+      let tipoHabitacion = 'Dos matrimoniales';
+      let categoriaHabitacion = 'doble';
+      let precioPorNoche = 2600;
+      
+      // Habitaciones sencillas (A, B, K, L, M, O)
+      if (['A', 'B', 'K', 'L', 'M', 'O'].includes(letraHabitacion)) {
+        tipoHabitacion = '1 cama king size';
+        categoriaHabitacion = 'sencilla';
+        precioPorNoche = 2400;
+      }
+      
+      habitacion = await ReservaHabitacion.create({
+        tipoHabitacion,
+        categoriaHabitacion,
+        precioPorNoche,
+        letraHabitacion,
+        numHuespedes: 2,
+        infoHuespedes: infoHuespedes || { nombres: [], detalles: '' },
+        tipoReservacion: 'evento',
+        reservaEvento: eventoId,
+        numeroHabitaciones: 1,
+        fechaEntrada: evento.fecha,
+        fechaSalida: new Date(evento.fecha.getTime() + 24 * 60 * 60 * 1000), // +1 día
+        habitacion: `Habitación ${letraHabitacion}`,
+        estado: 'pendiente',
+        nombreContacto: evento.nombreContacto,
+        apellidosContacto: evento.apellidosContacto,
+        emailContacto: evento.emailContacto,
+        telefonoContacto: evento.telefonoContacto,
+        fecha: evento.fecha,
+        precio: 0, // El precio se maneja a nivel de evento
+        precioTotal: 0
+      });
+    } else {
+      // Actualizar la información de huéspedes
+      habitacion = await ReservaHabitacion.findOneAndUpdate(
+        { 
+          reservaEvento: eventoId,
+          letraHabitacion: letraHabitacion
+        },
+        { infoHuespedes },
+        { new: true, runValidators: true }
+      );
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: habitacion
+    });
+  } catch (error) {
+    console.error('Error al actualizar habitación del evento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar la habitación del evento',
       error: error.message
     });
   }
@@ -881,4 +1032,4 @@ const ajustarDuracionValida = (duracion) => {
   
   console.log(`Ajustando duración inválida: ${duracion} min → ${duracionAjustada} min (valor permitido más cercano)`);
   return duracionAjustada;
-}; 
+};

@@ -10,15 +10,12 @@ const {
 } = require('../controllers/habitacion.controller');
 
 // Rutas públicas
-router.route('/').get(obtenerHabitaciones);
-router.route('/:id').get(obtenerHabitacion);
+router.get('/', obtenerHabitaciones);
+router.get('/:id', obtenerHabitacion);
 
 // Rutas protegidas para administradores
-router.route('/')
-  .post(protectRoute, authorize('admin'), crearHabitacion);
-
-router.route('/:id')
-  .put(protectRoute, authorize('admin'), actualizarHabitacion)
-  .delete(protectRoute, authorize('admin'), eliminarHabitacion);
+router.post('/', protectRoute, authorize('admin'), crearHabitacion);
+router.put('/:id', protectRoute, authorize('admin'), actualizarHabitacion);
+router.delete('/:id', protectRoute, authorize('admin'), eliminarHabitacion);
 
 module.exports = router; 

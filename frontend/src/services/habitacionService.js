@@ -1,7 +1,7 @@
 import axios from 'axios';
 import apiClient from './apiClient';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 // Obtener todas las habitaciones
 export const obtenerHabitaciones = async () => {
