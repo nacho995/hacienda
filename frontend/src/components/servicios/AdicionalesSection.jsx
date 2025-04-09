@@ -1,9 +1,179 @@
-import React from 'react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { FaMusic, FaGuitar, FaFireAlt, FaShoppingBag, FaCheck } from 'react-icons/fa';
+import { FaMusic, FaGuitar, FaFireAlt, FaShoppingBag, FaCheck, FaUtensils, FaCamera, FaWineGlassAlt } from 'react-icons/fa';
+import { MdOutlineDecorations, MdOutlineLocalFlorist } from 'react-icons/md';
+import { IoMusicalNotes } from 'react-icons/io5';
+import { BsCameraVideo } from 'react-icons/bs';
+import { getAllServicios } from '@/services/servicios.service';
+
+// Componente de tarjeta de servicio
+const ServicioCard = ({ servicio, index }) => {
+  // Determinar el icono según el tipo
+  let icon;
+  switch (servicio.iconType) {
+    case 'restaurante':
+      icon = <FaUtensils className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'decoracion':
+      icon = <MdOutlineDecorations className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'musica':
+      icon = <IoMusicalNotes className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'fotografia':
+      icon = <FaCamera className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'video':
+      icon = <BsCameraVideo className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'bebidas':
+    case 'barra':
+      icon = <FaWineGlassAlt className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'flores':
+      icon = <MdOutlineLocalFlorist className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'paquete':
+      icon = <FaCheck className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'coctel':
+    case 'brunch':
+      icon = <FaUtensils className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'montaje':
+      icon = <MdOutlineDecorations className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    case 'coordinacion':
+      icon = <FaCheck className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      break;
+    default:
+      icon = <FaCheck className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+  }
+  
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      viewport={{ once: true }}
+      className="bg-white p-6 rounded-lg shadow-md border border-[var(--color-brown-light)] hover:shadow-lg transition-all duration-300"
+      style={{ borderColor: servicio.color || '#D1B59B' }}
+    >
+      <div className="flex items-center mb-3">
+        {icon}
+        <h4 className="font-semibold text-[var(--color-brown-dark)]">{servicio.nombre}</h4>
+      </div>
+      <p className="text-sm text-[var(--color-brown-text)] mb-3">{servicio.descripcion}</p>
+      <p className="text-sm font-medium text-[var(--color-primary)]">{servicio.precio}</p>
+      
+      {servicio.incluye && servicio.incluye.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-[var(--color-cream)]">
+          <p className="text-xs font-medium mb-2">Incluye:</p>
+          <ul className="text-xs text-[var(--color-brown-text)] max-h-40 overflow-y-auto">
+            {servicio.incluye.slice(0, 5).map((item, idx) => (
+              <li key={idx} className="flex items-start space-x-1 mb-1">
+                <FaCheck className="text-[var(--color-primary)] flex-shrink-0 mt-1" size={10} />
+                <span>{item}</span>
+              </li>
+            ))}
+            {servicio.incluye.length > 5 && (
+              <li className="text-xs italic text-[var(--color-primary)] mt-2">
+                Y {servicio.incluye.length - 5} elementos más...
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+      
+      {servicio.preciosPorRango && servicio.preciosPorRango.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-[var(--color-cream)]">
+          <p className="text-xs font-medium mb-2">Precios por número de personas:</p>
+          <ul className="text-xs text-[var(--color-brown-text)] max-h-40 overflow-y-auto">
+            {servicio.preciosPorRango.slice(0, 3).map((rango, idx) => (
+              <li key={idx} className="mb-1">
+                <span className="font-medium">{rango.rango.min} a {rango.rango.max} personas:</span> {rango.precioFormateado} por persona
+              </li>
+            ))}
+            {servicio.preciosPorRango.length > 3 && (
+              <li className="text-xs italic text-[var(--color-primary)] mt-2">
+                Ver más rangos de precios...
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+      
+      {servicio.notas && servicio.notas.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-[var(--color-cream)]">
+          <p className="text-xs font-medium mb-2">Notas importantes:</p>
+          <ul className="text-xs text-[var(--color-brown-text)]">
+            {servicio.notas.map((nota, idx) => (
+              <li key={idx} className="italic mb-1">
+                {nota}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </motion.div>
+  );
+};
 
 const AdicionalesSection = () => {
+  const [servicios, setServicios] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Estado para servicios agrupados por categorías
+  const [serviciosPorCategoria, setServiciosPorCategoria] = useState({
+    paquete_evento: [],
+    servicio_adicional: [],
+    coctel_brunch: [],
+    bebidas: [],
+    montaje: [],
+    foto_video: [],
+    coordinacion: []
+  });
+
+  // Cargar servicios desde la API
+  useEffect(() => {
+    const fetchServicios = async () => {
+      try {
+        setLoading(true);
+        const data = await getAllServicios();
+        setServicios(data);
+        
+        // Agrupar servicios por categoría
+        const serviciosAgrupados = {
+          paquete_evento: [],
+          servicio_adicional: [],
+          coctel_brunch: [],
+          bebidas: [],
+          montaje: [],
+          foto_video: [],
+          coordinacion: []
+        };
+        
+        data.forEach(servicio => {
+          if (servicio.categoria && serviciosAgrupados[servicio.categoria]) {
+            serviciosAgrupados[servicio.categoria].push(servicio);
+          }
+        });
+        
+        setServiciosPorCategoria(serviciosAgrupados);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error al cargar servicios:', err);
+        setError('No se pudieron cargar los servicios. Por favor, inténtelo de nuevo más tarde.');
+        setLoading(false);
+      }
+    };
+
+    fetchServicios();
+  }, []);
   return (
     <div className="py-8">
       <div className="max-w-6xl mx-auto">
@@ -61,21 +231,115 @@ const AdicionalesSection = () => {
             Servicios Adicionales para el Evento
           </h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {serviciosAdicionales.map((servicio, index) => (
-              <motion.div 
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                className="bg-white p-6 rounded-lg shadow-md"
-              >
-                <h4 className="font-semibold text-[var(--color-brown-dark)] mb-3">{servicio.nombre}</h4>
-                <p className="text-sm text-[var(--color-brown-text)]">{servicio.descripcion}</p>
-              </motion.div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--color-primary)]"></div>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-center">
+              {error}
+            </div>
+          ) : (
+            <div className="space-y-16">
+              {/* Paquetes de Eventos */}
+              {serviciosPorCategoria.paquete_evento.length > 0 && (
+                <div>
+                  <h3 className="text-3xl font-[var(--font-display)] text-[var(--color-brown-dark)] mb-8 text-center">
+                    Paquetes para Eventos
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {serviciosPorCategoria.paquete_evento.map((servicio, index) => (
+                      <ServicioCard key={servicio.id} servicio={servicio} index={index} />  
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Servicios Adicionales */}
+              {serviciosPorCategoria.servicio_adicional.length > 0 && (
+                <div>
+                  <h3 className="text-3xl font-[var(--font-display)] text-[var(--color-brown-dark)] mb-8 text-center">
+                    Servicios Adicionales
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {serviciosPorCategoria.servicio_adicional.map((servicio, index) => (
+                      <ServicioCard key={servicio.id} servicio={servicio} index={index} />  
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Cóctel y Brunch */}
+              {serviciosPorCategoria.coctel_brunch.length > 0 && (
+                <div>
+                  <h3 className="text-3xl font-[var(--font-display)] text-[var(--color-brown-dark)] mb-8 text-center">
+                    Opciones de Cóctel y Brunch
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {serviciosPorCategoria.coctel_brunch.map((servicio, index) => (
+                      <ServicioCard key={servicio.id} servicio={servicio} index={index} />  
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Bebidas */}
+              {serviciosPorCategoria.bebidas.length > 0 && (
+                <div>
+                  <h3 className="text-3xl font-[var(--font-display)] text-[var(--color-brown-dark)] mb-8 text-center">
+                    Opciones de Bebidas
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {serviciosPorCategoria.bebidas.map((servicio, index) => (
+                      <ServicioCard key={servicio.id} servicio={servicio} index={index} />  
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Montaje */}
+              {serviciosPorCategoria.montaje.length > 0 && (
+                <div>
+                  <h3 className="text-3xl font-[var(--font-display)] text-[var(--color-brown-dark)] mb-8 text-center">
+                    Opciones de Montaje
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {serviciosPorCategoria.montaje.map((servicio, index) => (
+                      <ServicioCard key={servicio.id} servicio={servicio} index={index} />  
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Fotografía y Video */}
+              {serviciosPorCategoria.foto_video.length > 0 && (
+                <div>
+                  <h3 className="text-3xl font-[var(--font-display)] text-[var(--color-brown-dark)] mb-8 text-center">
+                    Servicios de Fotografía y Video
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {serviciosPorCategoria.foto_video.map((servicio, index) => (
+                      <ServicioCard key={servicio.id} servicio={servicio} index={index} />  
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Coordinación */}
+              {serviciosPorCategoria.coordinacion.length > 0 && (
+                <div>
+                  <h3 className="text-3xl font-[var(--font-display)] text-[var(--color-brown-dark)] mb-8 text-center">
+                    Servicios de Coordinación
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {serviciosPorCategoria.coordinacion.map((servicio, index) => (
+                      <ServicioCard key={servicio.id} servicio={servicio} index={index} />  
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           
           <div className="mt-8 text-center">
             <p className="text-[var(--color-brown-text)] italic">
@@ -185,7 +449,7 @@ const AdicionalesSection = () => {
   );
 };
 
-// Datos de servicios
+// Datos de servicios para el DJ (mantenemos esta parte estática ya que es específica)
 const servicioDJ = [
   "Expertos en bodas versátiles, dos discos duros con más de 30,000 canciones de todos los géneros, lo que garantiza que nunca dejará de haber música y baile durante tu evento",
   "Cabina de madera o blanca",
@@ -198,81 +462,6 @@ const servicioDJ = [
   "2 luces tipo wash",
   "Micrófono",
   "Cotillón para invitados (dependiendo el número de personas para tu evento)"
-];
-
-const serviciosAdicionales = [
-  {
-    nombre: "Tacos al Pastor",
-    descripcion: "Servicio de taquiza con tacos al pastor frescos preparados en el momento. Precio según cantidad requerida."
-  },
-  {
-    nombre: "Carro de Churros",
-    descripcion: "Deliciosos churros recién hechos con diferentes opciones de relleno y cobertura. Precio según cantidad requerida."
-  },
-  {
-    nombre: "Carro de Papas",
-    descripcion: "Papas a la francesa con variedad de aderezos y toppings. Precio según cantidad requerida."
-  },
-  {
-    nombre: "Mampara de Donas",
-    descripcion: "Exhibidor de donas decorativas para que tus invitados disfruten de un dulce postre. Precio según cantidad requerida."
-  },
-  {
-    nombre: "Sandalias y Pantuflas",
-    descripcion: "Cómodas opciones para tus invitados después de bailar. Cotiza según modelo (Mínimo 50 pzas)."
-  },
-  {
-    nombre: "Abanicos",
-    descripcion: "Abanicos personalizados para tus invitados. Cotiza según modelo (Mínimo 50 pzas)."
-  },
-  {
-    nombre: "Kits Anticruda",
-    descripcion: "Kit de recuperación para tus invitados después de la fiesta. Cotiza según modelo (Mínimo 50 pzas)."
-  },
-  {
-    nombre: "Carpas",
-    descripcion: "Carpas para eventos al aire libre. Precio depende de las medidas requeridas."
-  },
-  {
-    nombre: "Tarimas",
-    descripcion: "Tarimas para escenarios o pistas elevadas. Precio depende de las medidas requeridas."
-  },
-  {
-    nombre: "Carro Shots",
-    descripcion: "Servicio de shots variados para animar la fiesta."
-  },
-  {
-    nombre: "Papeles Metálicos",
-    descripcion: "Efectos especiales con papeles metálicos para momentos culminantes."
-  },
-  {
-    nombre: "Ludoteca Móvil",
-    descripcion: "Entretenimiento infantil con juegos y actividades supervisadas."
-  },
-  {
-    nombre: "Cabina de Fotos",
-    descripcion: "Cabina para que tus invitados se lleven un recuerdo fotográfico del evento."
-  },
-  {
-    nombre: "Cotillón",
-    descripcion: "Accesorios divertidos para animar la pista de baile."
-  },
-  {
-    nombre: "Ventiladores",
-    descripcion: "Ventiladores para eventos en temporada de calor."
-  },
-  {
-    nombre: "Calentadores",
-    descripcion: "Calentadores para eventos en temporada de frío."
-  },
-  {
-    nombre: "Trámite Civil",
-    descripcion: "Asistencia para realizar el trámite civil de tu boda."
-  },
-  {
-    nombre: "Trámite Religioso",
-    descripcion: "Asistencia para el trámite religioso directamente con la parroquia de San Carlos Borromeo."
-  }
 ];
 
 const opcionesEntretenimiento = [

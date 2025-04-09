@@ -53,7 +53,9 @@ const isPublicRoute = (url) => {
     '/auth/password-reset',
     '/auth/verify-email',
     '/eventos/disponibilidad',
-    '/reservas/eventos/disponibilidad'
+    '/reservas/eventos/disponibilidad',
+    '/servicios',
+    '/servicios/por-evento'
   ];
   
   return publicRoutes.some(route => url.includes(route));

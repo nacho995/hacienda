@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const sendEmail = require('../utils/email');
 const confirmacionTemplate = require('../emails/confirmacionReserva');
 const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
+const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
 
 /**
  * @desc    Crear una reserva de evento
@@ -23,7 +24,9 @@ exports.crearReservaEvento = async (req, res) => {
       telefono_contacto,
       mensaje,
       habitaciones,
-      modo_gestion_habitaciones
+      modo_gestion_habitaciones,
+      modo_gestion_servicios,
+      servicios_adicionales
     } = req.body;
     
     // Validar campos obligatorios
@@ -36,7 +39,7 @@ exports.crearReservaEvento = async (req, res) => {
 
     // Validar tipo de evento
     const tipoEventoDoc = await TipoEvento.findOne({ 
-      nombre: { $regex: new RegExp(tipo_evento, 'i') }
+      titulo: { $regex: new RegExp(tipo_evento, 'i') }
     });
 
     if (!tipoEventoDoc) {
@@ -101,6 +104,7 @@ exports.crearReservaEvento = async (req, res) => {
       estadoReserva: 'pendiente',
       metodoPago: 'pendiente',
       modoGestionHabitaciones: modo_gestion_habitaciones || 'usuario',
+      modoGestionServicios: modo_gestion_servicios || 'usuario',
       totalHabitaciones,
       serviciosAdicionales: {
         habitaciones: habitacionesValidadas.map((hab, index) => ({
@@ -117,6 +121,54 @@ exports.crearReservaEvento = async (req, res) => {
 
     // Crear la reserva
     const reserva = await ReservaEvento.create(reservaData);
+
+    // Enviar email de confirmación al cliente
+    try {
+      await sendEmail({
+        email: email_contacto,
+        subject: 'Confirmación de Reserva - Hacienda San Carlos Borromeo',
+        html: confirmacionTemplate({
+          ...reservaData,
+          tipoEvento: tipo_evento,
+          nombreEvento: tipo_evento,
+          numeroConfirmacion: reserva._id
+        })
+      });
+
+      console.log(`Email de confirmación enviado a ${email_contacto}`);
+    } catch (emailError) {
+      console.error('Error al enviar email de confirmación:', emailError);
+      // No interrumpimos el flujo si falla el envío del email
+    }
+
+    // Enviar notificación a los administradores sobre la gestión de servicios/habitaciones
+    try {
+      // Verificar si el cliente ha elegido que los organizadores gestionen algo
+      if (modo_gestion_habitaciones === 'organizador' || modo_gestion_servicios === 'organizador') {
+        // Obtener email de administradores (en un entorno real, esto vendría de la base de datos)
+        const adminEmails = ['hdasancarlos@gmail.com']; // Email de ejemplo
+
+        // Enviar email a cada administrador
+        for (const adminEmail of adminEmails) {
+          await sendEmail({
+            email: adminEmail,
+            subject: 'Notificación de Gestión - Nueva Reserva',
+            html: notificacionGestionAdmin({
+              ...reservaData,
+              tipoEvento: tipo_evento,
+              fecha: fechaEvento,
+              modoGestionHabitaciones: modo_gestion_habitaciones,
+              modoGestionServicios: modo_gestion_servicios
+            })
+          });
+        }
+
+        console.log('Email de notificación de gestión enviado a los administradores');
+      }
+    } catch (notificationError) {
+      console.error('Error al enviar notificación de gestión:', notificationError);
+      // No interrumpimos el flujo si falla el envío de la notificación
+    }
 
     // Crear las reservas de habitaciones asociadas
     const reservasHabitaciones = [];
@@ -577,7 +629,7 @@ exports.checkEventoAvailability = async (req, res) => {
 
     // Validar tipo de evento
     const tipoEventoDoc = await TipoEvento.findOne({ 
-      nombre: { $regex: new RegExp(tipo_evento, 'i') }
+      titulo: { $regex: new RegExp(tipo_evento, 'i') }
     });
 
     if (!tipoEventoDoc) {

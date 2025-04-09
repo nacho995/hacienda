@@ -5,9 +5,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { FaBars, FaTimes, FaPhoneAlt, FaRegEnvelope, FaSearch, FaCalendarAlt, FaChevronRight } from 'react-icons/fa';
+import AnimatedBackground from './AnimatedBackground';
 
 export default function Navbar() {
-  const [isScrolled, setIsScrolled] = useState(false);
+  // Eliminamos el estado de scroll
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const pathname = usePathname();
@@ -15,43 +16,7 @@ export default function Navbar() {
   const decorativeElementRef = useRef(null);
   const invitationPagesRef = useRef([]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      setIsScrolled(scrollY > 50);
-      
-      // Aplicar solo efecto de rotación al borde del sello
-      if (decorativeElementRef.current) {
-        const rotation = scrollY * 0.1; // Rotación más notable
-        decorativeElementRef.current.style.transform = `rotate(${rotation}deg)`;
-      }
-      
-      // Efecto de pasar hojas en invitación sin rotación 
-      if (invitationPagesRef.current && invitationPagesRef.current.length) {
-        // Calcular qué página mostrar según posición de scroll
-        const totalPages = invitationPagesRef.current.length;
-        const scrollPerPage = 400; // Cambiar de página con menos frecuencia
-        const currentPage = Math.min(Math.floor(scrollY / scrollPerPage) % totalPages, totalPages - 1);
-        
-        invitationPagesRef.current.forEach((page, index) => {
-          if (!page) return;
-          
-          // Solo mostrar la página actual - sin rotación
-          if (index === currentPage) {
-            page.style.opacity = '1';
-            page.style.transform = 'translateZ(0)';
-          } else {
-            // Páginas ocultas - sin rotación
-            page.style.opacity = '0';
-            page.style.transform = 'translateZ(-10px)';
-          }
-        });
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isScrolled]);
+  // Eliminamos el efecto de scroll
   
   // Inicializar las referencias de las páginas de la invitación
   useEffect(() => {
@@ -76,10 +41,13 @@ export default function Navbar() {
 
   return (
     <>
+      {/* Fondo elegante para el navbar */}
+      <div className="fixed top-0 left-0 right-0 h-28 z-0">
+        <div className="absolute inset-0 bg-black"></div>
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--color-primary)]/30 to-transparent"></div>
+      </div>
       {/* Barra superior con información de contacto */}
-      <div className={`w-full fixed top-0 transition-all duration-500 hidden lg:block z-50 ${
-        isScrolled ? 'h-0 opacity-0 overflow-hidden' : 'h-10 bg-[var(--color-accent)]'
-      }`}>
+      <div className="w-full hidden lg:block z-50 h-10 bg-black relative border-b border-[var(--color-primary)]/10">
         <div className="max-w-6xl mx-auto h-full px-6 flex items-center justify-between">
           <div className="flex items-center space-x-6 text-white/80 text-xs tracking-wider">
             <div className="flex items-center space-x-2">
@@ -100,11 +68,7 @@ export default function Navbar() {
       </div>
       
       {/* Barra de navegación principal */}
-      <nav className={`fixed top-0 w-full transition-all duration-500 z-50 ${
-        isScrolled 
-          ? 'py-3 bg-black/50 backdrop-blur-md shadow-lg' 
-          : 'py-5 bg-black/20 backdrop-blur-sm md:pt-8 lg:mt-10'
-      }`}>
+      <nav className="w-full z-50 py-3 bg-black/95 md:pt-5 lg:mt-0 relative shadow-sm">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
             {/* Logo con diseño de castillo */}
@@ -171,11 +135,7 @@ export default function Navbar() {
                 <Link
                   key={link.href}
                   href={getNavHref(link.href, link.isPage)}
-                  className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
-                    isScrolled 
-                      ? 'text-white hover:text-[var(--color-primary)]' 
-                      : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-[var(--color-primary)]'
-                  }`}
+                  className="text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-[var(--color-primary)]"
                 >
                   {link.label}
                 </Link>
@@ -464,11 +424,7 @@ export default function Navbar() {
                 <Link
                   key={link.href}
                   href={getNavHref(link.href, link.isPage)}
-                  className={`text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] ${
-                    isScrolled 
-                      ? 'text-white hover:text-[var(--color-primary)]' 
-                      : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-[var(--color-primary)]'
-                  }`}
+                  className="text-sm font-medium uppercase tracking-[0.15em] transition-colors border-b border-transparent hover:border-[var(--color-primary)] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] hover:text-[var(--color-primary)]"
                 >
                   {link.label}
                 </Link>
@@ -477,11 +433,7 @@ export default function Navbar() {
               {/* Botón de búsqueda */}
               <button 
                 onClick={() => setIsSearchOpen(!isSearchOpen)}
-                className={`transition-colors duration-300 ${
-                  isScrolled 
-                    ? 'text-white' 
-                    : 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]'
-                }`}
+                className="transition-colors duration-300 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
               >
                 <FaSearch />
               </button>
@@ -489,9 +441,7 @@ export default function Navbar() {
               {/* Botón de reserva destacado */}
               <Link
                 href="/reservar"
-                className={`flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-6 py-3 transition-all duration-300 hover:bg-[var(--color-brown-dark)] shadow-lg transform hover:scale-105 ${
-                  isScrolled ? 'opacity-100' : 'opacity-95 shadow-[0_4px_8px_rgba(0,0,0,0.3)]'
-                }`}
+                className="flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-6 py-3 transition-all duration-300 hover:bg-[var(--color-brown-dark)] shadow-lg transform hover:scale-105 opacity-95"
               >
                 <FaCalendarAlt className="mr-1" />
                 <span className="font-bold uppercase tracking-wider text-sm">Cotizar</span>
@@ -503,8 +453,8 @@ export default function Navbar() {
 
       {/* Barra de búsqueda */}
       <div 
-        className={`fixed w-full bg-black/50 backdrop-blur-md shadow-md z-40 transition-all duration-500 ${
-          isSearchOpen ? 'top-[80px] opacity-100' : '-top-20 opacity-0'
+        className={`w-full bg-black/50 backdrop-blur-md shadow-md z-40 transition-all duration-500 ${
+          isSearchOpen ? 'opacity-100' : 'opacity-0 hidden'
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 py-4">

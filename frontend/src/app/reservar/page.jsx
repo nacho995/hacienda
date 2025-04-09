@@ -1,737 +1,828 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle } from 'react-icons/fa';
 import { toast } from 'sonner';
-import { FaUserFriends, FaCalendarAlt, FaHotel, FaChevronRight, FaBirthdayCake, FaBed, FaUserCog, FaUtensils, FaMusic, FaCamera, FaWineGlassAlt, FaCheck } from 'react-icons/fa';
-import WizardSteps from '@/components/reservas/WizardSteps';
-import EventDateSelector from '@/components/reservas/EventDateSelector';
-import EventoMapaHabitaciones from '@/components/reservas/EventoMapaHabitaciones';
-import ModoGestionHabitaciones from '@/components/reservas/ModoGestionHabitaciones';
-import { createEventoReservation, checkEventoAvailability } from '@/services/reservationService';
-import ErrorModal from '@/components/ui/ErrorModal';
 
-// Importar componentes de layout
+import ModoSeleccionEvento from '@/components/reservas/ModoSeleccionEvento';
+import ModoGestionServicios from '@/components/reservas/ModoGestionServicios';
+import ModoGestionHabitaciones from '@/components/reservas/ModoGestionHabitaciones';
+import ModalModoGestionHabitaciones from '@/components/reservas/ModalModoGestionHabitaciones';
+import CalendarioReserva from '@/components/reservas/CalendarioReserva';
+import { ReservaProvider, useReserva } from '@/context/ReservaContext';
 import NavbarReservar from '@/components/layout/NavbarReservar';
 import Footer from '@/components/layout/Footer';
 
-export default function ReservarPage() {
-  const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState({
-    tipoEvento: '',
-    fechaEvento: null,
-    totalHabitaciones: 7,
-    nombre: '',
-    apellido: '',
-    correo: '',
-    telefono: '',
-    mensaje: '',
-    habitaciones: [],
-    modoGestionHabitaciones: '', // 'usuario' o 'hacienda'
-    servicios: [] // Array de servicios seleccionados
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState({ show: false, message: '' });
+// Componente wrapper que proporciona el contexto
+const ReservarPage = () => {
+  return (
+    <ReservaProvider>
+      <ReservarPageContent />
+    </ReservaProvider>
+  );
+};
 
-  const handleRoomsChange = (rooms) => {
-    setFormData({
-      ...formData,
-      habitaciones: rooms,
-      totalHabitaciones: rooms.length
-    });
-  };
+export default ReservarPage;
 
-  // Definición de servicios disponibles agrupados por categorías
-  const serviciosDisponibles = {
-    banquetes: [
-      { id: 'banquete_basico', nombre: 'Banquete Básico', descripcion: 'Menú de 3 tiempos con opciones tradicionales', precio: 'Desde $350 por persona' },
-      { id: 'banquete_premium', nombre: 'Banquete Premium', descripcion: 'Menú gourmet de 4 tiempos con opciones internacionales', precio: 'Desde $550 por persona' },
-      { id: 'barra_libre_platinum', nombre: 'Barra Libre Platinum', descripcion: 'Incluye ron, brandy, tequila, vodka, whiskey, ginebra y cerveza', precio: 'Desde $250 por persona' },
-      { id: 'barra_libre_oro', nombre: 'Barra Libre Oro', descripcion: 'Incluye licores premium y cocteles especiales', precio: 'Desde $350 por persona' }
-    ],
-    montaje: [
-      { id: 'montaje_incluido', nombre: 'Montaje Incluido', descripcion: 'Sillas, mesas, mantelería, cristalería y cubiertos básicos', precio: 'Incluido en paquete básico' },
-      { id: 'montaje_premium', nombre: 'Montaje Premium', descripcion: 'Mesas de cristal o mármol, sillas especiales y cubiertos premium', precio: 'Desde $5,000 adicionales' }
-    ],
-    fotografia: [
-      { id: 'foto_basico', nombre: 'Paquete Fotográfico Básico', descripcion: 'Cobertura del evento con 1 fotógrafo, 300 fotos editadas', precio: 'Desde $8,000' },
-      { id: 'foto_premium', nombre: 'Paquete Fotográfico Premium', descripcion: '2 fotógrafos, 500 fotos editadas, álbum impreso y sesión pre-boda', precio: 'Desde $15,000' },
-      { id: 'video', nombre: 'Video del Evento', descripcion: 'Video editado de 15-20 minutos con los mejores momentos', precio: 'Desde $10,000' }
-    ],
-    adicionales: [
-      { id: 'dj', nombre: 'DJ Profesional', descripcion: 'DJ con equipo completo de audio e iluminación', precio: 'Desde $8,000' },
-      { id: 'musica_vivo', nombre: 'Música en Vivo', descripcion: 'Mariachi, banda, saxofonista, trío o marimba', precio: 'Desde $5,000' },
-      { id: 'tacos', nombre: 'Taquiza', descripcion: 'Servicio de tacos al pastor para la hora de la fiesta', precio: 'Desde $80 por persona' },
-      { id: 'churros', nombre: 'Carro de Churros', descripcion: 'Churros recién hechos con diferentes opciones de relleno', precio: 'Desde $3,000' },
-      { id: 'cabina_fotos', nombre: 'Cabina de Fotos', descripcion: 'Cabina fotográfica con props y recuerdos impresos', precio: 'Desde $4,500' },
-      { id: 'cotillon', nombre: 'Cotillón para Fiesta', descripcion: 'Accesorios divertidos para animar la pista de baile', precio: 'Desde $2,500' }
-    ],
-    coordinacion: [
-      { id: 'wedding_planner', nombre: 'Wedding Planner', descripcion: 'Coordinación completa antes y durante el evento', precio: 'Desde $15,000' },
-      { id: 'coordinador_dia', nombre: 'Coordinador del Día', descripcion: 'Coordinación solo el día del evento', precio: 'Desde $5,000' },
-      { id: 'tramites', nombre: 'Asistencia en Trámites', descripcion: 'Ayuda con trámites civiles y/o religiosos', precio: 'Desde $3,000' }
-    ]
+const ReservarPageContent = () => {
+  const { formData, updateFormSection } = useReserva();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [showModoSeleccionServiciosModal, setShowModoSeleccionServiciosModal] = useState(false);
+  const [showModoSeleccionHabitacionesModal, setShowModoSeleccionHabitacionesModal] = useState(false);
+  // Mantener el objeto completo para la selección, pero manejar el renderizado con cuidado
+  const [selectedEventType, setSelectedEventType] = useState(formData.tipoEvento || null);
+
+  // Estilos para el contenedor principal del wizard
+  const wizardContainerStyle = {
+    background: 'linear-gradient(145deg, rgba(230,220,198,0.95), rgba(209,181,155,0.95))',
   };
 
   const steps = [
     {
       title: 'Tipo de Evento',
       description: 'Seleccione el tipo de evento que desea celebrar',
-      content: (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-4">
-            ¿Qué tipo de evento desea celebrar?
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div
-              onClick={() => setFormData({ ...formData, tipoEvento: 'Boda' })}
-              className={`p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 ${
-                formData.tipoEvento === 'Boda'
-                  ? 'bg-[#F8E8E0] border-[var(--color-primary)] shadow-md'
-                  : 'hover:bg-gray-50 border-gray-200'
-              }`}
-            >
-              <div className={`flex items-center justify-center w-16 h-16 rounded-full mb-4 ${formData.tipoEvento === 'Boda' ? 'bg-white' : 'bg-[var(--color-primary)]/10'}`}>
-                <FaUserFriends className={`w-8 h-8 ${formData.tipoEvento === 'Boda' ? 'text-[var(--color-primary)]' : 'text-[var(--color-primary)]'}`} />
-              </div>
-              <h3 className={`text-lg font-bold ${formData.tipoEvento === 'Boda' ? 'text-black' : ''}`}>Bodas</h3>
-              <p className={`mt-2 ${formData.tipoEvento === 'Boda' ? 'text-black font-medium' : 'text-gray-600'}`}>
-                Celebraciones íntimas o grandes bodas con todo lo necesario para un día inolvidable
-              </p>
-            </div>
-            
-            <div
-              onClick={() => setFormData({ ...formData, tipoEvento: 'Ceremonia Religiosa' })}
-              className={`p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 ${
-                formData.tipoEvento === 'Ceremonia Religiosa'
-                  ? 'bg-[#F8E8E0] border-[var(--color-primary)] shadow-md'
-                  : 'hover:bg-gray-50 border-gray-200'
-              }`}
-            >
-              <div className={`flex items-center justify-center w-16 h-16 rounded-full mb-4 ${formData.tipoEvento === 'Ceremonia Religiosa' ? 'bg-white' : 'bg-[var(--color-primary)]/10'}`}>
-                <FaCalendarAlt className={`w-8 h-8 ${formData.tipoEvento === 'Ceremonia Religiosa' ? 'text-[var(--color-primary)]' : 'text-[var(--color-primary)]'}`} />
-              </div>
-              <h3 className={`text-lg font-bold ${formData.tipoEvento === 'Ceremonia Religiosa' ? 'text-black' : ''}`}>Ceremonias Religiosas</h3>
-              <p className={`mt-2 ${formData.tipoEvento === 'Ceremonia Religiosa' ? 'text-black font-medium' : 'text-gray-600'}`}>
-                Espacios adecuados para ceremonias religiosas con la serenidad y privacidad necesarias
-              </p>
-            </div>
-            
-            <div
-              onClick={() => setFormData({ ...formData, tipoEvento: 'Evento Corporativo' })}
-              className={`p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 ${
-                formData.tipoEvento === 'Evento Corporativo'
-                  ? 'bg-[#F8E8E0] border-[var(--color-primary)] shadow-md'
-                  : 'hover:bg-gray-50 border-gray-200'
-              }`}
-            >
-              <div className={`flex items-center justify-center w-16 h-16 rounded-full mb-4 ${formData.tipoEvento === 'Evento Corporativo' ? 'bg-white' : 'bg-[var(--color-primary)]/10'}`}>
-                <FaHotel className={`w-8 h-8 ${formData.tipoEvento === 'Evento Corporativo' ? 'text-[var(--color-primary)]' : 'text-[var(--color-primary)]'}`} />
-              </div>
-              <h3 className={`text-lg font-bold ${formData.tipoEvento === 'Evento Corporativo' ? 'text-black' : ''}`}>Eventos Corporativos</h3>
-              <p className={`mt-2 ${formData.tipoEvento === 'Evento Corporativo' ? 'text-black font-medium' : 'text-gray-600'}`}>
-                Espacios modernos y equipados para reuniones de negocio, presentaciones y conferencias
-              </p>
-            </div>
-            
-            <div
-              onClick={() => setFormData({ ...formData, tipoEvento: 'Cumpleaños' })}
-              className={`p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 ${
-                formData.tipoEvento === 'Cumpleaños'
-                  ? 'bg-[#F8E8E0] border-[var(--color-primary)] shadow-md'
-                  : 'hover:bg-gray-50 border-gray-200'
-              }`}
-            >
-              <div className={`flex items-center justify-center w-16 h-16 rounded-full mb-4 ${formData.tipoEvento === 'Cumpleaños' ? 'bg-white' : 'bg-[var(--color-primary)]/10'}`}>
-                <FaBirthdayCake className={`w-8 h-8 ${formData.tipoEvento === 'Cumpleaños' ? 'text-[var(--color-primary)]' : 'text-[var(--color-primary)]'}`} />
-              </div>
-              <h3 className={`text-lg font-bold ${formData.tipoEvento === 'Cumpleaños' ? 'text-black' : ''}`}>Cumpleaños</h3>
-              <p className={`mt-2 ${formData.tipoEvento === 'Cumpleaños' ? 'text-black font-medium' : 'text-gray-600'}`}>
-                Celebraciones especiales para niños y adultos con todo lo necesario para una fiesta inolvidable
-              </p>
-            </div>
-          </div>
-        </div>
-      )
+      icon: FaCalendarAlt
     },
     {
       title: 'Fecha y Habitaciones',
       description: 'Seleccione la fecha y el número de habitaciones necesarias',
-      content: (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-4">
-            Seleccione la fecha y el número de habitaciones
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">Fecha del Evento</label>
-              <EventDateSelector
-                selectedDate={formData.fechaEvento}
-                onDateSelect={(date) => setFormData({ ...formData, fechaEvento: date })}
-              />
-            </div>
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">Número de Habitaciones</label>
-              <select
-                value={formData.totalHabitaciones}
-                onChange={(e) => setFormData({ ...formData, totalHabitaciones: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
-              >
-                {[7, 8, 9, 10, 11, 12, 13, 14].map(num => (
-                  <option key={num} value={num}>
-                    {num} habitaciones
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <p className="text-sm text-gray-600 mt-4">
-            Nota: El número mínimo de habitaciones es 7 y el máximo es 14, dependiendo del tipo de evento seleccionado
-          </p>
-        </div>
-      )
+      icon: FaCalendarAlt
+    },
+    {
+      title: 'Gestión de Habitaciones',
+      description: 'Asigne las habitaciones para sus huéspedes',
+      icon: FaBed
+    },
+    {
+      title: 'Servicios Adicionales',
+      description: 'Seleccione los servicios adicionales para su evento',
+      icon: FaUtensils
     },
     {
       title: 'Información de Contacto',
       description: 'Por favor, proporcione sus datos de contacto',
-      content: (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-4">
-            Información de Contacto
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">Nombre</label>
-              <input
-                type="text"
-                value={formData.nombre}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
-                required
-              />
-            </div>
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">Apellido</label>
-              <input
-                type="text"
-                value={formData.apellido}
-                onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
-                required
-              />
-            </div>
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">Email</label>
-              <input
-                type="email"
-                value={formData.correo}
-                onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
-                required
-              />
-            </div>
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-700">Teléfono</label>
-              <input
-                type="tel"
-                value={formData.telefono}
-                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
-                required
-              />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700">Mensaje Adicional (opcional)</label>
-            <textarea
-              value={formData.mensaje}
-              onChange={(e) => setFormData({ ...formData, mensaje: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]"
-              rows="3"
-              placeholder="Indique cualquier detalle o preferencia especial que tenga para su evento"
-            />
-          </div>
-        </div>
-      )
+      icon: FaUser
     },
     {
-      title: 'Modo de Gestión',
-      description: 'Elija cómo gestionar las habitaciones',
-      icon: FaUserCog,
-      content: (
-        <ModoGestionHabitaciones 
-          onModeSelect={(mode) => {
-            setFormData({
-              ...formData,
-              modoGestionHabitaciones: mode
-            });
-            handleNextStep();
-          }} 
-        />
-      )
-    },
-    {
-      title: 'Servicios',
-      description: 'Seleccione los servicios adicionales para su evento',
-      content: (
-        <div className="space-y-8">
-          <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-6">
-            Seleccione los servicios para su evento
-          </h2>
-          
-          {/* Banquetes y Bebidas */}
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-[var(--color-primary-dark)] mb-4 flex items-center">
-              <FaUtensils className="mr-2" /> Banquetes y Bebidas
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {serviciosDisponibles.banquetes.map((servicio) => (
-                <div 
-                  key={servicio.id}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${formData.servicios.includes(servicio.id) ? 'border-[var(--color-primary)] bg-[#F8E8E0]' : 'border-gray-200 hover:border-[var(--color-primary-light)]'}`}
-                  onClick={() => {
-                    const serviciosActualizados = formData.servicios.includes(servicio.id)
-                      ? formData.servicios.filter(id => id !== servicio.id)
-                      : [...formData.servicios, servicio.id];
-                    setFormData({ ...formData, servicios: serviciosActualizados });
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold">{servicio.nombre}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{servicio.descripcion}</p>
-                    </div>
-                    <div className="ml-4">
-                      {formData.servicios.includes(servicio.id) && (
-                        <div className="w-6 h-6 bg-[var(--color-primary)] rounded-full flex items-center justify-center">
-                          <FaCheck className="text-white text-xs" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm font-medium text-[var(--color-primary-dark)]">{servicio.precio}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Montaje */}
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-[var(--color-primary-dark)] mb-4 flex items-center">
-              <FaWineGlassAlt className="mr-2" /> Montaje y Decoración
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {serviciosDisponibles.montaje.map((servicio) => (
-                <div 
-                  key={servicio.id}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${formData.servicios.includes(servicio.id) ? 'border-[var(--color-primary)] bg-[#F8E8E0]' : 'border-gray-200 hover:border-[var(--color-primary-light)]'}`}
-                  onClick={() => {
-                    const serviciosActualizados = formData.servicios.includes(servicio.id)
-                      ? formData.servicios.filter(id => id !== servicio.id)
-                      : [...formData.servicios, servicio.id];
-                    setFormData({ ...formData, servicios: serviciosActualizados });
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold">{servicio.nombre}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{servicio.descripcion}</p>
-                    </div>
-                    <div className="ml-4">
-                      {formData.servicios.includes(servicio.id) && (
-                        <div className="w-6 h-6 bg-[var(--color-primary)] rounded-full flex items-center justify-center">
-                          <FaCheck className="text-white text-xs" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm font-medium text-[var(--color-primary-dark)]">{servicio.precio}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Fotografía y Video */}
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-[var(--color-primary-dark)] mb-4 flex items-center">
-              <FaCamera className="mr-2" /> Fotografía y Video
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {serviciosDisponibles.fotografia.map((servicio) => (
-                <div 
-                  key={servicio.id}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${formData.servicios.includes(servicio.id) ? 'border-[var(--color-primary)] bg-[#F8E8E0]' : 'border-gray-200 hover:border-[var(--color-primary-light)]'}`}
-                  onClick={() => {
-                    const serviciosActualizados = formData.servicios.includes(servicio.id)
-                      ? formData.servicios.filter(id => id !== servicio.id)
-                      : [...formData.servicios, servicio.id];
-                    setFormData({ ...formData, servicios: serviciosActualizados });
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold">{servicio.nombre}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{servicio.descripcion}</p>
-                    </div>
-                    <div className="ml-4">
-                      {formData.servicios.includes(servicio.id) && (
-                        <div className="w-6 h-6 bg-[var(--color-primary)] rounded-full flex items-center justify-center">
-                          <FaCheck className="text-white text-xs" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm font-medium text-[var(--color-primary-dark)]">{servicio.precio}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Servicios Adicionales */}
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-[var(--color-primary-dark)] mb-4 flex items-center">
-              <FaMusic className="mr-2" /> Servicios Adicionales
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {serviciosDisponibles.adicionales.map((servicio) => (
-                <div 
-                  key={servicio.id}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${formData.servicios.includes(servicio.id) ? 'border-[var(--color-primary)] bg-[#F8E8E0]' : 'border-gray-200 hover:border-[var(--color-primary-light)]'}`}
-                  onClick={() => {
-                    const serviciosActualizados = formData.servicios.includes(servicio.id)
-                      ? formData.servicios.filter(id => id !== servicio.id)
-                      : [...formData.servicios, servicio.id];
-                    setFormData({ ...formData, servicios: serviciosActualizados });
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold">{servicio.nombre}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{servicio.descripcion}</p>
-                    </div>
-                    <div className="ml-4">
-                      {formData.servicios.includes(servicio.id) && (
-                        <div className="w-6 h-6 bg-[var(--color-primary)] rounded-full flex items-center justify-center">
-                          <FaCheck className="text-white text-xs" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm font-medium text-[var(--color-primary-dark)]">{servicio.precio}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Coordinación */}
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-[var(--color-primary-dark)] mb-4 flex items-center">
-              <FaCalendarAlt className="mr-2" /> Coordinación y Planeación
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {serviciosDisponibles.coordinacion.map((servicio) => (
-                <div 
-                  key={servicio.id}
-                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all duration-300 ${formData.servicios.includes(servicio.id) ? 'border-[var(--color-primary)] bg-[#F8E8E0]' : 'border-gray-200 hover:border-[var(--color-primary-light)]'}`}
-                  onClick={() => {
-                    const serviciosActualizados = formData.servicios.includes(servicio.id)
-                      ? formData.servicios.filter(id => id !== servicio.id)
-                      : [...formData.servicios, servicio.id];
-                    setFormData({ ...formData, servicios: serviciosActualizados });
-                  }}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold">{servicio.nombre}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{servicio.descripcion}</p>
-                    </div>
-                    <div className="ml-4">
-                      {formData.servicios.includes(servicio.id) && (
-                        <div className="w-6 h-6 bg-[var(--color-primary)] rounded-full flex items-center justify-center">
-                          <FaCheck className="text-white text-xs" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm font-medium text-[var(--color-primary-dark)]">{servicio.precio}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <div className="bg-[var(--color-primary-light)]/10 p-4 rounded-lg border border-[var(--color-primary-light)]/30">
-            <p className="text-sm text-[var(--color-primary-dark)]">
-              <strong>Nota:</strong> Los precios son aproximados y pueden variar según la temporada y los detalles específicos de su evento. Un asesor se pondrá en contacto con usted para confirmar los precios finales.            
-            </p>
-          </div>
-        </div>
-      )
-    },
-    {
-      title: 'Habitaciones',
-      description: 'Seleccione las habitaciones para el evento',
-      content: (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-4">
-            Asignación de Habitaciones
-          </h2>
-          {formData.modoGestionHabitaciones === 'usuario' ? (
-            <>
-              <p className="text-gray-600">
-                Asigne las habitaciones para los invitados al evento. Puede seleccionar habitaciones del plano del hotel y especificar los huéspedes para cada una.
-              </p>
-              <EventoMapaHabitaciones onRoomsChange={handleRoomsChange} eventDate={formData.fechaEvento ? formData.fechaEvento.toISOString().split('T')[0] : ''} />
-            </>
-          ) : (
-            <div className="p-6 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-lg font-semibold text-blue-800 mb-3">Gestión por la Hacienda</h3>
-              <p className="text-blue-700 mb-4">
-                Ha seleccionado que el personal de la hacienda gestione la asignación de habitaciones. Una vez completada la reserva, recibirá un correo electrónico con instrucciones para proporcionar la información de los huéspedes.  
-              </p>
-              <div className="bg-white p-4 rounded-lg border border-blue-200">
-                <h4 className="font-medium text-gray-800 mb-2">Resumen:</h4>
-                <ul className="space-y-2">
-                  <li className="flex items-start">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                    </span>
-                    <span>El personal de la hacienda se encargará de asignar las habitaciones</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                    </span>
-                    <span>Recibirá un enlace para proporcionar los datos de los huéspedes</span>
-                  </li>
-                  <li className="flex items-start">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                    </span>
-                    <span>Podrá cargar un archivo Excel con los datos o completar un formulario</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-      )
-    },
-    {
-      title: 'Modo de Gestión',
-      description: 'Elija cómo gestionar las habitaciones',
-      icon: FaUserCog,
-      content: (
-        <ModoGestionHabitaciones 
-          onModeSelect={(mode) => {
-            setFormData({
-              ...formData,
-              modoGestionHabitaciones: mode
-            });
-            handleNextStep();
-          }} 
-        />
-      )
-    },
+      title: 'Resumen de la Reserva',
+      description: 'Revise los detalles de su reserva',
+      icon: FaCheck
+    }
   ];
 
-  const handleNextStep = async () => {
-    if (currentStep === 0 && !formData.tipoEvento) {
-      toast.error('Por favor, seleccione el tipo de evento');
-      return;
-    }
-
-    if (currentStep === 1 && !formData.fechaEvento) {
-      toast.error('Por favor, seleccione una fecha para su evento');
-      return;
-    }
-
-    if (currentStep === 2 && (!formData.nombre || !formData.correo || !formData.telefono)) {
-      toast.error('Por favor, complete todos los campos de contacto');
-      return;
-    }
-
-    if (currentStep === 3 && !formData.servicios.length) {
-      toast.error('Por favor, seleccione al menos un servicio');
-      return;
-    }
-
-    setCurrentStep(currentStep + 1);
-  };
-
-  const handlePreviousStep = () => {
-    setCurrentStep(currentStep - 1);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Validar que todos los campos requeridos estén completos
-    if (!formData.tipoEvento) {
-      toast.error('Por favor, seleccione el tipo de evento');
-      return;
-    }
-
-    if (!formData.fechaEvento) {
-      toast.error('Por favor, seleccione una fecha para el evento');
-      return;
-    }
-
-    if (!formData.nombre || !formData.correo || !formData.telefono) {
-      toast.error('Por favor, complete todos los campos de contacto');
+  const handleNextStep = () => {
+    // Validación según el paso actual
+    if (currentStep === 1 && !selectedEventType) {
+      toast.error('Por favor, seleccione un tipo de evento');
       return;
     }
     
-    if (!formData.modoGestionHabitaciones) {
-      toast.error('Por favor, seleccione el modo de gestión de habitaciones');
+    if (currentStep === 2 && !formData.fecha) {
+      toast.error('Por favor, seleccione una fecha para su evento');
       return;
     }
-
-    if (!formData.servicios.length) {
+    
+    // Si estamos en el paso 1 y no hay un modo de gestión de servicios seleccionado,
+    // mostramos el modal en lugar de avanzar al siguiente paso
+    if (currentStep === 1 && !formData.modoGestionServicios) {
+      setShowModoSeleccionServiciosModal(true);
+      return;
+    }
+    
+    // Si estamos en el paso 2 y no hay un modo de gestión de habitaciones seleccionado,
+    // mostramos el modal en lugar de avanzar al siguiente paso
+    if (currentStep === 2 && !formData.modoGestionHabitaciones) {
+      setShowModoSeleccionHabitacionesModal(true);
+      return;
+    }
+    
+    // Si estamos en el paso 4 (servicios) y no hay servicios seleccionados
+    if (currentStep === 4 && formData.modoGestionServicios === 'usuario' && formData.serviciosSeleccionados.length === 0) {
       toast.error('Por favor, seleccione al menos un servicio');
       return;
     }
+    
+    // Si estamos en el paso 5 (contacto) validamos los campos requeridos
+    if (currentStep === 5) {
+      const { nombre, apellidos, email, telefono } = formData.datosContacto;
+      if (!nombre || !apellidos || !email || !telefono) {
+        toast.error('Por favor, complete todos los campos obligatorios');
+        return;
+      }
+      
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        toast.error('Por favor, ingrese un email válido');
+        return;
+      }
+      
+      // Validar formato de teléfono (al menos 9 dígitos)
+      const telefonoRegex = /^\d{9,}$/;
+      if (!telefonoRegex.test(telefono.replace(/\s+/g, ''))) {
+        toast.error('Por favor, ingrese un número de teléfono válido (mínimo 9 dígitos)');
+        return;
+      }
+    }
+    
+    // Si estamos en el paso 6 (resumen), enviamos el formulario
+    if (currentStep === 6) {
+      handleSubmit();
+      return;
+    }
+    
+    // Avanzar al siguiente paso
+    setCurrentStep(prev => prev + 1);
+  };
 
+  const handleServicesSelect = (servicios) => {
+    updateFormSection('serviciosSeleccionados', servicios);
+  };
+  
+  const handleModoServiciosSelect = (modo) => {
+    updateFormSection('modoGestionServicios', modo);
+    setShowModoSeleccionServiciosModal(false);
+    setCurrentStep(prev => prev + 1);
+  };
+  
+  const handleModoHabitacionesSelect = (modo) => {
+    updateFormSection('modoGestionHabitaciones', modo);
+    setShowModoSeleccionHabitacionesModal(false);
+    setCurrentStep(prev => prev + 1);
+  };
+
+  const handleSubmit = async () => {
     try {
-      setLoading(true);
-      setError({ show: false, message: '' });
-
-      // Formatear la fecha para la API
-      const fechaFormateada = formData.fechaEvento instanceof Date 
-        ? formData.fechaEvento.toISOString().split('T')[0]
-        : null;
-
-      if (!fechaFormateada) {
-        setError({ show: true, message: 'Fecha inválida' });
-        return;
-      }
-
-      // Verificar disponibilidad
-      try {
-        const availability = await checkEventoAvailability({
-          fecha: fechaFormateada,
-          tipoEvento: formData.tipoEvento,
-          totalHabitaciones: formData.totalHabitaciones
-        });
-
-        if (!availability.available) {
-          setError({ show: true, message: availability.message || 'No hay disponibilidad para estas fechas' });
-          return;
-        }
-      } catch (availabilityError) {
-        console.error('Error al verificar disponibilidad:', availabilityError);
-        setError({ show: true, message: 'Error al verificar disponibilidad. Por favor, inténtelo de nuevo.' });
-        return;
-      }
-
-      // Crear la reserva
-      try {
-        const reservationData = {
-          tipo_evento: formData.tipoEvento,
-          fecha_evento: fechaFormateada,
-          nombre: formData.nombre,
-          apellido: formData.apellido,
-          correo: formData.correo,
-          telefono: formData.telefono,
-          mensaje: formData.mensaje,
-          modo_gestion_habitaciones: formData.modoGestionHabitaciones,
-          servicios: formData.servicios,
-          habitaciones: formData.modoGestionHabitaciones === 'usuario' ? formData.habitaciones.map(room => ({
-            fecha_entrada: room.checkIn,
-            fecha_salida: room.checkOut || room.checkIn, // Usar fecha de entrada como fallback si no hay fecha de salida
-            huespedes: room.guests.map(guest => ({
-              nombre: guest.name,
-              numero_personas: guest.guests
-            }))
-          })) : []
-        };
-
-        const reservation = await createEventoReservation(reservationData);
-
-        if (!reservation || !reservation._id) {
-          throw new Error('Error al crear la reserva');
-        }
-
-        toast.success('Reserva creada exitosamente');
-        router.push(`/admin/reservaciones/eventos/${reservation._id}`);
-      } catch (reservationError) {
-        console.error('Error al crear la reserva:', reservationError);
-        setError({ show: true, message: reservationError.message || 'Error al crear la reserva. Por favor, inténtelo de nuevo.' });
-      } finally {
-        setLoading(false);
-      }
+      // Enviar formulario
+      console.log('Formulario enviado:', formData);
+      toast.success('Reserva creada exitosamente');
+      setCurrentStep(6); // Avanzar al paso de confirmación
     } catch (err) {
-      console.error('Error en el proceso de reserva:', err);
-      setError({ show: true, message: err.message || 'Error al procesar la reserva' });
+      console.error('Error al enviar formulario:', err);
+      toast.error('Error al crear la reserva. Por favor, inténtelo de nuevo.');
+    }
+  };
+
+  const handleEventTypeSelect = (eventType) => {
+    // Guardar el objeto completo para mantener la referencia
+    setSelectedEventType(eventType);
+    updateFormSection('tipoEvento', eventType);
+  };
+
+  // Renderizar el contenido según el paso actual
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-gradient-to-r from-[#F0E8DC] to-[#E6DCC6] p-6 rounded-xl shadow-md mb-8 border border-[#D1B59B]">
+              <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Seleccione el tipo de evento</h3>
+              <p className="text-[#8A6E52] mb-6 italic">Elija el tipo de evento que desea celebrar en nuestra hacienda</p>
+              
+              <ModoSeleccionEvento
+                selectedEventType={selectedEventType}
+                onEventTypeSelect={handleEventTypeSelect}
+              />
+            </div>
+          </div>
+        );
+      
+      case 2:
+        // Paso 2: Selección de fecha y número de habitaciones
+        const isEvento = selectedEventType && 
+          (typeof selectedEventType === 'object' ? 
+            (selectedEventType.titulo !== 'hospedaje' && selectedEventType.nombre !== 'hospedaje') : 
+            selectedEventType !== 'hospedaje');
+        const minHabitaciones = isEvento ? 7 : 1;
+        const maxHabitaciones = isEvento ? 14 : 20;
+        
+        // Generar opciones para el selector de habitaciones
+        const habitacionesOptions = [];
+        for (let i = minHabitaciones; i <= maxHabitaciones; i++) {
+          habitacionesOptions.push(
+            <option key={i} value={i}>{i} habitaciones</option>
+          );
+        }
+        
+        return (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-gradient-to-r from-[#F0E8DC] to-[#E6DCC6] p-6 rounded-xl shadow-md mb-8 border border-[#D1B59B]">
+              <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Detalles del evento</h3>
+              
+              <div className="mb-6">
+                <label className="block text-[#5D4B3A] font-medium mb-2">Fecha del evento</label>
+                <CalendarioReserva 
+                  value={formData.fecha || ''}
+                  onChange={(fecha) => updateFormSection('fecha', fecha)}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <p className="text-sm text-[#8A6E52] mt-2 italic">
+                  Seleccione la fecha en la que desea celebrar su {typeof selectedEventType === 'object' ? selectedEventType?.titulo?.toLowerCase() || 'evento' : 'evento'}
+                </p>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-[#5D4B3A] font-medium mb-2">Número de habitaciones</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <FaBed className="text-[#A5856A]" />
+                  </div>
+                  {isEvento ? (
+                    <select
+                      value={formData.numeroHabitaciones || minHabitaciones}
+                      onChange={(e) => updateFormSection('numeroHabitaciones', parseInt(e.target.value))}
+                      className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow appearance-none"
+                    >
+                      {habitacionesOptions}
+                    </select>
+                  ) : (
+                    <input 
+                      type="number" 
+                      value={formData.numeroHabitaciones || 1} 
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 1;
+                        updateFormSection('numeroHabitaciones', Math.max(1, Math.min(value, 20)));
+                      }}
+                      min="1"
+                      max="20"
+                      className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
+                    />
+                  )}
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <div className="text-[#A5856A] text-sm font-medium">
+                      {isEvento ? '7-14' : '1-20'}
+                    </div>
+                  </div>
+                </div>
+                {isEvento ? (
+                  <p className="text-sm text-[#8A6E52] mt-2 italic">
+                    Para eventos, se requiere un mínimo de 7 y un máximo de 14 habitaciones
+                  </p>
+                ) : (
+                  <p className="text-sm text-[#8A6E52] mt-2 italic">
+                    Seleccione el número de habitaciones que necesitará
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-[#F5F0E8] border-l-4 border-[#A5856A] rounded-lg p-5 shadow-sm">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <FaCalendarAlt className="h-5 w-5 text-[#A5856A]" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-[#5D4B3A]">Información importante</h3>
+                  <div className="mt-2 text-sm text-[#8A6E52]">
+                    <p>
+                      La disponibilidad de habitaciones está sujeta a confirmación. Nuestro equipo se pondrá en contacto con usted para confirmar la reserva.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 3:
+        // Paso 3: Gestión de habitaciones
+        return (
+          <ModoGestionHabitaciones
+            onModeSelect={() => setCurrentStep(prev => prev + 1)}
+            numeroHabitaciones={formData.numeroHabitaciones}
+          />
+        );
+        
+      case 4:
+        // Paso 4: Selección de servicios adicionales
+        return (
+          <ModoGestionServicios 
+            tipoEvento={typeof formData.tipoEvento === 'object' ? formData.tipoEvento.titulo : formData.tipoEvento}
+            onServicesSelect={handleServicesSelect}
+            modoGestion={formData.modoGestionServicios}
+            serviciosSeleccionados={formData.serviciosSeleccionados}
+          />
+        );
+      
+      case 5:
+        // Paso 5: Información de contacto
+        return (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-gradient-to-r from-[#F0E8DC] to-[#E6DCC6] p-6 rounded-xl shadow-md mb-8 border border-[#D1B59B]">
+              <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Información de contacto</h3>
+              <p className="text-[#8A6E52] mb-6 italic">Por favor, proporcione sus datos para que podamos contactarle</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-[#5D4B3A] font-medium mb-2">Nombre *</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <FaUser className="text-[#A5856A]" />
+                    </div>
+                    <input 
+                      type="text" 
+                      value={formData.datosContacto?.nombre || ''} 
+                      onChange={(e) => updateFormSection('datosContacto', {...formData.datosContacto, nombre: e.target.value})}
+                      className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
+                      placeholder="Introduzca su nombre"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-[#5D4B3A] font-medium mb-2">Apellidos *</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <FaUser className="text-[#A5856A]" />
+                    </div>
+                    <input 
+                      type="text" 
+                      value={formData.datosContacto?.apellidos || ''} 
+                      onChange={(e) => updateFormSection('datosContacto', {...formData.datosContacto, apellidos: e.target.value})}
+                      className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
+                      placeholder="Introduzca sus apellidos"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-[#5D4B3A] font-medium mb-2">Email *</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <FaEnvelope className="text-[#A5856A]" />
+                    </div>
+                    <input 
+                      type="email" 
+                      value={formData.datosContacto?.email || ''} 
+                      onChange={(e) => updateFormSection('datosContacto', {...formData.datosContacto, email: e.target.value})}
+                      className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
+                      placeholder="ejemplo@correo.com"
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-[#5D4B3A] font-medium mb-2">Teléfono *</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#A5856A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                    </div>
+                    <input 
+                      type="tel" 
+                      value={formData.datosContacto?.telefono || ''} 
+                      onChange={(e) => updateFormSection('datosContacto', {...formData.datosContacto, telefono: e.target.value})}
+                      className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
+                      placeholder="Ej. 600123456"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <label className="block text-[#5D4B3A] font-medium mb-2">Mensaje o comentarios adicionales</label>
+                <div className="relative">
+                  <textarea 
+                    value={formData.datosContacto?.mensaje || ''} 
+                    onChange={(e) => updateFormSection('datosContacto', {...formData.datosContacto, mensaje: e.target.value})}
+                    className="w-full p-4 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
+                    placeholder="Indique cualquier información adicional que considere relevante"
+                    rows="4"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-[#F5F0E8] p-6 rounded-xl shadow-md border border-[#D1B59B]">
+              <h4 className="text-lg font-semibold text-[#5D4B3A] mb-4">Términos y condiciones</h4>
+              
+              <div className="mb-4">
+                <label className="flex items-start cursor-pointer group relative z-10">
+                  <div className="relative flex items-center">
+                    <input 
+                      type="checkbox" 
+                      id="privacidad"
+                      checked={formData.aceptaPoliticas || false}
+                      onChange={(e) => updateFormSection('aceptaPoliticas', e.target.checked)}
+                      className="opacity-0 absolute h-5 w-5 cursor-pointer z-20"
+                      required
+                    />
+                    <div className={`w-5 h-5 border-2 ${formData.aceptaPoliticas ? 'bg-[#A5856A] border-[#A5856A]' : 'border-[#A5856A] bg-white'} rounded mr-3 flex items-center justify-center transition-all`}>
+                      <svg className={`w-3 h-3 text-white ${formData.aceptaPoliticas ? 'opacity-100' : 'opacity-0'}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                  <span className="text-sm text-[#5D4B3A] leading-tight">
+                    He leído y acepto la <a href="/politica-privacidad" target="_blank" className="text-[#A5856A] hover:text-[#8B6B4F] hover:underline transition-colors">política de privacidad</a> *
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 6:
+        // Paso 6: Resumen de la reserva
+        return (
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-gradient-to-r from-[#F0E8DC] to-[#E6DCC6] p-6 rounded-xl shadow-md mb-8 border border-[#D1B59B]">
+              <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Resumen de su reserva</h3>
+              <p className="text-[#8A6E52] mb-6 italic">Por favor, revise los detalles de su reserva antes de confirmar</p>
+              
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-5 mb-6 shadow-sm border border-[#D1B59B]/50">
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-full bg-[#A5856A]/20 flex items-center justify-center mr-3">
+                    <FaCalendarAlt className="text-[#A5856A]" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-[#5D4B3A]">Detalles del evento</h4>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-12">
+                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
+                    <p className="text-[#8A6E52] text-sm font-medium">Tipo de evento</p>
+                    <p className="font-semibold text-[#5D4B3A] capitalize">
+                      {typeof formData.tipoEvento === 'object' ? 
+                        (formData.tipoEvento.titulo || formData.tipoEvento.nombre || 'No especificado') : 
+                        (formData.tipoEvento || 'No especificado')}
+                    </p>
+                  </div>
+                  
+                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
+                    <p className="text-[#8A6E52] text-sm font-medium">Fecha</p>
+                    <p className="font-semibold text-[#5D4B3A]">
+                      {formData.fecha ? new Date(formData.fecha).toLocaleDateString('es-ES', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      }) : 'No especificada'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-5 mb-6 shadow-sm border border-[#D1B59B]/50">
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-full bg-[#A5856A]/20 flex items-center justify-center mr-3">
+                    <FaBed className="text-[#A5856A]" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-[#5D4B3A]">Habitaciones</h4>
+                </div>
+                
+                <div className="pl-12">
+                  <div className="border-l-2 border-[#D1B59B]/30 pl-4 mb-4">
+                    <p className="text-[#8A6E52] text-sm font-medium">Modo de gestión</p>
+                    <p className="font-semibold text-[#5D4B3A]">
+                      {formData.modoGestionHabitaciones === 'usuario' 
+                        ? 'Gestión por el organizador' 
+                        : 'Gestión por la hacienda'}
+                    </p>
+                  </div>
+                  
+                  {formData.modoGestionHabitaciones === 'usuario' && formData.habitacionesSeleccionadas?.length > 0 && (
+                    <div className="border-l-2 border-[#D1B59B]/30 pl-4">
+                      <p className="text-[#8A6E52] text-sm font-medium mb-2">Habitaciones seleccionadas:</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {formData.habitacionesSeleccionadas.map((habitacion, index) => (
+                          <div key={index} className="flex items-center py-1 px-2 rounded bg-[#F5F0E8] mb-1">
+                            <FaBed className="text-[#A5856A] mr-2 flex-shrink-0" />
+                            <span className="text-sm text-[#5D4B3A]">{habitacion.nombre} - {habitacion.precio}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[#8A6E52] text-sm mt-2">
+                        Total: {formData.habitacionesSeleccionadas.length} habitaciones
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-5 mb-6 shadow-sm border border-[#D1B59B]/50">
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-full bg-[#A5856A]/20 flex items-center justify-center mr-3">
+                    <FaUtensils className="text-[#A5856A]" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-[#5D4B3A]">Servicios</h4>
+                </div>
+                
+                <div className="pl-12">
+                  <div className="border-l-2 border-[#D1B59B]/30 pl-4 mb-4">
+                    <p className="text-[#8A6E52] text-sm font-medium">Modo de gestión</p>
+                    <p className="font-semibold text-[#5D4B3A]">
+                      {formData.modoGestionServicios === 'usuario' 
+                        ? 'Selección por el organizador' 
+                        : 'Consulta con la hacienda'}
+                    </p>
+                  </div>
+                  
+                  {formData.modoGestionServicios === 'usuario' && formData.serviciosSeleccionados?.length > 0 && (
+                    <div className="border-l-2 border-[#D1B59B]/30 pl-4">
+                      <p className="text-[#8A6E52] text-sm font-medium mb-2">Servicios seleccionados:</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {formData.serviciosSeleccionados.map((servicio, index) => (
+                          <div key={index} className="flex items-center py-1 px-2 rounded bg-[#F5F0E8] mb-1">
+                            <FaUtensils className="text-[#A5856A] mr-2 flex-shrink-0" />
+                            <span className="text-sm text-[#5D4B3A]">
+                              {typeof servicio === 'object' ? 
+                                (servicio.titulo || servicio.nombre || `Servicio ${index + 1}`) : 
+                                `Servicio ${servicio}`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-5 shadow-sm border border-[#D1B59B]/50">
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-full bg-[#A5856A]/20 flex items-center justify-center mr-3">
+                    <FaUser className="text-[#A5856A]" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-[#5D4B3A]">Datos de contacto</h4>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-12">
+                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
+                    <p className="text-[#8A6E52] text-sm font-medium">Nombre completo</p>
+                    <p className="font-semibold text-[#5D4B3A]">{formData.datosContacto?.nombre} {formData.datosContacto?.apellidos}</p>
+                  </div>
+                  
+                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
+                    <p className="text-[#8A6E52] text-sm font-medium">Email</p>
+                    <p className="font-semibold text-[#5D4B3A]">{formData.datosContacto?.email}</p>
+                  </div>
+                  
+                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
+                    <p className="text-[#8A6E52] text-sm font-medium">Teléfono</p>
+                    <p className="font-semibold text-[#5D4B3A]">{formData.datosContacto?.telefono}</p>
+                  </div>
+                </div>
+                
+                {formData.datosContacto?.mensaje && (
+                  <div className="pl-12 mt-4">
+                    <div className="border-l-2 border-[#D1B59B]/30 pl-4">
+                      <p className="text-[#8A6E52] text-sm font-medium">Mensaje</p>
+                      <p className="font-semibold text-[#5D4B3A]">{formData.datosContacto.mensaje}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <FaCalendarAlt className="h-5 w-5 text-yellow-500" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">Confirmación pendiente</h3>
+                  <div className="mt-2 text-sm text-yellow-700">
+                    <p>
+                      Al completar la reserva, recibirá un email de confirmación con los detalles. Nuestro equipo se pondrá en contacto con usted para confirmar la disponibilidad y los detalles finales.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      
+      case 6:
+        // Paso 6: Confirmación
+        return (
+          <div className="text-center max-w-2xl mx-auto">
+            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+              <FaCheck className="w-10 h-10 text-green-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-[var(--color-primary)]">
+              ¡Reserva Confirmada!
+            </h2>
+            <p className="text-gray-600 max-w-md mx-auto">
+              Hemos recibido su solicitud de reserva. En breve recibirá un correo electrónico con los detalles y los siguientes pasos a seguir.
+            </p>
+            <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 max-w-md mx-auto text-left">
+              <p><span className="font-medium">Número de Reserva:</span> {Math.floor(Math.random() * 10000).toString().padStart(4, '0')}</p>
+              <p><span className="font-medium">Evento:</span> {formData.tipoEvento}</p>
+              <p><span className="font-medium">Fecha:</span> {formData.fecha}</p>
+            </div>
+          </div>
+        );
+      default:
+        return null;
     }
   };
 
   return (
-    <>
+    <div className="min-h-screen relative">
+      <div 
+        className="fixed inset-0 z-0" 
+        style={{
+          backgroundImage: 'url(/images/imagendron3.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed',
+          filter: 'brightness(0.3)'
+        }}
+      />
       <NavbarReservar />
-      <div className="min-h-screen pt-96 pb-24 px-4 sm:px-6 lg:px-8 relative">
-        {/* Imagen de fondo con overlay */}
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/40"></div>
-          <img 
-            src="/images/imagendron3.jpg" 
-            alt="Fondo Hacienda" 
-            className="w-full h-full object-cover opacity-25"
-            style={{ filter: 'blur(2px)' }}
-          />
-        </div>
-        <div className="max-w-7xl mx-auto relative z-10">
-          <ErrorModal 
-            isOpen={error.show}
-            onClose={() => setError({ show: false, message: '' })}
-            message={error.message}
-          />
-          
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-white/20">
-            <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-8">
-              Reservar Evento
-            </h1>
-            
-            <WizardSteps currentStep={currentStep} steps={steps} />
+      <main className="relative z-10 container mx-auto px-4 py-8 min-h-screen flex flex-col">
+        <div className="flex-grow max-w-7xl mx-auto w-full">
+        {/* Modal para selección de modo de gestión de servicios */}
+        {showModoSeleccionServiciosModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-xl p-6 max-w-4xl w-full">
+              <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-4">
+                Selección de Servicios
+              </h2>
+              <p className="text-gray-600 mb-6">
+                ¿Cómo desea gestionar la selección de servicios para su evento?
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Opción 1: Selección por el usuario */}
+                <div
+                  onClick={() => handleModoServiciosSelect('usuario')}
+                  className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-primary)]/50"
+                >
+                  <div className="flex items-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-4">
+                      <FaUser className="w-8 h-8 text-[var(--color-primary)]" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Seleccionar servicios ahora</h3>
+                      <p className="text-sm text-gray-500">Usted elige los servicios que desea para su evento</p>
+                    </div>
+                  </div>
+                  
+                  <ul className="space-y-2 text-gray-600 mb-4">
+                    <li className="flex items-start">
+                      <span className="w-5 h-5 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
+                      </span>
+                      <span>Elija entre nuestros paquetes y servicios individuales</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-5 h-5 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
+                      </span>
+                      <span>Vea precios y descripciones detalladas</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-5 h-5 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
+                      </span>
+                      <span>Personalice su evento según sus preferencias</span>
+                    </li>
+                  </ul>
+                  
+                  <div className="text-sm text-gray-500 italic">
+                    Recomendado si ya tiene una idea clara de lo que desea para su evento
+                  </div>
+                </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-              {steps[currentStep].content}
-
-              <div className="flex justify-end mt-8">
-                {currentStep > 0 && (
-                  <button
-                    type="button"
-                    onClick={handlePreviousStep}
-                    className="px-6 py-3 mr-4 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
-                  >
-                    Atrás
-                  </button>
-                )}
-                {currentStep === steps.length - 1 ? (
-                  <button
-                    type="submit"
-                    disabled={loading || !formData.tipoEvento || !formData.fechaEvento || !formData.nombre || !formData.correo || !formData.telefono || !formData.modoGestionHabitaciones}
-                    className="px-8 py-3 rounded-lg transition-all duration-300 flex items-center space-x-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)]"
-                  >
-                    <span className="text-white font-medium">Finalizar</span>
-                    <FaChevronRight className="text-white" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleNextStep}
-                    className="px-8 py-3 rounded-lg transition-all duration-300 flex items-center space-x-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)]"
-                  >
-                    <span className="text-white font-medium">Siguiente</span>
-                    <FaChevronRight className="text-white" />
-                  </button>
-                )}
+                {/* Opción 2: Gestión por la hacienda */}
+                <div
+                  onClick={() => handleModoServiciosSelect('hacienda')}
+                  className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-primary)]/50"
+                >
+                  <div className="flex items-center mb-4">
+                    <div className="w-16 h-16 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-4">
+                      <FaUtensils className="w-8 h-8 text-[var(--color-accent)]" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Consultar con la Hacienda</h3>
+                      <p className="text-sm text-gray-500">Nuestro equipo le asesorará sobre los servicios</p>
+                    </div>
+                  </div>
+                  
+                  <ul className="space-y-2 text-gray-600 mb-4">
+                    <li className="flex items-start">
+                      <span className="w-5 h-5 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]"></span>
+                      </span>
+                      <span>Un coordinador de eventos se pondrá en contacto con usted</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-5 h-5 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]"></span>
+                      </span>
+                      <span>Reciba asesoramiento personalizado según su presupuesto</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="w-5 h-5 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]"></span>
+                      </span>
+                      <span>Flexibilidad para modificar servicios más adelante</span>
+                    </li>
+                  </ul>
+                  
+                  <div className="text-sm text-gray-500 italic">
+                    Recomendado si prefiere recibir orientación profesional
+                  </div>
+                </div>
               </div>
-            </form>
+            </div>
           </div>
+        )}
+        
+        {/* Modal para selección de modo de gestión de habitaciones */}
+        <ModalModoGestionHabitaciones 
+          isOpen={showModoSeleccionHabitacionesModal} 
+          onClose={() => setShowModoSeleccionHabitacionesModal(false)} 
+          onModeSelect={handleModoHabitacionesSelect} 
+        />
+        
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-[#A5856A]/20" 
+            style={wizardContainerStyle}>
+          <h1 className="text-3xl font-extrabold text-[#0F0F0F] mb-8">
+            Reservar Evento
+          </h1>
+          
+          {/* Wizard Steps */}
+          <div className="flex justify-between items-center mb-8">
+            <div className="flex items-center space-x-4">
+              {steps.map((step, index) => (
+                <div 
+                  key={index}
+                  className={`flex items-center ${index !== steps.length - 1 ? 'mr-4' : ''}`}
+                >
+                  <div 
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transform transition-all duration-300 shadow-lg ${
+                      currentStep > index + 1 
+                        ? 'bg-[#A5856A] text-white' 
+                        : currentStep === index + 1 
+                          ? 'bg-[var(--color-primary)] text-white'
+                          : 'bg-gray-200 text-gray-500'
+                    }`}
+                  >
+                    {currentStep > index + 1 ? (
+                      <FaCheck className="w-5 h-5" />
+                    ) : (
+                      <span className="font-bold text-black">{index + 1}</span>
+                    )}
+                  </div>
+                  {index !== steps.length - 1 && (
+                    <div className={`w-10 h-0.5 ${currentStep > index + 1 ? 'bg-[#A5856A]' : 'bg-gray-200'}`}></div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Step Content */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-[#0F0F0F] mb-4">
+              {currentStep <= steps.length ? steps[currentStep - 1].title : 'Confirmación'}
+            </h2>
+            <p className="text-gray-600 mb-6 font-medium">
+              {currentStep <= steps.length ? steps[currentStep - 1].description : 'Su reserva ha sido confirmada'}
+            </p>
+            
+            {renderStepContent()}
+          </div>
+          
+          {/* Navigation Buttons */}
+          <div className="flex justify-between items-center mt-8">
+            <div>
+              {currentStep > 1 && currentStep <= steps.length + 1 && (
+                <button 
+                  onClick={() => setCurrentStep(prev => prev - 1)}
+                  className="px-6 py-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
+                >
+                  <div className="flex items-center">
+                    <FaChevronLeft className="mr-2" />
+                    <span>Anterior</span>
+                  </div>
+                </button>
+              )}
+            </div>
+            
+            {currentStep <= steps.length && (
+              <button 
+                onClick={handleNextStep}
+                className="px-8 py-3 rounded-lg transition-all duration-300 flex items-center space-x-2 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5" style={{
+                  background: 'linear-gradient(145deg, #A5856A, #8B6B4F)',
+                }}
+              >
+                <span>{currentStep === 5 ? 'Completar Reserva' : 'Siguiente'}</span>
+                <FaChevronRight />
+              </button>
+            )}
+          </div>
+                  </div>
         </div>
-      </div>
+      </main>
       <Footer />
-    </>
+    </div>
   );
-}
+};
