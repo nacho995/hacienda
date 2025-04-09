@@ -4,8 +4,9 @@ const mongoose = require('mongoose');
 const ReservaHabitacionSchema = new mongoose.Schema({
   habitacion: {
     type: String,
-    required: [true, 'Por favor, proporcione un identificador para la habitación'],
-    trim: true
+    required: [true, 'Por favor, proporcione la letra de la habitación'],
+    trim: true,
+    description: 'Letra identificadora de la habitación (A, B, C, etc.)'
   },
   tipoHabitacion: {
     type: String,

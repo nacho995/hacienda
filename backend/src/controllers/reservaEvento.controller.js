@@ -15,238 +15,223 @@ const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
 exports.crearReservaEvento = async (req, res) => {
   try {
     const { 
-      nombreEvento,
-      tipoEvento,
-      nombreContacto,
-      apellidosContacto,
-      emailContacto,
-      telefonoContacto,
+      tipo_evento,
       fecha,
-      horaInicio,
-      horaFin,
-      espacioSeleccionado,
-      numInvitados,
-      peticionesEspeciales,
-      presupuestoEstimado
+      nombre_contacto,
+      apellidos_contacto,
+      email_contacto,
+      telefono_contacto,
+      mensaje,
+      habitaciones,
+      modo_gestion_habitaciones
     } = req.body;
     
     // Validar campos obligatorios
-    if (!nombreEvento || !tipoEvento || !nombreContacto || !apellidosContacto || !emailContacto || !telefonoContacto || !fecha || !numInvitados) {
+    if (!tipo_evento || !fecha || !nombre_contacto || !email_contacto || !telefono_contacto) {
       return res.status(400).json({
         success: false,
         message: 'Por favor, proporcione todos los campos obligatorios'
       });
     }
 
-    // Buscar el tipo de evento por su ID
-    const tipoEventoDoc = await TipoEvento.findById(tipoEvento);
+    // Validar tipo de evento
+    const tipoEventoDoc = await TipoEvento.findOne({ 
+      nombre: { $regex: new RegExp(tipo_evento, 'i') }
+    });
+
     if (!tipoEventoDoc) {
       return res.status(400).json({
         success: false,
-        message: `El tipo de evento no es válido`
+        message: 'Tipo de evento no válido'
       });
     }
 
-    // Verificar disponibilidad para la fecha y hora solicitadas
-    const disponible = await ReservaEvento.comprobarDisponibilidad(
-      fecha,
-      espacioSeleccionado || 'jardin',
-      horaInicio || '12:00',
-      horaFin || '18:00'
-    );
-
-    if (!disponible) {
+    // Validar fecha
+    const fechaEvento = new Date(fecha);
+    if (isNaN(fechaEvento.getTime())) {
       return res.status(400).json({
         success: false,
-        message: 'El espacio no está disponible para la fecha y hora solicitadas'
+        message: 'Fecha no válida'
       });
     }
+
+    // Verificar disponibilidad para la fecha
+    const reservasExistentes = await ReservaEvento.find({
+      fecha: {
+        $gte: new Date(fechaEvento.setHours(0, 0, 0, 0)),
+        $lt: new Date(fechaEvento.setHours(23, 59, 59, 999))
+      },
+      estadoReserva: { $ne: 'cancelada' }
+    });
+
+    if (reservasExistentes.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'La fecha seleccionada no está disponible'
+      });
+    }
+
+    // Procesar las habitaciones
+    const habitacionesValidadas = habitaciones?.map(hab => ({
+      fecha_entrada: new Date(hab.fecha_entrada),
+      huespedes: hab.huespedes.map(h => ({
+        nombre: h.nombre,
+        numero_personas: parseInt(h.numero_personas)
+      }))
+    })) || [];
+
+    // Calcular el total de habitaciones
+    const totalHabitaciones = habitacionesValidadas.length || 7;
     
     // Crear objeto para guardar
     const reservaData = {
       // Solo incluir usuario si está autenticado
       ...(req.user && req.user.id ? { usuario: req.user.id } : {}),
-      nombreEvento,
-      tipoEvento: tipoEventoDoc._id, // Usar el ObjectId del tipo de evento
-      nombreContacto,
-      apellidosContacto,
-      emailContacto,
-      telefonoContacto,
-      fecha,
-      horaInicio: horaInicio || '12:00',
-      horaFin: horaFin || '18:00',
-      espacioSeleccionado: espacioSeleccionado || 'jardin',
-      numInvitados: parseInt(numInvitados),
-      peticionesEspeciales: peticionesEspeciales || '',
-      presupuestoEstimado: presupuestoEstimado || 0,
+      tipoEvento: tipoEventoDoc._id,
+      nombreContacto: nombre_contacto,
+      apellidosContacto: apellidos_contacto,
+      emailContacto: email_contacto,
+      telefonoContacto: telefono_contacto,
+      fecha: fechaEvento,
+      horaInicio: '12:00',
+      horaFin: '18:00',
+      espacioSeleccionado: 'jardin',
+      numInvitados: 50, // Valor por defecto
+      peticionesEspeciales: mensaje || '',
+      estadoReserva: 'pendiente',
+      metodoPago: 'pendiente',
+      modoGestionHabitaciones: modo_gestion_habitaciones || 'usuario',
+      totalHabitaciones,
       serviciosAdicionales: {
-        habitaciones: req.body.serviciosAdicionales?.habitaciones?.map(habitacion => ({
-          tipoHabitacion: habitacion.tipoHabitacion,
-          nombre: habitacion.nombre,
-          fechaEntrada: habitacion.fechaEntrada,
-          fechaSalida: habitacion.fechaSalida,
-          numeroHabitaciones: habitacion.numeroHabitaciones,
-          numHuespedes: habitacion.numHuespedes,
-          precio: parseFloat(habitacion.precio)
-        })) || []
+        habitaciones: habitacionesValidadas.map((hab, index) => ({
+          tipoHabitacion: index < 6 ? '1 cama king size' : 'Dos matrimoniales',
+          categoriaHabitacion: index < 6 ? 'sencilla' : 'doble',
+          precio: index < 6 ? 2400 : 2600,
+          fechaEntrada: hab.fecha_entrada,
+          fechaSalida: new Date(hab.fecha_entrada.getTime() + 24 * 60 * 60 * 1000),
+          huespedes: hab.huespedes,
+          estado: 'pendiente'
+        }))
       }
     };
 
-    // Calcular precio base usando el precio del tipo de evento
-    const precioBase = parseFloat(tipoEventoDoc.precio) || 0;
+    // Crear la reserva
+    const reserva = await ReservaEvento.create(reservaData);
 
-    // Calcular precio por invitado
-    const precioPorInvitado = 350; // $350 por invitado
-    const precioInvitados = parseInt(numInvitados) * precioPorInvitado;
-
-    // Calcular precio por servicios adicionales
-    let precioServicios = 0;
-    if (req.body.serviciosAdicionales) {
-      if (req.body.serviciosAdicionales.decoracion) precioServicios += 15000;
-      if (req.body.serviciosAdicionales.musica) precioServicios += 12000;
-      if (req.body.serviciosAdicionales.fotografo) precioServicios += 8000;
-      if (req.body.serviciosAdicionales.transporte) precioServicios += 5000;
+    // Crear las reservas de habitaciones asociadas
+    const reservasHabitaciones = [];
+    for (const [index, hab] of habitacionesValidadas.entries()) {
+      const reservaHabitacion = await ReservaHabitacion.create({
+        tipoReserva: 'evento',
+        reservaEvento: reserva._id,
+        tipoHabitacion: index < 6 ? '1 cama king size' : 'Dos matrimoniales',
+        categoriaHabitacion: index < 6 ? 'sencilla' : 'doble',
+        numHuespedes: hab.huespedes.reduce((total, h) => total + h.numero_personas, 0),
+        infoHuespedes: {
+          nombres: hab.huespedes.map(h => h.nombre),
+          detalles: `${hab.huespedes.length} huéspedes`
+        },
+        fechaEntrada: hab.fecha_entrada,
+        fechaSalida: new Date(hab.fecha_entrada.getTime() + 24 * 60 * 60 * 1000),
+        estado: 'pendiente',
+        nombreContacto: nombre_contacto,
+        apellidosContacto: apellidos_contacto,
+        emailContacto: email_contacto,
+        telefonoContacto: telefono_contacto
+      });
+      reservasHabitaciones.push(reservaHabitacion);
     }
 
-    // Calcular precio por menú seleccionado
-    let precioMenu = 0;
-    switch (req.body.menuSeleccionado) {
-      case 'Premium':
-        precioMenu = parseInt(numInvitados) * 800;
-        break;
-      case 'Deluxe':
-        precioMenu = parseInt(numInvitados) * 1200;
-        break;
-      case 'Personalizado':
-        precioMenu = parseInt(numInvitados) * 1500;
-        break;
-      case 'Básico':
-        precioMenu = parseInt(numInvitados) * 500;
-        break;
-    }
+    // Actualizar la reserva del evento con las referencias a las habitaciones
+    reserva.serviciosAdicionales.habitaciones = reservasHabitaciones.map(rh => ({
+      reservaHabitacionId: rh._id,
+      tipoHabitacion: rh.tipoHabitacion,
+      precio: rh.tipoHabitacion === '1 cama king size' ? 2400 : 2600
+    }));
+    await reserva.save();
 
-    // Calcular precio total
-    const precioTotal = precioBase + precioInvitados + precioServicios + precioMenu;
-
-    // Actualizar el objeto de reserva con el precio total
-    reservaData.precio = precioTotal;
-
-    // Crear la reserva del evento
-    const reservaEvento = await ReservaEvento.create(reservaData);
-
-    // Si hay habitaciones seleccionadas, crear las reservas de habitaciones
-    if (req.body.serviciosAdicionales?.habitaciones?.length > 0) {
-      console.log('[DEBUG] Procesando habitaciones:', JSON.stringify(req.body.serviciosAdicionales.habitaciones, null, 2));
-      console.log('[DEBUG] Total de habitaciones a procesar:', req.body.serviciosAdicionales.habitaciones.length);
-      
-      try {
-        // Usar el método estático del modelo para procesar las habitaciones
-        const datosEvento = {
-          nombreContacto, 
-          apellidosContacto, 
-          emailContacto, 
-          telefonoContacto,
-          fecha
-        };
-        
-        // Procesar las habitaciones una por una en secuencia con manejo de errores
-        for (const habitacion of req.body.serviciosAdicionales.habitaciones) {
-          try {
-            console.log('[DEBUG] Procesando habitación individual:', JSON.stringify(habitacion, null, 2));
-            
-            // Validar que tipoHabitacion y precio estén presentes y sean válidos
-            if (!habitacion.tipoHabitacion) {
-              console.error('[ERROR] Habitación sin tipoHabitacion:', habitacion);
-              throw new Error('El tipo de habitación es requerido');
-            }
-            
-            // Asegurarse que el precio es un número válido
-            let precio;
-            try {
-              precio = parseFloat(habitacion.precio);
-              if (isNaN(precio) || precio <= 0) {
-                precio = 0; // Valor por defecto para evitar error
-                console.warn('[WARN] Precio de habitación inválido, estableciendo default:', { 
-                  precio: habitacion.precio,
-                  parseado: precio
-                });
-              }
-            } catch (error) {
-              precio = 0; // Valor por defecto para evitar error
-              console.error('[ERROR] Error al parsear precio de habitación:', error);
-            }
-
-            // Crear la habitación usando el método estático del modelo
-            const nuevaHabitacion = await ReservaHabitacion.crearDesdeReservaEvento(
-              habitacion, 
-              datosEvento, 
-              reservaEvento._id
-            );
-            
-            console.log('[DEBUG] Habitación creada correctamente:', nuevaHabitacion._id);
-          } catch (habitacionError) {
-            console.error('[ERROR] Error al procesar habitación individual:', habitacionError);
-            console.error('[ERROR] Stack trace:', habitacionError.stack);
-            // Continuar con la siguiente habitación en lugar de detener todo el proceso
-          }
-        }
-      } catch (habitacionesError) {
-        console.error('[ERROR] Error al procesar grupo de habitaciones:', habitacionesError);
-        console.error('[ERROR] Stack trace:', habitacionesError.stack);
-        throw new Error(`Error al crear habitaciones: ${habitacionesError.message}`);
-      }
-    }
-
-    // Enviar email de confirmación al usuario
+    // Enviar correo de confirmación al cliente
     try {
-      await sendEmail({
-        email: emailContacto,
-        subject: 'Confirmación de Reserva de Evento - Hacienda San Carlos Borromeo',
-        html: confirmacionTemplate({
-          nombreContacto: nombreContacto,
-          apellidosContacto: apellidosContacto,
-          tipoEvento: tipoEvento,
-          nombreEvento: nombreEvento,
-          fecha: fecha,
-          horaInicio: horaInicio || '12:00',
-          horaFin: horaFin || '18:00',
-          espacioSeleccionado: espacioSeleccionado || 'jardin',
-          numeroInvitados: numInvitados,
-          numeroConfirmacion: reservaEvento.numeroConfirmacion,
-          estadoReserva: reservaEvento.estadoReserva,
-          presupuestoEstimado: presupuestoEstimado || 0
-        })
+      // Preparar contenido del email
+      const emailContent = confirmacionTemplate({
+        nombre: nombre_contacto,
+        apellidos: apellidos_contacto,
+        tipoEvento: tipoEventoDoc.nombre,
+        fecha: fechaEvento.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+        numeroConfirmacion: reserva.numeroConfirmacion,
+        habitaciones: habitacionesValidadas.length,
+        modoGestionHabitaciones: modo_gestion_habitaciones || 'usuario'
       });
-  
-      // Enviar email de notificación al administrador
+      
+      // Enviar email al cliente
       await sendEmail({
-        email: process.env.EMAIL_ADMIN || 'admin@hacienda-sancarlos.com',
-        subject: 'Nueva Reserva de Evento - Hacienda San Carlos Borromeo',
-        html: confirmacionAdminTemplate({
-          tipo: 'evento',
-          cliente: `${nombreContacto} ${apellidosContacto}`,
-          email: emailContacto,
-          telefono: telefonoContacto,
-          fecha: fecha,
-          hora: `${horaInicio || '12:00'} - ${horaFin || '18:00'}`,
-          detalles: `Tipo de evento: ${tipoEvento}, Número de personas: ${numInvitados}`,
-          comentarios: peticionesEspeciales || 'No hay comentarios adicionales'
-        })
+        email: email_contacto,
+        subject: 'Confirmación de Reserva - Hacienda La Esperanza',
+        html: emailContent
       });
+
+      // Si el modo de gestión es por la hacienda, enviar correo adicional al administrador
+      if (modo_gestion_habitaciones === 'hacienda') {
+        // Obtener todos los usuarios con rol admin
+        const adminUsers = await User.find({ role: 'admin' });
+        const adminEmails = adminUsers.map(admin => admin.email);
+        
+        if (adminEmails.length > 0) {
+          const adminEmailContent = `
+            <h2>Nueva Reserva de Evento con Gestión de Habitaciones por la Hacienda</h2>
+            <p><strong>Número de Confirmación:</strong> ${reserva.numeroConfirmacion}</p>
+            <p><strong>Tipo de Evento:</strong> ${tipoEventoDoc.nombre}</p>
+            <p><strong>Fecha:</strong> ${fechaEvento.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p><strong>Cliente:</strong> ${nombre_contacto} ${apellidos_contacto}</p>
+            <p><strong>Email:</strong> ${email_contacto}</p>
+            <p><strong>Teléfono:</strong> ${telefono_contacto}</p>
+            <p><strong>Modo de Gestión:</strong> Gestión por la Hacienda</p>
+            <p>El cliente ha seleccionado que el personal de la hacienda gestione la asignación de habitaciones.</p>
+            <p>Por favor, contacte al cliente para coordinar los detalles de las habitaciones y huéspedes.</p>
+            <p><a href="${process.env.FRONTEND_URL}/admin/reservas/eventos/${reserva._id}" style="padding: 10px 15px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 4px;">Ver Reserva en el Panel de Administración</a></p>
+          `;
+          
+          await sendEmail({
+            email: adminEmails,
+            subject: `Nueva Reserva con Gestión de Habitaciones - ${reserva.numeroConfirmacion}`,
+            html: adminEmailContent
+          });
+        }
+      } else {
+        // Enviar correo de notificación al administrador estándar
+        const defaultAdminEmails = ['admin@hacienda.com']; // Lista de correos de administradores
+        for (const adminEmail of defaultAdminEmails) {
+          await sendEmail({
+            email: adminEmail,
+            subject: 'Nueva Reserva de Evento',
+            html: confirmacionAdminTemplate({
+              nombre: nombre_contacto,
+              apellidos: apellidos_contacto,
+              tipoEvento: tipoEventoDoc.nombre,
+              fecha: fechaEvento.toLocaleDateString('es-ES'),
+              numeroConfirmacion: reserva.numeroConfirmacion,
+              habitaciones: habitacionesValidadas.length
+            })
+          });
+        }
+      }
     } catch (emailError) {
-      console.error('Error al enviar emails de confirmación:', emailError);
-      // Continuamos con la respuesta aunque falle el envío de emails
+      console.error('Error al enviar correos de confirmación:', emailError);
+      // No devolvemos error al cliente ya que la reserva se creó correctamente
     }
 
     res.status(201).json({
       success: true,
-      data: reservaEvento
+      data: {
+        reserva,
+        habitaciones: reservasHabitaciones
+      }
     });
   } catch (error) {
     console.error('Error al crear reserva de evento:', error);
     res.status(500).json({
       success: false,
-      message: 'No se pudo crear la reserva',
+      message: 'Error al crear la reserva de evento',
       error: error.message
     });
   }
@@ -560,37 +545,94 @@ exports.eliminarReservaEvento = async (req, res) => {
  */
 exports.checkEventoAvailability = async (req, res) => {
   try {
-    const { fecha, espacioSeleccionado, horaInicio, horaFin } = req.body;
-    
-    if (!fecha || !espacioSeleccionado) {
+    const { fecha, tipo_evento, total_habitaciones } = req.body;
+
+    console.log('Verificando disponibilidad con datos:', { fecha, tipo_evento, total_habitaciones });
+
+    // Validar campos requeridos
+    if (!fecha || !tipo_evento) {
       return res.status(400).json({
         success: false,
-        disponible: false,
-        mensaje: 'Debe proporcionar fecha y espacio seleccionado'
+        message: 'Por favor, proporcione la fecha y el tipo de evento'
       });
     }
+
+    // Validar que la fecha sea futura
+    const fechaReserva = new Date(fecha);
+    const hoy = new Date();
     
-    // Comprobar disponibilidad
-    const disponible = await ReservaEvento.comprobarDisponibilidad(
-      fecha,
-      espacioSeleccionado,
-      horaInicio || '12:00',
-      horaFin || '18:00'
-    );
+    // Establecer las horas a 0 para comparar solo las fechas
+    fechaReserva.setHours(0, 0, 0, 0);
+    hoy.setHours(0, 0, 0, 0);
     
-    return res.status(200).json({
+    console.log('Fecha reserva:', fechaReserva.toISOString());
+    console.log('Fecha hoy:', hoy.toISOString());
+    
+    if (fechaReserva <= hoy) {
+      return res.status(400).json({
+        success: false,
+        message: 'La fecha debe ser posterior a hoy'
+      });
+    }
+
+    // Validar tipo de evento
+    const tipoEventoDoc = await TipoEvento.findOne({ 
+      nombre: { $regex: new RegExp(tipo_evento, 'i') }
+    });
+
+    if (!tipoEventoDoc) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tipo de evento no válido'
+      });
+    }
+
+    // Validar número de habitaciones
+    const habitacionesRequeridas = total_habitaciones || 7;
+    if (habitacionesRequeridas < 7 || habitacionesRequeridas > 14) {
+      return res.status(400).json({
+        success: false,
+        message: 'El número de habitaciones debe estar entre 7 y 14'
+      });
+    }
+
+    // Buscar reservas existentes para la fecha
+    const inicioDelDia = new Date(fechaReserva);
+    inicioDelDia.setHours(0, 0, 0, 0);
+    
+    const finDelDia = new Date(fechaReserva);
+    finDelDia.setHours(23, 59, 59, 999);
+    
+    const reservasExistentes = await ReservaEvento.find({
+      fecha: {
+        $gte: inicioDelDia,
+        $lt: finDelDia
+      },
+      estadoReserva: { $ne: 'cancelada' }
+    });
+    
+    console.log('Buscando reservas entre:', inicioDelDia.toISOString(), 'y', finDelDia.toISOString());
+
+    // Si hay reservas en la fecha, verificar disponibilidad
+    if (reservasExistentes.length > 0) {
+      return res.status(200).json({
+        success: true,
+        available: false,
+        message: 'La fecha seleccionada no está disponible'
+      });
+    }
+
+    res.status(200).json({
       success: true,
-      disponible,
-      mensaje: disponible 
-        ? 'El espacio está disponible para la fecha y hora seleccionadas'
-        : 'El espacio no está disponible para la fecha y hora seleccionadas'
+      available: true,
+      message: 'Fecha disponible para el evento'
     });
   } catch (error) {
-    console.error('Error al comprobar disponibilidad de evento:', error);
-    return res.status(500).json({
+    console.error('Error al verificar disponibilidad:', error);
+    res.status(500).json({
       success: false,
-      disponible: false,
-      mensaje: 'Error al comprobar disponibilidad: ' + error.message
+      message: 'Error al verificar disponibilidad',
+      error: error.message
     });
   }
 };
@@ -789,106 +831,30 @@ exports.obtenerHabitacionesEvento = async (req, res) => {
       });
     }
     
-    // Obtener todas las habitaciones asociadas a este evento
-    const ReservaHabitacion = require('../models/ReservaHabitacion');
-    const habitaciones = await ReservaHabitacion.find({ reservaEvento: eventoId })
-      .sort('letraHabitacion');
-    
-    // Si no hay habitaciones, crear la lista según el formulario proporcionado
-    if (habitaciones.length === 0) {
-      // Crear 14 habitaciones predeterminadas según el formato de la tabla
-      const habitacionesPredeterminadas = [];
-      
-      // Crear 6 habitaciones sencillas (con cama king size)
-      for (let i = 0; i < 6; i++) {
-        let letra;
-        switch (i) {
-          case 0: letra = 'A'; break;
-          case 1: letra = 'B'; break;
-          case 2: letra = 'K'; break;
-          case 3: letra = 'L'; break;
-          case 4: letra = 'M'; break;
-          case 5: letra = 'O'; break;
-          default: letra = String.fromCharCode(65 + i); // A, B, C, etc.
-        }
-        
-        habitacionesPredeterminadas.push({
-          tipoHabitacion: '1 cama king size',
-          categoriaHabitacion: 'sencilla',
-          precioPorNoche: 2400,
-          letraHabitacion: letra,
-          numHuespedes: 2,
-          infoHuespedes: { nombres: [], detalles: '' },
-          tipoReservacion: 'evento',
-          reservaEvento: eventoId,
-          numeroHabitaciones: 1,
-          fechaEntrada: evento.fecha,
-          fechaSalida: new Date(evento.fecha.getTime() + 24 * 60 * 60 * 1000), // +1 día
-          habitacion: `Habitación ${letra}`,
-          estado: 'pendiente',
-          nombreContacto: evento.nombreContacto,
-          apellidosContacto: evento.apellidosContacto,
-          emailContacto: evento.emailContacto,
-          telefonoContacto: evento.telefonoContacto,
-          fecha: evento.fecha,
-          precio: 0, // El precio se maneja a nivel de evento
-          precioTotal: 0
-        });
+    // Crear un array con las 14 habitaciones
+    const habitaciones = Array(14).fill().map((_, index) => ({
+      numero: index + 1,
+      tipo: index < 6 ? '1 cama king size' : 'Dos matrimoniales',
+      categoria: index < 6 ? 'sencilla' : 'doble',
+      precio: index < 6 ? 2400 : 2600,
+      estado: 'pendiente',
+      fechaEntrada: evento.fecha,
+      fechaSalida: new Date(evento.fecha.getTime() + 24 * 60 * 60 * 1000), // +1 día
+      infoHuespedes: {
+        nombres: [],
+        detalles: ''
       }
-      
-      // Crear 8 habitaciones dobles (con dos camas matrimoniales)
-      for (let i = 0; i < 8; i++) {
-        let letra;
-        switch (i) {
-          case 0: letra = 'C'; break;
-          case 1: letra = 'D'; break;
-          case 2: letra = 'E'; break;
-          case 3: letra = 'F'; break;
-          case 4: letra = 'G'; break;
-          case 5: letra = 'H'; break;
-          case 6: letra = 'I'; break;
-          case 7: letra = 'J'; break;
-          default: letra = String.fromCharCode(67 + i); // C, D, E, etc.
-        }
-        
-        habitacionesPredeterminadas.push({
-          tipoHabitacion: 'Dos matrimoniales',
-          categoriaHabitacion: 'doble',
-          precioPorNoche: 2600,
-          letraHabitacion: letra,
-          numHuespedes: 2,
-          infoHuespedes: { nombres: [], detalles: '' },
-          tipoReservacion: 'evento',
-          reservaEvento: eventoId,
-          numeroHabitaciones: 1,
-          fechaEntrada: evento.fecha,
-          fechaSalida: new Date(evento.fecha.getTime() + 24 * 60 * 60 * 1000), // +1 día
-          habitacion: `Habitación ${letra}`,
-          estado: 'pendiente',
-          nombreContacto: evento.nombreContacto,
-          apellidosContacto: evento.apellidosContacto,
-          emailContacto: evento.emailContacto,
-          telefonoContacto: evento.telefonoContacto,
-          fecha: evento.fecha,
-          precio: 0, // El precio se maneja a nivel de evento
-          precioTotal: 0
-        });
-      }
-      
-      return res.status(200).json({
-        success: true,
-        count: habitacionesPredeterminadas.length,
-        data: habitacionesPredeterminadas
-      });
-    }
+    }));
     
     res.status(200).json({
       success: true,
-      count: habitaciones.length,
-      data: habitaciones
+      data: {
+        evento,
+        habitaciones
+      }
     });
   } catch (error) {
-    console.error('Error al obtener habitaciones del evento:', error);
+    console.error('Error al obtener las habitaciones del evento:', error);
     res.status(500).json({
       success: false,
       message: 'Error al obtener las habitaciones del evento',

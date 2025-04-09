@@ -45,7 +45,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2400.00,
         totalHabitacion: 4800.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Primera planta',
+        ubicacion: 'Ala derecha',
+        capacidad: 2,
+        metrosCuadrados: 25,
+        coordenadas: {
+          x: 10,
+          y: 20
+        }
       },
       {
         nombre: 'Habitación B',
@@ -58,7 +66,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2400.00,
         totalHabitacion: 4800.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Primera planta',
+        ubicacion: 'Ala derecha',
+        capacidad: 2,
+        metrosCuadrados: 25,
+        coordenadas: {
+          x: 20,
+          y: 20
+        }
       },
       {
         nombre: 'Habitación C',
@@ -71,7 +87,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2450.00,
         totalHabitacion: 4900.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Primera planta',
+        ubicacion: 'Ala izquierda',
+        capacidad: 4,
+        metrosCuadrados: 30,
+        coordenadas: {
+          x: 30,
+          y: 20
+        }
       },
       {
         nombre: 'Habitación D',
@@ -84,7 +108,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2450.00,
         totalHabitacion: 4900.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Primera planta',
+        ubicacion: 'Ala izquierda',
+        capacidad: 4,
+        metrosCuadrados: 30,
+        coordenadas: {
+          x: 40,
+          y: 20
+        }
       },
       {
         nombre: 'Habitación E',
@@ -97,7 +129,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2450.00,
         totalHabitacion: 4900.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Segunda planta',
+        ubicacion: 'Ala derecha',
+        capacidad: 4,
+        metrosCuadrados: 30,
+        coordenadas: {
+          x: 10,
+          y: 40
+        }
       },
       {
         nombre: 'Habitación F',
@@ -110,7 +150,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2450.00,
         totalHabitacion: 4900.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Segunda planta',
+        ubicacion: 'Ala derecha',
+        capacidad: 4,
+        metrosCuadrados: 30,
+        coordenadas: {
+          x: 20,
+          y: 40
+        }
       },
       {
         nombre: 'Habitación G',
@@ -123,7 +171,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2450.00,
         totalHabitacion: 4900.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Segunda planta',
+        ubicacion: 'Ala izquierda',
+        capacidad: 4,
+        metrosCuadrados: 30,
+        coordenadas: {
+          x: 30,
+          y: 40
+        }
       },
       {
         nombre: 'Habitación H',
@@ -136,7 +192,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2450.00,
         totalHabitacion: 4900.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Segunda planta',
+        ubicacion: 'Ala izquierda',
+        capacidad: 4,
+        metrosCuadrados: 30,
+        coordenadas: {
+          x: 40,
+          y: 40
+        }
       },
       {
         nombre: 'Habitación I',
@@ -149,7 +213,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2450.00,
         totalHabitacion: 4900.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Tercera planta',
+        ubicacion: 'Ala derecha',
+        capacidad: 4,
+        metrosCuadrados: 30,
+        coordenadas: {
+          x: 10,
+          y: 60
+        }
       },
       {
         nombre: 'Habitación J',
@@ -162,7 +234,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2450.00,
         totalHabitacion: 4900.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Tercera planta',
+        ubicacion: 'Ala derecha',
+        capacidad: 4,
+        metrosCuadrados: 30,
+        coordenadas: {
+          x: 20,
+          y: 60
+        }
       },
       {
         nombre: 'Habitación K',
@@ -175,7 +255,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2400.00,
         totalHabitacion: 4800.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Tercera planta',
+        ubicacion: 'Ala izquierda',
+        capacidad: 2,
+        metrosCuadrados: 25,
+        coordenadas: {
+          x: 30,
+          y: 60
+        }
       },
       {
         nombre: 'Habitación L',
@@ -188,7 +276,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2400.00,
         totalHabitacion: 4800.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Tercera planta',
+        ubicacion: 'Ala izquierda',
+        capacidad: 2,
+        metrosCuadrados: 25,
+        coordenadas: {
+          x: 40,
+          y: 60
+        }
       },
       {
         nombre: 'Habitación M',
@@ -201,7 +297,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2400.00,
         totalHabitacion: 4800.00,
-        especificaciones: '1 noche en cortesía en hab. Nupcial'
+        especificaciones: '1 noche en cortesía en hab. Nupcial',
+        planta: 'Primera planta',
+        ubicacion: 'Ala derecha',
+        capacidad: 2,
+        metrosCuadrados: 25,
+        coordenadas: {
+          x: 50,
+          y: 20
+        }
       },
       {
         nombre: 'Habitación O',
@@ -214,7 +318,15 @@ db.once('open', async () => {
         noches: 2,
         precioPorNoche: 2400.00,
         totalHabitacion: 4800.00,
-        especificaciones: ''
+        especificaciones: '',
+        planta: 'Primera planta',
+        ubicacion: 'Ala derecha',
+        capacidad: 2,
+        metrosCuadrados: 25,
+        coordenadas: {
+          x: 60,
+          y: 20
+        }
       }
     ];
 

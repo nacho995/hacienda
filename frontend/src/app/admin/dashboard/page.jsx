@@ -17,7 +17,7 @@ import {
 } from '../../../services/reservationService';
 import userService from '../../../services/userService';
 import { toast } from 'sonner';
-import { obtenerHabitaciones } from '../../../services/habitacionService';
+import { obtenerHabitaciones } from '../../../services/habitaciones.service';
 
 export default function AdminDashboard() {
   const { isAuthenticated, isAdmin, loading, user } = useAuth();

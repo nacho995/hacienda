@@ -11,8 +11,8 @@ export * from './authService';
 export * from './reservationService';
 
 // Servicios de habitaciones
-export * from './habitacionService';
-export { default as habitacionService } from './habitacionService';
+export * from './habitaciones.service';
+export { default as habitacionService } from './habitaciones.service';
 
 // Servicios de eventos
 export * from './eventoService';

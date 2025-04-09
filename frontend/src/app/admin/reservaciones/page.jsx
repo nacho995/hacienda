@@ -1315,10 +1315,12 @@ export default function AdminReservations() {
               <option value="all">Todos los usuarios</option>
               <option value="sin_asignar">Sin asignar</option>
               <option value="mis_reservas">Mis reservas</option>
-              {usuarios.map(usuario => (
-                <option key={usuario._id} value={usuario._id}>
-                  {usuario.nombre} {usuario.apellidos}
-                </option>
+              {usuarios
+                .filter(usuario => usuario._id !== user?.id) // Filtrar el usuario actual
+                .map(usuario => (
+                  <option key={usuario._id} value={usuario._id}>
+                    {usuario.nombre} {usuario.apellidos}
+                  </option>
               ))}
             </select>
             <FaUserCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />

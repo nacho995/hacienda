@@ -454,8 +454,24 @@ export const getEventoReservation = async (id) => {
 
 export const createEventoReservation = async (reservaData) => {
   try {
-    const response = await apiClient.post('/reservas/eventos', reservaData);
-    return response.data;
+    // Validar datos requeridos
+    if (!reservaData.tipo_evento || !reservaData.fecha || !reservaData.nombre_contacto || !reservaData.email_contacto) {
+      throw new Error('Faltan datos requeridos para crear la reserva');
+    }
+
+    console.log('Creando reserva de evento con datos:', reservaData);
+
+    const response = await apiClient.post('/reservas/eventos', reservaData, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response) {
+      throw new Error('No se recibió respuesta del servidor');
+    }
+
+    return response;
   } catch (error) {
     console.error('Error al crear la reserva de evento:', error);
     throw error;
@@ -631,6 +647,39 @@ export const getEventoOccupiedDates = async (params = {}) => {
 };
 
 // Verificar disponibilidad
+export const checkEventoAvailability = async (availabilityData) => {
+  try {
+    // Validar datos requeridos
+    if (!availabilityData.fecha || !availabilityData.tipoEvento) {
+      throw new Error('Fecha y tipo de evento son requeridos');
+    }
+
+    // Formatear los datos para la API
+    const requestData = {
+      fecha: availabilityData.fecha,
+      tipo_evento: availabilityData.tipoEvento,
+      total_habitaciones: availabilityData.totalHabitaciones || 0
+    };
+
+    console.log('Verificando disponibilidad con datos:', requestData);
+
+    const response = await apiClient.post('/reservas/eventos/disponibilidad', requestData, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // Asegurar que la respuesta tenga el formato esperado
+    return {
+      available: response?.available || false,
+      message: response?.message || 'No hay disponibilidad para la fecha seleccionada'
+    };
+  } catch (error) {
+    console.error('Error al verificar disponibilidad del evento:', error);
+    throw error;
+  }
+};
+
 export const checkHabitacionAvailability = async (availabilityData) => {
   try {
     // Validar que todos los campos requeridos estén presentes
@@ -1064,12 +1113,12 @@ export const unassignEventoReservation = async (id) => {
 export const createReservacion = async (reservaData) => {
   try {
     console.log('Enviando datos de reserva:', reservaData);
-    const response = await apiClient.post('/api/reservas/habitaciones', reservaData);
+    const response = await apiClient.post('/reservas/habitaciones', reservaData);
     console.log('Respuesta de creación de reserva:', response.data);
     
     return {
       success: true,
-      data: response.data.data,
+      data: response.data,
       message: 'Reserva creada exitosamente'
     };
   } catch (error) {
@@ -1087,22 +1136,42 @@ export const createMultipleReservaciones = async (reservasData) => {
   try {
     console.log('Enviando reservas múltiples:', reservasData);
     const responses = [];
+    const errores = [];
     
     // Procesar cada reserva individualmente
     for (const reservaData of reservasData) {
-      const response = await apiClient.post('/api/reservas/habitaciones', reservaData);
-      responses.push(response.data.data);
+      try {
+        const response = await apiClient.post('/reservas/habitaciones', reservaData);
+        responses.push(response.data);
+        console.log('Reserva creada exitosamente:', response.data);
+      } catch (err) {
+        console.error('Error al crear reserva individual:', err);
+        errores.push({
+          habitacion: reservaData.habitacion,
+          error: err.message || 'Error desconocido'
+        });
+      }
     }
     
     console.log('Respuestas de reservas múltiples:', responses);
     
+    if (errores.length > 0) {
+      console.warn('Algunas reservas no pudieron ser creadas:', errores);
+    }
+    
+    // Consideramos éxito si al menos una reserva se creó correctamente
     return {
-      success: true,
+      success: responses.length > 0,
       data: responses,
-      message: 'Reservas creadas exitosamente'
+      errores: errores,
+      message: responses.length > 0 
+        ? (errores.length > 0 
+            ? `Se crearon ${responses.length} de ${reservasData.length} reservas` 
+            : 'Todas las reservas fueron creadas exitosamente')
+        : 'No se pudo crear ninguna reserva'
     };
   } catch (error) {
-    console.error('Error al crear múltiples reservas:', error);
+    console.error('Error general al crear múltiples reservas:', error);
     return {
       success: false,
       data: null,

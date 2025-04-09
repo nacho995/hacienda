@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const habitacionSchema = new mongoose.Schema({
+  letra: {
+    type: String,
+    required: [true, 'La letra de identificación de la habitación es requerida'],
+    unique: true,
+    index: true
+  },
   nombre: {
     type: String,
     required: [true, 'El nombre de la habitación es requerido'],
@@ -14,11 +20,6 @@ const habitacionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'TipoHabitacion',
     required: [true, 'El tipo de habitación es requerido']
-  },
-  letra: {
-    type: String,
-    required: [true, 'La letra de identificación de la habitación es requerida'],
-    unique: true
   },
   camas: {
     type: String,
@@ -53,6 +54,33 @@ const habitacionSchema = new mongoose.Schema({
   },
   especificaciones: {
     type: String
+  },
+  planta: {
+    type: String,
+    required: [true, 'La planta es requerida'],
+    enum: ['Primera planta', 'Segunda planta', 'Tercera planta']
+  },
+  ubicacion: {
+    type: String,
+    required: [true, 'La ubicación es requerida']
+  },
+  capacidad: {
+    type: Number,
+    required: [true, 'La capacidad es requerida']
+  },
+  metrosCuadrados: {
+    type: Number,
+    required: [true, 'Los metros cuadrados son requeridos']
+  },
+  coordenadas: {
+    x: {
+      type: Number,
+      required: [true, 'La coordenada X es requerida']
+    },
+    y: {
+      type: Number,
+      required: [true, 'La coordenada Y es requerida']
+    }
   }
 }, {
   timestamps: true
@@ -66,4 +94,4 @@ habitacionSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('Habitacion', habitacionSchema); 
+module.exports = mongoose.model('Habitacion', habitacionSchema);

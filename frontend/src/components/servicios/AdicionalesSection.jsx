@@ -174,7 +174,7 @@ const AdicionalesSection = () => {
         <div className="text-center">
           <a 
             href="/reservar?servicio=adicionales" 
-            className="inline-flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-8 py-4 rounded-lg hover:bg-[var(--color-brown-dark)] transition-colors"
+            className="inline-flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-8 py-4 rounded-lg hover:bg-[var(--color-brown-dark)] hover:text-black transition-colors"
           >
             <FaShoppingBag className="text-black" />
             <span>Cotiza servicios adicionales</span>

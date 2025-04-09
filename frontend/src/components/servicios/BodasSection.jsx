@@ -83,7 +83,7 @@ const BodasSection = () => {
         <div className="text-center">
           <a 
             href="/reservar?tipo=boda" 
-            className="inline-flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-8 py-4 rounded-lg hover:bg-[var(--color-brown-dark)] transition-colors"
+            className="inline-flex items-center space-x-2 bg-[var(--color-brown-medium)] text-black px-8 py-4 rounded-lg hover:bg-[var(--color-brown-dark)] hover:text-black transition-colors"
           >
             <FaHeart />
             <span>Cotiza tu boda ahora</span>

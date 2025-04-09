@@ -106,6 +106,11 @@ const reservaEventoSchema = new mongoose.Schema({
     enum: ['salon', 'jardin', 'terraza'],
     required: [true, 'Por favor, seleccione un espacio']
   },
+  modoGestionHabitaciones: {
+    type: String,
+    enum: ['usuario', 'hacienda'],
+    default: 'usuario'
+  },
   serviciosAdicionales: {
     masajes: [{
       tipo: String,

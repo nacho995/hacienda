@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { FaCalendarAlt, FaCheck, FaWifi, FaCoffee, FaTv, FaSnowflake, FaUserFriends, FaDoorOpen, FaEnvelope, FaPhone, FaPen, FaSpinner } from 'react-icons/fa';
-import { createHabitacionReservation, getHabitacionOccupiedDates } from '@/services/reservationService';
-import { obtenerHabitaciones } from '@/services/habitacionService';
+import { toast } from 'sonner';
+import { createReservacion, createMultipleReservaciones, getHabitacionOccupiedDates } from '@/services/reservationService';
+import { obtenerHabitaciones } from '@/services/habitaciones.service';
 import { useAuth } from '@/context/AuthContext';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -20,11 +21,8 @@ export default function BookingFormSection({
   selectedRooms = [], 
   onSelectRoom, 
   formData, 
-  setFormData, 
-  tipoReservacionForzado = null,
-  esReservaMultiple = false,
-  onTipoReservaChange = null,
-  ocultarOpcionesCategoriaHabitacion = false
+  setFormData,
+  onTipoReservaChange
 }) {
   const { user } = useAuth();
   const [isFormValid, setIsFormValid] = useState(false);
@@ -35,10 +33,23 @@ export default function BookingFormSection({
   const [fechasOcupadas, setFechasOcupadas] = useState([]);
   const [fechaEntrada, setFechaEntrada] = useState(null);
   const [fechaSalida, setFechaSalida] = useState(null);
-  const [tipoReservacion, setTipoReservacion] = useState(tipoReservacionForzado || 'individual');
+  const [ocultarOpcionesCategoriaHabitacion, setOcultarOpcionesCategoriaHabitacion] = useState(false);
+  const [esReservaMultiple, setEsReservaMultiple] = useState(false);
+
   const [categoriaHabitacion, setCategoriaHabitacion] = useState('doble');
   const [metodoPago, setMetodoPago] = useState('');
   const [mostrarPago, setMostrarPago] = useState(false);
+  const [mostrarFormularioTarjeta, setMostrarFormularioTarjeta] = useState(false);
+  const [datosTarjeta, setDatosTarjeta] = useState({
+    numeroTarjeta: '',
+    nombreTitular: '',
+    fechaExpiracion: '',
+    cvv: '',
+    direccion: '',
+    codigoPostal: '',
+    ciudad: '',
+    estado: ''
+  });
   
   // Precios predeterminados según categoría
   const precioSencilla = 2400;
@@ -49,6 +60,9 @@ export default function BookingFormSection({
   const [currentRoomIndex, setCurrentRoomIndex] = useState(0);
   const [processingMultipleRooms, setProcessingMultipleRooms] = useState(false);
   
+  // Estado para el número de habitaciones para eventos
+  const [totalHabitaciones, setTotalHabitaciones] = useState(7);
+
   // Efecto para actualizar formData cuando se selecciona una habitación
   useEffect(() => {
     if (selectedRoom) {
@@ -70,20 +84,7 @@ export default function BookingFormSection({
     }));
   }, [categoriaHabitacion]);
   
-  // Efecto para actualizar el tipo de reservación
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      tipoReservacion
-    }));
-  }, [tipoReservacion]);
 
-  // Efecto para forzar el tipo de reservación si se proporciona
-  useEffect(() => {
-    if (tipoReservacionForzado) {
-      setTipoReservacion(tipoReservacionForzado);
-    }
-  }, [tipoReservacionForzado]);
 
   // Cargar fechas ocupadas desde el backend
   useEffect(() => {
@@ -127,13 +128,26 @@ export default function BookingFormSection({
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    
+    if (name === 'totalHabitaciones') {
+      const numValue = parseInt(value);
+      if (numValue >= 7 && numValue <= 14) {
+        setTotalHabitaciones(numValue);
+        setFormData(prev => ({
+          ...prev,
+          totalHabitaciones: numValue
+        }));
+      }
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
       [name]: value
-    });
+    }));
     
     // Validar formulario
-    const { nombre, apellidos, email, telefono, fechaEntrada, fechaSalida } = {
+    const { nombre, apellidos, email, telefono } = {
       ...formData,
       [name]: value
     };
@@ -141,11 +155,96 @@ export default function BookingFormSection({
       nombre !== '' && 
       apellidos !== '' &&
       email !== '' && 
-      telefono !== '' && 
-      fechaEntrada !== '' && 
-      fechaSalida !== '' && 
-      selectedRoom !== null
+      telefono !== ''
     );
+  };
+
+  // Procesar pago con tarjeta
+  const procesarPagoTarjeta = async () => {
+    // Validar datos de la tarjeta
+    if (!datosTarjeta.numeroTarjeta || !datosTarjeta.nombreTitular || !datosTarjeta.fechaExpiracion || !datosTarjeta.cvv) {
+      setReservationError('Por favor, complete todos los campos obligatorios de la tarjeta');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Aquí se integraría con un procesador de pagos real
+      console.log('Procesando pago con tarjeta:', datosTarjeta);
+      
+      // Simulamos un procesamiento exitoso
+      // En una implementación real, aquí se enviarían los datos a un procesador de pagos
+      
+      // Preparar los datos para enviar al backend
+      let reservaData = {
+        ...formData,
+        habitacion: selectedRoom?._id,
+        tipoHabitacion: selectedRoom?.tipo,
+        metodoPago: 'tarjeta',
+        categoriaHabitacion: categoriaHabitacion,
+        precioPorNoche: categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble,
+        // Información de pago (en producción, no se enviarían datos sensibles como el CVV)
+        infoPago: {
+          ultimosDigitos: datosTarjeta.numeroTarjeta.slice(-4),
+          titular: datosTarjeta.nombreTitular
+        }
+      };
+      
+      // Si es reserva múltiple, preparar datos de todas las habitaciones
+      if (esReservaMultiple && selectedRooms.length > 0) {
+        console.log('Procesando reserva múltiple con tarjeta:', selectedRooms.length, 'habitaciones');
+        const reservas = [];
+        
+        for (const room of selectedRooms) {
+          const reservaIndividual = {
+            ...formData,
+            habitacion: room._id,
+            tipoHabitacion: room.tipo,
+            numeroHabitaciones: 1,
+            metodoPago: 'tarjeta',
+                categoriaHabitacion: room.categoriaHabitacion || categoriaHabitacion,
+            precioPorNoche: room.precio || (room.categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble),
+            infoPago: {
+              ultimosDigitos: datosTarjeta.numeroTarjeta.slice(-4),
+              titular: datosTarjeta.nombreTitular
+            }
+          };
+          reservas.push(reservaIndividual);
+        }
+        
+        console.log('Datos de reservas múltiples con tarjeta:', reservas);
+        const response = await createMultipleReservaciones(reservas);
+        
+        if (response.success) {
+          setMultipleReservationConfirmations(response.data);
+          setShowReservationSuccess(true);
+          toast.success('Pago procesado correctamente. Sus habitaciones han sido reservadas con éxito');
+        } else {
+          console.error('Error en la respuesta:', response);
+          setReservationError(response.message || 'Error al procesar su reserva');
+        }
+      } else {
+        // Reserva individual
+        console.log('Datos de reserva individual con tarjeta:', reservaData);
+        const response = await createReservacion(reservaData);
+        
+        if (response.success) {
+          setReservationConfirmation(response.data);
+          setShowReservationSuccess(true);
+          toast.success('Pago procesado correctamente. Su habitación ha sido reservada con éxito');
+        } else {
+          console.error('Error en la respuesta:', response);
+          setReservationError(response.message || 'Error al procesar su reserva');
+        }
+      }
+    } catch (error) {
+      console.error('Error al procesar el pago con tarjeta:', error);
+      setReservationError(error.message || 'Error al procesar el pago. Por favor, inténtelo de nuevo.');
+    } finally {
+      setIsSubmitting(false);
+      setMostrarFormularioTarjeta(false);
+    }
   };
 
   // Modificar handleSubmit para mostrar opciones de pago
@@ -160,46 +259,13 @@ export default function BookingFormSection({
       return;
     }
     
-    // Si es reserva de tipo hotel, mostrar opciones de pago
-    if (tipoReservacion === 'individual') {
-      // Verificar que se ha seleccionado una habitación
-      if (esReservaMultiple && selectedRooms.length === 0) {
-        setReservationError('Por favor, seleccione al menos una habitación para reservar');
-        return;
-      } else if (!esReservaMultiple && !selectedRoom) {
-        setReservationError('Por favor, seleccione una habitación para reservar');
-        return;
-      }
-      
-      setMostrarPago(true);
-    } else {
-      // Para tipo evento, redirigir a la página de eventos con parámetros
-      const selectedRoomData = selectedRoom;
-      
-      if (!selectedRoomData) {
-        setReservationError('Habitación no encontrada');
-        return;
-      }
-      
-      // Crear datos de habitación para pasar a la página de eventos
-      const habitacionData = {
-        id: selectedRoomData._id || Math.random().toString(36).substr(2, 9),
-        nombre: selectedRoomData.nombre,
-        tipo: selectedRoomData.tipo,
-        fechaEntrada: formData.fechaEntrada,
-        fechaSalida: formData.fechaSalida,
-        precio: selectedRoomData.precio || (categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble),
-        numHuespedes: parseInt(formData.huespedes) || 1
-      };
-      
-      console.log('Datos de habitación para evento:', habitacionData);
-      
-      // Codificar datos para URL
-      const habitacionesParam = encodeURIComponent(JSON.stringify([habitacionData]));
-      
-      // Redirigir a la página de eventos
-      window.location.href = `/reservar?tipo=evento&habitaciones=${habitacionesParam}`;
+    // Verificar que se ha seleccionado al menos una habitación
+    if (selectedRooms.length === 0 && !selectedRoom) {
+      setReservationError('Por favor, seleccione al menos una habitación para reservar');
+      return;
     }
+    
+    setMostrarPago(true);
   };
 
   // Procesar pago de la reserva
@@ -210,37 +276,71 @@ export default function BookingFormSection({
     }
     
     setMetodoPago(metodo);
-    setIsSubmitting(true);
     setReservationError(null);
+    
+    // Si el método es tarjeta, mostrar el formulario de tarjeta
+    if (metodo === 'tarjeta') {
+      setMostrarFormularioTarjeta(true);
+      return;
+    }
+    
+    // Si es efectivo, continuar con el proceso normal
+    setIsSubmitting(true);
     
     try {
       console.log('Procesando reserva con método:', metodo);
-      // Preparar los datos para enviar al backend
-      let reservaData = {
-        ...formData,
-        habitacion: selectedRoom?._id,
-        tipoHabitacion: selectedRoom?.tipo,
-        metodoPago: metodo,
-        tipoReservacion: tipoReservacion,
-        categoriaHabitacion: categoriaHabitacion,
-        precioPorNoche: categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble
-      };
       
-      // Si es reserva múltiple, preparar datos de todas las habitaciones
-      if (esReservaMultiple && selectedRooms.length > 0) {
-        console.log('Procesando reserva múltiple con', selectedRooms.length, 'habitaciones');
+      // Calcular la duración de la estancia en días
+      const fechaInicio = new Date(formData.fechaEntrada);
+      const fechaFin = new Date(formData.fechaSalida);
+      const duracionEstancia = Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24));
+
+      // Calcular precios
+      const precioPorNoche = categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble;
+      const precioTotal = precioPorNoche * duracionEstancia;
+      
+      // Si hay múltiples habitaciones seleccionadas
+      if (selectedRooms && selectedRooms.length > 0) {
+        console.log('Procesando reserva con', selectedRooms.length, 'habitaciones');
         const reservas = [];
         
         for (const room of selectedRooms) {
+          const precioPorNocheHab = room.precio || (room.categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble);
+          const precioTotalHab = precioPorNocheHab * duracionEstancia;
+          
           const reservaIndividual = {
-            ...formData,
-            habitacion: room._id,
-            tipoHabitacion: room.tipo,
+            // Datos de contacto
+            nombreContacto: formData.nombre,
+            apellidosContacto: formData.apellidos,
+            emailContacto: formData.email,
+            telefonoContacto: formData.telefono,
+            
+            // Datos de la habitación
+            habitacion: room.letra || 'A', // Usar letra en lugar de ID
+            tipoHabitacion: room.tipo || 'doble',
+            
+            // Fechas
+            fechaEntrada: formData.fechaEntrada,
+            fechaSalida: formData.fechaSalida,
+            
+            // Detalles de la reserva
+            numHuespedes: formData.huespedes || 1,
             numeroHabitaciones: 1,
+            tipoReserva: 'hotel',
+            estadoReserva: 'pendiente',
+            
+            // Detalles de pago
             metodoPago: metodo,
-            tipoReservacion: tipoReservacion,
+            estadoPago: 'pendiente',
+            
+            // Categoría y precios
             categoriaHabitacion: room.categoriaHabitacion || categoriaHabitacion,
-            precioPorNoche: room.precio || (room.categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble)
+            precioPorNoche: precioPorNocheHab,
+            precio: precioTotalHab,
+            
+            // Información adicional
+            mensaje: formData.mensaje || '',
+            esReservaIndependiente: true
           };
           reservas.push(reservaIndividual);
         }
@@ -251,13 +351,56 @@ export default function BookingFormSection({
         if (response.success) {
           setMultipleReservationConfirmations(response.data);
           setShowReservationSuccess(true);
-          toast.success('Sus habitaciones han sido reservadas con éxito');
+          
+          if (response.errores && response.errores.length > 0) {
+            // Algunas reservas fallaron
+            toast.warning(`${response.message}. Revise los detalles para más información.`);
+          } else {
+            // Todas las reservas fueron exitosas
+            toast.success('Sus habitaciones han sido reservadas con éxito');
+          }
         } else {
           console.error('Error en la respuesta:', response);
           setReservationError(response.message || 'Error al procesar su reserva');
+          toast.error(response.message || 'Error al procesar su reserva');
         }
       } else {
         // Reserva individual
+        const reservaData = {
+          // Datos de contacto
+          nombreContacto: formData.nombre,
+          apellidosContacto: formData.apellidos,
+          emailContacto: formData.email,
+          telefonoContacto: formData.telefono,
+          
+          // Datos de la habitación
+          habitacion: selectedRoom?._id || 'Habitación estándar',
+          tipoHabitacion: selectedRoom?.tipo || 'doble',
+          
+          // Fechas
+          fechaEntrada: formData.fechaEntrada,
+          fechaSalida: formData.fechaSalida,
+          
+          // Detalles de la reserva
+          numHuespedes: formData.huespedes || 1,
+          numeroHabitaciones: 1,
+          tipoReserva: 'hotel',
+          estadoReserva: 'pendiente',
+          
+          // Detalles de pago
+          metodoPago: metodo,
+          estadoPago: 'pendiente',
+          
+          // Categoría y precios
+          categoriaHabitacion: categoriaHabitacion,
+          precioPorNoche: precioPorNoche,
+          precio: precioTotal,
+          
+          // Información adicional
+          mensaje: formData.mensaje || '',
+          esReservaIndependiente: true
+        };
+        
         console.log('Datos de reserva individual:', reservaData);
         const response = await createReservacion(reservaData);
         
@@ -304,26 +447,26 @@ export default function BookingFormSection({
     return true;
   };
 
-  // Nuevo manejador para sincronizar el tipo de reserva con el componente padre
-  const handleTipoReservacionChange = (tipo) => {
-    setTipoReservacion(tipo);
-    // Notificar al componente padre del cambio
-    if (typeof onTipoReservaChange === 'function') {
-      onTipoReservaChange(tipo);
-    }
-    // Actualizar formData
-    setFormData(prev => ({
-      ...prev,
-      tipoReservacion: tipo
-    }));
-  };
-
   return (
     <section id="reserva-form" className="py-16 bg-[var(--color-cream-light)]">
       <div className="container-custom">
         <div className="max-w-4xl mx-auto">
-          <h2 className="font-[var(--font-display)] text-3xl text-center mb-4">
-            {selectedRoom && selectedRoom.nombre ? `Reservar ${selectedRoom.nombre}` : selectedRooms.length > 0 ? `Reservar Habitaciones (${selectedRooms.length})` : 'Haga su Reservación'}
+          <h2 className="text-3xl md:text-4xl font-[var(--font-display)] text-center text-black mb-4">
+            {selectedRooms.length > 0 ? (
+              <>
+                Reservar Habitación{' '}
+                {selectedRooms.map((room, index) => (
+                  <React.Fragment key={room._id}>
+                    <span className={room.tipo === 'sencilla' ? 'text-[var(--color-primary)]' : 'text-[var(--color-accent)]'}>
+                      {room.letra}
+                    </span>
+                    {index < selectedRooms.length - 1 && ', '}
+                  </React.Fragment>
+                ))}
+              </>
+            ) : (
+              'Completar Reserva'
+            )}
           </h2>
           <div className="w-16 h-[1px] bg-[var(--color-primary)] mx-auto mb-8"></div>
           
@@ -342,15 +485,16 @@ export default function BookingFormSection({
                 <h3 className="text-2xl font-semibold text-[var(--color-primary)] mb-3">¡Reserva Confirmada!</h3>
                 <p className="text-gray-700 mb-6">Su reserva ha sido realizada con éxito.</p>
                 
-                {esReservaMultiple && multipleReservationConfirmations.length > 0 ? (
+                {multipleReservationConfirmations.length > 0 ? (
                   <div className="mb-6">
                     <h4 className="font-semibold mb-3 text-[var(--color-accent)]">Detalle de habitaciones reservadas</h4>
                     <div className="space-y-4">
                       {multipleReservationConfirmations.map((confirmacion, index) => (
                         <div key={index} className="bg-gray-50 p-4 rounded-lg text-left">
-                          <p><span className="font-semibold">Habitación {index + 1}:</span> {selectedRooms[index]?.nombre || 'Habitación'}</p>
-                          <p><span className="font-semibold">Número de reserva:</span> {confirmacion?.numeroConfirmacion || confirmacion?._id || 'N/A'}</p>
-                          <p><span className="font-semibold">Fechas:</span> {new Date(formData.fechaEntrada).toLocaleDateString()} - {new Date(formData.fechaSalida).toLocaleDateString()}</p>
+                          <p><span className="font-semibold">Habitación:</span> {selectedRooms[index]?.letra || 'N/A'} ({selectedRooms[index]?.tipo || 'N/A'})</p>
+                          <p><span className="font-semibold">Número de reserva:</span> {confirmacion._id || 'N/A'}</p>
+                          <p><span className="font-semibold">Fechas:</span> {new Date(formData.fechaEntrada).toLocaleDateString('es-ES')} - {new Date(formData.fechaSalida).toLocaleDateString('es-ES')}</p>
+                          <p><span className="font-semibold">Método de pago:</span> {metodoPago === 'tarjeta' ? 'Tarjeta de crédito/débito' : 'Efectivo al llegar'}</p>
                         </div>
                       ))}
                       <div className="bg-[var(--color-primary)]/10 p-4 rounded-lg text-left">
@@ -361,9 +505,9 @@ export default function BookingFormSection({
                   </div>
                 ) : (
                   <div className="bg-gray-50 p-4 rounded-lg mb-4 text-left">
-                    <p><span className="font-semibold">Número de reserva:</span> {reservationConfirmation?.numeroConfirmacion || reservationConfirmation?._id || 'N/A'}</p>
+                    <p><span className="font-semibold">Número de reserva:</span> {reservationConfirmation?._id || 'N/A'}</p>
                     <p><span className="font-semibold">Habitación:</span> {selectedRoom?.nombre}</p>
-                    <p><span className="font-semibold">Fechas:</span> {new Date(formData.fechaEntrada).toLocaleDateString()} - {new Date(formData.fechaSalida).toLocaleDateString()}</p>
+                    <p><span className="font-semibold">Fechas:</span> {new Date(formData.fechaEntrada).toLocaleDateString('es-ES')} - {new Date(formData.fechaSalida).toLocaleDateString('es-ES')}</p>
                     <p><span className="font-semibold">Método de pago:</span> {metodoPago === 'tarjeta' ? 'Tarjeta de crédito/débito' : 'Efectivo al llegar'}</p>
                   </div>
                 )}
@@ -371,6 +515,207 @@ export default function BookingFormSection({
                 <p className="text-gray-600 text-sm">
                   Hemos enviado un correo electrónico con los detalles de su reserva.
                 </p>
+              </div>
+            ) : mostrarFormularioTarjeta ? (
+              <div className="py-10">
+                <h3 className="text-2xl font-semibold text-[var(--color-primary)] mb-6 text-center">Pago con Tarjeta</h3>
+                
+                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                  <div className="mb-4">
+                    <label htmlFor="numeroTarjeta" className="block text-sm font-medium text-gray-700 mb-1">Número de Tarjeta *</label>
+                    <input
+                      type="text"
+                      id="numeroTarjeta"
+                      name="numeroTarjeta"
+                      value={datosTarjeta.numeroTarjeta}
+                      onChange={(e) => {
+                        // Solo permitir números y limitar a 16 dígitos
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+                        setDatosTarjeta({...datosTarjeta, numeroTarjeta: value});
+                      }}
+                      placeholder="1234 5678 9012 3456"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label htmlFor="nombreTitular" className="block text-sm font-medium text-gray-700 mb-1">Nombre del Titular *</label>
+                    <input
+                      type="text"
+                      id="nombreTitular"
+                      name="nombreTitular"
+                      value={datosTarjeta.nombreTitular}
+                      onChange={(e) => setDatosTarjeta({...datosTarjeta, nombreTitular: e.target.value})}
+                      placeholder="Como aparece en la tarjeta"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="flex space-x-4 mb-4">
+                    <div className="flex-1">
+                      <label htmlFor="fechaExpiracion" className="block text-sm font-medium text-gray-700 mb-1">Fecha de Expiración *</label>
+                      <input
+                        type="text"
+                        id="fechaExpiracion"
+                        name="fechaExpiracion"
+                        value={datosTarjeta.fechaExpiracion}
+                        onChange={(e) => {
+                          // Formato MM/AA y validación
+                          let value = e.target.value.replace(/\D/g, '');
+                          if (value.length > 2) {
+                            value = value.slice(0, 2) + '/' + value.slice(2, 4);
+                          }
+                          setDatosTarjeta({...datosTarjeta, fechaExpiracion: value});
+                        }}
+                        placeholder="MM/AA"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                        required
+                      />
+                    </div>
+                    <div className="w-1/3">
+                      <label htmlFor="cvv" className="block text-sm font-medium text-gray-700 mb-1">CVV *</label>
+                      <input
+                        type="text"
+                        id="cvv"
+                        name="cvv"
+                        value={datosTarjeta.cvv}
+                        onChange={(e) => {
+                          // Solo permitir números y limitar a 3-4 dígitos
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                          setDatosTarjeta({...datosTarjeta, cvv: value});
+                        }}
+                        placeholder="123"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label htmlFor="direccion" className="block text-sm font-medium text-gray-700 mb-1">Dirección de Facturación *</label>
+                    <input
+                      type="text"
+                      id="direccion"
+                      name="direccion"
+                      value={datosTarjeta.direccion}
+                      onChange={(e) => setDatosTarjeta({...datosTarjeta, direccion: e.target.value})}
+                      placeholder="Calle y número"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="flex space-x-4 mb-4">
+                    <div className="w-1/3">
+                      <label htmlFor="codigoPostal" className="block text-sm font-medium text-gray-700 mb-1">Código Postal *</label>
+                      <input
+                        type="text"
+                        id="codigoPostal"
+                        name="codigoPostal"
+                        value={datosTarjeta.codigoPostal}
+                        onChange={(e) => {
+                          // Solo permitir números y limitar a 5 dígitos (México)
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 5);
+                          setDatosTarjeta({...datosTarjeta, codigoPostal: value});
+                        }}
+                        placeholder="12345"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                        required
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label htmlFor="ciudad" className="block text-sm font-medium text-gray-700 mb-1">Ciudad *</label>
+                      <input
+                        type="text"
+                        id="ciudad"
+                        name="ciudad"
+                        value={datosTarjeta.ciudad}
+                        onChange={(e) => setDatosTarjeta({...datosTarjeta, ciudad: e.target.value})}
+                        placeholder="Ciudad"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <label htmlFor="estado" className="block text-sm font-medium text-gray-700 mb-1">Estado *</label>
+                    <select
+                      id="estado"
+                      name="estado"
+                      value={datosTarjeta.estado}
+                      onChange={(e) => setDatosTarjeta({...datosTarjeta, estado: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                      required
+                    >
+                      <option value="">Seleccione un estado</option>
+                      <option value="Aguascalientes">Aguascalientes</option>
+                      <option value="Baja California">Baja California</option>
+                      <option value="Baja California Sur">Baja California Sur</option>
+                      <option value="Campeche">Campeche</option>
+                      <option value="Chiapas">Chiapas</option>
+                      <option value="Chihuahua">Chihuahua</option>
+                      <option value="Ciudad de México">Ciudad de México</option>
+                      <option value="Coahuila">Coahuila</option>
+                      <option value="Colima">Colima</option>
+                      <option value="Durango">Durango</option>
+                      <option value="Estado de México">Estado de México</option>
+                      <option value="Guanajuato">Guanajuato</option>
+                      <option value="Guerrero">Guerrero</option>
+                      <option value="Hidalgo">Hidalgo</option>
+                      <option value="Jalisco">Jalisco</option>
+                      <option value="Michoacán">Michoacán</option>
+                      <option value="Morelos">Morelos</option>
+                      <option value="Nayarit">Nayarit</option>
+                      <option value="Nuevo León">Nuevo León</option>
+                      <option value="Oaxaca">Oaxaca</option>
+                      <option value="Puebla">Puebla</option>
+                      <option value="Querétaro">Querétaro</option>
+                      <option value="Quintana Roo">Quintana Roo</option>
+                      <option value="San Luis Potosí">San Luis Potosí</option>
+                      <option value="Sinaloa">Sinaloa</option>
+                      <option value="Sonora">Sonora</option>
+                      <option value="Tabasco">Tabasco</option>
+                      <option value="Tamaulipas">Tamaulipas</option>
+                      <option value="Tlaxcala">Tlaxcala</option>
+                      <option value="Veracruz">Veracruz</option>
+                      <option value="Yucatán">Yucatán</option>
+                      <option value="Zacatecas">Zacatecas</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex justify-between mt-6">
+                    <button
+                      onClick={() => {
+                        setMostrarFormularioTarjeta(false);
+                        setMostrarPago(true);
+                      }}
+                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      Volver
+                    </button>
+                    
+                    <button
+                      onClick={procesarPagoTarjeta}
+                      disabled={isSubmitting}
+                      className="px-6 py-2 bg-[var(--color-brown-medium)] text-black font-bold rounded-lg hover:bg-[var(--color-brown-dark)] transition-colors"
+                    >
+                      Confirmar Pago
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="text-center text-sm text-gray-600">
+                  <p className="mb-2">Pago seguro con encriptación SSL</p>
+                  <div className="flex justify-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span>Sus datos están protegidos</span>
+                  </div>
+                </div>
               </div>
             ) : mostrarPago ? (
               <div className="py-10">
@@ -426,41 +771,6 @@ export default function BookingFormSection({
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Tipo de Reservación */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Reservación</label>
-                  <div className="flex space-x-4">
-                    <label className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        className="form-radio text-[var(--color-primary)]"
-                        name="tipoReservacion"
-                        value="individual"
-                        checked={tipoReservacion === 'individual'}
-                        onChange={() => handleTipoReservacionChange('individual')}
-                      />
-                      <span className="ml-2">Estancia Hotel</span>
-                    </label>
-                    <label className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        className="form-radio text-[var(--color-primary)]"
-                        name="tipoReservacion"
-                        value="evento"
-                        checked={tipoReservacion === 'evento'}
-                        onChange={() => handleTipoReservacionChange('evento')}
-                      />
-                      <span className="ml-2">Con Evento</span>
-                    </label>
-                  </div>
-                  {tipoReservacion === 'evento' && (
-                    <p className="text-sm text-gray-500 mt-2">
-                      Al reservar con evento, será redirigido a nuestro formulario de eventos.
-                    </p>
-                  )}
-                </div>
-
-                {/* Resto del formulario */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
@@ -563,7 +873,7 @@ export default function BookingFormSection({
                   {selectedRooms.length > 0 ? (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Huéspedes por Habitación</label>
-                      <div className={`space-y-3 ${selectedRooms.length > 4 ? 'max-h-40 overflow-y-auto pr-2' : ''}`}>
+                      <div className={selectedRooms.length > 4 ? 'space-y-3 max-h-40 overflow-y-auto pr-2' : 'space-y-3'}>
                         {selectedRooms.map((room, index) => {
                           // Determinar la capacidad máxima de la habitación
                           const maxCapacidad = typeof room.capacidad === 'object' 
@@ -657,38 +967,18 @@ export default function BookingFormSection({
                     </div>
                   ) : (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Habitaciones Seleccionadas</label>
-                      <div className="px-4 py-3 border border-gray-200 rounded-md bg-gray-50">
-                        <div className="flex justify-between items-center mb-2">
-                          <p className="font-medium text-[var(--color-brown-medium)]">{selectedRooms.length} habitación(es) seleccionada(s)</p>
-                          <p className="text-[var(--color-brown-medium)] font-semibold">
-                            Total: ${selectedRooms.reduce((total, room) => total + parseFloat(room.precio || 0), 0).toFixed(2)}
-                          </p>
-                        </div>
-                        {selectedRooms.length > 0 && (
-                          <div className="mt-2 pt-2 border-t border-gray-200">
-                            <div className={`${selectedRooms.length > 4 ? 'max-h-40 overflow-y-auto' : ''}`}>
-                              {selectedRooms.map((room, index) => (
-                                <div key={index} className="py-2 border-b border-gray-100 last:border-b-0">
-                                  <div className="flex justify-between items-center mb-1">
-                                    <div className="font-medium text-gray-800">{room.nombre || room.tipo || `Habitación ${index + 1}`}</div>
-                                    <div className="text-[var(--color-brown-medium)] font-semibold">${parseFloat(room.precio || 0).toFixed(2)}</div>
-                                  </div>
-                                  <div className="flex justify-between text-xs text-gray-500">
-                                    <div>
-                                      {typeof room.capacidad === 'object' 
-                                        ? `${room.capacidad.adultos + room.capacidad.ninos} huéspedes (${room.capacidad.adultos} adultos, ${room.capacidad.ninos} niños)` 
-                                        : `${room.capacidad || 2} huéspedes`}
-                                    </div>
-                                    <div>{room.tipo || 'Estándar'}</div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <p className="text-xs text-gray-500 mt-2">Las habitaciones ya están pre-seleccionadas según su elección anterior</p>
-                      </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Número de Habitaciones para Eventos (7-14)</label>
+                      <select
+                        id="totalHabitaciones"
+                        name="totalHabitaciones"
+                        value={totalHabitaciones}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
+                      >
+                        {[7, 8, 9, 10, 11, 12, 13, 14].map(num => (
+                          <option key={num} value={num}>{num}</option>
+                        ))}
+                      </select>
                     </div>
                   )}
                 </div>
@@ -714,11 +1004,7 @@ export default function BookingFormSection({
                       isFormValid ? 'bg-[var(--color-brown-medium)] hover:bg-[var(--color-brown-dark)]' : 'bg-gray-400 cursor-not-allowed'
                     }`}
                   >
-                    {tipoReservacion === 'individual' ? (
-                      'Continuar a Pago'
-                    ) : (
-                      'Continuar a Reserva de Evento'
-                    )}
+                    Continuar a Pago
                   </button>
                 </div>
                 

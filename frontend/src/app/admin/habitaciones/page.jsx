@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { FaEdit, FaTrash, FaBed, FaBath, FaWifi, FaUsers, FaInfoCircle, FaCalendar } from 'react-icons/fa';
 import Image from 'next/image';
-import { obtenerHabitacionesConReservas } from '@/services/habitacionService';
+import { obtenerHabitacionesConReservas } from '@/services/habitaciones.service';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
