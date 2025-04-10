@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const path = require('path');
 const Servicio = require('../models/Servicio');
 
-// Cargar variables de entorno
-dotenv.config();
+// Cargar variables de entorno especificando la ruta
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Conectar a MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
@@ -27,7 +28,7 @@ const montajeFotoCoordinacion = [
     iconType: 'montaje',
     categoria: 'montaje',
     subcategoria: 'montaje_incluido',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     incluye: [
@@ -50,7 +51,7 @@ const montajeFotoCoordinacion = [
     iconType: 'montaje',
     categoria: 'montaje',
     subcategoria: 'montaje_premium',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     incluye: [
@@ -77,7 +78,7 @@ const montajeFotoCoordinacion = [
     iconType: 'fotografia',
     categoria: 'foto_video',
     subcategoria: 'fotografia',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     duracion: '10-12 horas',
@@ -100,7 +101,7 @@ const montajeFotoCoordinacion = [
     iconType: 'video',
     categoria: 'foto_video',
     subcategoria: 'video',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     duracion: '10-12 horas',
@@ -129,7 +130,7 @@ const montajeFotoCoordinacion = [
     iconType: 'coordinacion',
     categoria: 'coordinacion',
     subcategoria: 'coordinacion',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     detalles: 'En su servicio integral, tiene presupuestado coordinación integral y ES UN SEGURO PARA SU EVENTO, será su hada madrina, si desean despreocuparse por todo, que coordinemos y diseñemos de principio a fin su evento, organizando logística, diseño, decoración, montaje, minuto a minuto, pagos, layout, llamadas de confirmación, invitación digital, entrega de documentos a iglesia, civil. Etc. Ustedes sólo se encargarán de disfrutar al máximo ese gran dia dejando todo en nuestras manos.'

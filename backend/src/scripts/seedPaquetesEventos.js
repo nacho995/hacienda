@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const path = require('path');
 const Servicio = require('../models/Servicio');
 
-// Cargar variables de entorno
-dotenv.config();
+// Cargar variables de entorno especificando la ruta
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Conectar a MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
@@ -26,7 +27,7 @@ const paquetesEventos = [
     iconType: 'paquete',
     categoria: 'paquete_evento',
     subcategoria: 'basico',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     detalles: 'Paquete básico con todos los servicios esenciales para tu evento.',
@@ -86,7 +87,7 @@ const paquetesEventos = [
     iconType: 'paquete',
     categoria: 'paquete_evento',
     subcategoria: 'platinum',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     detalles: 'Paquete premium con servicios adicionales para una experiencia de lujo.',
@@ -147,7 +148,7 @@ const paquetesEventos = [
     iconType: 'paquete',
     categoria: 'paquete_evento',
     subcategoria: 'oro',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     detalles: 'Nuestro paquete más exclusivo con barra libre y servicios premium.',

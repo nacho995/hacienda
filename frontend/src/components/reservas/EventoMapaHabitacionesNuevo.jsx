@@ -22,14 +22,14 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
   const areasSeleccionables = {
     'A': { coords: '332,143,392,204', shape: 'rect', direction: 'bottom' },
     'B': { coords: '400,143,460,204', shape: 'rect', direction: 'bottom' },
-    'C': { coords: '453,205,514,266', shape: 'rect', direction: 'left' },
-    'D': { coords: '453,263,514,324', shape: 'rect', direction: 'left' },
-    'E': { coords: '453,321,514,382', shape: 'rect', direction: 'left' },
-    'F': { coords: '453,379,514,440', shape: 'rect', direction: 'left' },
-    'G': { coords: '467,492,528,553', shape: 'rect', direction: 'top' },
-    'H': { coords: '523,492,584,553', shape: 'rect', direction: 'top' },
-    'I': { coords: '579,492,640,553', shape: 'rect', direction: 'top' },
-    'J': { coords: '635,492,696,553', shape: 'rect', direction: 'top' },
+    'C': { coords: '453,205,534,266', shape: 'rect', direction: 'left' },
+    'D': { coords: '453,263,534,324', shape: 'rect', direction: 'left' },
+    'E': { coords: '453,321,534,382', shape: 'rect', direction: 'left' },
+    'F': { coords: '453,379,534,440', shape: 'rect', direction: 'left' },
+    'G': { coords: '467,492,528,573', shape: 'rect', direction: 'top' },
+    'H': { coords: '523,492,584,573', shape: 'rect', direction: 'top' },
+    'I': { coords: '579,492,640,573', shape: 'rect', direction: 'top' },
+    'J': { coords: '635,492,696,573', shape: 'rect', direction: 'top' },
     'K': { coords: '399,568,460,629', shape: 'rect', direction: 'right' },
     'L': { coords: '399,492,460,553', shape: 'rect', direction: 'right' },
     'M': { coords: '759,353,820,414', shape: 'rect', direction: 'left' },
@@ -44,19 +44,26 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
       try {
         setIsLoading(true);
         // Obtener habitaciones exclusivamente de la base de datos
-        const data = await obtenerHabitaciones();
-        console.log('Habitaciones obtenidas de la BD:', data);
+        const response = await obtenerHabitaciones();
+        console.log('Habitaciones obtenidas de la BD:', response);
         
-        if (!data || data.length === 0) {
-          console.error('No se encontraron habitaciones en la base de datos');
+        // Check if response is successful and data is an array
+        let habitacionesData = [];
+        if (response && response.success && Array.isArray(response.data)) {
+           habitacionesData = response.data;
+        } else if (Array.isArray(response)) { // Handle cases where API returns array directly
+            console.warn('API devolvió un array directamente, usando ese array.');
+            habitacionesData = response;
+        } else {
+          console.error('No se encontraron habitaciones en la base de datos o el formato es incorrecto:', response);
           setHabitaciones([]);
           setIsLoading(false);
           toast.error('No se encontraron habitaciones disponibles');
           return;
         }
         
-        // Procesar habitaciones recibidas
-        const habitacionesProcesadas = data.map(hab => {
+        // Procesar habitaciones recibidas usando habitacionesData
+        const habitacionesProcesadas = habitacionesData.map(hab => {
           const letra = hab.letra || hab.id;
           return {
             ...hab,
@@ -190,45 +197,49 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
     const width = x2 - x1;
     const height = y2 - y1;
     
-    // Determinar colores según la planta
-    let colorNoSeleccionado, colorSeleccionado, borderColor;
-    
-    // Primera planta: A, B - Verde menta brillante
+    // --- NEW COLOR LOGIC ---
+    // Unified color for selected rooms
+    const selectedColor = '#E57373'; // Reddish-coral
+    const selectedBorderColor = '#D32F2F'; // Darker red border for selected
+
+    // Base color per floor (when not selected)
+    let floorBaseColor;
     if (['A', 'B'].includes(habitacion.letra)) {
-      colorNoSeleccionado = '#7FFFD4';  // Verde menta claro
-      colorSeleccionado = '#00CBA9';    // Verde menta brillante
-      borderColor = selected ? '#009B82' : '#7FFFD4';
-    }
-    // Segunda planta: C, D, E, F - Verde esmeralda
-    else if (['C', 'D', 'E', 'F'].includes(habitacion.letra)) {
-      colorNoSeleccionado = '#90EE90';  // Verde esmeralda claro
-      colorSeleccionado = '#2E8B57';    // Verde esmeralda
-      borderColor = selected ? '#1B5233' : '#90EE90';
-    }
-    // Tercera planta: G-O - Verde oliva
-    else {
-      colorNoSeleccionado = '#98FB98';  // Verde oliva claro
-      colorSeleccionado = '#556B2F';    // Verde oliva
-      borderColor = selected ? '#3B4A20' : '#98FB98';
+      floorBaseColor = '#A5D6A7'; // Soft Green (Floor 1)
+    } else if (['C', 'D', 'E', 'F'].includes(habitacion.letra)) {
+      floorBaseColor = '#90CAF9'; // Soft Blue (Floor 2)
+    } else {
+      floorBaseColor = '#FFCC80'; // Soft Orange/Peach (Floor 3)
     }
 
-    // Determinar el gradiente según la dirección de la puerta
+    // Determine final colors based on selection status
+    const finalBackgroundColor = selected ? selectedColor : floorBaseColor;
+    const finalBorderColor = selected ? selectedBorderColor : floorBaseColor; // Border matches base color when not selected
+    // --- END NEW COLOR LOGIC ---
+
+    // Determinar el gradiente según la dirección de la puerta (ahora color -> transparente -> transparente)
     const getGradientByDirection = (direction, isSelected) => {
-      const color = isSelected ? colorSeleccionado : colorNoSeleccionado;
-      const baseOpacity = isSelected ? 'E6' : 'CC'; // 90% para seleccionado, 80% para no seleccionado
-      const finalOpacity = '00'; // Completamente transparente al final
+      const color = finalBackgroundColor;
+      const baseOpacity = selected ? 'E6' : 'CC'; // 90% or 80% opacity hex
+      const transparent = `${color}00`; // Fully transparent version of the color
+      const semiTransparent = `${color}${baseOpacity}`; // Semi-transparent version
 
+      // Define the gradient stops: Color -> Transparent (early) -> Transparent
+      const gradientStops = `${semiTransparent} 0%, ${transparent} 40%, ${transparent} 100%`;
+
+      // Apply the gradient based on direction
       switch (direction) {
         case 'top':
-          return `linear-gradient(to top, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+          return `linear-gradient(to top, ${gradientStops})`;
         case 'bottom':
-          return `linear-gradient(to bottom, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+          return `linear-gradient(to bottom, ${gradientStops})`;
         case 'left':
-          return `linear-gradient(to left, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+          return `linear-gradient(to left, ${gradientStops})`;
         case 'right':
-          return `linear-gradient(to right, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+          return `linear-gradient(to right, ${gradientStops})`;
         default:
-          return `linear-gradient(to bottom, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+          // Default to bottom if direction is not specified
+          return `linear-gradient(to bottom, ${gradientStops})`;
       }
     };
 
@@ -242,8 +253,10 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
           top: `${y1}px`,
           width: `${width}px`,
           height: `${height}px`,
+          // Use the determined background gradient
           background: getGradientByDirection(area.direction, selected),
-          border: `2px solid ${borderColor}`,
+           // Use the determined border color
+          border: `2px solid ${finalBorderColor}`,
           zIndex: 1,
           pointerEvents: 'none',
           transition: 'all 0.3s ease'
@@ -316,60 +329,42 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
                   </map>
                 </div>
                 
-                {/* Leyenda */}
-                <div className="mt-6 space-y-4">
-                  <h4 className="text-lg font-semibold text-[var(--color-primary)] mb-2">Leyenda del Mapa</h4>
+                {/* Leyenda Actualizada */}
+                <div className="mt-6 space-y-3">
+                  <h4 className="text-lg font-semibold text-[var(--color-primary)] mb-3">Leyenda del Mapa</h4>
                   
-                  {/* Primera Planta */}
-                  <div className="bg-white/80 p-4 rounded-lg shadow-sm">
-                    <h5 className="font-medium text-[var(--color-primary)] mb-2">Primera Planta</h5>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-[#7FFFD4CC] mr-2 border border-[#7FFFD4]"></div>
-                        <span className="text-sm">Disponible</span>
-                      </div>
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-[#00CBA9E6] mr-2 border border-[#009B82]"></div>
-                        <span className="text-sm">Seleccionada</span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Habitaciones: A, B
+                  {/* Color de Selección Unificado */}
+                  <div className="bg-white/80 p-3 rounded-lg shadow-sm">
+                    <div className="flex items-center gap-3">
+                       <div className="flex items-center">
+                        <div className="w-6 h-6 rounded bg-[#E57373E6] mr-2 border-2 border-[#D32F2F]"></div>
+                        <span className="text-sm font-medium">Seleccionada</span>
                       </div>
                     </div>
                   </div>
-
-                  {/* Segunda Planta */}
-                  <div className="bg-white/80 p-4 rounded-lg shadow-sm">
-                    <h5 className="font-medium text-[var(--color-accent)] mb-2">Segunda Planta</h5>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-[#90EE90CC] mr-2 border border-[#90EE90]"></div>
-                        <span className="text-sm">Disponible</span>
-                      </div>
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-[#2E8B57E6] mr-2 border border-[#1B5233]"></div>
-                        <span className="text-sm">Seleccionada</span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Habitaciones: C, D, E, F
+                  
+                  {/* Colores Disponibles por Planta */}
+                  <div className="bg-white/80 p-3 rounded-lg shadow-sm space-y-2">
+                    <h5 className="font-medium text-gray-700 mb-2">Disponibles por Planta:</h5>
+                    {/* Primera Planta */}
+                    <div className="flex items-center gap-3">
+                       <div className="flex items-center">
+                        <div className="w-6 h-6 rounded bg-[#A5D6A7CC] mr-2 border border-[#A5D6A7]"></div>
+                        <span className="text-sm">Primera Planta (A, B)</span>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Tercera Planta */}
-                  <div className="bg-white/80 p-4 rounded-lg shadow-sm">
-                    <h5 className="font-medium text-[var(--color-secondary)] mb-2">Tercera Planta</h5>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-[#98FB98CC] mr-2 border border-[#98FB98]"></div>
-                        <span className="text-sm">Disponible</span>
+                    {/* Segunda Planta */}
+                    <div className="flex items-center gap-3">
+                       <div className="flex items-center">
+                        <div className="w-6 h-6 rounded bg-[#90CAF9CC] mr-2 border border-[#90CAF9]"></div>
+                        <span className="text-sm">Segunda Planta (C, D, E, F)</span>
                       </div>
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-[#556B2FE6] mr-2 border border-[#3B4A20]"></div>
-                        <span className="text-sm">Seleccionada</span>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Habitaciones: G, H, I, J, K, L, M, O
+                    </div>
+                    {/* Tercera Planta */}
+                    <div className="flex items-center gap-3">
+                       <div className="flex items-center">
+                        <div className="w-6 h-6 rounded bg-[#FFCC80CC] mr-2 border border-[#FFCC80]"></div>
+                        <span className="text-sm">Tercera Planta (G-O)</span>
                       </div>
                     </div>
                   </div>

@@ -43,7 +43,7 @@ export const verificarDisponibilidadFecha = async (fecha) => {
  */
 export const crearReservaEvento = async (reservaData) => {
   try {
-    const response = await axios.post(`${API_URL}/reservas`, reservaData);
+    const response = await axios.post(`${API_URL}/reservas/eventos`, reservaData);
     return {
       success: true,
       data: response.data
@@ -78,7 +78,7 @@ export const obtenerReservasEvento = async () => {
  */
 export const obtenerReservaEvento = async (id) => {
   try {
-    const response = await axios.get(`${API_URL}/reservas/${id}`);
+    const response = await apiClient.get(`/reservas/eventos/${id}`);
     return {
       success: true,
       data: response.data
@@ -88,6 +88,58 @@ export const obtenerReservaEvento = async (id) => {
     return {
       success: false,
       message: error.response?.data?.message || 'Error al obtener los detalles de la reserva'
+    };
+  }
+};
+
+/**
+ * Actualiza una reserva de evento existente por su ID
+ * @param {string} id - ID de la reserva de evento
+ * @param {Object} updateData - Datos a actualizar
+ * @returns {Promise<Object>} Respuesta de la API
+ */
+export const actualizarReservaEvento = async (id, updateData) => {
+  try {
+    const response = await apiClient.put(`/reservas/eventos/${id}`, updateData);
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Error al actualizar la reserva de evento:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error al actualizar la reserva de evento'
+    };
+  }
+};
+
+/**
+ * Actualiza una reserva de habitación específica por su ID
+ * @param {string} habitacionId - ID de la reserva de habitación
+ * @param {Object} updateData - Datos a actualizar (ej: { fechaEntrada, fechaSalida, numHuespedes, nombreHuespedes })
+ * @returns {Promise<Object>} Respuesta de la API
+ */
+export const actualizarReservaHabitacion = async (habitacionId, updateData) => {
+  try {
+    // Asegurarse de que solo enviamos los campos permitidos y necesarios
+    const validUpdateData = {};
+    if (updateData.hasOwnProperty('fechaEntrada')) validUpdateData.fechaEntrada = updateData.fechaEntrada;
+    if (updateData.hasOwnProperty('fechaSalida')) validUpdateData.fechaSalida = updateData.fechaSalida;
+    if (updateData.hasOwnProperty('numHuespedes')) validUpdateData.numHuespedes = updateData.numHuespedes;
+    if (updateData.hasOwnProperty('nombreHuespedes')) validUpdateData.nombreHuespedes = updateData.nombreHuespedes;
+    // Añadir otros campos si fueran editables desde aquí
+
+    const response = await apiClient.put(`/reservas/habitaciones/${habitacionId}`, validUpdateData);
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Error al actualizar la reserva de habitación:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error al actualizar la habitación'
     };
   }
 };

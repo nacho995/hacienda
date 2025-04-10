@@ -30,6 +30,9 @@ exports.crearReservaEvento = async (req, res) => {
       servicios_adicionales
     } = req.body;
     
+    // Log para ver los datos de habitaciones recibidos
+    console.log('Datos de habitaciones recibidos:', JSON.stringify(habitaciones, null, 2));
+
     // Validar campos obligatorios
     if (!tipo_evento || !fecha || !nombre_contacto || !email_contacto || !telefono_contacto) {
       return res.status(400).json({
@@ -75,23 +78,15 @@ exports.crearReservaEvento = async (req, res) => {
       });
     }
 
-    // Procesar las habitaciones
-    const habitacionesValidadas = habitaciones?.map(hab => ({
-      fecha_entrada: new Date(hab.fecha_entrada),
-      huespedes: hab.huespedes.map(h => ({
-        nombre: h.nombre,
-        numero_personas: parseInt(h.numero_personas)
-      }))
-    })) || [];
-
-    // Calcular el total de habitaciones
-    const totalHabitaciones = habitacionesValidadas.length || 7;
+    // Calcular el total de habitaciones desde los datos recibidos
+    const totalHabitaciones = habitaciones?.length || 0;
     
     // Crear objeto para guardar
     const reservaData = {
       // Solo incluir usuario si está autenticado
       ...(req.user && req.user.id ? { usuario: req.user.id } : {}),
       tipoEvento: tipoEventoDoc._id,
+      nombreEvento: tipoEventoDoc.nombre || tipoEventoDoc.titulo || 'Evento sin nombre',
       nombreContacto: nombre_contacto,
       apellidosContacto: apellidos_contacto,
       emailContacto: email_contacto,
@@ -101,23 +96,14 @@ exports.crearReservaEvento = async (req, res) => {
       horaFin: '18:00',
       espacioSeleccionado: 'jardin',
       numInvitados: 50, // Valor por defecto
+      precio: tipoEventoDoc.precioBase || 0,
       peticionesEspeciales: mensaje || '',
       estadoReserva: 'pendiente',
       metodoPago: 'pendiente',
       modoGestionHabitaciones: modo_gestion_habitaciones || 'usuario',
       modoGestionServicios: modo_gestion_servicios || 'usuario',
       totalHabitaciones,
-      serviciosAdicionales: {
-        habitaciones: habitacionesValidadas.map((hab, index) => ({
-          tipoHabitacion: index < 6 ? '1 cama king size' : 'Dos matrimoniales',
-          categoriaHabitacion: index < 6 ? 'sencilla' : 'doble',
-          precio: index < 6 ? 2400 : 2600,
-          fechaEntrada: hab.fecha_entrada,
-          fechaSalida: new Date(hab.fecha_entrada.getTime() + 24 * 60 * 60 * 1000),
-          huespedes: hab.huespedes,
-          estado: 'pendiente'
-        }))
-      }
+      serviciosAdicionales: servicios_adicionales || []
     };
 
     // Crear la reserva
@@ -171,35 +157,46 @@ exports.crearReservaEvento = async (req, res) => {
       // No interrumpimos el flujo si falla el envío de la notificación
     }
 
-    // Crear las reservas de habitaciones asociadas
+    // Crear las reservas de habitaciones asociadas iterando sobre 'habitaciones' de req.body
     const reservasHabitaciones = [];
-    for (const [index, hab] of habitacionesValidadas.entries()) {
-      const reservaHabitacion = await ReservaHabitacion.create({
-        tipoReserva: 'evento',
-        reservaEvento: reserva._id,
-        tipoHabitacion: index < 6 ? '1 cama king size' : 'Dos matrimoniales',
-        categoriaHabitacion: index < 6 ? 'sencilla' : 'doble',
-        numHuespedes: hab.huespedes.reduce((total, h) => total + h.numero_personas, 0),
-        infoHuespedes: {
-          nombres: hab.huespedes.map(h => h.nombre),
-          detalles: `${hab.huespedes.length} huéspedes`
-        },
-        fechaEntrada: hab.fecha_entrada,
-        fechaSalida: new Date(hab.fecha_entrada.getTime() + 24 * 60 * 60 * 1000),
-        estado: 'pendiente',
-        nombreContacto: nombre_contacto,
-        apellidosContacto: apellidos_contacto,
-        emailContacto: email_contacto,
-        telefonoContacto: telefono_contacto
-      });
-      reservasHabitaciones.push(reservaHabitacion);
+    if (habitaciones && habitaciones.length > 0) { // Verificar si hay habitaciones
+      for (const hab of habitaciones) { // Iterar sobre los datos originales del frontend
+        // Log para ver el objeto hab original
+        console.log('Procesando habitación recibida:', JSON.stringify(hab, null, 2));
+
+        try {
+          const reservaHabitacion = await ReservaHabitacion.create({
+            tipoReserva: 'evento',
+            reservaEvento: reserva._id,
+            habitacion: hab.habitacion, // Campo 'habitacion' del frontend (letra)
+            tipoHabitacion: hab.tipoHabitacion, // Campo 'tipoHabitacion' del frontend
+            categoriaHabitacion: hab.numHuespedes <= 2 ? 'sencilla' : 'doble', // Determinar categoría por numHuespedes
+            precio: hab.precio, // Campo 'precio' del frontend (ya es número)
+            numHuespedes: hab.numHuespedes, // Campo 'numHuespedes' del frontend
+            fechaEntrada: hab.fechaEntrada, // Campo 'fechaEntrada' del frontend (ya es Date)
+            fechaSalida: hab.fechaSalida, // Campo 'fechaSalida' del frontend (ya es Date)
+            estadoReserva: 'pendiente', // Cambiado de 'estado' a 'estadoReserva'
+            nombreContacto: nombre_contacto,
+            apellidosContacto: apellidos_contacto,
+            emailContacto: email_contacto,
+            telefonoContacto: telefono_contacto,
+            fecha: fechaEvento, // Usar la fecha principal del evento
+            letraHabitacion: hab.habitacion // Guardar también la letra si es útil
+          });
+          reservasHabitaciones.push(reservaHabitacion);
+        } catch (validationError) {
+          console.error(`Error al validar/crear ReservaHabitacion para ${hab.habitacion}:`, validationError);
+          // Lanzar el error para detener el proceso y devolver 500
+          throw new Error(`Error al procesar la habitación ${hab.habitacion}: ${validationError.message}`); 
+        }
+      }
     }
 
-    // Actualizar la reserva del evento con las referencias a las habitaciones
-    reserva.serviciosAdicionales.habitaciones = reservasHabitaciones.map(rh => ({
+    // Actualizar la reserva del evento con las referencias correctas
+    reserva.serviciosAdicionales = reservasHabitaciones.map(rh => ({
       reservaHabitacionId: rh._id,
       tipoHabitacion: rh.tipoHabitacion,
-      precio: rh.tipoHabitacion === '1 cama king size' ? 2400 : 2600
+      precio: rh.precio
     }));
     await reserva.save();
 
@@ -212,7 +209,7 @@ exports.crearReservaEvento = async (req, res) => {
         tipoEvento: tipoEventoDoc.nombre,
         fecha: fechaEvento.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
         numeroConfirmacion: reserva.numeroConfirmacion,
-        habitaciones: habitacionesValidadas.length,
+        habitaciones: habitaciones.length,
         modoGestionHabitaciones: modo_gestion_habitaciones || 'usuario'
       });
       
@@ -263,7 +260,7 @@ exports.crearReservaEvento = async (req, res) => {
               tipoEvento: tipoEventoDoc.nombre,
               fecha: fechaEvento.toLocaleDateString('es-ES'),
               numeroConfirmacion: reserva.numeroConfirmacion,
-              habitaciones: habitacionesValidadas.length
+              habitaciones: habitaciones.length
             })
           });
         }
@@ -389,6 +386,7 @@ exports.obtenerReservasEvento = async (req, res) => {
  */
 exports.obtenerReservaEvento = async (req, res) => {
   try {
+    // Buscar la reserva de evento con los datos básicos populados
     const reserva = await ReservaEvento.findById(req.params.id)
       .populate({
         path: 'usuario',
@@ -412,20 +410,28 @@ exports.obtenerReservaEvento = async (req, res) => {
       });
     }
     
-    // Temporalmente desactivada la verificación de permisos para debugging
-    // Comentado: Verificar que el usuario tenga acceso a esta reserva
-    // if (reserva.usuario && reserva.usuario._id && 
-    //     reserva.usuario._id.toString() !== req.user.id && 
-    //     req.user.role !== 'admin') {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: 'No tienes permiso para ver esta reserva'
-    //   });
-    // }
-    
+    // --- NUEVO: Buscar y popular las habitaciones asociadas ---
+    const habitacionesAsociadas = await ReservaHabitacion.find({ reservaEvento: reserva._id })
+      .populate({
+        path: 'habitacion', // Popular la referencia a la habitación física
+        select: 'letra nombre tipo', // Seleccionar campos específicos si es necesario
+        strictPopulate: false
+      })
+      .populate({
+        path: 'tipoHabitacion', // Popular la referencia al tipo de habitación
+        strictPopulate: false
+      });
+      
+    // Convertir la reserva a un objeto plano para poder añadirle propiedades
+    const reservaObj = reserva.toObject();
+    // Añadir las habitaciones encontradas al objeto de respuesta
+    reservaObj.habitaciones = habitacionesAsociadas;
+    // --- FIN NUEVO ---
+
     res.status(200).json({
       success: true,
-      data: reserva
+      // Enviar el objeto modificado que incluye las habitaciones
+      data: reservaObj 
     });
   } catch (error) {
     console.error('Error al obtener reserva de evento:', error);

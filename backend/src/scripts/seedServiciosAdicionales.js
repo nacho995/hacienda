@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const path = require('path');
 const Servicio = require('../models/Servicio');
 
-// Cargar variables de entorno
-dotenv.config();
+// Cargar variables de entorno especificando la ruta
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Conectar a MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
@@ -26,7 +27,7 @@ const serviciosAdicionales = [
     iconType: 'restaurante',
     categoria: 'servicio_adicional',
     subcategoria: 'comida',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -38,7 +39,7 @@ const serviciosAdicionales = [
     iconType: 'restaurante',
     categoria: 'servicio_adicional',
     subcategoria: 'comida',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -50,7 +51,7 @@ const serviciosAdicionales = [
     iconType: 'restaurante',
     categoria: 'servicio_adicional',
     subcategoria: 'comida',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -62,7 +63,7 @@ const serviciosAdicionales = [
     iconType: 'restaurante',
     categoria: 'servicio_adicional',
     subcategoria: 'comida',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -74,7 +75,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'comodidad',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -86,7 +87,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'comodidad',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -98,7 +99,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'comodidad',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -110,7 +111,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'infraestructura',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true,
     requisitos: [
@@ -125,7 +126,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'infraestructura',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -137,7 +138,7 @@ const serviciosAdicionales = [
     iconType: 'bebidas',
     categoria: 'servicio_adicional',
     subcategoria: 'bebidas',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -149,7 +150,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'entretenimiento',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -161,7 +162,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'entretenimiento',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -173,7 +174,7 @@ const serviciosAdicionales = [
     iconType: 'fotografia',
     categoria: 'servicio_adicional',
     subcategoria: 'entretenimiento',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -185,7 +186,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'entretenimiento',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -197,7 +198,7 @@ const serviciosAdicionales = [
     iconType: 'musica',
     categoria: 'servicio_adicional',
     subcategoria: 'entretenimiento',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -209,7 +210,7 @@ const serviciosAdicionales = [
     iconType: 'musica',
     categoria: 'servicio_adicional',
     subcategoria: 'entretenimiento',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -221,7 +222,7 @@ const serviciosAdicionales = [
     iconType: 'musica',
     categoria: 'servicio_adicional',
     subcategoria: 'entretenimiento',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -233,7 +234,7 @@ const serviciosAdicionales = [
     iconType: 'musica',
     categoria: 'servicio_adicional',
     subcategoria: 'entretenimiento',
-    recomendadoPara: ['Boda', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -245,7 +246,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'infraestructura',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -257,7 +258,7 @@ const serviciosAdicionales = [
     iconType: 'decoracion',
     categoria: 'servicio_adicional',
     subcategoria: 'infraestructura',
-    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Evento Corporativo', 'Cumpleaños', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -269,7 +270,7 @@ const serviciosAdicionales = [
     iconType: 'coordinacion',
     categoria: 'servicio_adicional',
     subcategoria: 'coordinacion',
-    recomendadoPara: ['Boda'],
+    recomendadoPara: ['Boda', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   },
@@ -281,7 +282,7 @@ const serviciosAdicionales = [
     iconType: 'coordinacion',
     categoria: 'servicio_adicional',
     subcategoria: 'coordinacion',
-    recomendadoPara: ['Boda', 'Ceremonia Religiosa'],
+    recomendadoPara: ['Boda', 'Ceremonia Religiosa', 'Aniversario'],
     color: '#D1B59B',
     activo: true
   }

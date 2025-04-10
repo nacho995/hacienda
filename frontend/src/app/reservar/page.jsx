@@ -25,11 +25,56 @@ const ReservarPage = () => {
 
 export default ReservarPage;
 
+// --- Nuevo componente Modal ---
+const ValidationModal = ({ isOpen, onClose, message, setCurrentStep, redirectToStep }) => {
+  if (!isOpen) return null;
+
+  const handleGoToStep = () => {
+    if (setCurrentStep && redirectToStep) {
+      setCurrentStep(redirectToStep);
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full mx-4">
+        <div className="flex items-center mb-4">
+          <FaInfoCircle className="text-red-500 text-2xl mr-3" />
+          <h3 className="text-lg font-semibold text-gray-800">Error de Validación</h3>
+        </div>
+        <p className="text-gray-600 mb-6">{message}</p>
+        <div className="flex space-x-4">
+          <button
+            onClick={onClose}
+            className="w-1/2 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
+          >
+            Entendido
+          </button>
+          {redirectToStep && (
+            <button
+              onClick={handleGoToStep}
+              className="w-1/2 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+            >
+              Ir a Corregir
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+// --- Fin nuevo componente Modal ---
+
 const ReservaWizard = () => {
   const { formData, updateFormSection } = useReservation();
   const [currentStep, setCurrentStep] = useState(1);
   const [showModoSeleccionServiciosModal, setShowModoSeleccionServiciosModal] = useState(false);
   const [showModoSeleccionHabitacionesModal, setShowModoSeleccionHabitacionesModal] = useState(false);
+  // Estados para el nuevo modal de validación
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationErrorMessage, setValidationErrorMessage] = useState('');
+  const [validationRedirectStep, setValidationRedirectStep] = useState(null);
   // Mantener el objeto completo para la selección, pero manejar el renderizado con cuidado
   const [selectedEventType, setSelectedEventType] = useState(formData.tipoEvento || null);
   const router = useRouter();
@@ -154,6 +199,15 @@ const ReservaWizard = () => {
   };
 
   const handleSubmit = async () => {
+    // --- Inicio: Añadir validación y log ---
+    if (!formData.fecha || isNaN(new Date(formData.fecha).getTime())) {
+      toast.error('La fecha seleccionada no es válida. Por favor, selecciónela de nuevo.');
+      setCurrentStep(2); // Volver al paso de fecha
+      return;
+    }
+    console.log('Datos de habitaciones seleccionadas antes de mapear:', JSON.stringify(formData.habitacionesSeleccionadas, null, 2));
+    // --- Fin: Añadir validación y log ---
+    
     try {
       // Preparar datos de la reserva
       const reservaData = {
@@ -164,10 +218,21 @@ const ReservaWizard = () => {
         email_contacto: formData.datosContacto.email,
         telefono_contacto: formData.datosContacto.telefono,
         mensaje: formData.datosContacto.mensaje,
-        habitaciones: formData.habitacionesSeleccionadas?.map(hab => ({
-          fecha_entrada: formData.fecha,
-          huespedes: [{ nombre: 'Por asignar', numero_personas: 2 }]
-        })) || [],
+        habitaciones: formData.habitacionesSeleccionadas?.map(hab => {
+          // Calcular fecha de salida (día siguiente a la entrada)
+          const entrada = new Date(formData.fecha);
+          const salida = new Date(entrada);
+          salida.setDate(entrada.getDate() + 1);
+          
+          return {
+            habitacion: hab.letra || '', // Usar la letra, default a string vacío si no existe
+            tipoHabitacion: hab.tipoHabitacion?.nombre || hab.tipo || 'Estándar', // Usar el nombre del objeto tipoHabitacion, o el tipo simple, o default
+            precio: parseFloat(hab.tipoHabitacion?.precio) || parseFloat(hab.precioPorNoche) || 0, // Usar el precio del objeto tipoHabitacion, o precioPorNoche, o default 0
+            fechaEntrada: entrada,
+            fechaSalida: salida,
+            numHuespedes: hab.capacidad || 2 // Añadir numHuespedes (usar capacidad o default 2)
+          };
+        }) || [],
         modo_gestion_habitaciones: formData.modoGestionHabitaciones,
         modo_gestion_servicios: formData.modoGestionServicios,
         servicios_adicionales: formData.serviciosSeleccionados
@@ -178,14 +243,29 @@ const ReservaWizard = () => {
       
       if (response.success) {
         toast.success('Reserva creada exitosamente');
-        // Redirigir a la página de confirmación
-        router.push(`/reservar/confirmacion?id=${response.data.reserva._id}`);
+        // Redirigir a la página de confirmación usando la estructura correcta
+        router.push(`/reservar/confirmacion?id=${response.data.data.reserva._id}`);
       } else {
         throw new Error(response.message || 'Error al crear la reserva');
       }
     } catch (err) {
       console.error('Error al enviar formulario:', err);
-      toast.error('Error al crear la reserva. Por favor, inténtelo de nuevo.');
+      // Comprobar si es un error de validación del backend
+      const errorMessage = err.message || 'Error desconocido';
+      // Busca mensajes que indiquen fallo de validación o datos faltantes
+      if (errorMessage.toLowerCase().includes('validation failed') || 
+          errorMessage.toLowerCase().includes('faltan datos') || 
+          errorMessage.toLowerCase().includes('required')) { 
+        // Mensaje específico para el modal
+        setValidationErrorMessage(
+          'Faltan datos requeridos para completar la reserva. Por favor, revise los pasos anteriores y asegúrese de que toda la información esté completa.'
+        );
+        setValidationRedirectStep(5);
+        setShowValidationModal(true);
+      } else {
+        // Otro tipo de error, mostrar toast genérico
+        toast.error('Error al crear la reserva. Por favor, inténtelo de nuevo.');
+      }
     }
   };
 
@@ -768,6 +848,15 @@ const ReservaWizard = () => {
           onModeSelect={handleModoHabitacionesSelect} 
         />
         
+        {/* --- Modal de Error de Validación --- */}
+        <ValidationModal
+          isOpen={showValidationModal}
+          onClose={() => setShowValidationModal(false)}
+          message={validationErrorMessage}
+          setCurrentStep={setCurrentStep}
+          redirectToStep={validationRedirectStep}
+        />
+
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-[#A5856A]/20" 
             style={wizardContainerStyle}>
           <h1 className="text-3xl font-extrabold text-[#0F0F0F] mb-8">
@@ -817,11 +906,11 @@ const ReservaWizard = () => {
             {renderStepContent()}
           </div>
           
-          {/* Navigation Buttons */}
-          <div className="flex justify-between items-center mt-8">
+                    {/* Navigation Buttons */}
+                    <div className="flex justify-between items-center mt-8">
             <div>
               {currentStep > 1 && currentStep <= steps.length + 1 && (
-                <button 
+                <button
                   onClick={() => setCurrentStep(prev => prev - 1)}
                   className="px-6 py-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
                 >
@@ -832,23 +921,23 @@ const ReservaWizard = () => {
                 </button>
               )}
             </div>
-            
+
             {currentStep <= steps.length && (
-              <button 
+              <button
                 onClick={handleNextStep}
                 className="px-8 py-3 rounded-lg transition-all duration-300 flex items-center space-x-2 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5" style={{
                   background: 'linear-gradient(145deg, #A5856A, #8B6B4F)',
                 }}
               >
-                <span>{currentStep === steps.length ? 'Finalizar' : 'Siguiente'}</span>
+                                <span>{currentStep === steps.length ? 'Finalizar' : 'Siguiente'}</span>
                 <FaChevronRight />
               </button>
             )}
           </div>
-                  </div>
         </div>
-      </main>
-      <Footer />
-    </div>
-  );
+      </div>
+    </main>
+    <Footer />
+  </div>
+);
 };

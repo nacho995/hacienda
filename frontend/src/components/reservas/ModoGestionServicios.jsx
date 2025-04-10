@@ -7,17 +7,32 @@ import { IoMusicalNotes } from 'react-icons/io5';
 import { BsCameraVideo } from 'react-icons/bs';
 import { getAllServicios, getServiciosPorEvento } from '@/services/servicios.service';
 import { useReservation } from '@/context/ReservationContext';
-import ModalPaqueteUnico from './ModalPaqueteUnico';
 import { toast } from 'sonner';
+
+// Helper function to format price display
+const formatPrice = (price) => {
+  if (typeof price === 'object' && price !== null) {
+    if (price.min && price.max) {
+      return `Desde ${price.min}€ hasta ${price.max}€`; // Adjust currency/format as needed
+    } else if (price.min) {
+      return `Desde ${price.min}€`;
+    } else if (price.max) {
+      return `Hasta ${price.max}€`;
+    }
+    // Fallback if object format is unexpected
+    return 'Precio no disponible'; 
+  }
+  // Return as is if it's a string or number
+  return price;
+};
 
 const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
   const { formData, updateFormSection } = useReservation();
-  const [selectedServices, setSelectedServices] = useState(formData.serviciosSeleccionados || []);
+  const [selectedServices, setSelectedServices] = useState(formData.serviciosSeleccionados?.map(s => s?.id).filter(Boolean) || []); // Store only IDs
   const [servicios, setServicios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [servicioDetallado, setServicioDetallado] = useState(null);
-  const [showPaqueteUnicoModal, setShowPaqueteUnicoModal] = useState(false);
 
   // Estado para servicios agrupados por categorías
   const [serviciosPorCategoria, setServiciosPorCategoria] = useState({
@@ -35,95 +50,102 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
     const fetchServicios = async () => {
       try {
         setLoading(true);
-        let data;
+        let response; // Rename variable
         
         if (tipoEvento) {
           // Si hay un tipo de evento seleccionado, obtener servicios recomendados
           console.log('Obteniendo servicios para evento:', tipoEvento);
-          data = await getServiciosPorEvento(tipoEvento);
+          response = await getServiciosPorEvento(tipoEvento);
         } else {
           // Si no, obtener todos los servicios
           console.log('Obteniendo todos los servicios');
-          data = await getAllServicios();
+          response = await getAllServicios();
         }
         
-        console.log('Datos recibidos de la API:', data);
-        
-        if (!data || data.length === 0) {
-          console.warn('No se recibieron datos de servicios');
-          // Usar datos de respaldo si no hay datos de la API
-          data = [
-            {
-              id: 'catering_premium',
-              nombre: 'Catering Premium',
-              descripcion: 'Menú gourmet personalizado con opciones para todos los gustos y necesidades dietéticas',
-              precio: 'Desde €450 por persona',
-              iconType: 'restaurante',
-              categoria: 'servicio_adicional',
-              subcategoria: 'comida',
-              recomendadoPara: ['Boda', 'Evento Corporativo', 'Aniversario', 'Comunión', 'Bautizo'],
-              color: '#D1B59B'
-            },
-            {
-              id: 'decoracion_personalizada',
-              nombre: 'Decoración Personalizada',
-              descripcion: 'Diseño y montaje de decoración elegante adaptada al estilo de su evento',
-              precio: 'Desde €3,500',
-              iconType: 'decoracion',
-              categoria: 'servicio_adicional',
-              subcategoria: 'decoracion',
-              recomendadoPara: ['Boda', 'Aniversario', 'Comunión', 'Bautizo'],
-              color: '#D1B59B'
-            },
-            {
-              id: 'musica_vivo',
-              nombre: 'Música en Vivo',
-              descripcion: 'Grupo musical o DJ profesional con equipo de sonido incluido',
-              precio: 'Desde €2,800',
-              iconType: 'musica',
-              categoria: 'servicio_adicional',
-              subcategoria: 'entretenimiento',
-              recomendadoPara: ['Boda', 'Evento Corporativo', 'Aniversario'],
-              color: '#D1B59B'
-            },
-            {
-              id: 'foto_video',
-              nombre: 'Fotografía y Video',
-              descripcion: 'Servicio profesional de fotografía y videografía para capturar todos los momentos especiales',
-              precio: 'Desde €1,800',
-              iconType: 'camara',
-              categoria: 'foto_video',
-              subcategoria: 'multimedia',
-              recomendadoPara: ['Boda', 'Comunión', 'Bautizo', 'Aniversario'],
-              color: '#D1B59B'
-            },
-            {
-              id: 'barra_libre',
-              nombre: 'Barra Libre Premium',
-              descripcion: 'Selección de bebidas premium y cócteles personalizados para su evento',
-              precio: 'Desde €35 por persona',
-              iconType: 'bebidas',
-              categoria: 'bebidas',
-              subcategoria: 'alcohol',
-              recomendadoPara: ['Boda', 'Evento Corporativo', 'Aniversario'],
-              color: '#D1B59B'
-            },
-            {
-              id: 'coordinacion_evento',
-              nombre: 'Coordinación del Evento',
-              descripcion: 'Servicio profesional de coordinación el día del evento para asegurar que todo salga perfecto',
-              precio: 'Desde €1,200',
-              iconType: 'coordinacion',
-              categoria: 'coordinacion',
-              subcategoria: 'planificacion',
-              recomendadoPara: ['Boda', 'Evento Corporativo', 'Aniversario', 'Comunión', 'Bautizo'],
-              color: '#D1B59B'
-            }
-          ];
-          console.log('Usando datos de respaldo:', data);
+        console.log('Datos recibidos de la API:', response);
+
+        // Check if response is successful and data is an array
+        let serviciosData = [];
+        if (response && response.success && Array.isArray(response.data)) {
+          serviciosData = response.data;
+        } else if (Array.isArray(response)) { // Fallback if API directly returns array
+           console.warn('La API devolvió un array directamente, usando ese array.');
+           serviciosData = response;
+        } else {
+           console.warn('La respuesta de la API de servicios no tiene el formato esperado o falló:', response);
+           // Using fallback data as before
+            serviciosData = [
+              {
+                id: 'catering_premium',
+                nombre: 'Catering Premium',
+                descripcion: 'Menú gourmet personalizado con opciones para todos los gustos y necesidades dietéticas',
+                precio: 'Desde €450 por persona',
+                iconType: 'restaurante',
+                categoria: 'servicio_adicional',
+                subcategoria: 'comida',
+                recomendadoPara: ['Boda', 'Evento Corporativo', 'Aniversario', 'Comunión', 'Bautizo'],
+                color: '#D1B59B'
+              },
+              {
+                id: 'decoracion_personalizada',
+                nombre: 'Decoración Personalizada',
+                descripcion: 'Diseño y montaje de decoración elegante adaptada al estilo de su evento',
+                precio: 'Desde €3,500',
+                iconType: 'decoracion',
+                categoria: 'servicio_adicional',
+                subcategoria: 'decoracion',
+                recomendadoPara: ['Boda', 'Aniversario', 'Comunión', 'Bautizo'],
+                color: '#D1B59B'
+              },
+              {
+                id: 'musica_vivo',
+                nombre: 'Música en Vivo',
+                descripcion: 'Grupo musical o DJ profesional con equipo de sonido incluido',
+                precio: 'Desde €2,800',
+                iconType: 'musica',
+                categoria: 'servicio_adicional',
+                subcategoria: 'entretenimiento',
+                recomendadoPara: ['Boda', 'Evento Corporativo', 'Aniversario'],
+                color: '#D1B59B'
+              },
+              {
+                id: 'foto_video',
+                nombre: 'Fotografía y Video',
+                descripcion: 'Servicio profesional de fotografía y videografía para capturar todos los momentos especiales',
+                precio: 'Desde €1,800',
+                iconType: 'camara',
+                categoria: 'foto_video',
+                subcategoria: 'multimedia',
+                recomendadoPara: ['Boda', 'Comunión', 'Bautizo', 'Aniversario'],
+                color: '#D1B59B'
+              },
+              {
+                id: 'barra_libre',
+                nombre: 'Barra Libre Premium',
+                descripcion: 'Selección de bebidas premium y cócteles personalizados para su evento',
+                precio: 'Desde €35 por persona',
+                iconType: 'bebidas',
+                categoria: 'bebidas',
+                subcategoria: 'alcohol',
+                recomendadoPara: ['Boda', 'Evento Corporativo', 'Aniversario'],
+                color: '#D1B59B'
+              },
+              {
+                id: 'coordinacion_evento',
+                nombre: 'Coordinación del Evento',
+                descripcion: 'Servicio profesional de coordinación el día del evento para asegurar que todo salga perfecto',
+                precio: 'Desde €1,200',
+                iconType: 'coordinacion',
+                categoria: 'coordinacion',
+                subcategoria: 'planificacion',
+                recomendadoPara: ['Boda', 'Evento Corporativo', 'Aniversario', 'Comunión', 'Bautizo'],
+                color: '#D1B59B'
+              }
+            ];
+            console.log('Usando datos de respaldo:', serviciosData);
         }
         
-        // Agrupar servicios por categoría
+        // Agrupar servicios por categoría usando serviciosData
         const serviciosAgrupados = {
           paquete_evento: [],
           servicio_adicional: [],
@@ -134,7 +156,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           coordinacion: []
         };
         
-        data.forEach(servicio => {
+        serviciosData.forEach(servicio => {
           if (servicio.categoria && serviciosAgrupados[servicio.categoria]) {
             serviciosAgrupados[servicio.categoria].push(servicio);
           } else {
@@ -144,7 +166,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
         });
         
         setServiciosPorCategoria(serviciosAgrupados);
-        setServicios(data);
+        setServicios(serviciosData); // Set the actual array of services
         setLoading(false);
       } catch (err) {
         console.error('Error al cargar servicios:', err);
@@ -195,113 +217,73 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
     fetchServicios();
   }, [tipoEvento]);
 
-  // Función para verificar si dos servicios son incompatibles
-  const sonServiciosIncompatibles = (servicio1, servicio2) => {
-    if (servicio1.id === servicio2.id) return false;
-
-    if (servicio1.categoria === 'paquete_evento' && servicio2.categoria === 'paquete_evento') {
-      return true;
-    }
-
-    if (servicio1.subcategoria === servicio2.subcategoria) {
-      const subcategoriasExclusivas = [
-        'catering',
-        'bebidas',
-        'musica',
-        'fotografia',
-        'video',
-        'coordinacion',
-        'decoracion',
-        'iluminacion',
-        'coctel',
-        'brunch'
-      ];
-      return subcategoriasExclusivas.includes(servicio1.subcategoria);
-    }
-
-    if (servicio1.categoria === servicio2.categoria) {
-      const categoriasExclusivas = [
-        'coctel_brunch',
-        'bebidas',
-        'montaje',
-        'foto_video',
-        'coordinacion'
-      ];
-      return categoriasExclusivas.includes(servicio1.categoria);
-    }
-
-    return false;
-  };
-
   const toggleService = (serviceId, e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    
+
     const servicioSeleccionado = servicios.find(s => s.id === serviceId);
-    
     if (!servicioSeleccionado) {
       console.error('Servicio no encontrado:', serviceId);
       return;
     }
-    
+
     let nuevosServiciosSeleccionados = [...selectedServices];
-    
-    if (selectedServices.includes(serviceId)) {
+    const isSelected = selectedServices.includes(serviceId);
+
+    if (isSelected) {
+      // Deselecting: just remove it
       nuevosServiciosSeleccionados = nuevosServiciosSeleccionados.filter(id => id !== serviceId);
     } else {
-      const esPaquete = servicioSeleccionado.categoria === 'paquete_evento';
-      
-      if (esPaquete) {
-        const paquetesSeleccionados = servicios
-          .filter(s => s.categoria === 'paquete_evento' && selectedServices.includes(s.id));
-        
-        if (paquetesSeleccionados.length > 0) {
-          setShowPaqueteUnicoModal(true);
-          return;
-        }
-      }
-      
-      const serviciosSeleccionadosCompletos = servicios.filter(s => selectedServices.includes(s.id));
-      const servicioIncompatible = serviciosSeleccionadosCompletos.find(s => 
-        sonServiciosIncompatibles(s, servicioSeleccionado)
-      );
-      
-      if (servicioIncompatible) {
-        let mensaje = '';
-        
-        if (servicioSeleccionado.categoria === 'paquete_evento') {
-          mensaje = `No es posible seleccionar múltiples paquetes de evento. Ya tiene seleccionado "${servicioIncompatible.nombre}".`;
-        } else if (servicioSeleccionado.categoria === servicioIncompatible.categoria) {
-          mensaje = `No es posible seleccionar múltiples servicios de ${servicioSeleccionado.categoria.replace('_', ' ')}. Ya tiene seleccionado "${servicioIncompatible.nombre}".`;
-        } else if (servicioSeleccionado.subcategoria === servicioIncompatible.subcategoria) {
-          mensaje = `No es posible seleccionar múltiples servicios de ${servicioSeleccionado.subcategoria}. Ya tiene seleccionado "${servicioIncompatible.nombre}".`;
-        }
-        
-        toast.error('Servicio incompatible', {
-          description: mensaje + ' Por favor, deseleccione el servicio actual antes de elegir otro.',
-          duration: 5000,
+      // Selecting: Check for single-selection categories/subcategories
+      const singleSelectionCategories = ['paquete_evento', 'coctel_brunch', 'bebidas', 'montaje'];
+      const singleSelectionSubcategories = ['catering']; // Assuming 'catering' is a subcategory
+
+      const isSingleSelectionCategory = singleSelectionCategories.includes(servicioSeleccionado.categoria);
+      // Check subcategory if it exists and is relevant
+      const isSingleSelectionSubcategory = servicioSeleccionado.subcategoria && singleSelectionSubcategories.includes(servicioSeleccionado.subcategoria);
+
+      if (isSingleSelectionCategory || isSingleSelectionSubcategory) {
+        // Find and remove existing service of the same type before adding the new one
+        const serviciosCompletosActuales = servicios.filter(s => nuevosServiciosSeleccionados.includes(s.id));
+
+        serviciosCompletosActuales.forEach(servicioExistente => {
+          // Check if existing service is of the same single-selection type as the one being added
+          const isSameCategoryType = isSingleSelectionCategory && servicioExistente.categoria === servicioSeleccionado.categoria;
+          const isSameSubcategoryType = isSingleSelectionSubcategory && servicioExistente.subcategoria === servicioSeleccionado.subcategoria;
+
+          if (isSameCategoryType || isSameSubcategoryType) {
+            // Remove the existing one of the same type
+            nuevosServiciosSeleccionados = nuevosServiciosSeleccionados.filter(id => id !== servicioExistente.id);
+             // Optionally, notify the user about the replacement
+             // toast.info(`Servicio "${servicioExistente.nombre}" reemplazado por "${servicioSeleccionado.nombre}".`);
+          }
         });
-        return;
       }
       
+      // Add the new service ID
       nuevosServiciosSeleccionados.push(serviceId);
     }
-    
+
     setSelectedServices(nuevosServiciosSeleccionados);
-    
-    const serviciosSeleccionadosCompletos = servicios.filter(servicio => 
+
+    // Pass the full service objects back to the parent/context
+    const serviciosSeleccionadosCompletos = servicios.filter(servicio =>
       nuevosServiciosSeleccionados.includes(servicio.id)
     );
-    onServicesSelect(serviciosSeleccionadosCompletos);
+    onServicesSelect(serviciosSeleccionadosCompletos); 
+    // Ensure context is updated if needed (might be redundant if parent handles it via onServicesSelect)
+    // updateFormSection('serviciosSeleccionados', serviciosSeleccionadosCompletos);
   };
 
   const handleContinue = () => {
-    // Guardar servicios seleccionados en el contexto
-    updateFormSection('serviciosSeleccionados', selectedServices);
+    // Guardar servicios seleccionados (IDs or full objects depending on what parent expects)
+    const serviciosCompletos = servicios.filter(s => selectedServices.includes(s.id));
+    updateFormSection('serviciosSeleccionados', serviciosCompletos); // Save full objects to context
     updateFormSection('modoGestionServicios', 'usuario');
-    onServicesSelect(selectedServices);
+    // onServicesSelect might be redundant if context is updated directly here
+    onServicesSelect(serviciosCompletos); 
   };
 
   // Función para mostrar detalles de un servicio
@@ -392,7 +374,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <h2 className="text-2xl font-semibold text-[var(--color-primary)] mb-4">Seleccione los servicios para su evento</h2>
+      <h2 className="text-2xl font-semibold text-[#000000] mb-4">Seleccione los servicios para su evento</h2>
       
       <div className="bg-[#F9F5F0] border border-[#D1B59B] rounded-lg p-4 mb-6">
         <div className="flex items-start">
@@ -400,8 +382,8 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
             <FaInfoCircle size={20} />
           </div>
           <div>
-            <h3 className="font-medium text-[#5D4B3A] mb-1">¿Cómo funciona?</h3>
-            <p className="text-sm text-[#8A6E52]">
+            <h3 className="font-medium text-[#000000] mb-1">¿Cómo funciona?</h3>
+            <p className="text-sm text-[#000000]">
               Hemos seleccionado los servicios más recomendados para su tipo de evento: <span className="font-medium">{typeof tipoEvento === 'object' ? (tipoEvento?.titulo || 'Evento') : (tipoEvento || 'Evento')}</span>. 
               Puede seleccionar los servicios haciendo clic en los iconos o ver más detalles con el botón de información. 
               Los servicios seleccionados aparecerán en el resumen al final de la página.
@@ -458,7 +440,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
         </div>
       </div>
       
-      <p className="mb-6 font-bold text-[#0F0F0F]">
+      <p className="mb-6 font-bold text-[#000000]">
         Seleccione los servicios para su evento
       </p>
       
@@ -475,7 +457,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           {/* Paquetes de Eventos */}
           {serviciosPorCategoria.paquete_evento.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'paquete_evento') && (
             <div>
-              <h3 className="text-xl font-bold text-[#0F0F0F] mb-4">Paquetes Completos</h3>
+              <h3 className="text-xl font-bold text-[#000000] mb-4">Paquetes Completos</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtrarPorBusqueda(serviciosPorCategoria.paquete_evento).map((servicio) => (
                   <div
@@ -499,7 +481,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{servicio.precio}</p>
+                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -532,7 +514,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           {/* Servicios Adicionales */}
           {serviciosPorCategoria.servicio_adicional.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'servicio_adicional') && (
             <div>
-              <h3 className="text-xl font-bold text-[#0F0F0F] mb-4">Servicios Adicionales</h3>
+              <h3 className="text-xl font-bold text-[#000000] mb-4">Servicios Adicionales</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtrarPorBusqueda(serviciosPorCategoria.servicio_adicional).map((servicio) => (
                   <div
@@ -556,7 +538,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{servicio.precio}</p>
+                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -589,7 +571,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           {/* Cóctel y Brunch */}
           {serviciosPorCategoria.coctel_brunch.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'coctel_brunch') && (
             <div>
-              <h3 className="text-xl font-bold text-[#0F0F0F] mb-4">Opciones de Cóctel y Brunch</h3>
+              <h3 className="text-xl font-bold text-[#000000] mb-4">Opciones de Cóctel y Brunch</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtrarPorBusqueda(serviciosPorCategoria.coctel_brunch).map((servicio) => (
                   <div
@@ -613,7 +595,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{servicio.precio}</p>
+                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -646,7 +628,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           {/* Bebidas */}
           {serviciosPorCategoria.bebidas.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'bebidas') && (
             <div>
-              <h3 className="text-xl font-bold text-[#0F0F0F] mb-4">Opciones de Bebidas</h3>
+              <h3 className="text-xl font-bold text-[#000000] mb-4">Opciones de Bebidas</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtrarPorBusqueda(serviciosPorCategoria.bebidas).map((servicio) => (
                   <div
@@ -670,7 +652,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{servicio.precio}</p>
+                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -703,7 +685,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           {/* Montaje */}
           {serviciosPorCategoria.montaje.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'montaje') && (
             <div>
-              <h3 className="text-xl font-bold text-[#0F0F0F] mb-4">Opciones de Montaje</h3>
+              <h3 className="text-xl font-bold text-[#000000] mb-4">Opciones de Montaje</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtrarPorBusqueda(serviciosPorCategoria.montaje).map((servicio) => (
                   <div
@@ -727,7 +709,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{servicio.precio}</p>
+                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -760,7 +742,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           {/* Fotografía y Video */}
           {serviciosPorCategoria.foto_video.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'foto_video') && (
             <div>
-              <h3 className="text-xl font-bold text-[#0F0F0F] mb-4">Fotografía y Video</h3>
+              <h3 className="text-xl font-bold text-[#000000] mb-4">Fotografía y Video</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtrarPorBusqueda(serviciosPorCategoria.foto_video).map((servicio) => (
                   <div
@@ -784,7 +766,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{servicio.precio}</p>
+                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -817,7 +799,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           {/* Coordinación */}
           {serviciosPorCategoria.coordinacion.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'coordinacion') && (
             <div>
-              <h3 className="text-xl font-bold text-[#0F0F0F] mb-4">Coordinación de Eventos</h3>
+              <h3 className="text-xl font-bold text-[#000000] mb-4">Coordinación de Eventos</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filtrarPorBusqueda(serviciosPorCategoria.coordinacion).map((servicio) => (
                   <div
@@ -841,7 +823,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{servicio.precio}</p>
+                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -893,7 +875,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                   {renderIcon(servicioDetallado.iconType)}
                 </div>
                 <div>
-                  <p className="text-lg font-medium text-[#8A6E52]">{servicioDetallado.precio}</p>
+                  <p className="text-lg font-medium text-[#8A6E52]">{formatPrice(servicioDetallado.precio)}</p>
                   {servicioDetallado.duracion && (
                     <p className="text-sm text-gray-600">Duración: {servicioDetallado.duracion}</p>
                   )}
@@ -1005,60 +987,35 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
 
       {/* Resumen de servicios seleccionados */}
       {selectedServices.length > 0 && (
-        <div className="mt-8 p-6 bg-[#F0E8DC] border border-[#D1B59B] rounded-lg shadow-sm">
-          <h4 className="text-lg font-bold text-[#0F0F0F] mb-4">Resumen de servicios seleccionados</h4>
-          
-          <div className="divide-y divide-[#D1B59B]/30">
-            {selectedServices.map(serviceId => {
-              const servicio = servicios.find(s => s.id === serviceId);
-              
-              // Verificar si el servicio existe antes de renderizarlo
-              if (!servicio) return null;
-              
-              return (
-                <div key={serviceId} className="py-3 flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-3">
-                      {servicio.iconType ? renderIcon(servicio.iconType) : <FaUtensils />}
-                    </div>
-                    <div>
-                      <h5 className="font-medium text-[#5D4B3A]">{servicio.nombre || 'Servicio'}</h5>
-                      <p className="text-sm text-[#8A6E52]">
-                        {servicio.categoria ? servicio.categoria.replace('_', ' ') : 'Servicio adicional'}
-                      </p>
-                    </div>
+        <div className="mt-10 pt-6 border-t border-[#D1B59B]">
+          <h3 className="text-xl font-semibold text-[#000000] mb-4">Servicios seleccionados</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {servicios.filter(s => selectedServices.includes(s.id)).map(servicio => (
+              <div key={servicio.id} className="bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-sm border border-[#D1B59B]/50 flex items-center justify-between">
+                <div className='flex items-center'>
+                  <div className="w-8 h-8 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-3 flex-shrink-0">
+                    {renderIcon(servicio.iconType)}
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium text-[#5D4B3A]">{servicio.precio || 'Consultar precio'}</p>
-                    <button 
-                      onClick={() => toggleService(serviceId)}
-                      className="text-xs text-red-500 hover:text-red-700 transition-colors"
-                    >
-                      Eliminar
-                    </button>
+                  <div>
+                    <p className="font-medium text-[#5D4B3A]">{servicio.nombre}</p>
+                    <p className="text-xs text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                   </div>
                 </div>
-              );
-            })}
+                <button 
+                  onClick={(e) => toggleService(servicio.id, e)}
+                  className="text-red-500 hover:text-red-700 transition-colors p-1 rounded-full hover:bg-red-100"
+                  aria-label={`Quitar ${servicio.nombre}`}
+                >
+                  <FaTimes size={14}/>
+                </button>
+              </div>
+            ))}
           </div>
-          
-          <div className="mt-4 pt-4 border-t border-[#D1B59B] flex justify-between items-center">
-            <div>
-              <p className="text-[#5D4B3A] font-medium">Total de servicios seleccionados:</p>
-              <p className="text-sm text-[#8A6E52]">Los precios finales pueden variar según las opciones específicas y el número de invitados</p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-semibold text-[#5D4B3A]">{selectedServices.length} {selectedServices.length === 1 ? 'servicio' : 'servicios'}</p>
-            </div>
-          </div>
+          <p className="text-sm text-[#000000] mt-4 italic">
+            Total: {selectedServices.length} servicio(s) seleccionado(s).
+          </p>
         </div>
       )}
-
-      {/* Modal para advertir sobre selección de múltiples paquetes */}
-      <ModalPaqueteUnico 
-        isOpen={showPaqueteUnicoModal}
-        onClose={() => setShowPaqueteUnicoModal(false)}
-      />
     </div>
   );
 };

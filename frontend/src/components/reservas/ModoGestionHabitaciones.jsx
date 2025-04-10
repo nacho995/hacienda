@@ -164,20 +164,30 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
         setLoading(true);
         setError(null);
         
-        let habitaciones;
+        let response; // Rename variable to avoid confusion
         if (formData.fecha) {
           // Si hay una fecha seleccionada, buscar habitaciones disponibles para esa fecha
           const fechaInicio = formData.fecha;
           // Asumimos que la estancia es de un día para el evento
           const fechaFin = formData.fecha;
-          habitaciones = await obtenerHabitacionesDisponibles(fechaInicio, fechaFin);
+          response = await obtenerHabitacionesDisponibles(fechaInicio, fechaFin);
         } else {
           // Si no hay fecha, obtener todas las habitaciones
-          habitaciones = await obtenerHabitaciones();
+          response = await obtenerHabitaciones();
         }
         
-        // Transformar los datos para el formato que necesitamos
-        const habitacionesFormateadas = habitaciones.map(hab => ({
+        // Check if response is successful and data is an array
+        let habitacionesData = [];
+        if (response && response.success && Array.isArray(response.data)) {
+          habitacionesData = response.data;
+        } else {
+           console.warn('La respuesta de la API de habitaciones no tiene el formato esperado o falló:', response);
+           // Optionally, use fallback data or throw error
+           // For now, proceed with empty array
+        }
+
+        // Transformar los datos usando habitacionesData
+        const habitacionesFormateadas = habitacionesData.map(hab => ({
           id: hab.id || hab._id,
           letra: hab.letra || (hab.id ? hab.id.toString().charAt(0).toUpperCase() : ''),
           nombre: hab.nombre || `Habitación ${hab.numeroHabitacion || hab.numero || hab.letra}`,

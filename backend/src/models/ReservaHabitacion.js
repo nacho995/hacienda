@@ -31,6 +31,12 @@ const ReservaHabitacionSchema = new mongoose.Schema({
     default: 2,
     min: [1, 'El número de huéspedes debe ser al menos 1']
   },
+  // Nuevo campo para nombres de huéspedes (simple string)
+  nombreHuespedes: {
+    type: String,
+    trim: true,
+    default: '' // Valor por defecto vacío
+  },
   precio: {
     type: Number,
     required: [true, 'Por favor, proporcione el precio de la habitación']
