@@ -65,16 +65,23 @@ export default function ReservacionesPage() {
     // Crear un Set con los IDs de las habitaciones asociadas a eventos
     const habitacionesEventosIds = new Set();
     eventoReservations.forEach(evento => {
-      if (evento.habitacionesIds && Array.isArray(evento.habitacionesIds)) {
-        evento.habitacionesIds.forEach(id => {
-          if (id) habitacionesEventosIds.add(id);
+      if (evento.serviciosAdicionales && Array.isArray(evento.serviciosAdicionales)) {
+        evento.serviciosAdicionales.forEach(servicio => {
+          if (servicio && servicio.reservaHabitacionId) {
+            habitacionesEventosIds.add(servicio.reservaHabitacionId.toString());
+          }
         });
       }
     });
+    
+    // Log para verificar los IDs recolectados
+    console.log('IDs de habitaciones asociadas a eventos:', Array.from(habitacionesEventosIds));
 
     // Filtrar habitaciones que no están asociadas a eventos
     const habitacionesIndependientes = habitacionReservations.filter(hab => {
-      const habId = hab._id || hab.id;
+      const habId = (hab._id || hab.id)?.toString(); // Convertir a string para comparar con el Set
+      // Log para depuración
+      // console.log(`Verificando Habitación ID: ${habId}, ¿Está en Set?: ${habitacionesEventosIds.has(habId)}`);
       return habId && !habitacionesEventosIds.has(habId);
     });
 
@@ -212,6 +219,101 @@ export default function ReservacionesPage() {
     }));
   };
 
+  // --- INICIO: Nuevas funciones Handler para acciones ---
+
+  const handleDeleteReservation = useCallback(async (tipo, id) => {
+    if (!id) {
+      toast.error('ID de reserva inválido.');
+      return;
+    }
+    
+    const userConfirmed = window.confirm('¿Estás seguro de que deseas eliminar esta reservación permanentemente?');
+    
+    if (userConfirmed) {
+      setIsLoading(true); // Mostrar indicador de carga
+      try {
+        const apiUrl = `/api/reservas/${tipo === 'evento' ? 'eventos' : 'habitaciones'}/${id}`;
+        const response = await fetch(apiUrl, {
+          method: 'DELETE',
+          headers: {
+            // Asumiendo que necesitas autenticación (ajusta según tu middleware)
+            'Authorization': `Bearer ${localStorage.getItem('token')}` 
+          }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Error al eliminar la reservación');
+        }
+
+        toast.success('Reservación eliminada correctamente');
+        
+        // Actualizar estado local para reflejar el cambio
+        setFilteredReservations(prev => prev.filter(res => (res._id || res.id) !== id));
+        // Opcionalmente, podrías recargar todo si la lógica es compleja:
+        // await loadAllReservations(); 
+
+      } catch (err) {
+        console.error('Error al eliminar reservación:', err);
+        toast.error(err.message || 'Error al eliminar la reservación');
+      } finally {
+        setIsLoading(false); // Ocultar indicador de carga
+      }
+    }
+  }, []); // Dependencias si usas estado externo
+
+  const handleChangeReservationStatus = useCallback(async (tipo, id, nuevoEstado) => {
+    if (!id || !tipo || !nuevoEstado) {
+        toast.error('Datos inválidos para actualizar estado.');
+        return;
+    }
+    
+    setIsLoading(true); // Mostrar indicador de carga
+    try {
+      const apiUrl = '/api/reservas/estado'; // Endpoint genérico que añadimos
+      const response = await fetch(apiUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          // Asumiendo autenticación
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          tipoReserva: tipo, // 'evento' o 'habitacion'
+          id: id,
+          estadoReserva: nuevoEstado // 'pendiente', 'confirmada', 'cancelada'
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Error al actualizar el estado');
+      }
+
+      toast.success(`Estado de la reservación actualizado a ${nuevoEstado}`);
+      
+      // Actualizar estado local
+      setFilteredReservations(prev => prev.map(res => {
+        if ((res._id || res.id) === id) {
+          return { ...res, estado: nuevoEstado, estadoReserva: nuevoEstado }; // Actualizar ambos por si acaso
+        }
+        return res;
+      }));
+      // Opcionalmente, recargar todo:
+      // await loadAllReservations();
+
+    } catch (err) {
+      console.error('Error al actualizar estado:', err);
+      toast.error(err.message || 'Error al actualizar el estado');
+    } finally {
+      setIsLoading(false); // Ocultar indicador de carga
+    }
+  }, []); // Dependencias si usas estado externo
+
+  // --- FIN: Nuevas funciones Handler ---
+
   // Manejo de estados de carga
   if (authLoading || (isLoading && !initialLoadDone)) {
     return (
@@ -311,8 +413,10 @@ export default function ReservacionesPage() {
           reservations={filteredReservations}
           onSort={handleSort}
           sortConfig={sortConfig}
-          isLoading={reservationsLoading}
+          isLoading={isLoading || reservationsLoading}
           usuarios={usuarios}
+          onDelete={handleDeleteReservation}
+          onChangeStatus={handleChangeReservationStatus}
         />
 
         {/* Mensaje cuando no hay resultados para los filtros aplicados */}

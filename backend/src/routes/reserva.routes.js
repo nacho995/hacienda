@@ -31,6 +31,7 @@ const {
 } = require('../controllers/reservaEvento.controller');
 
 const { protectRoute, authorize } = require('../middleware/auth');
+const reservaEstadoController = require('../controllers/reservaEstado.controller');
 
 const router = express.Router();
 
@@ -87,5 +88,10 @@ router.put('/eventos/:eventoId/habitaciones/:letraHabitacion', protectRoute, act
 router.get('/eventos/:id/servicios', protectRoute, authorize('admin'), getEventoServicios);
 router.post('/eventos/:id/servicios', protectRoute, authorize('admin'), addEventoServicio); 
 router.delete('/eventos/:id/servicios/:servicioId', protectRoute, authorize('admin'), removeEventoServicio);
+
+// ==========================
+// RUTA PARA ACTUALIZAR ESTADO (ADMIN)
+// ==========================
+router.put('/estado', protectRoute, authorize('admin'), reservaEstadoController.actualizarEstado);
 
 module.exports = router;

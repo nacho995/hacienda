@@ -3,10 +3,21 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { FaSort, FaSortUp, FaSortDown, FaSpinner, FaUserCircle } from 'react-icons/fa';
+import {
+  FaSort, FaSortUp, FaSortDown, FaSpinner, FaUserCircle,
+  FaEye, FaTrashAlt, FaCheckCircle, FaTimesCircle, FaHourglassHalf
+} from 'react-icons/fa';
 import Link from 'next/link';
 
-const TablaReservaciones = ({ reservations, onSort, sortConfig, isLoading, usuarios = [] }) => {
+const TablaReservaciones = ({ 
+  reservations,
+  onSort,
+  sortConfig,
+  isLoading,
+  usuarios = [],
+  onDelete,
+  onChangeStatus
+}) => {
   const getSortIcon = (key) => {
     if (sortConfig.key !== key) return <FaSort />;
     return sortConfig.direction === 'asc' ? <FaSortUp /> : <FaSortDown />;
@@ -74,6 +85,17 @@ const TablaReservaciones = ({ reservations, onSort, sortConfig, isLoading, usuar
     const usuario = usuarios.find(u => u._id === asignadoA);
     return usuario ? (usuario.nombre || usuario.email || 'Usuario') : 'Usuario desconocido';
   };
+
+  // Componente auxiliar para los botones de acción
+  const ActionButton = ({ onClick, icon: Icon, colorClass, tooltip }) => (
+    <button
+      onClick={onClick}
+      className={`p-1 rounded hover:opacity-75 transition ${colorClass}`}
+      title={tooltip}
+    >
+      <Icon />
+    </button>
+  );
 
   if (isLoading) {
     return (
@@ -154,6 +176,8 @@ const TablaReservaciones = ({ reservations, onSort, sortConfig, isLoading, usuar
             // Obtener la información del cliente
             const cliente = getClienteInfo(reservation);
             const reservationId = getReservationId(reservation);
+            const reservationType = reservation.tipo;
+            const currentStatus = reservation.estadoReserva || reservation.estado;
             
             return (
               <tr key={reservation.uniqueId || `${reservation.tipo}_${reservationId}`} className="hover:bg-gray-50">
@@ -186,8 +210,8 @@ const TablaReservaciones = ({ reservations, onSort, sortConfig, isLoading, usuar
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(reservation.estado)}`}>
-                    {reservation.estado || 'No especificado'}
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(currentStatus)}`}>
+                    {currentStatus || 'No especificado'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -196,13 +220,48 @@ const TablaReservaciones = ({ reservations, onSort, sortConfig, isLoading, usuar
                     {getUsuarioAsignado(reservation.asignadoA)}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <Link 
-                    href={`/admin/reservas/${reservationId}`}
-                    className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] font-medium"
-                  >
-                    Ver detalles
-                  </Link>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <div className="flex items-center space-x-2">
+                    <Link 
+                      href={`/admin/reservaciones/${reservationType}/${reservationId}`}
+                      className="p-1 rounded text-blue-600 hover:text-blue-800 transition" 
+                      title="Ver Detalles"
+                    >
+                      <FaEye />
+                    </Link>
+                    
+                    <ActionButton
+                      onClick={() => onDelete(reservationType, reservationId)}
+                      icon={FaTrashAlt}
+                      colorClass="text-red-600 hover:text-red-800"
+                      tooltip="Eliminar"
+                    />
+
+                    {currentStatus !== 'confirmada' && (
+                      <ActionButton
+                        onClick={() => onChangeStatus(reservationType, reservationId, 'confirmada')}
+                        icon={FaCheckCircle}
+                        colorClass="text-green-600 hover:text-green-800"
+                        tooltip="Confirmar"
+                      />
+                    )}
+                    {currentStatus !== 'cancelada' && (
+                      <ActionButton
+                        onClick={() => onChangeStatus(reservationType, reservationId, 'cancelada')}
+                        icon={FaTimesCircle}
+                        colorClass="text-orange-600 hover:text-orange-800"
+                        tooltip="Cancelar"
+                      />
+                    )}
+                    {currentStatus !== 'pendiente' && (
+                      <ActionButton
+                        onClick={() => onChangeStatus(reservationType, reservationId, 'pendiente')}
+                        icon={FaHourglassHalf}
+                        colorClass="text-yellow-600 hover:text-yellow-800"
+                        tooltip="Marcar como Pendiente"
+                      />
+                    )}
+                  </div>
                 </td>
               </tr>
             );

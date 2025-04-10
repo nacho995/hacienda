@@ -15,4 +15,15 @@ router.put('/:id', [authJwt.verifyToken, authJwt.isAdmin], tipoEventoController.
 // Eliminar tipo de evento (solo admin)
 router.delete('/:id', [authJwt.verifyToken, authJwt.isAdmin], tipoEventoController.deleteTipoEvento);
 
+// --- NUEVAS RUTAS PARA SERVICIOS ASOCIADOS ---
+
+// Obtener servicios de un tipo de evento específico
+router.get('/:id/servicios', tipoEventoController.getServiciosDeTipoEvento);
+
+// Añadir un servicio a un tipo de evento (Admin)
+router.post('/:id/servicios', [authJwt.verifyToken, authJwt.isAdmin], tipoEventoController.addServicioATipoEvento);
+
+// Eliminar un servicio de un tipo de evento (Admin)
+router.delete('/:id/servicios/:servicioId', [authJwt.verifyToken, authJwt.isAdmin], tipoEventoController.removeServicioDeTipoEvento);
+
 module.exports = router; 

@@ -26,10 +26,10 @@ const tipoEventoSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  serviciosDisponibles: {
-    type: [String],
-    default: []
-  },
+  serviciosDisponibles: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Servicio'
+  }],
   activo: {
     type: Boolean,
     default: true

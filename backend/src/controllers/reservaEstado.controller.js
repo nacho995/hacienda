@@ -1,6 +1,6 @@
 const ReservaEvento = require('../models/ReservaEvento');
 const ReservaHabitacion = require('../models/ReservaHabitacion');
-const ReservaMasaje = require('../models/ReservaMasaje');
+// const ReservaMasaje = require('../models/ReservaMasaje'); // Comentado porque el modelo no existe
 const { StatusCodes } = require('http-status-codes');
 
 // Función auxiliar para actualizar el estado de una reserva
@@ -14,11 +14,16 @@ const actualizarEstadoReserva = async (tipoReserva, id, nuevoEstado) => {
     case 'habitacion':
       modelo = ReservaHabitacion;
       break;
-    case 'masaje':
-      modelo = ReservaMasaje;
-      break;
+    // case 'masaje': // Comentado porque el modelo no existe
+    //   modelo = ReservaMasaje;
+    //   break;
     default:
-      throw new Error('Tipo de reserva no válido');
+      // Modificado para lanzar error si no es evento o habitacion
+      if (tipoReserva !== 'evento' && tipoReserva !== 'habitacion') {
+          throw new Error(`Tipo de reserva no válido o no soportado: ${tipoReserva}`);
+      }
+      // Si llega aquí, algo raro pasó, pero lanzamos error genérico
+      throw new Error('Tipo de reserva no válido'); 
   }
 
   // Validar que el nuevo estado sea válido
