@@ -7,6 +7,7 @@ const sendEmail = require('../utils/email');
 const confirmacionTemplate = require('../emails/confirmacionReserva');
 const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
 const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
+const Servicio = require('../models/Servicio');
 
 /**
  * @desc    Crear una reserva de evento
@@ -1050,4 +1051,139 @@ const ajustarDuracionValida = (duracion) => {
   
   console.log(`Ajustando duración inválida: ${duracion} min → ${duracionAjustada} min (valor permitido más cercano)`);
   return duracionAjustada;
+};
+
+/**
+ * @desc    Obtener los servicios contratados para un evento
+ * @route   GET /api/reservas/eventos/:id/servicios
+ * @access  Private (Admin)
+ */
+exports.getEventoServicios = async (req, res, next) => {
+  try {
+    const reserva = await ReservaEvento.findById(req.params.id).populate('serviciosContratados');
+
+    if (!reserva) {
+      return res.status(404).json({
+        success: false,
+        message: `Reserva de evento no encontrada con ID ${req.params.id}`
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      count: reserva.serviciosContratados.length,
+      data: reserva.serviciosContratados
+    });
+  } catch (error) {
+    console.error('Error al obtener servicios del evento:', error);
+    res.status(500).json({ success: false, message: 'Error del servidor' });
+  }
+};
+
+/**
+ * @desc    Añadir un servicio a una reserva de evento
+ * @route   POST /api/reservas/eventos/:id/servicios
+ * @access  Private (Admin)
+ */
+exports.addEventoServicio = async (req, res, next) => {
+  const { servicioId } = req.body;
+
+  if (!servicioId) {
+    return res.status(400).json({ success: false, message: 'Falta el ID del servicio' });
+  }
+
+  // Validar que el servicioId es válido y existe
+  if (!mongoose.Types.ObjectId.isValid(servicioId)) {
+      return res.status(400).json({ success: false, message: 'ID de servicio no válido' });
+  }
+  const servicioExists = await Servicio.findById(servicioId);
+  if (!servicioExists) {
+      return res.status(404).json({ success: false, message: 'Servicio no encontrado' });
+  }
+
+  try {
+    const reserva = await ReservaEvento.findById(req.params.id);
+
+    if (!reserva) {
+      return res.status(404).json({
+        success: false,
+        message: `Reserva de evento no encontrada con ID ${req.params.id}`
+      });
+    }
+
+    // Verificar si el servicio ya está añadido
+    if (reserva.serviciosContratados.includes(servicioId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'El servicio ya está contratado para este evento'
+      });
+    }
+
+    // Añadir el servicio al array
+    reserva.serviciosContratados.push(servicioId);
+    await reserva.save();
+    
+    // Popular los servicios antes de devolver para dar la lista completa
+    await reserva.populate('serviciosContratados');
+
+    res.status(200).json({
+      success: true,
+      message: 'Servicio añadido al evento',
+      data: reserva.serviciosContratados // Devolver la lista actualizada
+    });
+  } catch (error) {
+    console.error('Error al añadir servicio al evento:', error);
+    res.status(500).json({ success: false, message: 'Error del servidor' });
+  }
+};
+
+/**
+ * @desc    Eliminar un servicio de una reserva de evento
+ * @route   DELETE /api/reservas/eventos/:id/servicios/:servicioId
+ * @access  Private (Admin)
+ */
+exports.removeEventoServicio = async (req, res, next) => {
+  const { id: eventoId, servicioId } = req.params;
+
+  // Validar IDs
+  if (!mongoose.Types.ObjectId.isValid(eventoId) || !mongoose.Types.ObjectId.isValid(servicioId)) {
+      return res.status(400).json({ success: false, message: 'ID de evento o servicio no válido' });
+  }
+
+  try {
+    const reserva = await ReservaEvento.findById(eventoId);
+
+    if (!reserva) {
+      return res.status(404).json({
+        success: false,
+        message: `Reserva de evento no encontrada con ID ${eventoId}`
+      });
+    }
+
+    // Verificar si el servicio existe en el array
+    const servicioIndex = reserva.serviciosContratados.findIndex(id => id.toString() === servicioId);
+
+    if (servicioIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'El servicio no se encontró contratado para este evento'
+      });
+    }
+
+    // Eliminar el servicio del array
+    reserva.serviciosContratados.splice(servicioIndex, 1);
+    await reserva.save();
+    
+    // Popular los servicios antes de devolver
+    await reserva.populate('serviciosContratados');
+
+    res.status(200).json({
+      success: true,
+      message: 'Servicio eliminado del evento',
+      data: reserva.serviciosContratados // Devolver la lista actualizada
+    });
+  } catch (error) {
+    console.error('Error al eliminar servicio del evento:', error);
+    res.status(500).json({ success: false, message: 'Error del servidor' });
+  }
 };

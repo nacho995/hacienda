@@ -131,7 +131,13 @@ const reservaEventoSchema = new mongoose.Schema({
         ref: 'ReservaHabitacion'
       }
     }]
-  }
+  },
+  
+  // Nuevo campo para IDs de servicios contratados
+  serviciosContratados: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Servicio' // Referencia al modelo Servicio
+  }]
 }, {
   timestamps: true
 });

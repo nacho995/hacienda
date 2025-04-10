@@ -433,11 +433,11 @@ export default function EventoReservationDetail({ params }) {
       {/* Sección para Habitaciones del Evento */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden mt-8">
         <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <h3 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
             <FaBed /> Habitaciones Asociadas al Evento
           </h3>
         </div>
-        <div className="p-6">
+        <div className="p-6 space-y-8">
           {loadingHabitaciones ? (
             <div className="text-center py-6">
               <FaSpinner className="animate-spin text-2xl text-[var(--color-primary)] mx-auto mb-2" />
@@ -450,67 +450,65 @@ export default function EventoReservationDetail({ params }) {
           ) : habitacionesEvento.length === 0 ? (
             <p className="text-gray-500 text-sm">No hay habitaciones asociadas a este evento.</p>
           ) : (
-            <div className="space-y-6">
-              {habitacionesEvento.map((hab) => (
-                <div key={hab._id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <h4 className="font-medium text-gray-700 mb-3">Habitación: {hab.letraHabitacion || hab.tipoHabitacion || hab._id.substring(0, 6)}</h4>
+            habitacionesEvento.map((hab) => (
+              <div key={hab._id} className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
+                <h4 className="font-medium text-gray-700 mb-4 text-lg">Habitación: {hab.letraHabitacion || hab.tipoHabitacion || hab._id.substring(0, 6)}</h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Número de Huéspedes */}
+                  <div>
+                    <label htmlFor={`numHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Nº Huéspedes</label>
+                    <input 
+                      type="number"
+                      id={`numHuespedes_${hab._id}`}
+                      min="1"
+                      value={huespedesEditados[hab._id]?.numHuespedes || ''}
+                      onChange={(e) => handleHuespedChange(hab._id, 'numHuespedes', e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    />
+                  </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Número de Huéspedes */}
-                    <div>
-                      <label htmlFor={`numHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Nº Huéspedes</label>
-                      <input 
-                        type="number"
-                        id={`numHuespedes_${hab._id}`}
-                        min="1"
-                        value={huespedesEditados[hab._id]?.numHuespedes || ''}
-                        onChange={(e) => handleHuespedChange(hab._id, 'numHuespedes', e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                      />
-                    </div>
-                    
-                    {/* Nombres Huéspedes */}
-                    <div className="md:col-span-2">
-                      <label htmlFor={`nombresHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Nombres Huéspedes (uno por línea)</label>
-                      <textarea 
-                        id={`nombresHuespedes_${hab._id}`}
-                        rows="3"
-                        value={huespedesEditados[hab._id]?.nombres || ''}
-                        onChange={(e) => handleHuespedChange(hab._id, 'nombres', e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                        placeholder="Ej:
+                  {/* Nombres Huéspedes */}
+                  <div className="md:col-span-2">
+                    <label htmlFor={`nombresHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Nombres Huéspedes (uno por línea)</label>
+                    <textarea 
+                      id={`nombresHuespedes_${hab._id}`}
+                      rows="3"
+                      value={huespedesEditados[hab._id]?.nombres || ''}
+                      onChange={(e) => handleHuespedChange(hab._id, 'nombres', e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      placeholder="Ej:
 Juan Pérez
 Maria García"
-                      />
-                    </div>
+                    />
+                  </div>
 
-                    {/* (Opcional) Detalles Huéspedes */}
-                    {/* 
-                    <div className="md:col-span-3">
-                      <label htmlFor={`detallesHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Detalles Adicionales</label>
-                      <textarea 
-                        id={`detallesHuespedes_${hab._id}`}
-                        rows="2"
-                        value={huespedesEditados[hab._id]?.detalles || ''}
-                        onChange={(e) => handleHuespedChange(hab._id, 'detalles', e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                      />
-                    </div>
-                    */}
+                  {/* (Opcional) Detalles Huéspedes */}
+                  {/* 
+                  <div className="md:col-span-3">
+                    <label htmlFor={`detallesHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Detalles Adicionales</label>
+                    <textarea 
+                      id={`detallesHuespedes_${hab._id}`}
+                      rows="2"
+                      value={huespedesEditados[hab._id]?.detalles || ''}
+                      onChange={(e) => handleHuespedChange(hab._id, 'detalles', e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    />
                   </div>
-                  
-                  <div className="mt-4 text-right">
-                    <button
-                      onClick={() => handleGuardarHuespedes(hab._id)}
-                      disabled={updating}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                    >
-                      {updating ? <FaSpinner className="animate-spin mr-2"/> : <FaSave className="mr-2"/>} Guardar Huéspedes Hab. {hab.letraHabitacion || ''}
-                    </button>
-                  </div>
+                  */}
                 </div>
-              ))}
-            </div>
+                
+                <div className="mt-6 text-right">
+                  <button
+                    onClick={() => handleGuardarHuespedes(hab._id)}
+                    disabled={updating}
+                    className={`inline-flex items-center px-6 py-2.5 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-amber-700 hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-600 disabled:opacity-50`}
+                  >
+                    {updating ? <FaSpinner className="animate-spin mr-2"/> : <FaSave className="mr-2"/>} Guardar Cambios
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>

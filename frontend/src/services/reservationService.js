@@ -1216,4 +1216,56 @@ export const updateReservaHabitacionHuespedes = async (reservaHabitacionId, data
       message: error.response?.data?.message || 'Error al actualizar los huéspedes'
     };
   }
+};
+
+// Función para obtener los servicios contratados de un evento
+export const getEventoServicios = async (eventoId) => {
+  if (!eventoId) {
+    return { success: false, message: 'ID de evento no proporcionado' };
+  }
+  try {
+    const response = await apiClient.get(`/reservas/eventos/${eventoId}/servicios`);
+    return response; // Asume que apiClient devuelve { success: true, data: [...] }
+  } catch (error) {
+    console.error(`Error al obtener servicios para evento ${eventoId}:`, error.response || error);
+    return { 
+      success: false, 
+      data: [],
+      message: error.response?.data?.message || 'Error al obtener servicios del evento'
+    };
+  }
+};
+
+// Función para añadir un servicio a un evento
+export const addEventoServicio = async (eventoId, servicioData) => { // servicioData debe ser { servicioId: 'id_del_servicio' }
+  if (!eventoId || !servicioData?.servicioId) {
+    return { success: false, message: 'ID de evento o servicio no proporcionado' };
+  }
+  try {
+    const response = await apiClient.post(`/reservas/eventos/${eventoId}/servicios`, servicioData);
+    return response; // Asume que devuelve la lista actualizada de servicios
+  } catch (error) {
+    console.error(`Error al añadir servicio ${servicioData.servicioId} al evento ${eventoId}:`, error.response || error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'Error al añadir servicio al evento'
+    };
+  }
+};
+
+// Función para eliminar un servicio de un evento
+export const removeEventoServicio = async (eventoId, servicioId) => {
+  if (!eventoId || !servicioId) {
+    return { success: false, message: 'ID de evento o servicio no proporcionado' };
+  }
+  try {
+    const response = await apiClient.delete(`/reservas/eventos/${eventoId}/servicios/${servicioId}`);
+    return response; // Asume que devuelve la lista actualizada
+  } catch (error) {
+    console.error(`Error al eliminar servicio ${servicioId} del evento ${eventoId}:`, error.response || error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'Error al eliminar servicio del evento'
+    };
+  }
 }; 

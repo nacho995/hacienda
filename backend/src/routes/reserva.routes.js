@@ -24,7 +24,10 @@ const {
   assignReservaEvento,
   unassignReservaEvento,
   obtenerHabitacionesEvento,
-  actualizarHabitacionEvento
+  actualizarHabitacionEvento,
+  getEventoServicios,
+  addEventoServicio,
+  removeEventoServicio
 } = require('../controllers/reservaEvento.controller');
 
 const { protectRoute, authorize } = require('../middleware/auth');
@@ -75,5 +78,14 @@ router.put('/eventos/:id/desasignar', protectRoute, unassignReservaEvento);
 // Rutas protegidas para eventos (solo admin o cliente autenticado)
 router.get('/eventos/:id/habitaciones', protectRoute, obtenerHabitacionesEvento);
 router.put('/eventos/:eventoId/habitaciones/:letraHabitacion', protectRoute, actualizarHabitacionEvento);
+
+// Rutas para gestionar habitaciones específicas de un evento
+router.get('/eventos/:id/habitaciones', protectRoute, obtenerHabitacionesEvento);
+router.put('/eventos/:eventoId/habitaciones/:letraHabitacion', protectRoute, actualizarHabitacionEvento);
+
+// --- NUEVAS RUTAS PARA GESTIONAR SERVICIOS DE UN EVENTO ---
+router.get('/eventos/:id/servicios', protectRoute, authorize('admin'), getEventoServicios);
+router.post('/eventos/:id/servicios', protectRoute, authorize('admin'), addEventoServicio); 
+router.delete('/eventos/:id/servicios/:servicioId', protectRoute, authorize('admin'), removeEventoServicio);
 
 module.exports = router;
