@@ -13,7 +13,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "flowbite-react": "^0.7.0-beta.6"
   },
   "devDependencies": {
     "@types/node": "22.14.0",

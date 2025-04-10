@@ -6,11 +6,12 @@ import { MdRestaurant, MdOutlineDining, MdLocalFlorist, MdOutlineRestaurant } fr
 import { IoMusicalNotes } from 'react-icons/io5';
 import { BsCameraVideo } from 'react-icons/bs';
 import { getAllServicios, getServiciosPorEvento } from '@/services/servicios.service';
-import { useReserva } from '@/context/ReservaContext';
+import { useReservation } from '@/context/ReservationContext';
 import ModalPaqueteUnico from './ModalPaqueteUnico';
+import { toast } from 'sonner';
 
 const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
-  const { formData, updateFormSection } = useReserva();
+  const { formData, updateFormSection } = useReservation();
   const [selectedServices, setSelectedServices] = useState(formData.serviciosSeleccionados || []);
   const [servicios, setServicios] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -194,16 +195,50 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
     fetchServicios();
   }, [tipoEvento]);
 
+  // Función para verificar si dos servicios son incompatibles
+  const sonServiciosIncompatibles = (servicio1, servicio2) => {
+    if (servicio1.id === servicio2.id) return false;
+
+    if (servicio1.categoria === 'paquete_evento' && servicio2.categoria === 'paquete_evento') {
+      return true;
+    }
+
+    if (servicio1.subcategoria === servicio2.subcategoria) {
+      const subcategoriasExclusivas = [
+        'catering',
+        'bebidas',
+        'musica',
+        'fotografia',
+        'video',
+        'coordinacion',
+        'decoracion',
+        'iluminacion',
+        'coctel',
+        'brunch'
+      ];
+      return subcategoriasExclusivas.includes(servicio1.subcategoria);
+    }
+
+    if (servicio1.categoria === servicio2.categoria) {
+      const categoriasExclusivas = [
+        'coctel_brunch',
+        'bebidas',
+        'montaje',
+        'foto_video',
+        'coordinacion'
+      ];
+      return categoriasExclusivas.includes(servicio1.categoria);
+    }
+
+    return false;
+  };
+
   const toggleService = (serviceId, e) => {
-    // Prevenir comportamiento por defecto para evitar que el evento se propague
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
     
-    console.log('Toggling service:', serviceId);
-    
-    // Obtener el servicio que se está seleccionando
     const servicioSeleccionado = servicios.find(s => s.id === serviceId);
     
     if (!servicioSeleccionado) {
@@ -211,39 +246,51 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
       return;
     }
     
-    // Crear una copia del array de servicios seleccionados para modificarlo
     let nuevosServiciosSeleccionados = [...selectedServices];
     
     if (selectedServices.includes(serviceId)) {
-      // Si ya está seleccionado, lo quitamos
-      console.log('Deseleccionando servicio:', serviceId);
       nuevosServiciosSeleccionados = nuevosServiciosSeleccionados.filter(id => id !== serviceId);
     } else {
-      // Verificar si es un paquete
       const esPaquete = servicioSeleccionado.categoria === 'paquete_evento';
       
       if (esPaquete) {
-        // Si es un paquete, verificamos si ya hay otro paquete seleccionado
         const paquetesSeleccionados = servicios
           .filter(s => s.categoria === 'paquete_evento' && selectedServices.includes(s.id));
         
         if (paquetesSeleccionados.length > 0) {
-          // Si ya hay un paquete seleccionado, mostramos el modal
           setShowPaqueteUnicoModal(true);
           return;
         }
       }
       
-      // Si no hay conflictos, añadimos el servicio a la selección
-      console.log('Seleccionando servicio:', serviceId);
+      const serviciosSeleccionadosCompletos = servicios.filter(s => selectedServices.includes(s.id));
+      const servicioIncompatible = serviciosSeleccionadosCompletos.find(s => 
+        sonServiciosIncompatibles(s, servicioSeleccionado)
+      );
+      
+      if (servicioIncompatible) {
+        let mensaje = '';
+        
+        if (servicioSeleccionado.categoria === 'paquete_evento') {
+          mensaje = `No es posible seleccionar múltiples paquetes de evento. Ya tiene seleccionado "${servicioIncompatible.nombre}".`;
+        } else if (servicioSeleccionado.categoria === servicioIncompatible.categoria) {
+          mensaje = `No es posible seleccionar múltiples servicios de ${servicioSeleccionado.categoria.replace('_', ' ')}. Ya tiene seleccionado "${servicioIncompatible.nombre}".`;
+        } else if (servicioSeleccionado.subcategoria === servicioIncompatible.subcategoria) {
+          mensaje = `No es posible seleccionar múltiples servicios de ${servicioSeleccionado.subcategoria}. Ya tiene seleccionado "${servicioIncompatible.nombre}".`;
+        }
+        
+        toast.error('Servicio incompatible', {
+          description: mensaje + ' Por favor, deseleccione el servicio actual antes de elegir otro.',
+          duration: 5000,
+        });
+        return;
+      }
+      
       nuevosServiciosSeleccionados.push(serviceId);
     }
     
-    // Actualizar el estado con la nueva selección
-    console.log('Nuevos servicios seleccionados:', nuevosServiciosSeleccionados);
     setSelectedServices(nuevosServiciosSeleccionados);
     
-    // Notificar al componente padre sobre los servicios seleccionados
     const serviciosSeleccionadosCompletos = servicios.filter(servicio => 
       nuevosServiciosSeleccionados.includes(servicio.id)
     );
@@ -956,8 +1003,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
         </div>
       )}
 
-      {/* El botón de continuar se ha eliminado porque ya existe el botón de siguiente en el wizard */}
-
       {/* Resumen de servicios seleccionados */}
       {selectedServices.length > 0 && (
         <div className="mt-8 p-6 bg-[#F0E8DC] border border-[#D1B59B] rounded-lg shadow-sm">
@@ -1011,8 +1056,8 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
 
       {/* Modal para advertir sobre selección de múltiples paquetes */}
       <ModalPaqueteUnico 
-        isOpen={showPaqueteUnicoModal} 
-        onClose={() => setShowPaqueteUnicoModal(false)} 
+        isOpen={showPaqueteUnicoModal}
+        onClose={() => setShowPaqueteUnicoModal(false)}
       />
     </div>
   );

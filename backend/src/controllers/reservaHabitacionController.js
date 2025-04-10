@@ -579,4 +579,89 @@ exports.getHabitacionOccupiedDates = asyncHandler(async (req, res, next) => {
       error: error.message
     });
   }
+});
+
+// @desc    Actualizar información de huéspedes para una reserva de habitación
+// @route   PUT /api/reservas/habitaciones/:id/huespedes
+// @access  Private
+exports.updateReservaHabitacionHuespedes = asyncHandler(async (req, res, next) => {
+  const { numHuespedes, infoHuespedes } = req.body;
+
+  // Validación básica de entrada
+  if (numHuespedes === undefined && infoHuespedes === undefined) {
+    return next(
+      new ErrorResponse('Debe proporcionar numHuespedes o infoHuespedes', 400)
+    );
+  }
+  
+  if (numHuespedes !== undefined && (typeof numHuespedes !== 'number' || numHuespedes < 1)) {
+    return next(
+      new ErrorResponse('El número de huéspedes debe ser un número positivo', 400)
+    );
+  }
+
+  if (infoHuespedes !== undefined) {
+    if (typeof infoHuespedes !== 'object' || infoHuespedes === null) {
+      return next(
+        new ErrorResponse('infoHuespedes debe ser un objeto', 400)
+      );
+    }
+    if (infoHuespedes.nombres !== undefined && !Array.isArray(infoHuespedes.nombres)) {
+      return next(
+        new ErrorResponse('infoHuespedes.nombres debe ser un array', 400)
+      );
+    }
+    if (infoHuespedes.detalles !== undefined && typeof infoHuespedes.detalles !== 'string') {
+      return next(
+        new ErrorResponse('infoHuespedes.detalles debe ser un string', 400)
+      );
+    }
+  }
+
+  try {
+    let reserva = await ReservaHabitacion.findById(req.params.id);
+
+    if (!reserva) {
+      return next(
+        new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404)
+      );
+    }
+
+    // TODO: Añadir comprobación de permisos si es necesario
+    // Por ejemplo, ¿solo el admin o el creador del evento pueden modificar?
+    // if (reserva.creadoPor.toString() !== req.user.id && req.user.role !== 'admin') {
+    //   return next(new ErrorResponse('No autorizado para actualizar esta reserva', 401));
+    // }
+
+    // Actualizar los campos proporcionados
+    const updateData = {};
+    if (numHuespedes !== undefined) {
+      updateData.numHuespedes = numHuespedes;
+    }
+    if (infoHuespedes !== undefined) {
+      // Asegurarse de que no sobreescribimos todo el objeto si solo viene una parte
+      updateData.infoHuespedes = { ...reserva.infoHuespedes }; 
+      if (infoHuespedes.nombres !== undefined) {
+        updateData.infoHuespedes.nombres = infoHuespedes.nombres;
+      }
+      if (infoHuespedes.detalles !== undefined) {
+        updateData.infoHuespedes.detalles = infoHuespedes.detalles;
+      }
+    }
+
+    // Guardar los cambios
+    reserva = await ReservaHabitacion.findByIdAndUpdate(req.params.id, updateData, {
+      new: true, // Devolver el documento modificado
+      runValidators: true // Ejecutar validadores del schema
+    });
+
+    res.status(200).json({
+      success: true,
+      data: reserva
+    });
+
+  } catch (error) {
+    console.error('Error al actualizar huéspedes de reserva:', error);
+    next(error);
+  }
 }); 

@@ -815,21 +815,9 @@ export const getAllReservationsForDashboard = async () => {
         };
       }
 
-      // Procesar habitacion
-      let habitacionProcesada = h.habitacion;
-      if (typeof h.habitacion === 'object' && h.habitacion !== null) {
-        habitacionProcesada = {
-          ...h.habitacion,
-          nombre: h.habitacion.nombre || h.habitacion.titulo || 'Habitación sin nombre',
-          tipo: h.habitacion.tipo || tipoHabitacionProcesado.tipo || 'standard'
-        };
-      } else if (typeof h.habitacion === 'string') {
-        habitacionProcesada = {
-          nombre: h.habitacion,
-          tipo: tipoHabitacionProcesado.tipo || 'standard',
-          _id: h.habitacionId || h.habitacion
-        };
-      }
+      // --- NO procesar/convertir el campo 'habitacion' --- 
+      // Dejar 'habitacion' como el string que viene del backend (la letra)
+      const habitacionOriginal = h.habitacion; // Guardamos el string original
 
       return {
         ...h,
@@ -837,20 +825,23 @@ export const getAllReservationsForDashboard = async () => {
         tipo: 'habitacion',
         tipoDisplay: esParteDePaquete ? 'Habitación (Evento)' : 'Habitación',
         fechaDisplay: `${new Date(h.fechaEntrada).toLocaleDateString()} - ${new Date(h.fechaSalida).toLocaleDateString()}`,
-        tituloDisplay: habitacionProcesada.nombre || `Habitación ${h.letraHabitacion || ''}`,
+        // Usar el string original para el título si está disponible
+        tituloDisplay: typeof habitacionOriginal === 'string' ? `Habitación ${habitacionOriginal}` : `Habitación ${h.letraHabitacion || ''}`,
         clienteDisplay: `${h.nombreContacto || ''} ${h.apellidosContacto || ''}`.trim() || 'Cliente',
         detallesUrl: `/admin/reservaciones/habitacion/${h._id || h.id}`,
         estado: h.estadoReserva || h.estado || 'pendiente',
         precio: parseFloat(h.precio || h.precioTotal || 0),
         precioPorNoche: parseFloat(h.precioPorNoche || 0),
         tipoHabitacion: tipoHabitacionProcesado,
-        habitacion: habitacionProcesada,
+        // Asegurarse de que el campo 'habitacion' se mantenga como el string original
+        habitacion: habitacionOriginal, 
         datosCompletos: {
           ...h,
           tipoHabitacion: tipoHabitacionProcesado,
           categoriaHabitacion: h.categoriaHabitacion,
           letraHabitacion: h.letraHabitacion,
-          nombre: habitacionProcesada.nombre,
+          // nombre: habitacionProcesada.nombre, // Ya no usamos habitacionProcesada
+          nombre: typeof habitacionOriginal === 'string' ? habitacionOriginal : 'Sin Letra', 
           eventoAsociado: eventoAsociado ? {
             id: h.reservaEvento || h.eventoId,
             nombre: h.nombreEvento || 'Evento asociado'
@@ -1176,6 +1167,53 @@ export const createMultipleReservaciones = async (reservasData) => {
       success: false,
       data: null,
       message: error.response?.data?.message || 'Error al crear las reservas. Por favor intente nuevamente.'
+    };
+  }
+};
+
+// Nueva función para obtener las habitaciones detalladas de un evento
+export const getEventoHabitaciones = async (eventoId) => {
+  if (!eventoId) {
+    console.error('ID de evento no proporcionado para getEventoHabitaciones');
+    return { success: false, data: [], message: 'ID de evento no proporcionado' };
+  }
+  try {
+    // Usamos la ruta definida en reserva.routes.js
+    const response = await apiClient.get(`/reservas/eventos/${eventoId}/habitaciones`);
+    // El interceptor de apiClient ya debería manejar la estructura { success: true, data: [...] }
+    console.log(`Habitaciones obtenidas para evento ${eventoId}:`, response);
+    return response; 
+  } catch (error) {
+    console.error(`Error al obtener habitaciones para evento ${eventoId}:`, error.response || error);
+    return { 
+      success: false, 
+      data: [], 
+      message: error.response?.data?.message || 'Error al obtener las habitaciones del evento'
+    };
+  }
+};
+
+// Nueva función para actualizar los huéspedes de una ReservaHabitacion
+export const updateReservaHabitacionHuespedes = async (reservaHabitacionId, data) => {
+  if (!reservaHabitacionId) {
+    console.error('ID de ReservaHabitacion no proporcionado');
+    return { success: false, message: 'ID de reserva de habitación no proporcionado' };
+  }
+  if (!data || (data.numHuespedes === undefined && data.infoHuespedes === undefined)) {
+    console.error('No se proporcionaron datos para actualizar', data);
+    return { success: false, message: 'No se proporcionaron datos válidos para actualizar' };
+  }
+  
+  try {
+    // Usamos la nueva ruta definida
+    const response = await apiClient.put(`/reservas/habitaciones/${reservaHabitacionId}/huespedes`, data);
+    console.log(`Respuesta al actualizar huéspedes de ${reservaHabitacionId}:`, response);
+    return response; // Devolver la respuesta completa del apiClient
+  } catch (error) {
+    console.error(`Error al actualizar huéspedes para reserva ${reservaHabitacionId}:`, error.response || error);
+    return { 
+      success: false, 
+      message: error.response?.data?.message || 'Error al actualizar los huéspedes'
     };
   }
 }; 

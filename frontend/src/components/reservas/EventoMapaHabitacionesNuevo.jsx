@@ -4,16 +4,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaPlus, FaTrash, FaUserFriends, FaBed, FaList, FaMapMarkedAlt, FaCheckCircle, FaCalendarAlt } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { obtenerHabitaciones } from '../../services/habitaciones.service';
-import { useReserva } from '@/context/ReservaContext';
+import { useReservation } from '@/context/ReservationContext';
 import './EventoMapaHabitaciones.css';
 
 const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesLoad }) => {
-  const { formData, updateFormSection } = useReserva();
+  const { formData, updateFormSection } = useReservation();
   const [rooms, setRooms] = useState(formData.habitacionesSeleccionadas || []);
   const [showMap, setShowMap] = useState(true);
   const [habitaciones, setHabitaciones] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const mapRef = useRef(null);
+
+  // Obtener el número máximo de habitaciones del contexto
+  const maxHabitaciones = formData.numeroHabitaciones || 7;
 
   // Áreas seleccionables para cada habitación basadas en la imagen del plano
   const areasSeleccionables = {
@@ -98,6 +101,12 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
       toast.info(`La habitación ${habitacion.letra} ya está seleccionada`);
       return;
     }
+
+    // Verificar si ya se alcanzó el límite de habitaciones
+    if (rooms.length >= maxHabitaciones) {
+      toast.error(`No puede seleccionar más de ${maxHabitaciones} habitaciones`);
+      return;
+    }
     
     // Agregar la habitación a las seleccionadas localmente
     const updatedRooms = [...rooms, habitacion];
@@ -105,7 +114,6 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
     
     // Notificar al componente padre de la habitación seleccionada
     if (onRoomsChange) {
-      // Enviamos un objeto especial para indicar que es una adición
       onRoomsChange({
         action: 'add',
         habitacion: habitacion,
@@ -113,7 +121,7 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
       });
     }
     
-    toast.success(`Habitación ${habitacion.letra} seleccionada`);
+    toast.success(`Habitación ${habitacion.letra} seleccionada (${updatedRooms.length} de ${maxHabitaciones})`);
   };
 
   // Eliminar habitación
@@ -182,19 +190,48 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
     const width = x2 - x1;
     const height = y2 - y1;
     
-    // Determinar dirección del gradiente
-    let gradientDirection = 'to bottom';
-    switch (area.direction) {
-      case 'top': gradientDirection = 'to top'; break;
-      case 'right': gradientDirection = 'to right'; break;
-      case 'left': gradientDirection = 'to left'; break;
-      default: gradientDirection = 'to bottom';
+    // Determinar colores según la planta
+    let colorNoSeleccionado, colorSeleccionado, borderColor;
+    
+    // Primera planta: A, B - Verde menta brillante
+    if (['A', 'B'].includes(habitacion.letra)) {
+      colorNoSeleccionado = '#7FFFD4';  // Verde menta claro
+      colorSeleccionado = '#00CBA9';    // Verde menta brillante
+      borderColor = selected ? '#009B82' : '#7FFFD4';
     }
-    
-    // Colores pastel suaves
-    const colorNoSeleccionado = '#F8E8E0'; // Beige pastel suave
-    const colorSeleccionado = '#E6B89C'; // Marrón claro pastel
-    
+    // Segunda planta: C, D, E, F - Verde esmeralda
+    else if (['C', 'D', 'E', 'F'].includes(habitacion.letra)) {
+      colorNoSeleccionado = '#90EE90';  // Verde esmeralda claro
+      colorSeleccionado = '#2E8B57';    // Verde esmeralda
+      borderColor = selected ? '#1B5233' : '#90EE90';
+    }
+    // Tercera planta: G-O - Verde oliva
+    else {
+      colorNoSeleccionado = '#98FB98';  // Verde oliva claro
+      colorSeleccionado = '#556B2F';    // Verde oliva
+      borderColor = selected ? '#3B4A20' : '#98FB98';
+    }
+
+    // Determinar el gradiente según la dirección de la puerta
+    const getGradientByDirection = (direction, isSelected) => {
+      const color = isSelected ? colorSeleccionado : colorNoSeleccionado;
+      const baseOpacity = isSelected ? 'E6' : 'CC'; // 90% para seleccionado, 80% para no seleccionado
+      const finalOpacity = '00'; // Completamente transparente al final
+
+      switch (direction) {
+        case 'top':
+          return `linear-gradient(to top, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+        case 'bottom':
+          return `linear-gradient(to bottom, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+        case 'left':
+          return `linear-gradient(to left, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+        case 'right':
+          return `linear-gradient(to right, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+        default:
+          return `linear-gradient(to bottom, ${color}${baseOpacity} 30%, ${color}${baseOpacity} 60%, ${color}${finalOpacity})`;
+      }
+    };
+
     return (
       <div
         key={`marker-${habitacion.id || habitacion._id || habitacion.letra}-${Math.random().toString(36).substr(2, 9)}`}
@@ -205,12 +242,10 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
           top: `${y1}px`,
           width: `${width}px`,
           height: `${height}px`,
-          background: selected 
-            ? `linear-gradient(${gradientDirection}, ${colorSeleccionado} 0%, rgba(230, 184, 156, 0.7) 70%, rgba(230, 184, 156, 0.5) 100%)`
-            : `linear-gradient(${gradientDirection}, ${colorNoSeleccionado} 0%, rgba(248, 232, 224, 0.6) 70%, rgba(248, 232, 224, 0.3) 100%)`,
-          border: selected ? '2px solid #D4A389' : '1px solid rgba(248, 232, 224, 0.8)',
+          background: getGradientByDirection(area.direction, selected),
+          border: `2px solid ${borderColor}`,
           zIndex: 1,
-          pointerEvents: 'none', // Para que no interfiera con los clics
+          pointerEvents: 'none',
           transition: 'all 0.3s ease'
         }}
       />
@@ -230,9 +265,14 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-xl font-semibold text-gray-900">
-          Asignación de Habitaciones
-        </h3>
+        <div>
+          <h3 className="text-xl font-semibold text-gray-900">
+            Asignación de Habitaciones
+          </h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Seleccionadas: {rooms.length} de {maxHabitaciones} habitaciones
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setShowMap(!showMap)}
@@ -277,14 +317,61 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
                 </div>
                 
                 {/* Leyenda */}
-                <div className="mt-6 flex flex-wrap gap-4 justify-center">
-                  <div className="flex items-center">
-                    <div className="w-6 h-6 bg-gradient-to-b from-[#F8E8E0] to-transparent mr-2"></div>
-                    <span className="text-sm">Habitación disponible (haz clic en las letras)</span>
+                <div className="mt-6 space-y-4">
+                  <h4 className="text-lg font-semibold text-[var(--color-primary)] mb-2">Leyenda del Mapa</h4>
+                  
+                  {/* Primera Planta */}
+                  <div className="bg-white/80 p-4 rounded-lg shadow-sm">
+                    <h5 className="font-medium text-[var(--color-primary)] mb-2">Primera Planta</h5>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-[#7FFFD4CC] mr-2 border border-[#7FFFD4]"></div>
+                        <span className="text-sm">Disponible</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-[#00CBA9E6] mr-2 border border-[#009B82]"></div>
+                        <span className="text-sm">Seleccionada</span>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Habitaciones: A, B
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center">
-                    <div className="w-6 h-6 bg-gradient-to-b from-[#E6B89C] to-transparent mr-2"></div>
-                    <span className="text-sm">Habitación seleccionada</span>
+
+                  {/* Segunda Planta */}
+                  <div className="bg-white/80 p-4 rounded-lg shadow-sm">
+                    <h5 className="font-medium text-[var(--color-accent)] mb-2">Segunda Planta</h5>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-[#90EE90CC] mr-2 border border-[#90EE90]"></div>
+                        <span className="text-sm">Disponible</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-[#2E8B57E6] mr-2 border border-[#1B5233]"></div>
+                        <span className="text-sm">Seleccionada</span>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Habitaciones: C, D, E, F
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tercera Planta */}
+                  <div className="bg-white/80 p-4 rounded-lg shadow-sm">
+                    <h5 className="font-medium text-[var(--color-secondary)] mb-2">Tercera Planta</h5>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-[#98FB98CC] mr-2 border border-[#98FB98]"></div>
+                        <span className="text-sm">Disponible</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-[#556B2FE6] mr-2 border border-[#3B4A20]"></div>
+                        <span className="text-sm">Seleccionada</span>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Habitaciones: G, H, I, J, K, L, M, O
+                      </div>
+                    </div>
                   </div>
                 </div>
               </>

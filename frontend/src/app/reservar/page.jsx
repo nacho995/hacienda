@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle } from 'react-icons/fa';
 import { toast } from 'sonner';
 
@@ -9,28 +10,29 @@ import ModoGestionServicios from '@/components/reservas/ModoGestionServicios';
 import ModoGestionHabitaciones from '@/components/reservas/ModoGestionHabitaciones';
 import ModalModoGestionHabitaciones from '@/components/reservas/ModalModoGestionHabitaciones';
 import CalendarioReserva from '@/components/reservas/CalendarioReserva';
-import { ReservaProvider, useReserva } from '@/context/ReservaContext';
+import { useReservation } from '@/context/ReservationContext';
 import NavbarReservar from '@/components/layout/NavbarReservar';
 import Footer from '@/components/layout/Footer';
+import { crearReservaEvento } from '@/services/reservas.service';
 
-// Componente wrapper que proporciona el contexto
 const ReservarPage = () => {
   return (
-    <ReservaProvider>
-      <ReservarPageContent />
-    </ReservaProvider>
+    <div className="min-h-screen bg-gray-100">
+      <ReservaWizard />
+    </div>
   );
 };
 
 export default ReservarPage;
 
-const ReservarPageContent = () => {
-  const { formData, updateFormSection } = useReserva();
+const ReservaWizard = () => {
+  const { formData, updateFormSection } = useReservation();
   const [currentStep, setCurrentStep] = useState(1);
   const [showModoSeleccionServiciosModal, setShowModoSeleccionServiciosModal] = useState(false);
   const [showModoSeleccionHabitacionesModal, setShowModoSeleccionHabitacionesModal] = useState(false);
   // Mantener el objeto completo para la selección, pero manejar el renderizado con cuidado
   const [selectedEventType, setSelectedEventType] = useState(formData.tipoEvento || null);
+  const router = useRouter();
 
   // Estilos para el contenedor principal del wizard
   const wizardContainerStyle = {
@@ -153,10 +155,34 @@ const ReservarPageContent = () => {
 
   const handleSubmit = async () => {
     try {
-      // Enviar formulario
-      console.log('Formulario enviado:', formData);
-      toast.success('Reserva creada exitosamente');
-      setCurrentStep(6); // Avanzar al paso de confirmación
+      // Preparar datos de la reserva
+      const reservaData = {
+        tipo_evento: typeof formData.tipoEvento === 'object' ? formData.tipoEvento.titulo : formData.tipoEvento,
+        fecha: formData.fecha,
+        nombre_contacto: formData.datosContacto.nombre,
+        apellidos_contacto: formData.datosContacto.apellidos,
+        email_contacto: formData.datosContacto.email,
+        telefono_contacto: formData.datosContacto.telefono,
+        mensaje: formData.datosContacto.mensaje,
+        habitaciones: formData.habitacionesSeleccionadas?.map(hab => ({
+          fecha_entrada: formData.fecha,
+          huespedes: [{ nombre: 'Por asignar', numero_personas: 2 }]
+        })) || [],
+        modo_gestion_habitaciones: formData.modoGestionHabitaciones,
+        modo_gestion_servicios: formData.modoGestionServicios,
+        servicios_adicionales: formData.serviciosSeleccionados
+      };
+
+      // Enviar datos al backend
+      const response = await crearReservaEvento(reservaData);
+      
+      if (response.success) {
+        toast.success('Reserva creada exitosamente');
+        // Redirigir a la página de confirmación
+        router.push(`/reservar/confirmacion?id=${response.data.reserva._id}`);
+      } else {
+        throw new Error(response.message || 'Error al crear la reserva');
+      }
     } catch (err) {
       console.error('Error al enviar formulario:', err);
       toast.error('Error al crear la reserva. Por favor, inténtelo de nuevo.');
@@ -814,7 +840,7 @@ const ReservarPageContent = () => {
                   background: 'linear-gradient(145deg, #A5856A, #8B6B4F)',
                 }}
               >
-                <span>{currentStep === 5 ? 'Completar Reserva' : 'Siguiente'}</span>
+                <span>{currentStep === steps.length ? 'Finalizar' : 'Siguiente'}</span>
                 <FaChevronRight />
               </button>
             )}

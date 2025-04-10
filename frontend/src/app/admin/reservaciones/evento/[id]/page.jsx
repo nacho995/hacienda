@@ -2,8 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getEventoReservation, updateEventoReservation, deleteEventoReservation } from '@/services/reservationService';
-import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaGlassCheers, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaUtensils } from 'react-icons/fa';
+import { 
+  getEventoReservation, 
+  updateEventoReservation, 
+  deleteEventoReservation, 
+  getEventoHabitaciones,
+  updateReservaHabitacionHuespedes
+} from '@/services/reservationService';
+import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaGlassCheers, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaUtensils, FaBed, FaSave, FaPlus, FaTrash } from 'react-icons/fa';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
@@ -19,35 +25,58 @@ export default function EventoReservationDetail({ params }) {
   const [error, setError] = useState(null);
   const [updating, setUpdating] = useState(false);
   const [statusUpdated, setStatusUpdated] = useState(false);
+  const [habitacionesEvento, setHabitacionesEvento] = useState([]);
+  const [loadingHabitaciones, setLoadingHabitaciones] = useState(false);
+  const [errorHabitaciones, setErrorHabitaciones] = useState(null);
+  const [huespedesEditados, setHuespedesEditados] = useState({});
   
   useEffect(() => {
-    const fetchReservation = async () => {
+    const fetchReservationAndHabitaciones = async () => {
       if (!id) return;
       
       setLoading(true);
       setError(null);
+      setLoadingHabitaciones(true);
+      setErrorHabitaciones(null);
+      
       try {
-        const response = await getEventoReservation(id);
-        if (response && response.success && response.data) {
-          setReservation(response.data);
-        } else if (response && !response.error) {
-          if (response.data) {
-            setReservation(response.data);
-          } else {
-            setReservation(response);
+        const responseEvento = await getEventoReservation(id);
+        if (responseEvento && responseEvento.success && responseEvento.data) {
+          setReservation(responseEvento.data);
+          
+          try {
+            const responseHabitaciones = await getEventoHabitaciones(id);
+            if (responseHabitaciones && responseHabitaciones.success && Array.isArray(responseHabitaciones.data)) {
+              setHabitacionesEvento(responseHabitaciones.data);
+              const initialEdits = {};
+              responseHabitaciones.data.forEach(hab => {
+                initialEdits[hab._id] = {
+                  numHuespedes: hab.numHuespedes || 1,
+                  nombres: (hab.infoHuespedes?.nombres || []).join('\n'),
+                  detalles: hab.infoHuespedes?.detalles || ''
+                };
+              });
+              setHuespedesEditados(initialEdits);
+            } else {
+              setErrorHabitaciones('No se pudieron cargar las habitaciones del evento.');
+            }
+          } catch (errHab) {
+            console.error('Error fetching habitaciones del evento:', errHab);
+            setErrorHabitaciones('Error al cargar las habitaciones del evento.');
           }
         } else {
-          throw new Error(response?.message || 'Error al cargar los datos de la reserva');
+          throw new Error(responseEvento?.message || 'Error al cargar los datos de la reserva');
         }
       } catch (err) {
         console.error('Error fetching reservation:', err);
-        setError('No se pudo cargar la información de la reserva. Por favor, intenta de nuevo más tarde.');
+        setError('No se pudo cargar la información de la reserva.');
       } finally {
         setLoading(false);
+        setLoadingHabitaciones(false);
       }
     };
     
-    fetchReservation();
+    fetchReservationAndHabitaciones();
   }, [id]);
   
   const handleStatusChange = async (newStatus) => {
@@ -95,6 +124,45 @@ export default function EventoReservationDetail({ params }) {
     } catch (err) {
       console.error('Error deleting reservation:', err);
       toast.error('No se pudo eliminar la reserva: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setUpdating(false);
+    }
+  };
+  
+  const handleHuespedChange = (habitacionId, field, value) => {
+    setHuespedesEditados(prev => ({
+      ...prev,
+      [habitacionId]: {
+        ...prev[habitacionId],
+        [field]: value
+      }
+    }));
+  };
+  
+  const handleGuardarHuespedes = async (habitacionId) => {
+    const datosEditados = huespedesEditados[habitacionId];
+    if (!datosEditados) return;
+
+    const nombresArray = datosEditados.nombres.split('\n').map(n => n.trim()).filter(n => n); 
+    
+    const updateData = {
+      numHuespedes: parseInt(datosEditados.numHuespedes, 10) || 1,
+      infoHuespedes: {
+        nombres: nombresArray,
+        detalles: datosEditados.detalles || ''
+      }
+    };
+    
+    setUpdating(true);
+    try {
+      const response = await updateReservaHabitacionHuespedes(habitacionId, updateData);
+      if (response && response.success) {
+        toast.success('Información de huéspedes actualizada');
+      } else {
+        toast.error(response?.message || 'Error al actualizar huéspedes');
+      }
+    } catch (err) {
+      toast.error('Error al guardar cambios: ' + (err.message || 'Error desconocido'));
     } finally {
       setUpdating(false);
     }
@@ -359,6 +427,91 @@ export default function EventoReservationDetail({ params }) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Sección para Habitaciones del Evento */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden mt-8">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <FaBed /> Habitaciones Asociadas al Evento
+          </h3>
+        </div>
+        <div className="p-6">
+          {loadingHabitaciones ? (
+            <div className="text-center py-6">
+              <FaSpinner className="animate-spin text-2xl text-[var(--color-primary)] mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">Cargando habitaciones...</p>
+            </div>
+          ) : errorHabitaciones ? (
+            <div className="bg-red-50 border-l-4 border-red-500 p-3 text-sm text-red-700">
+              {errorHabitaciones}
+            </div>
+          ) : habitacionesEvento.length === 0 ? (
+            <p className="text-gray-500 text-sm">No hay habitaciones asociadas a este evento.</p>
+          ) : (
+            <div className="space-y-6">
+              {habitacionesEvento.map((hab) => (
+                <div key={hab._id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-medium text-gray-700 mb-3">Habitación: {hab.letraHabitacion || hab.tipoHabitacion || hab._id.substring(0, 6)}</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Número de Huéspedes */}
+                    <div>
+                      <label htmlFor={`numHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Nº Huéspedes</label>
+                      <input 
+                        type="number"
+                        id={`numHuespedes_${hab._id}`}
+                        min="1"
+                        value={huespedesEditados[hab._id]?.numHuespedes || ''}
+                        onChange={(e) => handleHuespedChange(hab._id, 'numHuespedes', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      />
+                    </div>
+                    
+                    {/* Nombres Huéspedes */}
+                    <div className="md:col-span-2">
+                      <label htmlFor={`nombresHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Nombres Huéspedes (uno por línea)</label>
+                      <textarea 
+                        id={`nombresHuespedes_${hab._id}`}
+                        rows="3"
+                        value={huespedesEditados[hab._id]?.nombres || ''}
+                        onChange={(e) => handleHuespedChange(hab._id, 'nombres', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                        placeholder="Ej:
+Juan Pérez
+Maria García"
+                      />
+                    </div>
+
+                    {/* (Opcional) Detalles Huéspedes */}
+                    {/* 
+                    <div className="md:col-span-3">
+                      <label htmlFor={`detallesHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Detalles Adicionales</label>
+                      <textarea 
+                        id={`detallesHuespedes_${hab._id}`}
+                        rows="2"
+                        value={huespedesEditados[hab._id]?.detalles || ''}
+                        onChange={(e) => handleHuespedChange(hab._id, 'detalles', e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      />
+                    </div>
+                    */}
+                  </div>
+                  
+                  <div className="mt-4 text-right">
+                    <button
+                      onClick={() => handleGuardarHuespedes(hab._id)}
+                      disabled={updating}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                      {updating ? <FaSpinner className="animate-spin mr-2"/> : <FaSave className="mr-2"/>} Guardar Huéspedes Hab. {hab.letraHabitacion || ''}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

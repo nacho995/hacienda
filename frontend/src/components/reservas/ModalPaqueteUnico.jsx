@@ -1,70 +1,40 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { FaExclamationTriangle, FaTimes } from 'react-icons/fa';
+import React from 'react';
+import { FaExclamationTriangle } from 'react-icons/fa';
 
 /**
  * Modal que se muestra cuando el usuario intenta seleccionar más de un paquete a la vez
  */
 const ModalPaqueteUnico = ({ isOpen, onClose }) => {
-  const [scrollPosition, setScrollPosition] = useState(0);
-  
-  useEffect(() => {
-    if (isOpen) {
-      // Capturar la posición actual de desplazamiento cuando se abre el modal
-      setScrollPosition(window.scrollY);
-    }
-  }, [isOpen]);
-  
   if (!isOpen) return null;
 
-  // Calcular el estilo para posicionar el modal en la posición actual
-  const modalStyle = {
-    top: `${scrollPosition + 100}px`, // 100px debajo de la posición actual de desplazamiento
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-      <div 
-        className="relative w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden transform transition-all mt-4"
-        style={modalStyle}>
-        <div className="absolute top-0 right-0 pt-4 pr-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
+        <div className="flex items-center mb-4">
+          <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center mr-4">
+            <FaExclamationTriangle className="text-yellow-500 text-xl" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900">Selección de Paquete</h2>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-gray-700 mb-4">
+            Solo puede seleccionar un paquete a la vez. Si desea cambiar de paquete, primero debe deseleccionar el paquete actual.
+          </p>
+          <p className="text-sm text-gray-600 italic">
+            Los paquetes incluyen una selección predefinida de servicios y no pueden combinarse entre sí.
+          </p>
+        </div>
+
+        <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 focus:outline-none"
+            className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors"
           >
-            <FaTimes size={20} />
+            Entendido
           </button>
-        </div>
-        
-        <div className="p-6">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
-              <FaExclamationTriangle className="text-amber-600" size={24} />
-            </div>
-          </div>
-          
-          <h3 className="text-xl font-bold text-[#0F0F0F] text-center mb-4">
-            Solo un paquete permitido
-          </h3>
-          
-          <div className="text-center mb-6">
-            <p className="text-gray-600 mb-2">
-              Solo puede seleccionar un paquete de evento a la vez.
-            </p>
-            <p className="text-gray-600">
-              Por favor, deseleccione el paquete actual antes de seleccionar otro.
-            </p>
-          </div>
-          
-          <div className="flex justify-center">
-            <button
-              onClick={onClose}
-              className="px-6 py-2 bg-gradient-to-r from-[#A5856A] to-[#D1B59B] text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-            >
-              Entendido
-            </button>
-          </div>
         </div>
       </div>
     </div>

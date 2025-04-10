@@ -7,7 +7,16 @@ import apiClient from './apiClient';
 export const getAllServicios = async () => {
   try {
     const response = await apiClient.get('/servicios');
-    return response.data || [];
+    // Verificar si la respuesta tiene la estructura esperada
+    if (response && response.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    // Si la respuesta es un array directamente
+    if (Array.isArray(response)) {
+      return response;
+    }
+    console.warn('Formato de respuesta inesperado:', response);
+    return [];
   } catch (error) {
     console.error('Error al obtener servicios:', error);
     throw error;
@@ -22,7 +31,16 @@ export const getAllServicios = async () => {
 export const getServicioById = async (id) => {
   try {
     const response = await apiClient.get(`/servicios/${id}`);
-    return response.data || null;
+    // Verificar si la respuesta tiene la estructura esperada
+    if (response && response.success && response.data) {
+      return response.data;
+    }
+    // Si la respuesta es un objeto directamente
+    if (response && !response.success) {
+      return response;
+    }
+    console.warn('Formato de respuesta inesperado:', response);
+    return null;
   } catch (error) {
     console.error(`Error al obtener servicio con ID ${id}:`, error);
     throw error;
@@ -37,7 +55,16 @@ export const getServicioById = async (id) => {
 export const getServiciosPorEvento = async (tipoEvento) => {
   try {
     const response = await apiClient.get(`/servicios/por-evento/${tipoEvento}`);
-    return response.data || [];
+    // Verificar si la respuesta tiene la estructura esperada
+    if (response && response.success && Array.isArray(response.data)) {
+      return response.data;
+    }
+    // Si la respuesta es un array directamente
+    if (Array.isArray(response)) {
+      return response;
+    }
+    console.warn('Formato de respuesta inesperado:', response);
+    return [];
   } catch (error) {
     console.error(`Error al obtener servicios para evento ${tipoEvento}:`, error);
     throw error;

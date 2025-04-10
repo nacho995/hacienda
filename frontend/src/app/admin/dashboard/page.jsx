@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaCalendarAlt, FaBed, FaUsers, FaClipboardList, FaGlassCheers, FaEye, FaUserCircle, FaSync, FaSpinner } from 'react-icons/fa';
+import { 
+  FaCalendarAlt, FaBed, FaUsers, FaClipboardList, FaGlassCheers, FaEye, 
+  FaUserCircle, FaSync, FaSpinner, FaFilter, FaSearch, FaTimes, 
+  FaChartLine, FaMoneyBillWave, FaMapMarkedAlt, FaChevronDown, 
+  FaChevronRight, FaArrowUp, FaArrowDown, FaHotel, FaListAlt, FaChevronLeft, FaListUl
+} from 'react-icons/fa';
 import { useAuth } from '../../../context/AuthContext';
-import { useReservationSync } from '../../../context/ReservationSyncContext';
+import { useReservation } from '../../../context/ReservationContext';
 import Link from 'next/link';
 import { 
   getHabitacionReservations, 
@@ -18,44 +23,83 @@ import {
 import userService from '../../../services/userService';
 import { toast } from 'sonner';
 import { obtenerHabitaciones } from '../../../services/habitaciones.service';
+import { format, addDays, subDays, isSameDay, parseISO, isValid, startOfWeek, endOfWeek, eachDayOfInterval, isWithinInterval, startOfDay, endOfDay, startOfMonth, endOfMonth, addMonths } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+// Define la paleta de colores pastel piedra
+const COLORES_PASTEL_PIEDRA = {
+  fondoPrincipal: 'bg-stone-50', // Fondo general
+  fondoContenedor: 'bg-white', // Contenedores como cards
+  textoPrincipal: 'text-stone-800', // Texto general
+  textoSecundario: 'text-stone-600', // Texto secundario, labels
+  borde: 'border-stone-200', // Bordes
+  resaltado: 'bg-stone-100', // Hover, elementos activos suaves
+  primario: 'bg-stone-500', // Botones principales, acentos
+  primarioHover: 'bg-stone-600',
+  textoPrimario: 'text-white', // Texto sobre primario
+  estadoConfirmado: 'bg-green-100 text-green-800 border-green-200', // Verde pastel
+  estadoPendiente: 'bg-yellow-100 text-yellow-800 border-yellow-200', // Amarillo pastel
+  estadoCancelado: 'bg-red-100 text-red-800 border-red-200', // Rojo pastel
+  estadoOcupado: 'bg-stone-200 text-stone-700 border-stone-300', // Gris piedra para ocupado
+  calendarioHeader: 'bg-stone-100',
+  calendarioBorde: 'border-stone-200',
+  calendarioTextoDia: 'text-stone-500',
+  calendarioTextoNumero: 'text-stone-700',
+  calendarioHoy: 'bg-stone-200 font-semibold',
+  letraHabitacion: 'bg-stone-300 text-stone-800 font-semibold', // Estilo para la letra
+};
 
 export default function AdminDashboard() {
-  const { isAuthenticated, isAdmin, loading, user } = useAuth();
-  const reservationSync = useReservationSync();
+  const { isAuthenticated, isAdmin, loading: authLoading, user } = useAuth();
+  const { 
+    reservations, 
+    habitacionReservations, 
+    eventoReservations, 
+    loading: reservationsLoading,
+    loadAllReservations,
+    updateReservation,
+    removeReservation,
+    error: reservationError
+  } = useReservation();
   const router = useRouter();
   const [stats, setStats] = useState({
     totalReservations: 0,
     pendingReservations: 0,
     confirmedReservations: 0,
+    cancelledReservations: 0,
     totalRooms: 14,
-    occupiedRooms: 0,
-    totalUsers: 0
+    occupiedRoomsToday: 0,
+    availableRoomsToday: 14,
+    occupiedRoomsNext7Days: 0,
+    availableRoomsNext7Days: 14,
+    occupiedRoomsNext30Days: 0,
+    availableRoomsNext30Days: 14,
+    totalUsers: 0,
+    eventosHoy: 0,
+    eventosNext7Days: 0,
+    eventosNext30Days: 0
   });
-  const [habitacionReservations, setHabitacionReservations] = useState([]);
-  const [eventoReservations, setEventoReservations] = useState([]);
   const [allReservations, setAllReservations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [usuarios, setUsuarios] = useState([]);
-  const [filtroUsuario, setFiltroUsuario] = useState('todos');
+  const [filtroUsuario, setFiltroUsuario] = useState('all');
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState(null);
   const [assigningReservation, setAssigningReservation] = useState(false);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date()); // Para controlar el mes/semana del calendario
+  const [calendarView, setCalendarView] = useState('month'); // 'month' o 'week'
+  const [ocupacionPorFecha, setOcupacionPorFecha] = useState([]); // Estado para ocupación por fecha
+  const [rangoFechaOcupacion, setRangoFechaOcupacion] = useState('ultimos7dias'); // Estado para el rango
   
   // Referencia para el intervalo de actualización automática
   const autoRefreshInterval = useRef(null);
 
-  // Redirigir si no está autenticado o no es admin
-  useEffect(() => {
-    if (!loading && (!isAuthenticated || !isAdmin)) {
-      router.push('/admin/login');
-    }
-  }, [loading, isAuthenticated, isAdmin, router]);
-
   // Cargar usuarios
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const usersResponse = await userService.getAllUsers();
       if (usersResponse.success && Array.isArray(usersResponse.data)) {
@@ -68,153 +112,326 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error('Error cargando usuarios:', err);
     }
-  };
+  }, []);
 
-  // Función para cargar los datos del dashboard (memoizada con useCallback)
+  // Función para calcular ocupación por fecha
+  const calcularOcupacionPorFecha = useCallback(() => {
+    const hoy = new Date();
+    let fechaInicioFiltro;
+    let fechaFinFiltro = endOfDay(hoy);
+
+    switch (rangoFechaOcupacion) {
+      case 'hoy':
+        fechaInicioFiltro = startOfDay(hoy);
+        fechaFinFiltro = endOfDay(hoy);
+        break;
+      case 'proximos7dias':
+        fechaInicioFiltro = startOfDay(addDays(hoy, 1)); // Empezar desde mañana
+        fechaFinFiltro = endOfDay(addDays(hoy, 7)); // Hasta 7 días desde hoy
+        break;
+      case 'proximoMes': // Lógica ajustada: Próximos 30 días desde mañana
+        fechaInicioFiltro = startOfDay(addDays(hoy, 1)); // Empezar desde mañana
+        fechaFinFiltro = endOfDay(addDays(hoy, 30)); // Hasta 30 días desde hoy
+        break;
+      case 'ultimos7dias':
+      default:
+        fechaInicioFiltro = startOfDay(subDays(hoy, 6));
+        fechaFinFiltro = endOfDay(hoy); // Incluye hoy
+        break;
+    }
+
+    const reservasFiltradas = [];
+
+    // Filtrar reservas de habitaciones
+    if (Array.isArray(habitacionReservations)) {
+      habitacionReservations.forEach(reserva => {
+        const fechaEntrada = reserva.fechaEntrada ? parseISO(reserva.fechaEntrada) : null;
+        const fechaSalida = reserva.fechaSalida ? parseISO(reserva.fechaSalida) : null;
+        if (isValid(fechaEntrada) && isValid(fechaSalida) && reserva.estado?.toLowerCase() !== 'cancelada') {
+          // La reserva solapa con el rango si: reserva.entrada < filtro.fin Y reserva.salida > filtro.inicio
+          if (fechaEntrada < fechaFinFiltro && fechaSalida > fechaInicioFiltro) {
+            reservasFiltradas.push({ ...reserva, tipo: 'habitacion' });
+          }
+        }
+      });
+    }
+    
+    // Filtrar reservas de eventos
+    if (Array.isArray(eventoReservations)) {
+      eventoReservations.forEach(reserva => {
+         const fechaEvento = reserva.fecha ? startOfDay(parseISO(reserva.fecha)) : null;
+         if (isValid(fechaEvento) && reserva.estado?.toLowerCase() !== 'cancelada') {
+           if (fechaEvento >= fechaInicioFiltro && fechaEvento <= fechaFinFiltro) {
+             reservasFiltradas.push({ ...reserva, tipo: 'evento' });
+           }
+         }
+      });
+    }
+    
+    // Ordenar por fecha de inicio
+    reservasFiltradas.sort((a, b) => {
+      const fechaA = parseISO(a.fechaEntrada || a.fecha);
+      const fechaB = parseISO(b.fechaEntrada || b.fecha);
+      if (!isValid(fechaA)) return 1;
+      if (!isValid(fechaB)) return -1;
+      return fechaA - fechaB;
+    });
+
+    setOcupacionPorFecha(reservasFiltradas);
+
+  }, [habitacionReservations, eventoReservations, rangoFechaOcupacion]);
+
+  // Efecto para recalcular ocupación por fecha cuando cambien las reservas o el rango
+  useEffect(() => {
+    // Solo calcular si las reservas ya están cargadas (evitar cálculo inicial con datos vacíos)
+    if (habitacionReservations?.length > 0 || eventoReservations?.length > 0) {
+        calcularOcupacionPorFecha();
+    }
+  }, [habitacionReservations, eventoReservations, rangoFechaOcupacion, calcularOcupacionPorFecha]);
+
+  // Función para cargar los datos del dashboard
   const loadDashboardData = useCallback(async (showToast = false) => {
+    if (!isAuthenticated || authLoading) return;
+
     try {
-      if (showToast) {
-        setIsRefreshing(true);
-      } else {
-        setIsLoading(true);
-      }
+      setRefreshing(true);
       setError(null);
+      
+      console.log('Iniciando carga de datos del dashboard');
       
       // Cargar usuarios primero
       await loadUsers();
+
+      // Cargar todas las reservas
+      await loadAllReservations(false);
       
-      // Intentar usar las reservas del contexto de sincronización si están disponibles
-      let reservas;
-      let habitaciones;
-      let eventos;
+      console.log('Datos de reservas disponibles:', { 
+        reservations: reservations?.length || 0,
+        habitacionReservations: habitacionReservations?.length || 0, 
+        eventoReservations: eventoReservations?.length || 0 
+      });
       
-      if (!reservationSync.loading && reservationSync.reservations.length > 0) {
-        console.log('Dashboard: Usando reservas del contexto de sincronización');
-        reservas = reservationSync.reservations;
-        habitaciones = reservationSync.habitacionReservations;
-        eventos = reservationSync.eventoReservations;
-      } else {
-        console.log('Dashboard: Cargando reservas desde el servidor');
-        // Cargar desde el contexto y actualizar el contexto
-        const result = await reservationSync.loadAllReservations(false);
-        reservas = result.allReservations;
-        habitaciones = result.habitaciones;
-        eventos = result.eventos;
+      // Calcular estadísticas usando los datos del contexto
+      let totalReservations = 0;
+      let pendingReservations = 0;
+      let confirmedReservations = 0;
+      let cancelledReservations = 0;
+      
+      // Procesar reservas de eventos
+      if (Array.isArray(eventoReservations)) {
+        totalReservations += eventoReservations.length;
+        
+        eventoReservations.forEach(reserva => {
+          const estado = reserva.estado?.toLowerCase() || '';
+          if (estado === 'pendiente') pendingReservations++;
+          else if (estado === 'confirmada') confirmedReservations++;
+          else if (estado === 'cancelada') cancelledReservations++;
+        });
       }
       
-      console.log('Habitaciones:', habitaciones.length);
-      console.log('Eventos:', eventos.length);
-      console.log('Total de reservas:', reservas.length);
+      // Procesar reservas de habitaciones independientes (que no pertenecen a eventos)
+      if (Array.isArray(habitacionReservations)) {
+        const habitacionesIndependientes = habitacionReservations.filter(
+          hab => !hab.eventoId && !hab.reservaEvento
+        );
+        
+        totalReservations += habitacionesIndependientes.length;
+        
+        habitacionesIndependientes.forEach(reserva => {
+          const estado = reserva.estado?.toLowerCase() || '';
+          if (estado === 'pendiente') pendingReservations++;
+          else if (estado === 'confirmada') confirmedReservations++;
+          else if (estado === 'cancelada') cancelledReservations++;
+        });
+      }
       
-      // Establecer las reservaciones en el estado
-      setAllReservations(reservas);
-      setHabitacionReservations(habitaciones);
-      setEventoReservations(eventos);
-      
-      // Calcular estadísticas
-      const totalReservations = reservas.length;
-      const pendingReservations = reservas.filter(
-        r => r.estado && r.estado.toLowerCase() === 'pendiente'
-      ).length;
-      const confirmedReservations = reservas.filter(
-        r => r.estado && r.estado.toLowerCase() === 'confirmada'
-      ).length;
-      
-      // Calcular habitaciones ocupadas solo por eventos (no independientes)
-      const occupiedRooms = habitaciones.filter(h => h.eventoAsociado || h.eventoId).length;
-      
-      // Obtener el número real de habitaciones desde la base de datos
-      let totalRooms = 14; // Valor por defecto de habitaciones disponibles
+      // Obtener el número real de habitaciones físicas
+      let totalPhysicalRooms = 14; // Valor por defecto
       try {
-        const habitacionesData = await obtenerHabitaciones();
-        if (Array.isArray(habitacionesData.data)) {
-          totalRooms = habitacionesData.data.length;
-          console.log(`Número total de habitaciones obtenido: ${totalRooms}`);
-        } else if (Array.isArray(habitacionesData)) {
-          totalRooms = habitacionesData.length;
-          console.log(`Número total de habitaciones obtenido: ${totalRooms}`);
+        const habitacionesData = await obtenerHabitaciones(); // Usa la función del servicio
+        if (habitacionesData && Array.isArray(habitacionesData.data)) {
+            totalPhysicalRooms = habitacionesData.data.length > 0 ? habitacionesData.data.length : 14;
+        } else if (habitacionesData && typeof habitacionesData.count === 'number') {
+            totalPhysicalRooms = habitacionesData.count > 0 ? habitacionesData.count : 14;
+        } else {
+           console.warn("No se pudo determinar el número total de habitaciones físicas desde la API.");
         }
       } catch (err) {
-        console.error('Error al obtener el número total de habitaciones:', err);
+        console.error('Error al obtener el número total de habitaciones físicas:', err);
       }
       
+      // Calcular habitaciones ocupadas HOY
+      const today = new Date();
+      const startOfToday = startOfDay(today);
+      const endOfToday = endOfDay(today); // Considerar hasta el final del día
+
+      let occupiedTodayCount = 0;
+      if (Array.isArray(habitacionReservations)) {
+        const uniqueOccupiedRoomsToday = new Set(); // Para no contar la misma habitación dos veces si tiene múltiples reservas hoy
+
+        habitacionReservations.forEach(h => {
+          // Asegurarse de que las fechas son válidas
+          const fechaEntrada = h.fechaEntrada ? parseISO(h.fechaEntrada) : null;
+          const fechaSalida = h.fechaSalida ? parseISO(h.fechaSalida) : null;
+
+          if (isValid(fechaEntrada) && isValid(fechaSalida) && h.estado?.toLowerCase() !== 'cancelada') {
+            // Una habitación está ocupada hoy si la fecha de hoy está entre la entrada (inclusive) y la salida (exclusive)
+            if (startOfToday < fechaSalida && endOfToday >= fechaEntrada) {
+               // Usar letraHabitacion o _id como identificador único de la habitación física
+               const habitacionIdentifier = h.letraHabitacion || h.habitacion || h._id;
+               uniqueOccupiedRoomsToday.add(habitacionIdentifier);
+            }
+          }
+        });
+        occupiedTodayCount = uniqueOccupiedRoomsToday.size;
+      }
+      
+      // Calcular ocupación PRÓXIMOS 7 DÍAS (desde mañana)
+      const startOfNext7Days = startOfDay(addDays(today, 1));
+      const endOfNext7Days = endOfDay(addDays(today, 7));
+      const uniqueOccupiedRoomsNext7Days = new Set();
+      if (Array.isArray(habitacionReservations)) {
+        habitacionReservations.forEach(h => {
+          const fechaEntrada = h.fechaEntrada ? parseISO(h.fechaEntrada) : null;
+          const fechaSalida = h.fechaSalida ? parseISO(h.fechaSalida) : null;
+          if (isValid(fechaEntrada) && isValid(fechaSalida) && h.estado?.toLowerCase() !== 'cancelada') {
+            // Solapa si: reserva.entrada < periodo.fin Y reserva.salida > periodo.inicio
+            if (fechaEntrada < endOfNext7Days && fechaSalida > startOfNext7Days) {
+              const idHab = h.letraHabitacion || h.habitacion || h._id;
+              uniqueOccupiedRoomsNext7Days.add(idHab);
+            }
+          }
+        });
+      }
+      const occupiedNext7DaysCount = uniqueOccupiedRoomsNext7Days.size;
+
+      // Calcular ocupación PRÓXIMOS 30 DÍAS (desde mañana)
+      const startOfNext30Days = startOfDay(addDays(today, 1));
+      const endOfNext30Days = endOfDay(addDays(today, 30));
+      const uniqueOccupiedRoomsNext30Days = new Set();
+      if (Array.isArray(habitacionReservations)) {
+        habitacionReservations.forEach(h => {
+          const fechaEntrada = h.fechaEntrada ? parseISO(h.fechaEntrada) : null;
+          const fechaSalida = h.fechaSalida ? parseISO(h.fechaSalida) : null;
+          if (isValid(fechaEntrada) && isValid(fechaSalida) && h.estado?.toLowerCase() !== 'cancelada') {
+            if (fechaEntrada < endOfNext30Days && fechaSalida > startOfNext30Days) {
+              const idHab = h.letraHabitacion || h.habitacion || h._id;
+              uniqueOccupiedRoomsNext30Days.add(idHab);
+            }
+          }
+        });
+      }
+      const occupiedNext30DaysCount = uniqueOccupiedRoomsNext30Days.size;
+      
+      // Calcular recuentos de EVENTOS
+      let eventosHoyCount = 0;
+      let eventosNext7DaysCount = 0;
+      let eventosNext30DaysCount = 0;
+
+      if (Array.isArray(eventoReservations)) {
+        eventoReservations.forEach(e => {
+          const fechaEvento = e.fecha ? parseISO(e.fecha) : null;
+          if (isValid(fechaEvento) && e.estado?.toLowerCase() !== 'cancelada') {
+            const startOfFechaEvento = startOfDay(fechaEvento);
+            
+            // Evento Hoy?
+            if (isSameDay(today, fechaEvento)) {
+              eventosHoyCount++;
+            }
+            // Evento Próx 7 días? (entre mañana y +7d)
+            if (startOfFechaEvento >= startOfNext7Days && startOfFechaEvento <= endOfNext7Days) {
+              eventosNext7DaysCount++;
+            }
+             // Evento Próx 30 días? (entre mañana y +30d)
+            if (startOfFechaEvento >= startOfNext30Days && startOfFechaEvento <= endOfNext30Days) {
+              eventosNext30DaysCount++;
+            }
+          }
+        });
+      }
+
       // Actualizar estadísticas
-      setStats({
+      const newStats = {
         totalReservations,
         pendingReservations,
         confirmedReservations,
-        totalRooms,
-        occupiedRooms,
-        totalUsers: usuarios.length
-      });
+        cancelledReservations,
+        totalRooms: totalPhysicalRooms, 
+        occupiedRoomsToday: occupiedTodayCount, 
+        availableRoomsToday: totalPhysicalRooms - occupiedTodayCount, 
+        occupiedRoomsNext7Days: occupiedNext7DaysCount,
+        availableRoomsNext7Days: totalPhysicalRooms - occupiedNext7DaysCount,
+        occupiedRoomsNext30Days: occupiedNext30DaysCount,
+        availableRoomsNext30Days: totalPhysicalRooms - occupiedNext30DaysCount,
+        totalUsers: usuarios?.length || 0,
+        eventosHoy: eventosHoyCount,
+        eventosNext7Days: eventosNext7DaysCount,
+        eventosNext30Days: eventosNext30DaysCount
+      };
       
-      // Actualizar la hora de última actualización
+      console.log('Estadísticas calculadas:', newStats);
+      setStats(newStats);
+      
       setLastUpdate(new Date());
       
       if (showToast) {
-        toast.success('Datos actualizados correctamente');
+        toast.success('Dashboard actualizado correctamente');
       }
     } catch (error) {
-      console.error('Error cargando dashboard:', error);
+      console.error('Error al cargar datos del dashboard:', error);
       setError('Error al cargar los datos del dashboard');
       if (showToast) {
-        toast.error('Error al actualizar los datos');
+        toast.error('Error al cargar los datos del dashboard');
       }
     } finally {
+      setRefreshing(false);
       setIsLoading(false);
-      setIsRefreshing(false);
+      setInitialLoadDone(true);
     }
-  }, [usuarios.length]);
+  }, [authLoading, isAuthenticated, loadAllReservations, loadUsers, usuarios?.length, eventoReservations, habitacionReservations]);
 
-  // Función de actualización manual
-  const handleManualRefresh = () => {
-    // Usar el contexto de sincronización para actualizar todas las páginas
-    reservationSync.loadAllReservations(true).then(() => {
-      loadDashboardData(true);
-    });
-  };
-
-  // Cargar datos iniciales
+  // Efecto para cargar datos iniciales
   useEffect(() => {
-    if (loading) return;
-    loadDashboardData();
-  }, [loading, filtroUsuario, loadDashboardData]);
+    const initializeData = async () => {
+      if (!authLoading && isAuthenticated && isAdmin && !initialLoadDone) {
+        setIsLoading(true);
+        await loadDashboardData();
+      }
+    };
+
+    initializeData();
+  }, [authLoading, isAuthenticated, isAdmin, initialLoadDone, loadDashboardData]);
 
   // Configurar actualización automática cada 2 minutos
   useEffect(() => {
-    // Iniciar intervalo cuando el componente se monte
-    autoRefreshInterval.current = setInterval(() => {
-      loadDashboardData();
-    }, 120000); // 2 minutos en milisegundos
-    
-    // Limpiar intervalo cuando el componente se desmonte
-    return () => {
-      if (autoRefreshInterval.current) {
-        clearInterval(autoRefreshInterval.current);
-      }
-    };
-  }, [loadDashboardData]);
+    if (!isAuthenticated) return;
 
-  // Escuchar cambios en el contexto de sincronización
-  useEffect(() => {
-    // Si el contexto tiene datos actualizados más recientes que nuestros datos locales
-    if (reservationSync.lastUpdate > lastUpdate) {
-      console.log('Dashboard: Detectado cambio en el contexto, actualizando datos locales');
-      
-      // Usar los datos del contexto para actualizar el estado local
-      if (reservationSync.reservations.length > 0) {
-        setAllReservations(reservationSync.reservations);
-        setHabitacionReservations(reservationSync.habitacionReservations);
-        setEventoReservations(reservationSync.eventoReservations);
-        
-        // Actualizar la hora de última actualización
-        setLastUpdate(reservationSync.lastUpdate);
+    const interval = setInterval(async () => {
+      if (!refreshing && !isLoading) {
+        await loadDashboardData(false);
       }
+    }, 120000);
+
+    autoRefreshInterval.current = interval;
+    return () => clearInterval(interval);
+  }, [isAuthenticated, refreshing, isLoading, loadDashboardData]);
+
+  // Redirigir si no está autenticado o no es admin
+  useEffect(() => {
+    if (!authLoading && (!isAuthenticated || !isAdmin)) {
+      router.push('/admin/login');
     }
-  }, [reservationSync.lastUpdate]);
+  }, [authLoading, isAuthenticated, isAdmin, router]);
+
+  // Actualizar cuando cambien las reservas en el contexto
+  useEffect(() => {
+    if (!isLoading && reservations && reservations.length > 0) {
+      loadDashboardData();
+    }
+  }, [reservations.length]);
 
   // Función para obtener el nombre del usuario asignado
-  const getUsuarioAsignado = (reserva) => {
+  const getAssignedUserName = (reserva) => {
     if (!reserva.asignadoA) return 'Sin asignar';
     
     // Si la reserva tiene los datos del usuario populados
@@ -229,24 +446,37 @@ export default function AdminDashboard() {
       'Usuario asignado';
   };
 
-  // Obtener badge de estado con colores
+  // Obtener badge de estado con colores pastel piedra
   const getStatusBadge = (estado) => {
     if (!estado) return null;
-    
-    const estadoLower = estado.toLowerCase();
-    let colorClass = 'bg-gray-100 text-gray-800';
-    
-    if (estadoLower === 'confirmada') {
-      colorClass = 'bg-green-100 text-green-800';
-    } else if (estadoLower === 'pendiente') {
-      colorClass = 'bg-yellow-100 text-yellow-800';
-    } else if (estadoLower === 'cancelada') {
-      colorClass = 'bg-red-100 text-red-800';
+    const estadoNormalizado = estado.toLowerCase();
+
+    let badgeClass = '';
+    let text = '';
+
+    switch (estadoNormalizado) {
+      case 'confirmada':
+      case 'confirmado':
+        badgeClass = COLORES_PASTEL_PIEDRA.estadoConfirmado;
+        text = 'Confirmada';
+        break;
+      case 'pendiente':
+        badgeClass = COLORES_PASTEL_PIEDRA.estadoPendiente;
+        text = 'Pendiente';
+        break;
+      case 'cancelada':
+      case 'cancelado':
+        badgeClass = COLORES_PASTEL_PIEDRA.estadoCancelado;
+        text = 'Cancelada';
+        break;
+      default:
+        badgeClass = 'bg-gray-100 text-gray-800 border-gray-200'; // Default fallback
+        text = estado;
     }
-    
+
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
-        {estado}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${badgeClass}`}>
+        {text}
       </span>
     );
   };
@@ -254,55 +484,60 @@ export default function AdminDashboard() {
   const dashboardCards = [
     {
       title: 'Reservaciones',
-      icon: <FaCalendarAlt className="text-amber-500" size={24} />,
+      icon: <FaCalendarAlt className="text-amber-600" size={24} />,
       stats: [
         { label: 'Total', value: stats.totalReservations },
         { label: 'Pendientes', value: stats.pendingReservations },
-        { label: 'Confirmadas', value: stats.confirmedReservations }
+        { label: 'Confirmadas', value: stats.confirmedReservations },
+        { label: 'Canceladas', value: stats.cancelledReservations }
       ],
-      color: 'bg-amber-100 border-amber-200'
+      color: 'bg-amber-50 border-amber-200'
     },
     {
       title: 'Habitaciones',
-      icon: <FaBed className="text-blue-500" size={24} />,
+      icon: <FaBed className="text-emerald-600" size={24} />,
       stats: [
         { label: 'Total', value: stats.totalRooms },
-        { label: 'Ocupadas', value: stats.occupiedRooms },
-        { label: 'Disponibles', value: stats.totalRooms - stats.occupiedRooms }
+        { label: 'Ocupadas', value: stats.occupiedRoomsToday },
+        { label: 'Disponibles', value: stats.availableRoomsToday }
       ],
-      color: 'bg-blue-100 border-blue-200'
+      color: 'bg-emerald-50 border-emerald-200'
     },
     {
       title: 'Eventos',
-      icon: <FaGlassCheers className="text-purple-500" size={24} />,
+      icon: <FaGlassCheers className="text-stone-600" size={24} />,
       stats: [
         { label: 'Reservados', value: eventoReservations.length },
         { label: 'Confirmados', value: eventoReservations.filter(e => e.estado && e.estado.toLowerCase() === 'confirmada').length },
-        { label: 'Pendientes', value: eventoReservations.filter(e => e.estado && e.estado.toLowerCase() === 'pendiente').length }
+        { label: 'Cancelados', value: eventoReservations.filter(e => e.estado && e.estado.toLowerCase() === 'cancelada').length }
       ],
-      color: 'bg-purple-100 border-purple-200'
+      color: 'bg-stone-50 border-stone-200'
     }
   ];
 
   // Formatear fecha para mostrar
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-ES');
+    if (!dateString) return 'Fecha no válida';
+    try {
+      const date = parseISO(dateString);
+      if (!isValid(date)) return 'Fecha inválida';
+      return format(date, 'PPp', { locale: es }); // Formato: 15 jul 2024, 14:30
+    } catch (error) {
+      console.error("Error formateando fecha:", dateString, error);
+      return 'Error de fecha';
+    }
   };
 
   // Formatear la hora para la última actualización
   const formatLastUpdate = () => {
-    const now = new Date();
-    const diffInMinutes = Math.floor((now - lastUpdate) / (1000 * 60));
-    
-    if (diffInMinutes < 1) {
-      return 'hace unos segundos';
-    } else if (diffInMinutes === 1) {
-      return 'hace 1 minuto';
-    } else if (diffInMinutes < 60) {
-      return `hace ${diffInMinutes} minutos`;
-    } else {
-      const hours = Math.floor(diffInMinutes / 60);
-      return `hace ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+    if (!lastUpdate || !isValid(lastUpdate)) return 'N/A';
+    return format(lastUpdate, 'PPPp', { locale: es }); // Formato más completo: Miércoles, 17 de julio de 2024, 10:30:00
+  };
+
+  // Manejar actualización manual
+  const handleManualRefresh = () => {
+    if (!refreshing) {
+      loadDashboardData(true);
     }
   };
 
@@ -314,119 +549,66 @@ export default function AdminDashboard() {
 
   // Función para asignar una reserva a mí mismo
   const handleAssignToMe = async (reserva) => {
-    try {
-      setAssigningReservation(true);
-      
-      // Asegurarnos de tener el ID correcto del usuario
-      const userId = user?.id || user?._id;
-      
-      console.log('Asignando reserva:', reserva);
-      console.log('Usuario actual:', user);
-      console.log('ID de usuario a usar para asignación:', userId);
-      
-      if (!userId) {
-        toast.error('No se pudo determinar tu ID de usuario');
-        setAssigningReservation(false);
-        return;
-      }
-      
-      let response;
-      
-      switch (reserva.tipo) {
-        case 'evento':
-          console.log('Asignando evento al usuario actual:', userId);
-          response = await assignEventoReservation(reserva._id || reserva.id, userId);
-          break;
-        case 'habitacion':
-          console.log('Asignando habitación al usuario actual:', userId);
-          // Verificar si es una habitación asociada a un evento
-          if (reserva.eventoId || reserva.reservaEvento) {
-            // Si la habitación está asociada a un evento, usar el endpoint de eventos
-            const eventoId = reserva.eventoId || reserva.reservaEvento;
-            console.log('Habitación asociada a evento. Usando endpoint de eventos con ID:', eventoId);
-            response = await assignEventoReservation(eventoId, userId, [reserva._id || reserva.id]);
-          } else {
-            // Si es una habitación independiente, usar el endpoint normal
-            response = await assignHabitacionReservation(reserva._id || reserva.id, userId);
-          }
-          break;
-        default:
-          throw new Error('Tipo de reserva no válido');
-      }
-      
-      console.log('Respuesta de asignación:', response);
+    if (!user || !user.id) {
+      toast.error("No se pudo identificar al usuario actual.");
+      return;
+    }
+    if (!reserva || (!reserva._id && !reserva.id)) {
+      toast.error("Reserva inválida para asignar.");
+      return;
+    }
 
-      if (response && (response.success || response.data)) {
-        toast.success('Reserva asignada exitosamente');
+    setAssigningReservation(true);
+    const reservaId = reserva._id || reserva.id;
+    const userId = user.id;
+
+    try {
+      let response;
+      if (reserva.tipo === 'evento' || reserva.eventoId || reserva.reservaEvento) {
+        response = await assignEventoReservation(reservaId, userId);
+      } else if (reserva.tipo === 'habitacion' || reserva.habitacionId || reserva.habitacionReservada) {
+        response = await assignHabitacionReservation(reservaId, userId);
+      } else {
+        // Intenta deducir el tipo si no está explícito
+        if (reserva.fechaEvento) {
+           response = await assignEventoReservation(reservaId, userId);
+        } else if (reserva.fechaEntrada) {
+           response = await assignHabitacionReservation(reservaId, userId);
+        } else {
+          toast.error("No se pudo determinar el tipo de reserva para asignar.");
+          setAssigningReservation(false);
+          return;
+        }
+      }
+
+      if (response && response.success) {
+        toast.success(`Reserva ${reserva.nombreContacto || reserva.nombreCompleto || reservaId} asignada a ti.`);
         
-        // Identificar el ID a actualizar
-        const idToUpdate = reserva._id || reserva.id;
-        
-        // Actualizar en el contexto de sincronización para que se refleje en todas las páginas
-        if (reserva.tipo === 'evento') {
-          // Si es un evento, actualizar el evento y sus habitaciones asociadas
-          reservationSync.updateReservation(idToUpdate, 'evento', { 
-            asignadoA: userId,
-            usuarioAsignado: userId
-          });
-          
-          // No es necesario actualizar las habitaciones manualmente, ya que el contexto lo maneja
-        } else if (reserva.tipo === 'habitacion') {
-          // Si es una habitación asociada a un evento, actualizar el evento primero
-          if (reserva.eventoId || reserva.reservaEvento) {
-            const eventoId = reserva.eventoId || reserva.reservaEvento;
-            
-            // Actualizar el evento asociado primero
-            reservationSync.updateReservation(eventoId, 'evento', {
-              asignadoA: userId,
-              usuarioAsignado: userId
-            });
-          }
-          
-          // Actualizar la habitación
-          reservationSync.updateReservation(idToUpdate, 'habitacion', {
-            asignadoA: userId,
-            usuarioAsignado: userId
-          });
+        // Actualizar el estado local inmediatamente
+        const updateReservation = (list) => list.map(r => {
+           const currentReservaId = r._id || r.id;
+           if (currentReservaId === reservaId) {
+             return { ...r, asignadoA: userId }; // O asignar el objeto usuario si la API lo devuelve
+           }
+           return r;
+         });
+
+        if (reserva.tipo === 'evento' || reserva.eventoId || reserva.reservaEvento || reserva.fechaEvento) {
+          // No tenemos un setter directo para eventoReservations desde useReservation
+          // Forzar recarga completa para reflejar el cambio
+           await loadDashboardData(false);
+        } else {
+           // Asumiendo que existe un setter para habitacionReservations o que loadAllReservations actualiza todo
+           await loadDashboardData(false); // Recargar datos para asegurar consistencia
         }
         
-        // Actualizar el estado local para reflejar los cambios inmediatamente
-        const updateReservation = (list) => list.map(r => {
-          // Actualizar el elemento principal
-          if ((r._id === reserva._id) || (r.id === reserva.id)) {
-            return { ...r, asignadoA: userId, asignadoAMi: true };
-          }
-          
-          // Si se asignó un evento, actualizar también las habitaciones asociadas
-          if (reserva.tipo === 'evento' && 
-              r.tipo === 'habitacion' && 
-              (r.eventoId === reserva._id || r.reservaEvento === reserva._id ||
-               r.eventoId === reserva.id || r.reservaEvento === reserva.id)) {
-            return { ...r, asignadoA: userId, asignadoAMi: true };
-          }
-          
-          return r;
-        });
-
-        setAllReservations(prev => updateReservation(prev));
-        setEventoReservations(prev => updateReservation(prev));
-        setHabitacionReservations(prev => updateReservation(prev));
-        
-        // Ya no necesitamos recargar los datos, el contexto mantiene todo sincronizado
         setShowAssignModal(false);
-        
-        // Para asegurar que el dashboard se actualice correctamente, forzamos una actualización
-        setTimeout(() => {
-          loadDashboardData(false);
-        }, 500);
       } else {
-        const errorMsg = response?.message || response?.mensaje || 'Error al asignar la reserva';
-        toast.error(errorMsg);
-        console.error('Error en respuesta del servidor:', errorMsg);
+        toast.error(response?.message || "Error al asignar la reserva.");
       }
     } catch (error) {
-      console.error('Error al asignar reserva:', error);
-      toast.error(error.message || 'Error al asignar la reserva');
+      console.error("Error asignando reserva:", error);
+      toast.error("Error al asignar la reserva.");
     } finally {
       setAssigningReservation(false);
     }
@@ -434,94 +616,56 @@ export default function AdminDashboard() {
 
   // Función para desasignar una reserva
   const handleUnassign = async (reserva) => {
+     if (!reserva || (!reserva._id && !reserva.id)) {
+      toast.error("Reserva inválida para desasignar.");
+      return;
+    }
+    
+    setAssigningReservation(true);
+    const reservaId = reserva._id || reserva.id;
+
     try {
-      setAssigningReservation(true);
-      
-      console.log('Iniciando desasignación de reserva:', reserva);
-      
       let response;
-      
-      switch(reserva.tipo) {
-        case 'habitacion':
-          response = await unassignHabitacionReservation(reserva._id || reserva.id);
-          break;
-        case 'evento':
-          response = await unassignEventoReservation(reserva._id || reserva.id);
-          break;
-        default:
-          throw new Error(`Tipo de reserva no válido: ${reserva.tipo}`);
-      }
-      
-      console.log('Respuesta de desasignación:', response);
-      
-      if (response && (response.success || response.data)) {
-        toast.success(`Reserva de ${reserva.tipoDisplay?.toLowerCase() || reserva.tipo} desasignada correctamente`);
-        
-        // Identificar el ID a actualizar
-        const idToUpdate = reserva._id || reserva.id;
-        
-        // Actualizar en el contexto de sincronización para que se refleje en todas las páginas
-        if (reserva.tipo === 'evento') {
-          // Si es un evento, actualizar el evento y sus habitaciones asociadas
-          reservationSync.updateReservation(idToUpdate, 'evento', { 
-            asignadoA: null, 
-            usuarioAsignado: null 
-          });
-          
-          // No es necesario actualizar las habitaciones manualmente, ya que el contexto lo maneja
-        } else if (reserva.tipo === 'habitacion') {
-          // Si es una habitación asociada a un evento, actualizar el evento primero
-          if (reserva.eventoId || reserva.reservaEvento) {
-            const eventoId = reserva.eventoId || reserva.reservaEvento;
-            
-            // Actualizar el evento asociado primero
-            reservationSync.updateReservation(eventoId, 'evento', {
-              asignadoA: null,
-              usuarioAsignado: null
-            });
-          }
-          
-          // Actualizar la habitación
-          reservationSync.updateReservation(idToUpdate, 'habitacion', {
-            asignadoA: null,
-            usuarioAsignado: null
-          });
-        }
-        
-        // Actualizar el estado local para reflejar los cambios inmediatamente
-        const updateLocalReservation = (list) => list.map(r => {
-          // Actualizar el elemento principal
-          if (r._id === reserva._id || r.id === reserva.id) {
-            return { ...r, asignadoA: null, usuarioAsignado: null, asignadoAMi: false };
-          }
-          
-          // Si se desasignó un evento, actualizar también las habitaciones asociadas
-          if (reserva.tipo === 'evento' && 
-              r.tipo === 'habitacion' && 
-              (r.eventoId === reserva._id || r.reservaEvento === reserva._id ||
-               r.eventoId === reserva.id || r.reservaEvento === reserva.id)) {
-            return { ...r, asignadoA: null, usuarioAsignado: null, asignadoAMi: false };
-          }
-          
-          return r;
-        });
-        
-        setAllReservations(prev => updateLocalReservation(prev));
-        setEventoReservations(prev => updateLocalReservation(prev));
-        setHabitacionReservations(prev => updateLocalReservation(prev));
-        
-        // Para asegurar que el dashboard se actualice correctamente, forzamos una actualización
-        setTimeout(() => {
-          loadDashboardData(false);
-        }, 500);
+       if (reserva.tipo === 'evento' || reserva.eventoId || reserva.reservaEvento) {
+        response = await unassignEventoReservation(reservaId);
+      } else if (reserva.tipo === 'habitacion' || reserva.habitacionId || reserva.habitacionReservada) {
+        response = await unassignHabitacionReservation(reservaId);
       } else {
-        const errorMsg = response?.message || response?.mensaje || 'Error al desasignar la reserva';
-        toast.error(errorMsg);
-        console.error('Error en respuesta del servidor:', errorMsg);
+         // Intenta deducir el tipo si no está explícito
+         if (reserva.fechaEvento) {
+            response = await unassignEventoReservation(reservaId);
+         } else if (reserva.fechaEntrada) {
+            response = await unassignHabitacionReservation(reservaId);
+         } else {
+           toast.error("No se pudo determinar el tipo de reserva para desasignar.");
+           setAssigningReservation(false);
+           return;
+         }
+      }
+
+      if (response && response.success) {
+        toast.success(`Reserva ${reserva.nombreContacto || reserva.nombreCompleto || reservaId} desasignada.`);
+        
+         // Actualizar el estado local inmediatamente
+         const updateLocalReservation = (list) => list.map(r => {
+           const currentReservaId = r._id || r.id;
+           if (currentReservaId === reservaId) {
+             // Crear un nuevo objeto sin la propiedad asignadoA
+             const { asignadoA, ...rest } = r;
+             return rest;
+           }
+           return r;
+         });
+
+         // Como antes, forzar recarga por falta de setters específicos
+         await loadDashboardData(false);
+
+      } else {
+        toast.error(response?.message || "Error al desasignar la reserva.");
       }
     } catch (error) {
-      console.error('Error al desasignar reserva:', error);
-      toast.error(error.message || 'Error al desasignar la reserva');
+      console.error("Error desasignando reserva:", error);
+      toast.error("Error al desasignar la reserva.");
     } finally {
       setAssigningReservation(false);
     }
@@ -534,52 +678,17 @@ export default function AdminDashboard() {
   
   // Función para filtrar reservaciones según el filtro seleccionado
   const getFilteredReservations = (reservations) => {
-    if (!reservations) return [];
-    
-    // Filtrar según el usuario seleccionado
-    let filteredReservations = [...reservations];
-    
-    // Primero filtrar por usuario asignado
-    if (filtroUsuario === 'sin_asignar') {
-      filteredReservations = filteredReservations.filter(r => !r.asignadoA);
-    } else if (filtroUsuario === 'mis_reservas') {
-      filteredReservations = filteredReservations.filter(r => 
-        r.asignadoA === user?.id || 
-        (r.asignadoA && typeof r.asignadoA === 'object' && r.asignadoA._id === user?.id)
-      );
-    } else if (filtroUsuario !== 'todos' && filtroUsuario) {
-      filteredReservations = filteredReservations.filter(r => {
-        const asignadoId = typeof r.asignadoA === 'object' ? r.asignadoA?._id : r.asignadoA;
-        return asignadoId === filtroUsuario;
-      });
+    if (!Array.isArray(reservations)) return [];
+    if (filtroUsuario === 'all') {
+      return reservations;
     }
-    
-    // Filtrar habitaciones duplicadas (mostrar solo las independientes o las de eventos, no ambas)
-    // Primero identificamos las habitaciones que son parte de eventos
-    const habitacionesDeEventos = filteredReservations
-      .filter(r => r.tipo === 'habitacion' && r.eventoId)
-      .map(r => r.id);
-    
-    // Luego filtramos las habitaciones duplicadas
-    filteredReservations = filteredReservations.filter(r => {
-      // Si no es una habitación, la incluimos
-      if (r.tipo !== 'habitacion') return true;
-      
-      // Si es una habitación de evento y está en la lista, la incluimos
-      if (r.eventoId && habitacionesDeEventos.includes(r.id)) {
-        return true;
-      }
-      
-      // Si es una habitación independiente (sin evento), la incluimos
-      if (!r.eventoId) {
-        return true;
-      }
-      
-      // En cualquier otro caso, la excluimos
-      return false;
-    });
-    
-    return filteredReservations;
+    if (filtroUsuario === 'me') {
+      return reservations.filter(res => res.asignadoA && (res.asignadoA === user?.id || res.asignadoA?._id === user?.id));
+    }
+    if (filtroUsuario === 'unassigned') {
+      return reservations.filter(res => !res.asignadoA);
+    }
+    return reservations.filter(res => res.asignadoA && (res.asignadoA === filtroUsuario || res.asignadoA?._id === filtroUsuario));
   };
 
   // Aplicar filtros a cada tipo de reserva
@@ -599,324 +708,712 @@ export default function AdminDashboard() {
     [allReservations, filtroUsuario, user?.id]
   );
 
-  // Si está cargando, mostrar spinner
-  if (isLoading) {
+  // --- Lógica del Calendario ---
+
+  const nextPeriod = () => {
+    if (calendarView === 'month') {
+      setCurrentDate(addDays(currentDate, 31)); // Aproximado para cambiar mes
+    } else {
+      setCurrentDate(addDays(currentDate, 7));
+    }
+  };
+
+  const prevPeriod = () => {
+     if (calendarView === 'month') {
+      setCurrentDate(subDays(currentDate, 31)); // Aproximado para cambiar mes
+    } else {
+      setCurrentDate(subDays(currentDate, 7));
+    }
+  };
+
+  const getCalendarDays = () => {
+    const firstDayOfMonth = startOfMonth(currentDate);
+    const lastDayOfMonth = endOfMonth(currentDate);
+    const firstDayOfGrid = startOfWeek(firstDayOfMonth, { locale: es });
+    const lastDayOfGrid = endOfWeek(lastDayOfMonth, { locale: es });
+    
+    return eachDayOfInterval({ start: firstDayOfGrid, end: lastDayOfGrid });
+  };
+
+  const getWeekDays = () => {
+    const firstDayOfWeek = startOfWeek(currentDate, { locale: es });
+    const lastDayOfWeek = endOfWeek(currentDate, { locale: es });
+    return eachDayOfInterval({ start: firstDayOfWeek, end: lastDayOfWeek });
+  };
+
+  const getReservationsForDay = (day) => {
+    const startOfDaySelected = startOfDay(day);
+    const endOfDaySelected = endOfDay(day);
+    const dayReservations = [];
+
+    // Revisar reservas de habitaciones
+    if (Array.isArray(habitacionReservations)) {
+      habitacionReservations.forEach(reserva => {
+        const fechaEntrada = reserva.fechaEntrada ? parseISO(reserva.fechaEntrada) : null;
+        const fechaSalida = reserva.fechaSalida ? parseISO(reserva.fechaSalida) : null;
+        
+        if (isValid(fechaEntrada) && isValid(fechaSalida) && reserva.estado?.toLowerCase() !== 'cancelada') {
+           // La reserva afecta al día si el día está entre la entrada (inclusive) y la salida (exclusive)
+           if (startOfDaySelected < fechaSalida && endOfDaySelected >= fechaEntrada) {
+             dayReservations.push({ ...reserva, tipo: 'habitacion' });
+           }
+        }
+      });
+    }
+
+    // Revisar reservas de eventos
+    if (Array.isArray(eventoReservations)) {
+      eventoReservations.forEach(reserva => {
+         // Los eventos suelen ser de un solo día, comparar la fecha del evento
+         const fechaEvento = reserva.fecha ? startOfDay(parseISO(reserva.fecha)) : null;
+         if (isValid(fechaEvento) && isSameDay(day, fechaEvento) && reserva.estado?.toLowerCase() !== 'cancelada') {
+            dayReservations.push({ ...reserva, tipo: 'evento' });
+         }
+         // Si los eventos pudieran durar varios días, necesitaríamos fechaInicio/fechaFin aquí también
+      });
+    }
+    
+    return dayReservations;
+  };
+  
+  // Renderizar letra de habitación o indicador de evento
+  const renderReservationIndicator = (reserva) => {
+    const idReserva = reserva._id || 'temp-' + Math.random();
+    let tipoIndicador = 'E'; // Por defecto: Evento
+    let colorIndicador = 'bg-green-500'; // Verde por defecto para evento
+    let letraDetalle = reserva.nombreEvento?.charAt(0).toUpperCase() || 'E';
+    let tooltipText = `Evento: ${reserva.nombreEvento || 'Sin nombre'}`;
+
+    if (reserva.tipo === 'habitacion') {
+      if (reserva.reservaEvento || reserva.tipoReserva === 'evento') { // Si está vinculada a un evento
+        tipoIndicador = 'H';
+        colorIndicador = 'bg-purple-500'; // Morado para habitación de evento
+        letraDetalle = reserva.letraHabitacion || reserva.habitacion || '?';
+        tooltipText = `Hab. Evento ${letraDetalle}: ${reserva.nombreContacto || 'Sin contacto'}`;
+      } else { // Habitación independiente (hotel)
+        tipoIndicador = 'H';
+        colorIndicador = 'bg-blue-500'; // Azul para habitación de hotel
+        letraDetalle = reserva.letraHabitacion || reserva.habitacion || '?';
+        tooltipText = `Hab. Hotel ${letraDetalle}: ${reserva.nombreContacto || 'Sin contacto'}`;
+      }
+    }
+    
+    // Asegurar que la letra detalle sea una sola letra
+    if (letraDetalle.length > 1) {
+      letraDetalle = letraDetalle.charAt(0).toUpperCase();
+    }
+
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+      <div 
+        key={idReserva}
+        className="relative group cursor-pointer m-0.5 flex-shrink-0" // Añadido flex-shrink-0
+      >
+        <span 
+          className={`w-6 h-6 rounded-full ${colorIndicador} text-white flex items-center justify-center text-xs font-bold shadow`} // <-- Usa colorIndicador
+        >
+          {tipoIndicador}{letraDetalle}
+        </span>
+        {/* Tooltip */}
+        <div className="absolute bottom-full mb-1 left-1/2 transform -translate-x-1/2 w-max max-w-xs 
+                      bg-gray-800 text-white text-xs rounded py-1 px-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+        >
+          {tooltipText}
+        </div>
+      </div>
+    );
+  };
+
+  // --- Fin Lógica del Calendario ---
+
+  // Si está cargando, mostrar spinner
+  if (authLoading || (isLoading && !initialLoadDone)) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-white bg-opacity-80 z-50">
+        <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center max-w-md mx-auto">
+          <div className="w-16 h-16 border-4 border-t-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <h2 className="text-xl font-medium text-gray-900 mb-2">Cargando dashboard</h2>
+          <p className="text-gray-500 text-center">Estamos preparando los datos del panel de control.</p>
+        </div>
       </div>
     );
   }
 
   // Si hay error, mostrar mensaje
-  if (error) {
+  if (error || reservationError) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl text-red-600 mb-4">Error al cargar el dashboard</h2>
-        <p className="text-gray-600">{error}</p>
-        <button 
-          onClick={handleManualRefresh}
-          className="mt-4 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors flex items-center justify-center mx-auto"
-        >
-          <FaSync className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> 
-          Reintentar
-        </button>
+      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-stone-100 rounded-full text-stone-500 mb-4">
+              <FaTimes size={24} />
+            </div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Error al cargar los datos</h2>
+            <p className="text-gray-600">{error || reservationError}</p>
+          </div>
+          
+          <button 
+            onClick={handleManualRefresh}
+            className="w-full bg-stone-600 hover:bg-stone-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center"
+          >
+            <FaSync className="mr-2" />
+            Intentar de nuevo
+          </button>
+        </div>
       </div>
     );
   }
 
+  // Renderizar contenido principal
   return (
-    <div className="space-y-6">
-      {/* Encabezado */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
-        <div>
-          <h1 className="text-3xl font-[var(--font-display)] text-gray-800">
-            Panel de Control
-          </h1>
-          <p className="text-gray-600">
-            Bienvenido, {user?.nombre || 'Administrador'} · {new Date().toLocaleDateString()}
+    <div className={`p-4 md:p-6 ${COLORES_PASTEL_PIEDRA.fondoPrincipal} min-h-screen ${COLORES_PASTEL_PIEDRA.textoPrincipal}`}>
+      {/* Header con título y actualización */}
+      <header className={`${COLORES_PASTEL_PIEDRA.fondoContenedor} rounded-xl shadow-sm mb-6`}>
+        <div className="p-4 md:p-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+            <h1 className="text-2xl font-bold">Panel de Administración</h1>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleManualRefresh} 
+                disabled={refreshing}
+                className={`${COLORES_PASTEL_PIEDRA.primario} ${COLORES_PASTEL_PIEDRA.textoPrimario} hover:${COLORES_PASTEL_PIEDRA.primarioHover} font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                <FaSync className={`mr-2 ${refreshing ? 'animate-spin' : ''}`} /> 
+                {refreshing ? 'Actualizando...' : 'Actualizar'}
+              </button>
+            </div>
+          </div>
+          <p className={`${COLORES_PASTEL_PIEDRA.textoSecundario} text-sm`}>
+            Última actualización: {formatLastUpdate()}
           </p>
         </div>
-        
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          {/* Filtro por usuario asignado */}
-          <select 
-            value={filtroUsuario}
-            onChange={handleFilterUsuario}
-            className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-          >
-            <option value="todos">Todas las reservas</option>
-            <option value="sin_asignar">Sin asignar</option>
-            <option value="mis_reservas">Mis reservas</option>
-            {usuarios.filter(u => u._id !== user?._id).map(usuario => (
-              <option key={usuario._id} value={usuario._id}>
-                Asignadas a: {usuario.nombre} {usuario.apellidos || ''}
-              </option>
-            ))}
-            <option value={user?._id}>Mis reservas</option>
-          </select>
-          
-          {/* Botón de actualización manual */}
-          <button 
-            onClick={handleManualRefresh} 
-            disabled={isRefreshing}
-            className="px-3 py-2 bg-[var(--color-primary)] text-white rounded-lg hover:bg-[var(--color-primary-dark)] transition-colors flex items-center justify-center whitespace-nowrap"
-            title="Actualizar datos del dashboard"
-          >
-            <FaSync className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} /> 
-            Actualizar
-          </button>
-        </div>
-      </div>
-      
-      {/* Indicador de última actualización */}
-      <div className="flex justify-end">
-        <p className="text-xs text-gray-500">
-          Última actualización: {formatLastUpdate()}
-        </p>
-      </div>
-      
-      {/* Tarjetas de estadísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {dashboardCards.map((card, index) => (
-          <div key={index} className={`${card.color} border rounded-xl p-6 shadow-sm`}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">{card.title}</h2>
-              {card.icon}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {card.stats.map((stat, statIndex) => (
-                <div key={statIndex} className="text-center">
-                  <p className="text-xl font-bold">{stat.value}</p>
-                  <p className="text-xs text-gray-600">{stat.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {/* Todas las reservas unificadas */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="font-semibold flex items-center">
-            <FaCalendarAlt className="mr-2 text-amber-500" />
-            Todas las reservaciones recientes
-          </h2>
-          <Link 
-            href="/admin/reservaciones" 
-            className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
-          >
-            <FaEye className="mr-1" /> Ver todas
-          </Link>
-        </div>
-        <div className="p-4">
-          {filteredAllReservations.length > 0 ? (
-            <div className="space-y-3">
-              {filteredAllReservations.slice(0, 10).map((reserva) => (
-                <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-                  <div className="flex justify-between mb-1">
-                    <div className="flex items-center">
-                      <span className="inline-block w-24 font-medium text-sm px-2 py-1 bg-gray-100 rounded-full mr-2 text-center">
-                        {reserva.tipoDisplay}
-                      </span>
-                      <span className="font-medium">{reserva.clienteDisplay}</span>
-                    </div>
-                    {getStatusBadge(reserva.estado)}
-                  </div>
-                  <div className="text-sm text-gray-600 flex justify-between">
-                    <span>{reserva.fechaDisplay}</span>
-                    <span>{reserva.tituloDisplay}</span>
-                  </div>
-                  <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                    <span className={`flex items-center ${
-                      reserva.asignadoA ? 'text-green-600' : 'text-gray-500'
-                    }`}>
-                      <FaUserCircle className="mr-1" />
-                      {getUsuarioAsignado(reserva)}
-                    </span>
-                    <div className="flex space-x-2">
-                      <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
-                        Ver detalles
-                      </Link>
-                      {!reserva.asignadoA ? (
-                        <button 
-                          onClick={() => handleAssignToMe(reserva)}
-                          className="text-[var(--color-primary)] hover:underline"
-                        >
-                          Asignar a mí
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => handleUnassign(reserva)}
-                          className="text-amber-600 hover:underline"
-                        >
-                          Desasignar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+      </header>
+
+      {/* Estadísticas */}
+      <DashboardStats stats={stats} COLORES_PASTEL_PIEDRA={COLORES_PASTEL_PIEDRA} />
+
+      {/* Calendario de Ocupación */}
+       <div className={`${COLORES_PASTEL_PIEDRA.fondoContenedor} rounded-xl shadow-sm mb-6 p-4 md:p-6`}>
+         <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Calendario de Ocupación</h2>
+             <div className="flex items-center gap-2">
+                 <button onClick={prevPeriod} className={`p-2 rounded ${COLORES_PASTEL_PIEDRA.resaltado} hover:bg-stone-200`}><FaChevronLeft /></button>
+                 <span className="font-medium text-lg capitalize">
+                  {format(currentDate, calendarView === 'month' ? 'MMMM yyyy' : "'Semana del' dd MMMM", { locale: es })}
+                </span>
+                 <button onClick={nextPeriod} className={`p-2 rounded ${COLORES_PASTEL_PIEDRA.resaltado} hover:bg-stone-200`}><FaChevronRight /></button>
+                 <select 
+                     value={calendarView} 
+                     onChange={(e) => setCalendarView(e.target.value)}
+                     className={`ml-4 p-2 border ${COLORES_PASTEL_PIEDRA.borde} rounded ${COLORES_PASTEL_PIEDRA.fondoContenedor}`}
+                 >
+                     <option value="month">Mes</option>
+                     <option value="week">Semana</option>
+                 </select>
+             </div>
+         </div>
+
+         {calendarView === 'month' ? (
+            <CalendarMonthView 
+                currentDate={currentDate}
+                getCalendarDays={getCalendarDays}
+                getReservationsForDay={getReservationsForDay}
+                renderReservationIndicator={renderReservationIndicator}
+                COLORES_PASTEL_PIEDRA={COLORES_PASTEL_PIEDRA}
+            />
           ) : (
-            <div className="text-center py-6 text-gray-500">
-              No hay reservaciones recientes
-            </div>
+            <CalendarWeekView
+                currentDate={currentDate}
+                getWeekDays={getWeekDays}
+                getReservationsForDay={getReservationsForDay}
+                renderReservationIndicator={renderReservationIndicator}
+                COLORES_PASTEL_PIEDRA={COLORES_PASTEL_PIEDRA}
+             />
           )}
-        </div>
       </div>
-      
-      {/* Contenedor de 2 columnas con las diferentes reservas por tipo */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Reservaciones de habitaciones */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="font-semibold flex items-center">
-              <FaBed className="mr-2 text-blue-500" />
-              Habitaciones Recientes
-            </h2>
-            <Link 
-              href="/admin/reservaciones?tipo=habitacion" 
-              className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
-            >
-              <FaEye className="mr-1" /> Ver todas
-            </Link>
-          </div>
-          <div className="p-4">
-            {filteredHabitacionReservations.length > 0 ? (
-              <div className="space-y-3">
-                {filteredHabitacionReservations.slice(0, 5).map((reserva) => (
-                  <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-                    <div className="flex justify-between mb-1">
-                      <span className="font-medium">{reserva.clienteDisplay}</span>
-                      {getStatusBadge(reserva.estado)}
-                    </div>
-                    <div className="text-sm text-gray-600 flex justify-between">
-                      <span>{formatDate(reserva.fechaEntrada)} - {formatDate(reserva.fechaSalida)}</span>
-                      <span>{reserva.tituloDisplay || 'Habitación'}</span>
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                      <span className={`flex items-center ${
-                        reserva.asignadoA ? 'text-green-600' : 'text-gray-500'
-                      }`}>
-                        <FaUserCircle className="mr-1" />
-                        {getUsuarioAsignado(reserva)}
-                      </span>
-                      <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
-                        Ver detalles
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+
+      {/* Listado de Próximas Reservas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Columna principal - Reservas de eventos recientes */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Sección de reservas de eventos */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <FaCalendarAlt className="text-stone-500 mr-2" />
+                Próximos Eventos
+              </h2>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar evento..."
+                    className="pl-8 pr-4 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-stone-500 focus:border-transparent"
+                  />
+                  <FaSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
+                </div>
+                <Link 
+                  href="/admin/reservaciones"
+                  className="text-stone-600 hover:text-stone-800 flex items-center text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-stone-50 transition-colors"
+                >
+                  Ver todos <FaChevronRight className="ml-1" size={12} />
+                </Link>
+              </div>
+            </div>
+            
+            {/* Tabla de eventos */}
+            {!Array.isArray(eventoReservations) || eventoReservations.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50">
+                <FaCalendarAlt className="mx-auto text-gray-300 text-4xl mb-3" />
+                <p className="text-gray-500">No hay reservas de eventos disponibles</p>
               </div>
             ) : (
-              <div className="text-center py-6 text-gray-500">
-                No hay reservaciones de habitaciones recientes
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Evento
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Fecha
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Cliente
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Estado
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Acción
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {eventoReservations.slice(0, 5).map((reserva) => {
+                      const fecha = reserva.fechaEvento || reserva.fecha;
+                      const nombreEvento = typeof reserva.tipoEvento === 'object' 
+                        ? (reserva.tipoEvento?.nombre || reserva.tipoEvento?.titulo || 'Evento') 
+                        : (reserva.tipoEvento || 'Evento');
+                      
+                      return (
+                        <tr key={reserva._id || reserva.id} className="hover:bg-gray-50 transition-all">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500">
+                                <FaGlassCheers />
+                              </div>
+                              <div className="ml-3">
+                                <div className="text-sm font-medium text-gray-900">{nombreEvento}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{format(new Date(fecha), 'dd MMM yyyy', { locale: es })}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {typeof reserva.datosContacto === 'object' 
+                                ? (reserva.datosContacto?.nombre || 'Sin nombre') 
+                                : (typeof reserva.nombre === 'string' ? reserva.nombre : 'Sin nombre')
+                              }
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {typeof reserva.datosContacto === 'object' 
+                                ? (reserva.datosContacto?.email || '') 
+                                : (typeof reserva.email === 'string' ? reserva.email : '')
+                              }
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                              ${typeof reserva.estado === 'string' && reserva.estado.toLowerCase() === 'confirmada' ? 'bg-stone-100 text-stone-800' : 
+                                typeof reserva.estado === 'string' && reserva.estado.toLowerCase() === 'cancelada' ? 'bg-red-100 text-red-800' :
+                                'bg-amber-100 text-amber-800'}`}
+                            >
+                              {typeof reserva.estado === 'string' ? reserva.estado : 'Pendiente'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <Link 
+                              href={`/admin/reservas/${reserva._id || reserva.id}`}
+                              className="text-stone-600 hover:text-stone-900 bg-stone-50 hover:bg-stone-100 p-2 rounded-lg inline-flex transition-colors"
+                            >
+                              <FaEye />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
         </div>
-        
-        {/* Reservaciones de eventos */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="font-semibold flex items-center">
-              <FaGlassCheers className="mr-2 text-purple-500" />
-              Eventos Recientes
-            </h2>
-            <Link 
-              href="/admin/reservaciones?tipo=evento" 
-              className="text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm flex items-center"
-            >
-              <FaEye className="mr-1" /> Ver todos
-            </Link>
-          </div>
-          <div className="p-4">
-            {filteredEventoReservations.length > 0 ? (
-              <div className="space-y-3">
-                {filteredEventoReservations.slice(0, 5).map((reserva) => (
-                  <div key={reserva._id} className="p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
-                    <div className="flex justify-between mb-1">
-                      <div className="flex items-center">
-                        <span className="inline-block w-24 font-medium text-sm px-2 py-1 bg-gray-100 rounded-full mr-2 text-center">
-                          {reserva.tipoDisplay}
-                        </span>
-                        <span className="font-medium">{reserva.clienteDisplay}</span>
-                      </div>
-                      {getStatusBadge(reserva.estado)}
-                    </div>
-                    <div className="text-sm text-gray-600 flex justify-between">
-                      <span>{reserva.fechaDisplay}</span>
-                      <span>{reserva.tituloDisplay}</span>
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1 flex justify-between">
-                      <span className={`flex items-center ${reserva.asignadoA ? 'text-green-600' : 'text-gray-500'}`}>
-                        <FaUserCircle className="mr-1" />
-                        {getUsuarioAsignado(reserva)}
-                      </span>
-                      <div className="flex space-x-2">
-                        <Link href={reserva.detallesUrl} className="text-[var(--color-primary)] hover:underline">
-                          Ver detalles
-                        </Link>
-                        {!reserva.asignadoA ? (
-                          <button 
-                            onClick={() => handleAssignToMe(reserva)}
-                            className="text-[var(--color-primary)] hover:underline"
-                          >
-                            Asignar a mí
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => handleUnassign(reserva)}
-                            className="text-amber-600 hover:underline"
-                          >
-                            Desasignar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+
+        {/* Columna lateral - Secciones apiladas */}
+        <div className="space-y-6">
+          {/* Widget de habitaciones recientes */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <FaBed className="text-stone-500 mr-2" />
+                Próximas Reservas
+              </h3>
+              <Link 
+                href="/admin/habitaciones"
+                className="text-stone-600 hover:text-stone-800 flex items-center text-sm font-medium"
+              >
+                Ver todas <FaChevronRight className="ml-1" size={12} />
+              </Link>
+            </div>
+            
+            {!Array.isArray(habitacionReservations) || habitacionReservations.length === 0 ? (
+              <div className="text-center py-10 bg-gray-50">
+                <FaBed className="mx-auto text-gray-300 text-3xl mb-2" />
+                <p className="text-gray-500">No hay reservas de habitaciones</p>
               </div>
             ) : (
-              <div className="text-center py-6 text-gray-500">
-                No hay reservaciones de eventos recientes
+              <div className="p-4">
+                <ul className="space-y-3">
+                  {habitacionReservations.slice(0, 5).map((reserva) => {
+                    // Lógica más robusta para obtener la letra, comprobando el tipo
+                    let letraHabitacion = '?';
+                    if (reserva.habitacion) {
+                      if (typeof reserva.habitacion === 'string') {
+                        letraHabitacion = reserva.habitacion; // Usar directamente si es string
+                      } else if (typeof reserva.habitacion === 'object' && reserva.habitacion.letra) {
+                        // Manejar si inesperadamente es un objeto populado
+                        letraHabitacion = reserva.habitacion.letra; 
+                      } else {
+                        // Log para depurar otros tipos inesperados
+                        console.warn('[Dashboard] Tipo inesperado para reserva.habitacion:', typeof reserva.habitacion, reserva.habitacion);
+                      }
+                    }
+                    
+                    return (
+                      <li key={reserva._id || reserva.id} className="flex justify-between items-center p-3 bg-stone-50 rounded-lg hover:bg-stone-100 transition-colors">
+                        <div className="flex items-center">
+                          <div className="text-xl text-stone-800 flex items-center justify-center font-bold mr-3"> 
+                            {letraHabitacion}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">Habitación {letraHabitacion !== '?' ? letraHabitacion : 'Desconocida'}</p>
+                            <p className="text-xs text-gray-500 flex items-center">
+                              <FaCalendarAlt className="mr-1 text-gray-400" size={10} />
+                              {reserva.fechaEntrada && format(new Date(reserva.fechaEntrada), 'dd MMM', { locale: es })}
+                              {reserva.fechaSalida && ` - ${format(new Date(reserva.fechaSalida), 'dd MMM', { locale: es })}`}
+                            </p>
+                          </div>
+                        </div>
+                        <Link 
+                          href={`/admin/reservaciones/habitacion/${reserva._id || reserva.id}`}
+                          className="text-stone-600 hover:text-stone-900 bg-white border border-gray-200 shadow-sm p-1.5 rounded-lg"
+                        >
+                          <FaEye size={14} />
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
+          </div>
+          
+          {/* Widget de resumen de actividad */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <FaUsers className="text-stone-500 mr-2" />
+                Resumen de Actividad
+              </h3>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-stone-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Usuarios activos</p>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900 text-lg">{stats.totalUsers}</span>
+                    <FaUsers className="text-stone-500" />
+                  </div>
+                </div>
+                
+                <div className="bg-stone-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Eventos pendientes</p>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900 text-lg">{stats.pendingReservations}</span>
+                    <FaListAlt className="text-amber-500" />
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                href="/admin/reservaciones"
+                className="block text-center bg-stone-100 hover:bg-stone-200 text-stone-700 py-2 px-4 rounded-lg mt-2 transition-colors"
+              >
+                Ver todas las reservas
+              </Link>
+            </div>
           </div>
         </div>
       </div>
 
-      {showAssignModal && selectedReservation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Asignar reserva</h3>
-            <p className="mb-4">
-              ¿Deseas asignar la reserva de <strong>{selectedReservation.clienteDisplay}</strong> a tu cuenta?
-            </p>
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
-                onClick={() => setShowAssignModal(false)}
-                disabled={assigningReservation}
+      {/* Fila Inferior (Lista de Ocupación por fecha y Resumen Actividad) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        {/* Ocupación por fecha (Lista) */}
+        <div className={`lg:col-span-2 ${COLORES_PASTEL_PIEDRA.fondoContenedor} rounded-xl shadow p-4 ${COLORES_PASTEL_PIEDRA.borde} border`}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className={`text-lg font-semibold ${COLORES_PASTEL_PIEDRA.textoPrincipal} flex items-center`}><FaListAlt className="mr-2" /> Ocupación por fecha</h3>
+            {/* Selector de Rango */}
+            <select 
+              value={rangoFechaOcupacion} 
+              onChange={(e) => setRangoFechaOcupacion(e.target.value)}
+              className={`text-sm p-1 border rounded ${COLORES_PASTEL_PIEDRA.borde} ${COLORES_PASTEL_PIEDRA.textoSecundario} bg-transparent focus:outline-none focus:ring-1 focus:ring-stone-400`}
+            >
+              <option value="ultimos7dias">Últimos 7 días</option>
+              <option value="hoy">Hoy</option>
+              <option value="proximos7dias">Próximos 7 días</option>
+              <option value="proximoMes">Próximo mes</option>
+            </select>
+          </div>
+          
+          {/* Lista de Reservas */}
+          {reservationsLoading ? (
+             <div className="text-center py-6">
+                <FaSpinner className="animate-spin text-xl text-stone-500 mx-auto mb-2" />
+             </div>
+          ) : ocupacionPorFecha.length === 0 ? (
+            <p className={`${COLORES_PASTEL_PIEDRA.textoSecundario} text-sm text-center py-6`}>No hay ocupación en el periodo seleccionado.</p>
+          ) : (
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+              {ocupacionPorFecha.map((reserva) => {
+                const id = reserva._id || reserva.id || `res-${Math.random()}`;
+                const esHabitacion = reserva.tipo === 'habitacion';
+                const fechaInicio = parseISO(reserva.fechaEntrada || reserva.fecha);
+                const fechaFin = parseISO(reserva.fechaSalida || reserva.fecha);
+                const titulo = esHabitacion ? `Hab. ${reserva.letraHabitacion || reserva.habitacion}` : (reserva.nombreEvento || 'Evento');
+                const contacto = esHabitacion ? `${reserva.nombreContacto || ''} ${reserva.apellidosContacto || ''}`.trim() : (reserva.nombreContacto || 'Sin contacto');
+                const url = esHabitacion ? `/admin/reservaciones/habitacion/${id}` : `/admin/reservaciones/evento/${id}`;
+                
+                return (
+                  <Link href={url} key={id} className={`block p-3 rounded-lg border hover:shadow-sm transition-shadow ${COLORES_PASTEL_PIEDRA.resaltado} ${COLORES_PASTEL_PIEDRA.borde}`}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className={`font-semibold text-sm ${COLORES_PASTEL_PIEDRA.textoPrincipal}`}>{titulo}</p>
+                        <p className={`text-xs ${COLORES_PASTEL_PIEDRA.textoSecundario}`}>{contacto || 'Invitado evento'}</p>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${reserva.estado === 'confirmada' ? COLORES_PASTEL_PIEDRA.estadoConfirmado : COLORES_PASTEL_PIEDRA.estadoPendiente}`}>{reserva.estado}</span>
+                    </div>
+                    <div className={`mt-1 text-xs ${COLORES_PASTEL_PIEDRA.textoSecundario} flex items-center gap-1`}>
+                      <FaCalendarAlt size={10}/> 
+                      <span>{isValid(fechaInicio) ? format(fechaInicio, 'dd MMM', { locale: es }) : '--'}</span>
+                      {isValid(fechaFin) && !isSameDay(fechaInicio, fechaFin) && (
+                         <><span>-</span> <span>{format(fechaFin, 'dd MMM', { locale: es })}</span></>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Resumen de Actividad (Columna derecha) */}
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <FaUsers className="text-stone-500 mr-2" />
+                Resumen de Actividad
+              </h3>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-stone-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Usuarios activos</p>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900 text-lg">{stats.totalUsers}</span>
+                    <FaUsers className="text-stone-500" />
+                  </div>
+                </div>
+                
+                <div className="bg-stone-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Eventos pendientes</p>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900 text-lg">{stats.pendingReservations}</span>
+                    <FaListAlt className="text-amber-500" />
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                href="/admin/reservaciones"
+                className="block text-center bg-stone-100 hover:bg-stone-200 text-stone-700 py-2 px-4 rounded-lg mt-2 transition-colors"
               >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:bg-[var(--color-primary-dark)] transition-colors flex items-center"
-                onClick={() => handleAssignToMe(selectedReservation)}
-                disabled={assigningReservation}
-              >
-                {assigningReservation && <FaSpinner className="animate-spin mr-2" />}
-                Confirmar asignación
-              </button>
+                Ver todas las reservas
+              </Link>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
+}
+
+function DashboardStats({ stats, COLORES_PASTEL_PIEDRA }) {
+  const StatCard = ({ icon: Icon, title, value, colorClass }) => (
+    <div className={`${COLORES_PASTEL_PIEDRA.fondoContenedor} rounded-xl shadow p-4 flex items-center space-x-4 ${COLORES_PASTEL_PIEDRA.borde} border`}>
+      <div className={`p-3 rounded-full ${colorClass}`}>
+        <Icon className="h-6 w-6 text-white" />
+      </div>
+      <div>
+        <p className={`text-sm font-medium ${COLORES_PASTEL_PIEDRA.textoSecundario}`}>{title}</p>
+        <p className={`text-2xl font-semibold ${COLORES_PASTEL_PIEDRA.textoPrincipal}`}>{value ?? 'N/A'}</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+      <StatCard 
+        icon={FaHotel} 
+        title="Hab. Disponibles Hoy" 
+        value={stats.availableRoomsToday} 
+        colorClass="bg-green-500" 
+      />
+      <StatCard 
+        icon={FaHotel}
+        title="Hab. Disponibles Próx. 7d" 
+        value={stats.availableRoomsNext7Days} 
+        colorClass="bg-teal-500"
+      />
+       <StatCard 
+        icon={FaHotel}
+        title="Hab. Disponibles Próx. 30d" 
+        value={stats.availableRoomsNext30Days} 
+        colorClass="bg-cyan-500"
+      />
+      <StatCard 
+        icon={FaBed} 
+        title="Hab. Ocupadas Hoy" 
+        value={stats.occupiedRoomsToday} 
+        colorClass="bg-orange-500" 
+      />
+      <StatCard 
+        icon={FaBed}
+        title="Hab. Ocupadas Próx. 7d" 
+        value={stats.occupiedRoomsNext7Days}
+        colorClass="bg-red-500"
+      />
+      <StatCard 
+        icon={FaBed}
+        title="Hab. Ocupadas Próx. 30d" 
+        value={stats.occupiedRoomsNext30Days}
+        colorClass="bg-pink-500"
+      />
+      <StatCard 
+        icon={FaGlassCheers}
+        title="Eventos Hoy" 
+        value={stats.eventosHoy}
+        colorClass="bg-indigo-500"
+      />
+      <StatCard 
+        icon={FaGlassCheers}
+        title="Eventos Próx. 7d" 
+        value={stats.eventosNext7Days}
+        colorClass="bg-purple-500"
+      />
+      <StatCard 
+        icon={FaGlassCheers}
+        title="Eventos Próx. 30d" 
+        value={stats.eventosNext30Days}
+        colorClass="bg-fuchsia-500"
+      />
+    </div>
+  );
+}
+
+// --- Componentes del Calendario ---
+
+function CalendarMonthView({ currentDate, getCalendarDays, getReservationsForDay, renderReservationIndicator, COLORES_PASTEL_PIEDRA }) {
+  const days = getCalendarDays();
+  const dayHeaders = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
+
+  return (
+    <div className={`${COLORES_PASTEL_PIEDRA.fondoContenedor} rounded-xl shadow-lg overflow-hidden ${COLORES_PASTEL_PIEDRA.borde} border`}>
+      {/* ... (cabecera del calendario) ... */}
+      <div className="grid grid-cols-7 border-t ${COLORES_PASTEL_PIEDRA.calendarioBorde}">
+        {/* Headers de días */}
+        {dayHeaders.map((header) => (
+          <div key={header} className={`text-center py-2 text-xs font-medium ${COLORES_PASTEL_PIEDRA.calendarioTextoDia} border-b ${COLORES_PASTEL_PIEDRA.calendarioBorde}`}>
+            {header}
+          </div>
+        ))}
+        
+        {/* Días del mes */}
+        {days.map((day, index) => {
+          const dayReservations = getReservationsForDay(day);
+          const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+          const isToday = isSameDay(day, new Date());
+
+          return (
+            <div 
+              key={index}
+              className={`relative border-b border-r ${COLORES_PASTEL_PIEDRA.calendarioBorde} p-1 min-h-[100px] ${isCurrentMonth ? '' : 'bg-stone-50 opacity-70'} ${index % 7 === 6 ? 'border-r-0' : ''}`}
+            >
+              <span className={`absolute top-1 right-1 text-xs ${isToday ? 'font-bold text-red-600' : COLORES_PASTEL_PIEDRA.calendarioTextoNumero}`}>
+                {format(day, 'd')}
+              </span>
+              {/* Contenedor de indicadores con flex-wrap */}
+              <div className="mt-4 flex flex-wrap items-start justify-start gap-0.5">
+                {dayReservations.slice(0, 6).map(reserva => renderReservationIndicator(reserva))}
+                {dayReservations.length > 6 && (
+                   <span className="text-[9px] text-stone-500 ml-1">+{dayReservations.length - 6} más</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+function CalendarWeekView({ currentDate, getWeekDays, getReservationsForDay, renderReservationIndicator, COLORES_PASTEL_PIEDRA }) {
+    const days = getWeekDays();
+    const today = new Date();
+    
+    return (
+         <div>
+            {/* Header de días de la semana */}
+             <div className={`grid grid-cols-7 gap-px ${COLORES_PASTEL_PIEDRA.calendarioHeader} rounded-t-lg border-l border-r border-t ${COLORES_PASTEL_PIEDRA.calendarioBorde}`}>
+                 {days.map(day => (
+                    <div key={day.toISOString()} className={`py-2 text-center text-xs font-medium ${COLORES_PASTEL_PIEDRA.textoDia} uppercase ${isSameDay(day, today) ? 'font-bold' : ''}`}>
+                         {format(day, 'EEE d', { locale: es })} {/* Muestra día y número */}
+                     </div>
+                 ))}
+             </div>
+             {/* Grid de días */}
+             <div className={`grid grid-cols-7 gap-px border ${COLORES_PASTEL_PIEDRA.calendarioBorde} rounded-b-lg bg-stone-100`}>
+                 {days.map(day => {
+                     const isToday = isSameDay(day, today);
+                     const reservations = getReservationsForDay(day);
+                     const cellClasses = `
+                         ${COLORES_PASTEL_PIEDRA.fondoContenedor} p-2 min-h-[150px] relative
+                         ${isToday ? COLORES_PASTEL_PIEDRA.calendarioHoy : ''}
+                     `;
+
+                     return (
+                         <div key={day.toISOString()} className={cellClasses}>
+                             {/* Ya no necesitamos mostrar el número aquí ya que está en el header */}
+                             <div className="mt-1 flex flex-wrap">
+                                 {reservations.map(res => renderReservationIndicator(res))}
+                             </div>
+                         </div>
+                     );
+                 })}
+             </div>
+         </div>
+    );
 }

@@ -8,7 +8,8 @@ const {
   updateReservaHabitacion,
   deleteReservaHabitacion,
   assignReservaHabitacion,
-  unassignReservaHabitacion
+  unassignReservaHabitacion,
+  updateReservaHabitacionHuespedes
 } = require('../controllers/reservaHabitacionController');
 
 // Importar controladores para eventos
@@ -48,6 +49,9 @@ router.delete('/habitaciones/:id', protectRoute, deleteReservaHabitacion);
 // Asignar/desasignar reserva a un usuario
 router.put('/habitaciones/:id/asignar', protectRoute, assignReservaHabitacion);
 router.put('/habitaciones/:id/desasignar', protectRoute, unassignReservaHabitacion);
+
+// Nueva ruta para actualizar información de huéspedes (solo Admin)
+router.put('/habitaciones/:id/huespedes', protectRoute, authorize('admin'), updateReservaHabitacionHuespedes);
 
 // ==================
 // RUTAS PARA EVENTOS

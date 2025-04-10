@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { FaUserCog, FaUsers, FaChevronRight, FaEnvelope, FaBed, FaTimes, FaSpinner, FaList, FaMapMarkedAlt, FaCheckCircle, FaTrash } from 'react-icons/fa';
-import { useReserva } from '@/context/ReservaContext';
+import { useReservation } from '@/context/ReservationContext';
 import { obtenerHabitaciones, obtenerHabitacionesDisponibles } from '@/services/habitaciones.service';
 import { toast } from 'sonner';
 import EventoMapaHabitaciones from './EventoMapaHabitacionesNuevo';
 
 const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
-  const { formData, updateFormSection } = useReserva();
+  const { formData, updateFormSection } = useReservation();
   const [selectedMode, setSelectedMode] = useState(formData.modoGestionHabitaciones || null);
   const [habitacionesSeleccionadas, setHabitacionesSeleccionadas] = useState(formData.habitacionesSeleccionadas || []);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -18,6 +18,14 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
   const [error, setError] = useState(null);
   const [asignacionHabitaciones, setAsignacionHabitaciones] = useState(formData.asignacionHabitaciones || []);
   const [mostrarListaHabitaciones, setMostrarListaHabitaciones] = useState(false);
+  
+  // Guardar el número de habitaciones en el contexto al inicializar
+  useEffect(() => {
+    const shouldUpdate = formData.numeroHabitaciones !== numeroHabitaciones;
+    if (shouldUpdate) {
+      updateFormSection('numeroHabitaciones', numeroHabitaciones);
+    }
+  }, [numeroHabitaciones, formData.numeroHabitaciones, updateFormSection]);
   
   // Memorizar callbacks para evitar renderizados innecesarios
   const handleRoomsChange = useCallback((data) => {
@@ -30,9 +38,15 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
       
       // Eliminar la habitación de habitacionesSeleccionadas
       setHabitacionesSeleccionadas(prev => {
-        const nuevasHabitaciones = prev.filter(h => 
-          h.letra !== data.letra
-        );
+        // Asegurarse de eliminar solo la primera ocurrencia con esa letra
+        let encontrada = false;
+        const nuevasHabitaciones = prev.filter(h => {
+          if (h.letra === data.letra && !encontrada) {
+            encontrada = true;
+            return false;
+          }
+          return true;
+        });
         // Actualizar el contexto
         updateFormSection('habitacionesSeleccionadas', nuevasHabitaciones);
         return nuevasHabitaciones;
@@ -48,11 +62,11 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
       // Actualizamos la asignación de habitaciones
       setAsignacionHabitaciones(prev => {
         // Si la habitación ya existe, no la agregamos de nuevo
-        const habitacionExistente = prev.find(h => 
+        const habitacionExisteEnAsignacion = prev.find(h => 
           (h.id && habitacion.id && h.id === habitacion.id) || 
           (h.letra && habitacion.letra && h.letra === habitacion.letra)
         );
-        if (habitacionExistente) return prev;
+        if (habitacionExisteEnAsignacion) return prev;
         return [...prev, habitacion];
       });
       
@@ -64,14 +78,17 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
           (h.letra && habitacion.letra && h.letra === habitacion.letra)
         ) || habitacion;
         
-        // Si la habitación ya existe, no la agregamos de nuevo
-        const habitacionExistente = prev.find(h => 
-          (h.id && nuevaHabitacion.id && h.id === nuevaHabitacion.id) || 
-          (h.letra && nuevaHabitacion.letra && h.letra === nuevaHabitacion.letra)
-        );
-        if (habitacionExistente) return prev;
+        // Añadimos un ID único basado en la letra y el timestamp actual
+        const habitacionConId = {
+          ...nuevaHabitacion,
+          uniqueId: `${nuevaHabitacion.letra}-${prev.length}-${Date.now()}`
+        };
         
-        const nuevasHabitaciones = [...prev, nuevaHabitacion];
+        // Si la habitación ya existe, no la agregamos de nuevo
+        const habitacionExisteEnSeleccionadas = prev.find(h => h.uniqueId === habitacionConId.uniqueId);
+        if (habitacionExisteEnSeleccionadas) return prev;
+        
+        const nuevasHabitaciones = [...prev, habitacionConId];
         // Actualizamos el contexto
         updateFormSection('habitacionesSeleccionadas', nuevasHabitaciones);
         return nuevasHabitaciones;
@@ -88,11 +105,11 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
       // Actualizamos la asignación de habitaciones
       setAsignacionHabitaciones(prev => {
         // Si la habitación ya existe, no la agregamos de nuevo
-        const habitacionExistente = prev.find(h => 
+        const habitacionExisteEnAsignacion = prev.find(h => 
           (h.id && habitacion.id && h.id === habitacion.id) || 
           (h.letra && habitacion.letra && h.letra === habitacion.letra)
         );
-        if (habitacionExistente) return prev;
+        if (habitacionExisteEnAsignacion) return prev;
         return [...prev, habitacion];
       });
       
@@ -104,14 +121,17 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
           (h.letra && habitacion.letra && h.letra === habitacion.letra)
         ) || habitacion;
         
-        // Si la habitación ya existe, no la agregamos de nuevo
-        const habitacionExistente = prev.find(h => 
-          (h.id && nuevaHabitacion.id && h.id === nuevaHabitacion.id) || 
-          (h.letra && nuevaHabitacion.letra && h.letra === nuevaHabitacion.letra)
-        );
-        if (habitacionExistente) return prev;
+        // Añadimos un ID único basado en la letra y el timestamp actual
+        const habitacionConId = {
+          ...nuevaHabitacion,
+          uniqueId: `${nuevaHabitacion.letra}-${prev.length}-${Date.now()}`
+        };
         
-        const nuevasHabitaciones = [...prev, nuevaHabitacion];
+        // Si la habitación ya existe, no la agregamos de nuevo
+        const habitacionExisteEnSeleccionadas = prev.find(h => h.uniqueId === habitacionConId.uniqueId);
+        if (habitacionExisteEnSeleccionadas) return prev;
+        
+        const nuevasHabitaciones = [...prev, habitacionConId];
         // Actualizamos el contexto
         updateFormSection('habitacionesSeleccionadas', nuevasHabitaciones);
         return nuevasHabitaciones;
@@ -262,6 +282,36 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
 
     // Llamar al callback para avanzar al siguiente paso
     onModeSelect();
+  };
+
+  const getButtonStyle = (habitacionLetra) => {
+    // Estilos base
+    const baseStyle = "px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700";
+    
+    // Primera planta (A, B) - Verde menta suave
+    if (['A', 'B'].includes(habitacionLetra)) {
+      return `${baseStyle} ${
+        habitacionesSeleccionadas.some(h => h.letra === habitacionLetra)
+          ? 'bg-[#9DDFD3] hover:bg-[#7DCFC3] border-2 border-[#6DBFB3]'
+          : 'bg-[#E5F6F3] hover:bg-[#D2EDE8] border-2 border-[#9DDFD3]'
+      }`;
+    }
+    
+    // Segunda planta (C, D, E, F) - Verde salvia suave
+    if (['C', 'D', 'E', 'F'].includes(habitacionLetra)) {
+      return `${baseStyle} ${
+        habitacionesSeleccionadas.some(h => h.letra === habitacionLetra)
+          ? 'bg-[#B5D8C7] hover:bg-[#95C8B7] border-2 border-[#75B8A7]'
+          : 'bg-[#EAF5F0] hover:bg-[#D7ECE5] border-2 border-[#B5D8C7]'
+      }`;
+    }
+    
+    // Tercera planta (resto de habitaciones) - Verde pistacho suave
+    return `${baseStyle} ${
+      habitacionesSeleccionadas.some(h => h.letra === habitacionLetra)
+        ? 'bg-[#C7E2B7] hover:bg-[#B7D2A7] border-2 border-[#97C287]'
+        : 'bg-[#F0F7EB] hover:bg-[#E0EDD6] border-2 border-[#C7E2B7]'
+    }`;
   };
 
   return (
@@ -431,64 +481,53 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
           </div>
 
           {/* Lista de habitaciones seleccionadas */}
-          {/* Mapa de habitaciones */}
-          <div className="mt-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h5 className="text-lg font-semibold text-[#7B5C44]">Selecciona habitaciones en el mapa</h5>
-            </div>
-            
-            <EventoMapaHabitaciones
-              onRoomsChange={handleRoomsChange}
-              eventDate={formData.fecha || new Date().toISOString().split('T')[0]}
-              onHabitacionesLoad={handleHabitacionesLoad}
-            />
-          </div>
-
-          {/* Lista de habitaciones seleccionadas */}
           <div className="mt-6 mb-8">
             <h5 className="text-lg font-semibold text-[#7B5C44] mb-4">Habitaciones seleccionadas</h5>
             {habitacionesSeleccionadas.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {habitacionesSeleccionadas.map((habitacion) => (
+                {habitacionesSeleccionadas.map((habitacion, index) => (
                   <div
-                    key={habitacion.id || habitacion.letra}
-                    className="p-4 rounded-lg border-2 border-[#E6DCC6] bg-gradient-to-b from-[#E6DCC6] to-[#D1B59B] shadow-sm"
+                    key={`lista-habitacion-${habitacion.letra}-${index}`}
+                    className="p-4 rounded-lg border border-gray-200 bg-white shadow-sm relative"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3 bg-[#A5856A] text-white">
-                          <span className="font-bold">{habitacion.letra || habitacion.id.charAt(0).toUpperCase()}</span>
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-[#0F0F0F]">{habitacion.nombre}</h4>
-                          <p className="text-sm text-gray-700">
-                            {habitacion.tipo || 'Estándar'} • {habitacion.planta || 'Planta principal'}
-                          </p>
-                        </div>
+                    {/* Botón de eliminar */}
+                    <button
+                      onClick={() => eliminarHabitacion(habitacion.letra || habitacion.id)}
+                      className="absolute top-2 right-2 p-2 text-gray-400 hover:text-red-500 transition-colors"
+                      title="Eliminar habitación"
+                    >
+                      <FaTrash className="w-4 h-4" />
+                    </button>
+
+                    <div className="flex items-center mb-2">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center mr-3 bg-[#9DDFD3] text-gray-800">
+                        <span className="font-bold">{habitacion.letra || habitacion.id.charAt(0).toUpperCase()}</span>
                       </div>
-                      <button
-                        onClick={() => eliminarHabitacion(habitacion.id || habitacion.letra)}
-                        className="text-[#A5856A] hover:text-red-600 transition-colors p-2"
-                        title="Eliminar habitación"
-                      >
-                        <FaTrash size={16} />
-                      </button>
+                      <div>
+                        <h4 className="font-semibold">{habitacion.nombre}</h4>
+                        <p className="text-sm text-gray-600">
+                          {habitacion.tipo || 'Estándar'} • {habitacion.planta || 'Planta principal'}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="mt-2 text-sm text-gray-700">
+                    <div className="mt-2 text-sm text-gray-600">
                       <div className="flex justify-between">
                         <span>Capacidad:</span>
                         <span className="font-medium">{habitacion.capacidad || 2} personas</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Precio:</span>
-                        <span className="font-medium">{habitacion.precio ? `${habitacion.precio}€/noche` : '2400€/noche'}</span>
+                        <span className="font-medium">{habitacion.precioPorNoche || habitacion.precio || '2400€/noche'}</span>
                       </div>
                       {habitacion.descripcion && (
-                        <div className="mt-2 text-xs text-gray-600">
+                        <div className="mt-2 text-xs text-gray-500">
                           {habitacion.descripcion.substring(0, 100)}{habitacion.descripcion.length > 100 ? '...' : ''}
                         </div>
                       )}
+                      <div className="mt-2 bg-[#E5F6F3] p-2 rounded text-xs">
+                        <FaCheckCircle className="inline-block mr-1 text-[#9DDFD3]" /> Habitación seleccionada
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -504,6 +543,38 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Leyenda del mapa con los nuevos colores verdes */}
+          <div className="mt-4 space-y-2">
+            <div className="text-lg font-semibold mb-3">Leyenda del Mapa</div>
+            
+            {/* Primera Planta */}
+            <div className="flex items-center space-x-2">
+              <div className="flex space-x-2">
+                <div className="w-6 h-6 rounded border-2 border-[#9DDFD3] bg-[#E5F6F3]"></div>
+                <div className="w-6 h-6 rounded bg-[#9DDFD3]"></div>
+              </div>
+              <span className="text-sm text-gray-600">Primera Planta - Habitaciones A, B</span>
+            </div>
+            
+            {/* Segunda Planta */}
+            <div className="flex items-center space-x-2">
+              <div className="flex space-x-2">
+                <div className="w-6 h-6 rounded border-2 border-[#B5D8C7] bg-[#EAF5F0]"></div>
+                <div className="w-6 h-6 rounded bg-[#B5D8C7]"></div>
+              </div>
+              <span className="text-sm text-gray-600">Segunda Planta - Habitaciones C, D, E, F</span>
+            </div>
+            
+            {/* Tercera Planta */}
+            <div className="flex items-center space-x-2">
+              <div className="flex space-x-2">
+                <div className="w-6 h-6 rounded border-2 border-[#C7E2B7] bg-[#F0F7EB]"></div>
+                <div className="w-6 h-6 rounded bg-[#C7E2B7]"></div>
+              </div>
+              <span className="text-sm text-gray-600">Tercera Planta - Habitaciones G-O</span>
+            </div>
           </div>
         </div>
       )}
@@ -531,16 +602,14 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
             </button>
           </div>
 
-          {/* No necesitamos otro mapa aquí, ya tenemos uno arriba */}
-
           {/* Lista de habitaciones seleccionadas (visible solo cuando se hace clic en "Ver lista") */}
           {mostrarListaHabitaciones && (
             <div className="mt-6 mb-8">
               <h5 className="text-lg font-semibold text-[#7B5C44] mb-4">Lista de habitaciones</h5>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {habitacionesSeleccionadas.map((habitacion) => (
+                {habitacionesSeleccionadas.map((habitacion, index) => (
                   <div
-                    key={habitacion.id || habitacion.letra}
+                    key={`lista-habitacion-${habitacion.letra}-${index}`}
                     className="p-4 rounded-lg border-2 border-[#E6B89C] bg-[#F8E8E0]/20"
                   >
                     <div className="flex items-center justify-between mb-2">

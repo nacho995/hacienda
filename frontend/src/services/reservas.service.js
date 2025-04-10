@@ -1,5 +1,6 @@
 // Servicio para gestionar las reservas
 import axios from 'axios';
+import apiClient from './apiClient';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -32,5 +33,61 @@ export const verificarDisponibilidadFecha = async (fecha) => {
     console.error('Error al verificar disponibilidad:', error);
     // En caso de error, asumimos que no está disponible por precaución
     return false;
+  }
+};
+
+/**
+ * Crea una nueva reserva de evento
+ * @param {Object} reservaData - Datos de la reserva
+ * @returns {Promise<Object>} Datos de la reserva creada
+ */
+export const crearReservaEvento = async (reservaData) => {
+  try {
+    const response = await axios.post(`${API_URL}/reservas`, reservaData);
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Error al crear la reserva:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error al crear la reserva'
+    };
+  }
+};
+
+/**
+ * Obtiene todas las reservas de eventos
+ * @returns {Promise<Array>} Lista de reservas
+ */
+export const obtenerReservasEvento = async () => {
+  try {
+    const response = await apiClient.get('/reservas/eventos');
+    return response;
+  } catch (error) {
+    console.error('Error al obtener reservas:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene una reserva específica por su ID
+ * @param {string} id - ID de la reserva
+ * @returns {Promise<Object>} Datos de la reserva
+ */
+export const obtenerReservaEvento = async (id) => {
+  try {
+    const response = await axios.get(`${API_URL}/reservas/${id}`);
+    return {
+      success: true,
+      data: response.data
+    };
+  } catch (error) {
+    console.error('Error al obtener la reserva:', error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error al obtener los detalles de la reserva'
+    };
   }
 };
