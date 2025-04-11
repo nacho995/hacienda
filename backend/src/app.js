@@ -12,6 +12,7 @@ const habitacionRoutes = require('./routes/habitacion.routes');
 const tipoHabitacionRoutes = require('./routes/tipoHabitacion.routes');
 const configRoutes = require('./routes/config.routes');
 const servicioRoutes = require('./routes/servicio.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api/habitaciones', habitacionRoutes);
 app.use('/api/tipos-habitacion', tipoHabitacionRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/servicios', servicioRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Ruta para comprobar estado del servidor
 app.get('/api/status', (req, res) => {

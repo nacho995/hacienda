@@ -485,19 +485,29 @@ export default function IntroSection() {
     <section
       id="intro"
       ref={sectionRef}
-      className="relative pt-16 pb-24 bg-white overflow-hidden"
+      className="relative overflow-hidden bg-white"
     >
-      {/* Logo elegante en la esquina superior */}
-      <div className="absolute top-4 lg:top-8 left-4 lg:left-8 z-20 transform transition-all duration-1000" style={{ opacity: logoVisible ? 1 : 0, transform: logoVisible ? 'translateY(0)' : 'translateY(-20px)' }}>
-        <div className="relative group">
+      {/* Logo elegante - Aplicar breakpoint personalizado 1520px */}
+      <div 
+        className="
+          relative px-4 pt-8 pb-4  // Estilos por defecto (< 1520px)
+          min-[1520px]:absolute min-[1520px]:top-8 min-[1520px]:left-8 min-[1520px]:p-0 // Estilos >= 1520px
+          z-20 
+          transform transition-all duration-1000
+        "
+        style={{ opacity: logoVisible ? 1 : 0, transform: logoVisible ? 'translateY(0)' : 'translateY(-20px)' }}
+      >
+        {/* Centrado por defecto, alineado a la izquierda desde 1520px */}
+        <div className="relative group w-max mx-auto min-[1520px]:mx-0">
           <div className="absolute inset-0 rounded-xl bg-white/70 backdrop-blur-md -z-10 shadow-xl"></div>
           <div className="absolute inset-0 rounded-xl border border-[var(--color-primary-light)]/30 -z-10"></div>
           <div className="absolute -inset-0.5 bg-gradient-to-r from-[var(--color-primary-light)]/0 via-[var(--color-primary-light)]/30 to-[var(--color-primary-light)]/0 rounded-xl opacity-0 group-hover:opacity-100 blur-md transition-opacity duration-500 -z-20"></div>
-          <div className="p-2.5">
+          {/* Anchos responsives - mantenerlos como estaban o ajustar si es necesario */}
+          <div className="p-2.5 w-48 sm:w-56 md:w-64 lg:w-72">
             <Image 
               src="/logo.png"
               alt="Hacienda San Carlos"
-              width={300}
+              width={300} 
               height={75}
               className="object-contain filter drop-shadow-[0_0_5px_rgba(0,0,0,0.2)] transition-all duration-500 group-hover:drop-shadow-[0_0_8px_rgba(0,0,0,0.3)] group-hover:scale-105"
             />
@@ -505,7 +515,8 @@ export default function IntroSection() {
         </div>
       </div>
 
-      <div className="container-custom">
+      {/* Contenedor principal - Ajustar padding top con breakpoint 1520px */}
+      <div className="container-custom pt-8 pb-24 min-[1520px]:pt-16">
         <div className="text-center mb-20">
           <h2 className="elegant-title centered fade-in text-5xl md:text-6xl font-[var(--font-display)] text-[var(--color-accent)] mb-12">
             Un <span className="text-[var(--color-primary)] font-semibold">Legado</span> de Distinción

@@ -28,8 +28,9 @@
   --gradient-secondary: linear-gradient(135deg, var(--color-brown-medium) 0%, var(--color-brown-dark) 100%);
   --gradient-accent: linear-gradient(135deg, var(--color-brown-dark) 0%, var(--color-brown-deep) 100%);
   
-  --font-display: 'Cormorant Garamond', serif;  /* Fuente más elegante para títulos */
+  --font-display: 'Akaya Kanadaka', cursive;  /* Fuente para títulos ahora Akaya Kanadaka */
   --font-body: 'Montserrat', sans-serif;  /* Fuente secundaria para texto normal */
+  --font-main: 'Akaya Kanadaka', cursive; /* Fuente principal actual */
   
   /* Opacidades para los colores principales */
   --color-primary-5: rgba(209, 181, 155, 0.05); /* Marrón pastel con 5% de opacidad */
@@ -56,7 +57,7 @@
 
   body {
     @apply bg-white text-gray-800;
-    font-family: var(--font-body);
+    font-family: var(--font-main);
     letter-spacing: 0.02em;
     overflow-x: hidden;
     width: 100%;
@@ -64,6 +65,7 @@
   
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
+    @apply font-bold;
     letter-spacing: 0.03em;
   }
   
