@@ -759,11 +759,16 @@ const ReservaWizard = () => {
                   <div className="border-l-2 border-[#D1B59B]/30 pl-4">
                     <p className="text-[#8A6E52] text-sm font-medium">Fecha</p>
                     <p className="font-semibold text-[#5D4B3A]">
-                      {formData.fecha ? new Date(formData.fecha).toLocaleDateString('es-ES', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                      }) : 'No especificada'}
+                      {formData.fechaInicio ? 
+                        new Date(formData.fechaInicio).toLocaleDateString('es-ES', {
+                          day: 'numeric', month: 'long', year: 'numeric'
+                        })
+                        : 'No especificada'}
+                      {formData.fechaFin && formData.fechaFin !== formData.fechaInicio ?
+                        ` - ${new Date(formData.fechaFin).toLocaleDateString('es-ES', {
+                            day: 'numeric', month: 'long', year: 'numeric'
+                          })}`
+                        : ''} 
                     </p>
                   </div>
                 </div>
