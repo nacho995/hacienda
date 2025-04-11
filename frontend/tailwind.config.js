@@ -23,6 +23,9 @@ module.exports = {
       },
       fontFamily: {
         display: ['var(--font-display)'],
+        script: ['"Dancing Script"', 'cursive'],
+        // ELIMINADO: Definición de 'rouge' ya no necesaria
+        // rouge: ['"Tangerine"', 'cursive'], 
       },
     },
   },

@@ -16,12 +16,12 @@ export default function HeroSection() {
       <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/70 to-black/50"></div>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
         <motion.h1 
-          className="text-white font-[var(--font-display)] text-5xl md:text-6xl lg:text-7xl elegant-reveal"
+          className="text-white text-5xl md:text-6xl lg:text-7xl elegant-reveal font-script"
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
-          Contacta con <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px var(--color-brown-dark), -1px -1px 0px var(--color-brown-light)"}}>Nosotros</span>
+          Contacta con <span style={{ color: 'var(--color-brown-medium)' }}>NOSOTROS</span>
         </motion.h1>
         <motion.div 
           className="w-32 h-[1px] bg-[var(--color-brown-medium)] my-6"

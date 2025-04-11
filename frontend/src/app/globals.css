@@ -4,6 +4,8 @@
 
 /* Importamos las fuentes más elegantes */
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+/* ELIMINADO: Ya no se importa Rouge Script aquí */
+/* @import url('https://fonts.googleapis.com/css2?family=Rouge+Script&display=swap'); */
 
 :root {
   --color-primary: #D1B59B;     /* Marrón pastel como color principal */
@@ -337,4 +339,13 @@
 .admin-page ~ div[class*="AnimatedBackground"],
 .admin-page ~ footer {
   display: none !important;
-} 
+}
+
+/* AÑADIDO: Definir la clase para Rouge Script */
+/* 
+.rouge-script-regular {
+  font-family: "Rouge Script", cursive;
+  font-weight: 400;
+  font-style: normal;
+}
+*/ 

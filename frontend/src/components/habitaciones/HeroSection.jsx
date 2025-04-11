@@ -62,14 +62,19 @@ export default function HeroSection({ scrollY, title = "Habitaciones de Ensueño
             </div>
           </div>
           
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-[var(--font-display)] leading-tight tracking-tight mb-4 transform-style-preserve-3d">
-            <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">{title.split(' ')[0]} </span>
-            <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "var(--color-brown-medium)", textShadow: "0px 0px 3px rgba(0,0,0,0.9), 0px 0px 6px rgba(0,0,0,0.7), 2px 2px 0px var(--color-brown-dark), -1px -1px 0px var(--color-brown-light)", transform: "translateZ(20px)", display: "inline-block"}}>{title.split(' ').slice(1).join(' ')}</span>
-          </h1>
-          
-          <p className="text-base sm:text-lg md:text-xl lg:text-2xl max-w-3xl mx-auto mb-8 perspective-[1000px] transform-style-preserve-3d">
-            <span className="text-white drop-shadow-[0_0_3px_rgba(110,70,20,0.9)]">{subtitle}</span>
-          </p>
+          {/* Contenido superpuesto */}
+          <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-4">
+            {/* MODIFICADO: Título con la nueva fuente y resaltado */}
+            <h1 
+              className="text-white text-5xl md:text-7xl lg:text-8xl mb-4 text-shadow font-script"
+            >
+              Nuestras <span style={{ color: 'var(--color-brown-medium)' }}>Habitaciones</span>
+            </h1>
+            {/* Subtítulo */}
+            <p className="text-white text-lg md:text-xl max-w-2xl mx-auto shadow-text">
+              Descubra el confort y la elegancia en cada uno de nuestros espacios únicos.
+            </p>
+          </div>
           
           <div className="mt-8">
             <button 

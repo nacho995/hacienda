@@ -64,9 +64,9 @@ export default function ServiciosPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8 }}
-              className="text-5xl md:text-6xl lg:text-7xl font-[var(--font-display)] mb-6"
+              className="text-5xl md:text-6xl lg:text-7xl font-script mb-6"
             >
-              Nuestros Servicios
+              Nuestros <span style={{ color: 'var(--color-brown-medium)' }}>Servicios</span>
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
