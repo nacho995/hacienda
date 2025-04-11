@@ -485,15 +485,18 @@ export default function ReservacionesPage() {
               value={filterUsuario}
               onChange={(e) => handleUsuarioFilter(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] appearance-none"
+              disabled={!isAdmin}
             >
               <option value="all">Todos los usuarios</option>
               <option value="mine">Mis reservas</option>
               <option value="unassigned">Sin asignar</option>
-              {usuarios.map(usuario => (
-                <option key={usuario._id} value={usuario._id}>
-                  {usuario.nombre || usuario.email}
-                </option>
-              ))}
+              {usuarios
+                .filter(u => u._id !== user?.id)
+                .map((u) => (
+                  <option key={u._id} value={u._id}>
+                    {u.nombre ? `${u.nombre} ${u.apellidos || ''}`.trim() : u.email}
+                  </option>
+                ))}
             </select>
             <FaUserCircle className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           </div>

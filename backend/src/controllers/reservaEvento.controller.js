@@ -156,32 +156,47 @@ exports.crearReservaEvento = async (req, res) => {
 
       // 2. Iterar y crear ReservaHabitacion para cada una
       for (const habInfo of habitacionesEstandar) {
-          const entrada = new Date(fechaEvento); // Fecha del evento
+          console.log(`[crearReservaEvento] Procesando habitación estándar encontrada:`, JSON.stringify(habInfo)); // Log detallado
+          
+          // Verificar si habInfo tiene letra, si no, usar fallback y loguear
+          const letraHab = habInfo?.letra;
+          if (!letraHab) {
+              console.warn(`[crearReservaEvento] Habitación estándar encontrada (ID: ${habInfo?._id}) no tiene campo 'letra'. Usando fallback.`);
+          }
+          const habitacionValor = letraHab || 'SinLetra_' + (habInfo?._id || 'IDDesconocido'); // Fallback más único
+
+          const entrada = new Date(fechaEvento);
           const salida = new Date(entrada);
-          salida.setDate(entrada.getDate() + 1); // Asumimos 1 noche
+          salida.setDate(entrada.getDate() + 1);
 
           const reservaHabitacionData = {
-            tipoReserva: 'evento', // Corregido: valor válido del enum
-            reservaEvento: reserva._id, // Link al evento
-            habitacion: habInfo.letra || 'SinLetra', // Corregido: Asignar la letra, no el ID. Añadir fallback.
-            letraHabitacion: habInfo.letra, 
-            tipoHabitacion: habInfo.tipo || 'Estándar', // Añadido valor por defecto
-            categoriaHabitacion: (habInfo.capacidad <= 2) ? 'sencilla' : 'doble', // Asignar categoría
-            precio: habInfo.precioPorNoche || 0, // Precio por noche de la habitación
-            numHuespedes: habInfo.capacidad || 2, // Capacidad por defecto
+            tipoReserva: 'evento',
+            reservaEvento: reserva._id,
+            habitacion: habitacionValor, // Usar valor seguro
+            letraHabitacion: letraHab || null, // Guardar letra si existe, sino null
+            tipoHabitacion: habInfo?.tipo || 'Estándar', 
+            categoriaHabitacion: (habInfo?.capacidad <= 2) ? 'sencilla' : 'doble', 
+            precio: habInfo?.precioPorNoche || 0, 
+            numHuespedes: habInfo?.capacidad || 2, 
             fechaEntrada: entrada,
             fechaSalida: salida,
             estadoReserva: 'pendiente',
-            // Copiar datos de contacto del evento
             nombreContacto: nombre_contacto,
             apellidosContacto: apellidos_contacto,
             emailContacto: email_contacto,
             telefonoContacto: telefono_contacto,
-            fecha: fechaEvento, // Fecha principal del evento
+            fecha: fechaEvento, 
           };
-          const reservaHabitacion = await ReservaHabitacion.create(reservaHabitacionData);
-          reservasHabitacionesCreadas.push(reservaHabitacion); // Guardar para la respuesta
-          console.log(`[crearReservaEvento] Habitación Hacienda ${habInfo.letra} creada con ID: ${reservaHabitacion._id}`);
+          
+          console.log(`[crearReservaEvento] Datos para crear ReservaHabitacion:`, JSON.stringify(reservaHabitacionData)); // Log antes de crear
+          try {
+            const reservaHabitacion = await ReservaHabitacion.create(reservaHabitacionData);
+            reservasHabitacionesCreadas.push(reservaHabitacion);
+            console.log(`[crearReservaEvento] Habitación Hacienda ${letraHab || '?'} creada con ID: ${reservaHabitacion._id}`);
+          } catch (errorCreacionHab) {
+              console.error(`[crearReservaEvento] ERROR al crear ReservaHabitacion para habInfo ${habInfo?._id}:`, errorCreacionHab);
+              // Decidir si continuar o lanzar error. Por ahora, logueamos y continuamos.
+          }
       }
 
     } else { // modo_gestion_habitaciones === 'usuario' (o por defecto)
@@ -204,9 +219,9 @@ exports.crearReservaEvento = async (req, res) => {
                 // --- Fin cálculo fechas --- 
 
                 const reservaHabitacionData = {
-                    tipoReserva: 'habitacion', // Asegurar tipo
-                    reservaEvento: reserva._id, // Link al evento
-                    habitacion: hab.habitacion, // Aquí debería venir el ID o letra de la Habitación seleccionada
+                    tipoReserva: 'evento',
+                    reservaEvento: reserva._id,
+                    habitacion: hab.habitacion,
                     tipoHabitacion: hab.tipoHabitacion || 'Estándar',
                     categoriaHabitacion: (hab.numHuespedes <= 2) ? 'sencilla' : 'doble',
                     precio: hab.precio || 0,
@@ -219,7 +234,7 @@ exports.crearReservaEvento = async (req, res) => {
                     emailContacto: email_contacto,
                     telefonoContacto: telefono_contacto,
                     fecha: fechaEvento,
-                    letraHabitacion: hab.habitacion // Asumiendo que hab.habitacion es la letra
+                    letraHabitacion: hab.habitacion
                 };
                 const reservaHabitacion = await ReservaHabitacion.create(reservaHabitacionData);
                 reservasHabitacionesCreadas.push(reservaHabitacion); // Guardar para la respuesta
@@ -1338,7 +1353,7 @@ exports.addHabitacionAEvento = async (req, res) => {
     const nuevaReservaHabitacion = await ReservaHabitacion.create({
       ...habitacionData, // Incluye letra, tipo, huespedes, fechas, precio
       reservaEvento: eventoId, // Asociar con el evento
-      tipoReserva: 'habitacion', // Asegurar el tipo correcto
+      tipoReserva: 'evento', // Asegurar el tipo correcto
       // Copiar datos de contacto del evento principal
       nombreContacto: evento.nombreContacto,
       apellidosContacto: evento.apellidosContacto,
