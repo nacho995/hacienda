@@ -1023,30 +1023,25 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {typeof reserva.datosContacto === 'object' 
-                                ? (reserva.datosContacto?.nombre || 'Sin nombre') 
-                                : (typeof reserva.nombre === 'string' ? reserva.nombre : 'Sin nombre')
-                              }
+                              {`${reserva.nombreContacto || ''} ${reserva.apellidosContacto || ''}`.trim() || 'Sin nombre'}
                             </div>
                             <div className="text-xs text-gray-500">
-                              {typeof reserva.datosContacto === 'object' 
-                                ? (reserva.datosContacto?.email || '') 
-                                : (typeof reserva.email === 'string' ? reserva.email : '')
-                              }
+                              {reserva.emailContacto || ''}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
-                              ${typeof reserva.estado === 'string' && reserva.estado.toLowerCase() === 'confirmada' ? 'bg-stone-100 text-stone-800' : 
-                                typeof reserva.estado === 'string' && reserva.estado.toLowerCase() === 'cancelada' ? 'bg-red-100 text-red-800' :
-                                'bg-amber-100 text-amber-800'}`}
-                            >
-                              {typeof reserva.estado === 'string' ? reserva.estado : 'Pendiente'}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                                (reserva.estadoReserva || reserva.estado)?.toLowerCase() === 'confirmada' ? COLORES_PASTEL_PIEDRA.estadoConfirmado :
+                                (reserva.estadoReserva || reserva.estado)?.toLowerCase() === 'pendiente' ? COLORES_PASTEL_PIEDRA.estadoPendiente :
+                                (reserva.estadoReserva || reserva.estado)?.toLowerCase() === 'cancelada' ? COLORES_PASTEL_PIEDRA.estadoCancelado :
+                                'bg-gray-100 text-gray-800 border-gray-200' // Fallback
+                            }`}>
+                              {(reserva.estadoReserva || reserva.estado) ? ((reserva.estadoReserva || reserva.estado).charAt(0).toUpperCase() + (reserva.estadoReserva || reserva.estado).slice(1)) : 'Pendiente'}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <Link 
-                              href={`/admin/reservas/${reserva._id || reserva.id}`}
+                              href={`/admin/reservaciones/evento/${reserva._id || reserva.id}`}
                               className="text-stone-600 hover:text-stone-900 bg-stone-50 hover:bg-stone-100 p-2 rounded-lg inline-flex transition-colors"
                             >
                               <FaEye />
