@@ -176,7 +176,7 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
 exports.getReservasHabitacion = asyncHandler(async (req, res, next) => {
   try {
     // Filtros básicos
-    let query = { estadoReserva: { $ne: 'cancelada' } };
+    let query = {};
     
     // Si el usuario está autenticado y es admin, puede ver reservas según filtros
     if (req.user && req.user.role === 'admin') {
@@ -190,7 +190,6 @@ exports.getReservasHabitacion = asyncHandler(async (req, res, next) => {
       } else {
         // Sin filtros específicos, mostrar tanto las asignadas a este admin como las sin asignar
         query = {
-          estadoReserva: { $ne: 'cancelada' }, // mantener filtro de estado
           $or: [
             { asignadoA: req.user.id },
             { asignadoA: null }
@@ -200,7 +199,6 @@ exports.getReservasHabitacion = asyncHandler(async (req, res, next) => {
     } else if (req.user) {
       // Usuario autenticado normal: ver sus propias reservas
       query = {
-        estadoReserva: { $ne: 'cancelada' }, // mantener filtro de estado
         $or: [
           { usuario: req.user.id },
           { asignadoA: req.user.id }
@@ -353,16 +351,20 @@ exports.updateReservaHabitacion = asyncHandler(async (req, res, next) => {
       console.log('Disponibilidad confirmada para la actualización.');
     }
     
-    // Actualizar la reserva con los datos del body
-    // findByIdAndUpdate aplicará solo los campos presentes en req.body
+    // Log ANTES de la actualización
+    console.log(`[updateReservaHabitacion] Intentando actualizar ${req.params.id} con body:`, req.body);
+    console.log(`[updateReservaHabitacion] Estado ANTES: ${reserva.estadoReserva}`);
+
     const reservaActualizada = await ReservaHabitacion.findByIdAndUpdate(req.params.id, req.body, {
       new: true, // Devolver el documento modificado
       runValidators: true // Ejecutar validaciones del Schema
     });
     
-    // Verificar si la actualización fue exitosa (aunque findByIdAndUpdate devuelve null si no encuentra)
+    // Log DESPUÉS de la actualización
+    console.log(`[updateReservaHabitacion] Resultado de findByIdAndUpdate:`, reservaActualizada);
+    console.log(`[updateReservaHabitacion] Estado DESPUÉS (en reservaActualizada): ${reservaActualizada?.estadoReserva}`);
+
      if (!reservaActualizada) {
-         // Esto no debería pasar si la reserva se encontró al principio, pero por si acaso
          return res.status(404).json({ success: false, message: 'No se pudo actualizar la reserva.' });
      }
 

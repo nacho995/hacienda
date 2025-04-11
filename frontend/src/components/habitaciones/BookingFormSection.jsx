@@ -159,6 +159,7 @@ export default function BookingFormSection({
           numHuespedes: formData.huespedes,
           mensaje: formData.mensaje,
           habitacion: room.letra,
+          tipoHabitacion: room.tipoHabitacion,
           precioPorNoche: room.precio,
           fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
           fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
@@ -225,6 +226,7 @@ export default function BookingFormSection({
             numHuespedes: formData.huespedes,
             mensaje: formData.mensaje,
             habitacion: room.letra,
+            tipoHabitacion: room.tipoHabitacion,
             precioPorNoche: room.precio,
             fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
             fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
@@ -259,12 +261,21 @@ export default function BookingFormSection({
   };
 
   if (showReservationSuccess) {
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
+    const formatDate = (dateInput) => {
+        if (!dateInput) return 'N/A';
         try {
-            return new Date(dateString + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+            // Intenta crear la fecha directamente desde la entrada
+            const date = new Date(dateInput);
+            // Comprueba si la fecha es válida
+            if (isNaN(date.getTime())) {
+                console.warn("Formato de fecha inválido recibido para la vista de éxito:", dateInput);
+                // Devolver el string original si no se puede parsear, podría ser útil para debug
+                return dateInput.toString(); 
+            }
+            return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
         } catch (e) {
-            return dateString;
+            console.error("Error formateando fecha en vista de éxito:", e);
+            return 'Error fecha'; 
         }
   };
 
@@ -283,12 +294,12 @@ export default function BookingFormSection({
               <p><strong>Habitación:</strong> {conf.habitacion || `Habitación ${index + 1}`}</p>
               <p><strong>Fechas:</strong> {formatDate(conf.fechaEntrada)} - {formatDate(conf.fechaSalida)}</p>
               <p><strong>Huéspedes:</strong> {conf.numHuespedes || formData.huespedes}</p>
-              <p><strong>Precio:</strong> ${conf.precioTotal ? conf.precioTotal.toFixed(2) : 'N/A'}</p>
+              <p><strong>Precio:</strong> ${typeof conf.precio === 'number' ? conf.precio.toFixed(2) : 'N/A'}</p>
               <p><strong>Método Pago:</strong> {conf.metodoPago}</p>
               <p className="text-xs text-gray-500">ID: {conf._id}</p>
-                        </div>
-                      ))}
-                      </div>
+            </div>
+          ))}
+        </div>
       </motion.div>
     );
   }

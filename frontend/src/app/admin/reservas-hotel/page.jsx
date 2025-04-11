@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
 import { FaEdit, FaTrash, FaBed, FaUserFriends, FaCalendarAlt, FaSpinner, FaEye,
          FaSync, FaUserPlus, FaUserMinus, FaUserCheck, FaFilter, FaSort, FaSearch,
          FaTimes, FaChevronDown, FaChevronRight, FaMapMarkerAlt, FaEuroSign, FaArrowUp, FaArrowDown,
-         FaEllipsisV, FaCheck } from 'react-icons/fa';
+         FaEllipsisV, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
 import { assignHabitacionReservation, unassignHabitacionReservation } from '@/services/reservationService';
 import { useAuth } from '@/context/AuthContext';
 import { useReservation } from '@/context/ReservationContext';
@@ -304,9 +304,11 @@ export default function AdminHotelReservations() {
 
   // --- Handlers de Reserva (Adaptar y añadir nuevos) ---
   const handleConfirmarReserva = async (reservaId) => {
+    console.log(`[AdminHotelReservations] INICIO handleConfirmarReserva (ID: ${reservaId})`);
     setOpenActionMenu(null);
     if (!reservaId) return;
     try {
+      console.log("[AdminHotelReservations] PRE-API CALL handleConfirmarReserva");
       const response = await apiClient.patch(`/reservas/habitaciones/${reservaId}`, {
         estadoReserva: 'confirmada'
       });
@@ -323,10 +325,12 @@ export default function AdminHotelReservations() {
   };
 
   const handleCancelarReserva = async (reservaId) => {
+    console.log(`[AdminHotelReservations] INICIO handleCancelarReserva (ID: ${reservaId})`);
     setOpenActionMenu(null);
     if (!reservaId) return;
     if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva de hotel?')) {
         try {
+            console.log("[AdminHotelReservations] PRE-API CALL handleCancelarReserva");
             const response = await apiClient.patch(`/reservas/habitaciones/${reservaId}`, {
               estadoReserva: 'cancelada'
             });
@@ -344,10 +348,12 @@ export default function AdminHotelReservations() {
   };
 
   const handleEliminarReserva = async (reservaId) => {
+    console.log(`[AdminHotelReservations] INICIO handleEliminarReserva (ID: ${reservaId})`);
     setOpenActionMenu(null);
     if (!reservaId) return;
     if (window.confirm('¡Acción irreversible! ¿Estás seguro de que quieres ELIMINAR esta reserva de hotel permanentemente?')) {
       try {
+        console.log("[AdminHotelReservations] PRE-API CALL handleEliminarReserva");
         const response = await apiClient.delete(`/reservas/habitaciones/${reservaId}`);
         if (response && response.data && response.data.success) {
           toast.success('Reserva eliminada permanentemente.');
@@ -358,6 +364,30 @@ export default function AdminHotelReservations() {
       } catch (error) {
         toast.error('Error al eliminar la reserva de hotel');
         console.error('Error eliminando reserva hotel:', error);
+      }
+    }
+  };
+
+  // NUEVA FUNCIÓN HANDLER para marcar como pendiente
+  const handleMarcarPendiente = async (reservaId) => {
+    setOpenActionMenu(null);
+    if (!reservaId) return;
+    if (window.confirm('¿Estás seguro de que quieres marcar esta reserva de hotel como pendiente?')) {
+      try {
+        // Usamos la misma API que para confirmar/cancelar, solo cambia el estado
+        const response = await apiClient.put(`/reservas/habitaciones/${reservaId}`, {
+          estadoReserva: 'pendiente'
+        });
+        // Asumimos que apiClient devuelve {success: true/false, ...}
+        if (response && response.success) { 
+          toast.success('Reserva de hotel marcada como pendiente.');
+          loadAllReservations(false);
+        } else {
+          toast.error(response?.message || 'Error al marcar como pendiente.');
+        }
+      } catch (error) {
+        toast.error('Error al marcar como pendiente');
+        console.error('Error marcando reserva hotel como pendiente:', error);
       }
     }
   };
@@ -447,6 +477,7 @@ export default function AdminHotelReservations() {
            onEliminarReserva={handleEliminarReserva}
            onAsignarReserva={abrirModalAsignar}
            onDesasignarReserva={handleDesasignarHabitacion}
+           onMarcarPendiente={handleMarcarPendiente}
          />
       )}
 
@@ -537,7 +568,8 @@ function RoomTableView({
   onCancelarReserva,
   onEliminarReserva,
   onAsignarReserva,
-  onDesasignarReserva
+  onDesasignarReserva,
+  onMarcarPendiente
 }) {
   const handleToggleMenu = (reservaId) => {
     setOpenActionMenu(prev => (prev === reservaId ? null : reservaId));
@@ -596,10 +628,13 @@ function RoomTableView({
               // URL de detalle específica para reservas de hotel
               const detalleUrl = `/admin/reservas-hotel/${reservaId}`; // Asumiendo esta ruta
               const canViewDetails = true; // Asumiendo que siempre se pueden ver
-              const canConfirm = reserva.estadoReserva === 'pendiente';
-              const canCancel = !['cancelada', 'completada'].includes(reserva.estadoReserva);
-              const canDelete = true; // Permitir eliminar por defecto
+              
+              // Lógica de botones ajustada
+              const canConfirm = reserva.estadoReserva !== 'confirmada' && reserva.estadoReserva !== 'completada'; 
+              const canCancel = reserva.estadoReserva !== 'cancelada' && reserva.estadoReserva !== 'completada'; 
+              const canDelete = true; 
               const canAssign = reserva.estadoReserva !== 'cancelada';
+              const canMarkPending = reserva.estadoReserva !== 'pendiente' && reserva.estadoReserva !== 'completada';
 
               return (
                 <Fragment key={reservaId}>
@@ -671,21 +706,22 @@ function RoomTableView({
                            >
                              <div className="py-1" role="none">
                                 {canViewDetails && (
-                                    <Link href={detalleUrl} legacyBehavior>
-                                        <a
-                                           role="menuitem"
-                                           tabIndex="-1"
-                                           className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center"
-                                           onClick={() => setOpenActionMenu(null)}
-                                        >
-                                            <FaEye className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
-                                            Ver Detalles
-                                        </a>
-                                    </Link>
+                                   <Link 
+                                       href={detalleUrl} 
+                                       role="menuitem"
+                                       tabIndex="-1"
+                                       className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center"
+                                       onClick={() => setOpenActionMenu(null)}
+                                   >
+                                       <FaEye className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
+                                       Ver Detalles
+                                   </Link>
                                 )}
                                 {canConfirm && (
                                     <button
-                                        onClick={() => onConfirmarReserva(reservaId)}
+                                        onClick={() => { 
+                                            onConfirmarReserva(reservaId);
+                                        }}
                                         className="text-green-700 block px-4 py-2 text-sm hover:bg-green-50 hover:text-green-900 w-full text-left flex items-center"
                                         role="menuitem"
                                         tabIndex="-1"
@@ -696,7 +732,9 @@ function RoomTableView({
                                 )}
                                 {canCancel && (
                                     <button
-                                        onClick={() => onCancelarReserva(reservaId)}
+                                        onClick={() => { 
+                                            onCancelarReserva(reservaId);
+                                        }}
                                         className="text-red-700 block px-4 py-2 text-sm hover:bg-red-50 hover:text-red-900 w-full text-left flex items-center"
                                         role="menuitem"
                                         tabIndex="-1"
@@ -707,7 +745,9 @@ function RoomTableView({
                                 )}
                                 {canDelete && (
                                     <button
-                                        onClick={() => onEliminarReserva(reservaId)}
+                                        onClick={() => { 
+                                            onEliminarReserva(reservaId);
+                                        }}
                                         className="text-red-700 block px-4 py-2 text-sm hover:bg-red-50 hover:text-red-900 w-full text-left flex items-center"
                                         role="menuitem"
                                         tabIndex="-1"
@@ -715,6 +755,19 @@ function RoomTableView({
                                          <FaTrash className="mr-3 h-4 w-4" aria-hidden="true" />
                                          Eliminar
                                     </button>
+                                )}
+                                {canMarkPending && (
+                                     <button
+                                         onClick={() => {
+                                             onMarcarPendiente(reservaId);
+                                         }}
+                                         className="text-yellow-700 block px-4 py-2 text-sm hover:bg-yellow-50 hover:text-yellow-900 w-full text-left flex items-center"
+                                         role="menuitem"
+                                         tabIndex="-1"
+                                     >
+                                          <FaExclamationTriangle className="mr-3 h-4 w-4" aria-hidden="true" />
+                                          Marcar Pendiente
+                                     </button>
                                 )}
                                 <div className="border-t border-gray-100 my-1"></div>
                                 {canAssign && (
