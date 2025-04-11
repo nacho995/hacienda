@@ -45,6 +45,47 @@ export default function ReservacionesPage() {
   const [sortConfig, setSortConfig] = useState({ key: 'fechaEvento', direction: 'asc' });
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
+  // <<< INICIO FUNCION getLetraHabitacion COPIADA >>>
+  const getLetraHabitacion = (reserva) => {
+    // Prioridad 1: Campo directo en la reserva (ej. si se denormaliza al crear la reserva)
+    if (reserva?.letraHabitacion) return reserva.letraHabitacion.toUpperCase();
+
+    // Prioridad 2: Objeto 'habitacion' populado
+    if (typeof reserva?.habitacion === 'object' && reserva.habitacion?.letra) {
+      return reserva.habitacion.letra.toUpperCase();
+    }
+
+    // Prioridad 3: Objeto 'habitacionId' populado (nombre común para referencias)
+    if (typeof reserva?.habitacionId === 'object' && reserva.habitacionId?.letra) {
+      return reserva.habitacionId.letra.toUpperCase();
+    }
+
+    // Prioridad 4: Objeto 'habitacion_id' populado (otra convención)
+    if (typeof reserva?.habitacion_id === 'object' && reserva.habitacion_id?.letra) {
+        return reserva.habitacion_id.letra.toUpperCase();
+    }
+
+    // Fallback 1: Si 'habitacion' es una string, verificar si es una letra válida
+    if (typeof reserva?.habitacion === 'string') {
+        const habString = reserva.habitacion.trim().toUpperCase();
+        // Check if it's a single uppercase letter A-O (typical room letters)
+        if (habString.length === 1 && habString >= 'A' && habString <= 'O') {
+            return habString;
+        }
+        // If not a letter, it might be an ID, return '?'
+    }
+
+    // Fallback 2: Si 'habitacionId' es un string (probablemente ID)
+    if (typeof reserva?.habitacionId === 'string') {
+      // No podemos obtener la letra solo del ID aquí, devolvemos '?'
+    }
+
+    // Fallback final si no se encontró nada
+    // console.warn(`getLetraHabitacion: No se pudo determinar la letra para la reserva ID: ${reserva?._id}`);
+    return '?';
+  };
+  // <<< FIN FUNCION getLetraHabitacion COPIADA >>>
+
   // Cargar usuarios
   const loadUsers = useCallback(async () => {
     try {
@@ -130,15 +171,18 @@ export default function ReservacionesPage() {
         }
         // -----------------------------------------------------
         
-        const letra = res.letraHabitacion || res.habitacion?.nombre || 'N/A';
+        // --- USAR getLetraHabitacion ---
+        const letra = getLetraHabitacion(res); // Llamar a la función copiada
+        const letraMostrada = letra === '?' ? 'N/A' : letra; // Usar N/A si la función devuelve '?'
+
         const primerHuesped = res.infoHuespedes?.nombres?.[0] || res.nombreHuespedes || res.huesped?.nombre;
         const clienteFinal = primerHuesped || res.huesped?.email || res.email || 'No especificado';
-        let nombreTipo = `Habitación ${letra}`;
+        let nombreTipo = `Habitación ${letraMostrada}`; // Usar letraMostrada aquí
         if (asociada && eventoEncontrado) { // Usar el evento encontrado
           const nombreEventoAsociado = eventoEncontrado.nombreEvento || 'Sin nombre';
           // Eliminar log anterior que ya no aplica
           // console.log(`[Debug Hab ${habId}] Asociada: ${asociada}, Evento Encontrado:`, servicioAsociado, `Nombre: ${nombreEventoAsociado}`);
-          nombreTipo += ` (Evento: ${nombreEventoAsociado})`; 
+          nombreTipo += ` (Evento: ${nombreEventoAsociado})`;
         }
         
         return {
@@ -148,7 +192,7 @@ export default function ReservacionesPage() {
           clientePrincipal: clienteFinal, // Cliente principal de la habitación (con fallback de email)
           nombreMostrado: nombreTipo, // Nombre para la columna TIPO
           asociadaAEvento: asociada, // Marcar si está asociada
-          letraHabitacionReal: letra, // Guardar la letra para posible uso futuro
+          letraHabitacionReal: letra, // Guardar la letra real (puede ser '?')
           uniqueId: `habitacion_${habId}`
         };
       })
