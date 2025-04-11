@@ -9,7 +9,7 @@ import { HiOutlineOfficeBuilding, HiOutlineUser } from 'react-icons/hi';
 const ModoSeleccionReserva = () => {
   const { formData, updateFormSection } = useReservation();
   const [modoSeleccionado, setModoSeleccionado] = useState(formData.modoReserva || '');
-  const [loading, setLoading] = useState(false);
+  // const [loading, setLoading] = useState(false); // Loading no se usa actualmente
 
   const handleModeChange = (nuevoModo) => {
     setModoSeleccionado(nuevoModo);
@@ -24,56 +24,74 @@ const ModoSeleccionReserva = () => {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h2 className="text-2xl font-semibold mb-4 text-center">¿Cómo desea gestionar su reserva?</h2>
+      <h2 className="text-2xl font-semibold mb-6 text-center text-gray-800">¿Cómo desea gestionar su reserva?</h2>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <Card 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Opción Cliente (Reemplazo de Card) */}
+        <div 
           onClick={() => handleModeChange('cliente')}
-          className={`cursor-pointer hover:shadow-lg transition-all ${modoSeleccionado === 'cliente' ? 'ring-2 ring-primary' : ''}`}
+          className={`cursor-pointer bg-white rounded-lg border border-gray-200 p-1 hover:shadow-md transition-all duration-200 ${modoSeleccionado === 'cliente' ? 'ring-2 ring-[var(--color-primary)]' : 'hover:border-gray-300'}`}
+          role="button" // Mejorar accesibilidad
+          tabIndex={0} // Permitir foco
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleModeChange('cliente')} // Permitir selección con teclado
         >
-          <div className="flex flex-col items-center p-4">
-            <HiOutlineUser className="w-16 h-16 text-primary mb-4" />
-            <h3 className="text-xl font-medium mb-2">Gestión Personal</h3>
-            <p className="text-gray-600 text-center mb-4">
+          <div className="flex flex-col items-center p-5">
+            <HiOutlineUser className="w-14 h-14 text-[var(--color-primary)] mb-3" />
+            <h3 className="text-lg font-medium mb-2 text-gray-900">Gestión Personal</h3>
+            <p className="text-gray-500 text-center text-sm mb-4 h-16">
               Usted selecciona los servicios y habitaciones específicas para su evento.
             </p>
-            <Radio 
-              id="reserva-cliente" 
-              name="modo-reserva" 
-              value="cliente"
-              checked={modoSeleccionado === 'cliente'}
-              readOnly
-              className="mt-2"
-            />
-            <Label htmlFor="reserva-cliente" className="mt-2">
-              Seleccionar esta opción
-            </Label>
+            {/* Reemplazo de Radio y Label */}
+            <div className="flex items-center mt-2">
+              <input 
+                id="reserva-cliente" 
+                type="radio"
+                name="modo-reserva" 
+                value="cliente"
+                checked={modoSeleccionado === 'cliente'}
+                readOnly 
+                onClick={(e) => e.stopPropagation()} // Prevenir doble disparo con el click del div
+                className="w-4 h-4 text-[var(--color-primary)] bg-gray-100 border-gray-300 focus:ring-[var(--color-primary)] focus:ring-2"
+              />
+              <label htmlFor="reserva-cliente" className="ml-2 text-sm font-medium text-gray-700">
+                Seleccionar esta opción
+              </label>
+            </div>
           </div>
-        </Card>
+        </div>
 
-        <Card 
+        {/* Opción Hacienda (Reemplazo de Card) */}
+        <div 
           onClick={() => handleModeChange('hacienda')}
-          className={`cursor-pointer hover:shadow-lg transition-all ${modoSeleccionado === 'hacienda' ? 'ring-2 ring-primary' : ''}`}
+          className={`cursor-pointer bg-white rounded-lg border border-gray-200 p-1 hover:shadow-md transition-all duration-200 ${modoSeleccionado === 'hacienda' ? 'ring-2 ring-[var(--color-primary)]' : 'hover:border-gray-300'}`}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleModeChange('hacienda')}
         >
-          <div className="flex flex-col items-center p-4">
-            <HiOutlineOfficeBuilding className="w-16 h-16 text-primary mb-4" />
-            <h3 className="text-xl font-medium mb-2">Gestión por Hacienda</h3>
-            <p className="text-gray-600 text-center mb-4">
+          <div className="flex flex-col items-center p-5">
+            <HiOutlineOfficeBuilding className="w-14 h-14 text-[var(--color-primary)] mb-3" />
+            <h3 className="text-lg font-medium mb-2 text-gray-900">Gestión por Hacienda</h3>
+            <p className="text-gray-500 text-center text-sm mb-4 h-16">
               La hacienda administrará los detalles de servicios y habitaciones en base a su evento.
             </p>
-            <Radio 
-              id="reserva-hacienda" 
-              name="modo-reserva" 
-              value="hacienda"
-              checked={modoSeleccionado === 'hacienda'}
-              readOnly
-              className="mt-2"
-            />
-            <Label htmlFor="reserva-hacienda" className="mt-2">
-              Seleccionar esta opción
-            </Label>
+             {/* Reemplazo de Radio y Label */}
+             <div className="flex items-center mt-2">
+              <input 
+                id="reserva-hacienda" 
+                type="radio"
+                name="modo-reserva" 
+                value="hacienda"
+                checked={modoSeleccionado === 'hacienda'}
+                readOnly
+                onClick={(e) => e.stopPropagation()} // Prevenir doble disparo
+                className="w-4 h-4 text-[var(--color-primary)] bg-gray-100 border-gray-300 focus:ring-[var(--color-primary)] focus:ring-2"
+              />
+              <label htmlFor="reserva-hacienda" className="ml-2 text-sm font-medium text-gray-700">
+                Seleccionar esta opción
+              </label>
+            </div>
           </div>
-        </Card>
+        </div>
       </div>
 
       <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
