@@ -23,7 +23,7 @@ export default function AdminLogin() {
       {/* Fondo de imagen con gradiente */}
       <div className="absolute inset-0 z-0">
         <Image 
-          src="/imagendron.jpg" 
+          src="/images/imagendron.jpg" 
           alt="Hacienda San Carlos" 
           fill
           sizes="100vw"
