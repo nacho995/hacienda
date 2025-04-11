@@ -19,10 +19,10 @@ export default function ModoSeleccionEvento({ selectedEventType, onEventTypeSele
       setError(null);
       const data = await obtenerTiposEventos();
       console.log('Tipos de eventos recibidos:', data);
-      if (Array.isArray(data) && data.length > 0) {
-        setTiposEventos(data.filter(tipo => tipo.activo));
+      if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
+        setTiposEventos(data.data.filter(tipo => tipo.activo));
       } else {
-        console.warn('No se recibieron tipos de eventos válidos');
+        console.warn('No se recibieron tipos de eventos válidos o la respuesta no tuvo el formato esperado.');
         setTiposEventos([]);
       }
     } catch (error) {

@@ -1,75 +1,97 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { FaUsers, FaCalendarAlt, FaPlus, FaTrash, FaSpinner, FaEye, FaListAlt, FaBoxOpen } from 'react-icons/fa';
+import { FaCalendarAlt, FaPlus, FaTrash, FaSpinner, FaEye, FaConciergeBell } from 'react-icons/fa';
 import { toast } from 'sonner';
-import Link from 'next/link';
 
-// Cambiar importaciones: Usar servicios de tiposEvento.service.js
-// import { getEventoServicios, addEventoServicio, removeEventoServicio } from '@/services/reservationService'; // QUITAR
-import { getAllTiposEvento } from '@/services/tiposEvento.service'; // AÑADIR
 import { 
-  getServiciosPorTipoEventoId, 
-  addServicioATipoEvento, 
-  removeServicioDeTipoEvento 
-} from '@/services/tiposEvento.service'; // AÑADIR
+  getEventoReservations,
+  addEventoServicio,
+  removeEventoServicio
+} from '@/services/reservationService';
 import { getAllServicios } from '@/services/servicios.service';
 
-export default function ServiciosEventosAdminPage() {
+const formatDate = (dateString) => {
+  try {
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString('es-ES', options);
+  } catch (error) {
+    // console.warn("Error formateando fecha:", dateString, error);
+    return dateString;
+  }
+};
+
+export default function ServiciosPorEventoAdminPage() {
   const router = useRouter();
   const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
 
-  const [tiposEvento, setTiposEvento] = useState([]);
-  const [selectedTipoEventoId, setSelectedTipoEventoId] = useState('');
-  const [serviciosDelTipoEvento, setServiciosDelTipoEvento] = useState([]);
+  const [eventos, setEventos] = useState([]);
+  const [selectedEventoId, setSelectedEventoId] = useState('');
   const [allServicios, setAllServicios] = useState([]);
   
-  const [loadingTiposEvento, setLoadingTiposEvento] = useState(true);
-  const [loadingServiciosDelTipo, setLoadingServiciosDelTipo] = useState(false);
+  const [loadingEventos, setLoadingEventos] = useState(true);
   const [loadingAllServicios, setLoadingAllServicios] = useState(true);
+  const [loadingEventoDetails, setLoadingEventoDetails] = useState(false);
   const [error, setError] = useState(null);
   
-  // Redirigir si no es admin
   useEffect(() => {
     if (!authLoading && (!isAuthenticated || !isAdmin)) {
       router.push('/admin/login');
     }
   }, [authLoading, isAuthenticated, isAdmin, router]);
 
-  // Cargar eventos y todos los servicios disponibles al montar
   useEffect(() => {
     const loadInitialData = async () => {
       if (isAuthenticated && isAdmin) {
-        setLoadingTiposEvento(true);
+        setLoadingEventos(true);
         setLoadingAllServicios(true);
         setError(null);
         try {
-          const [tiposEventoResponse, serviciosResponse] = await Promise.all([
-            getAllTiposEvento(),
+          const [eventosResponse, serviciosResponse] = await Promise.all([
+            getEventoReservations(),
             getAllServicios()
           ]);
 
-          if (tiposEventoResponse.success && Array.isArray(tiposEventoResponse.data)) {
-            setTiposEvento(tiposEventoResponse.data);
+          // LOG MUY ESPECÍFICO: Mostrar el primer evento recibido del backend
+          if (eventosResponse.success && Array.isArray(eventosResponse.data) && eventosResponse.data.length > 0) {
+            console.log('[DEBUG] Primer evento recibido del backend:', JSON.stringify(eventosResponse.data[0], null, 2));
+          } else if (eventosResponse.success) {
+            console.log('[DEBUG] El backend devolvió 0 eventos.');
           } else {
-            console.error("Error o formato inesperado al cargar tipos de evento:", tiposEventoResponse);
-            setError('No se pudieron cargar los tipos de evento.');
+            console.log('[DEBUG] La petición de eventos al backend falló o tuvo formato inesperado:', eventosResponse);
+          }
+
+          if (eventosResponse.success && Array.isArray(eventosResponse.data)) {
+            // Usar serviciosContratados y asegurar que es un array
+            const processedEventos = eventosResponse.data.map(evento => ({
+              ...evento,
+              serviciosContratados: Array.isArray(evento.serviciosContratados) ? evento.serviciosContratados : []
+            }));
+            setEventos(processedEventos);
+          } else {
+            console.error("Error o formato inesperado al cargar eventos:", eventosResponse);
+            setError('No se pudieron cargar los eventos.');
+            toast.error('Error al cargar eventos.')
           }
           
+          // console.log('[loadInitialData] Raw allServicios response:', serviciosResponse);
+
           if (serviciosResponse.success && Array.isArray(serviciosResponse.data)) {
             setAllServicios(serviciosResponse.data);
           } else {
              console.error("Error o formato inesperado al cargar servicios:", serviciosResponse);
-             setError('No se pudieron cargar los servicios disponibles.');
+             setError(prev => prev ? `${prev} No se pudieron cargar los servicios disponibles.` : 'No se pudieron cargar los servicios disponibles.');
+             toast.warn('No se pudieron cargar todos los servicios para añadir.')
           }
 
         } catch (err) {
           console.error("Error cargando datos iniciales:", err);
-          setError('Error al cargar datos iniciales.');
+          setError('Error de conexión al cargar datos iniciales.');
+          toast.error('Error de conexión al cargar datos.')
         } finally {
-           setLoadingTiposEvento(false);
+           setLoadingEventos(false);
            setLoadingAllServicios(false);
         }
       }
@@ -77,87 +99,154 @@ export default function ServiciosEventosAdminPage() {
     loadInitialData();
   }, [isAuthenticated, isAdmin]);
 
-  // Cargar servicios del TIPO de evento seleccionado
-  const handleTipoEventoSelect = useCallback(async (tipoEventoId) => {
-    setSelectedTipoEventoId(tipoEventoId);
-    if (!tipoEventoId) {
-      setServiciosDelTipoEvento([]);
-      return;
+  const eventosOrdenados = useMemo(() => {
+    if (!eventos || eventos.length === 0) {
+      return [];
     }
-    setLoadingServiciosDelTipo(true);
-    setError(null);
-    try {
-      const response = await getServiciosPorTipoEventoId(tipoEventoId);
-      if (response.success && Array.isArray(response.data)) {
-        // Log para ver qué datos se van a setear
-        console.log("[handleTipoEventoSelect] Datos recibidos para setear:", response.data);
-        setServiciosDelTipoEvento(response.data);
-      } else {
-        toast.error(response.message || 'Error al cargar servicios del tipo de evento');
-        setServiciosDelTipoEvento([]);
+    // console.log('[useMemo eventosOrdenados] Sorting data:', eventos);
+    return [...eventos].sort((a, b) => {
+      // Usar serviciosContratados.length
+      const countA = Array.isArray(a.serviciosContratados) ? a.serviciosContratados.length : 0;
+      const countB = Array.isArray(b.serviciosContratados) ? b.serviciosContratados.length : 0;
+      
+      if (countB !== countA) { 
+        return countB - countA;
       }
-    } catch (err) {
-      toast.error('Error de conexión al cargar servicios del tipo de evento');
-      setServiciosDelTipoEvento([]);
-    } finally {
-      setLoadingServiciosDelTipo(false);
-    }
-  }, []);
+      
+      try {
+          const dateA = a.fechaEvento || a.fecha; 
+          const dateB = b.fechaEvento || b.fecha;
+          const timeA = new Date(dateA).getTime();
+          const timeB = new Date(dateB).getTime();
+          if (isNaN(timeA) || isNaN(timeB)) return 0;
+          return timeB - timeA;
+      } catch (e) {
+          // console.warn("Error comparando fechas:", a.fechaEvento || a.fecha, b.fechaEvento || b.fecha, e);
+          return 0;
+      }
+    });
+  }, [eventos]);
 
-  // Añadir servicio al TIPO de evento
+  const selectedEvento = useMemo(() => {
+    const found = eventos.find(e => e._id === selectedEventoId) || null;
+    // console.log('[useMemo selectedEvento] Found:', found);
+    return found;
+  }, [eventos, selectedEventoId]);
+
+  const serviciosDisponiblesParaAnadir = useMemo(() => {
+    if (!selectedEvento || !allServicios.length) return [];
+    // Usar serviciosContratados
+    const serviciosContratadosActuales = Array.isArray(selectedEvento.serviciosContratados) 
+                                        ? selectedEvento.serviciosContratados 
+                                        : [];
+    const idsContratados = serviciosContratadosActuales.map(s => typeof s === 'object' ? s._id : s);
+    const disponibles = allServicios.filter(s => !idsContratados.includes(s._id));
+    // console.log('[useMemo serviciosDisponibles] Available to add:', disponibles);
+    return disponibles;
+  }, [selectedEvento, allServicios]);
+
+  const handleEventoSelect = (eventoId) => {
+    // console.log(`[handleEventoSelect] Selecting evento ID: ${eventoId}`);
+    setSelectedEventoId(eventoId);
+  };
+
   const handleAddServicio = async (servicioIdToAdd) => {
-    if (!selectedTipoEventoId || !servicioIdToAdd) return;
-    setLoadingServiciosDelTipo(true);
+    if (!selectedEventoId || !servicioIdToAdd) return;
+    setLoadingEventoDetails(true);
     try {
-      const response = await addServicioATipoEvento(selectedTipoEventoId, servicioIdToAdd);
-      if (response.success && Array.isArray(response.data)) {
-        setServiciosDelTipoEvento(response.data);
-        toast.success('Servicio añadido correctamente');
+      // console.log(`[handleAddServicio] Adding servicio ${servicioIdToAdd} to evento ${selectedEventoId}`);
+      const response = await addEventoServicio(selectedEventoId, { servicioId: servicioIdToAdd });
+      // console.log('[handleAddServicio] Response from backend:', response);
+      
+      if (response.success && response.data) {
+        // Esperamos que la respuesta devuelva la lista actualizada en response.data
+        // o dentro de response.data.serviciosContratados
+        const updatedServicios = Array.isArray(response.data.serviciosContratados) 
+                                  ? response.data.serviciosContratados 
+                                  : (Array.isArray(response.data) ? response.data : []);
+
+        if (!Array.isArray(updatedServicios)) {
+           console.warn("[handleAddServicio] Backend response did not contain a valid services array:", response.data);
+           toast.error('Respuesta inesperada del servidor al añadir servicio.');
+        } else {
+          setEventos(prevEventos => 
+            prevEventos.map(e => 
+              e._id === selectedEventoId 
+              // Actualizar serviciosContratados
+              ? { ...e, serviciosContratados: updatedServicios } 
+              : e
+            )
+          );
+          toast.success('Servicio añadido correctamente al evento');
+        }
       } else {
-        toast.error(response.message || 'Error al añadir el servicio');
+        toast.error(response.message || 'Error al añadir el servicio al evento');
       }
     } catch (err) {
-      toast.error('Error de conexión al añadir servicio');
+      toast.error('Error de conexión al añadir servicio al evento');
+      console.error("Error en handleAddServicio:", err);
     } finally {
-      setLoadingServiciosDelTipo(false);
+      setLoadingEventoDetails(false);
     }
   };
 
-  // Eliminar servicio del TIPO de evento
   const handleRemoveServicio = async (servicioIdToRemove) => {
-    if (!selectedTipoEventoId || !servicioIdToRemove) return;
-    if (!confirm('¿Está seguro de que desea eliminar este servicio del tipo de evento?')) return;
+    if (!selectedEventoId || !servicioIdToRemove) return;
+    if (!confirm('¿Está seguro de que desea quitar este servicio del evento?')) return;
     
-    setLoadingServiciosDelTipo(true);
+    setLoadingEventoDetails(true);
     try {
-      const response = await removeServicioDeTipoEvento(selectedTipoEventoId, servicioIdToRemove);
-       if (response.success && Array.isArray(response.data)) {
-        setServiciosDelTipoEvento(response.data);
-        toast.success('Servicio eliminado correctamente');
+      // console.log(`[handleRemoveServicio] Removing servicio ${servicioIdToRemove} from evento ${selectedEventoId}`);
+      const response = await removeEventoServicio(selectedEventoId, servicioIdToRemove);
+       // console.log('[handleRemoveServicio] Response from backend:', response);
+       
+       if (response.success && response.data) {
+         // Esperamos la lista actualizada en response.data.serviciosContratados o response.data
+         const updatedServicios = Array.isArray(response.data.serviciosContratados) 
+                                   ? response.data.serviciosContratados 
+                                   : (Array.isArray(response.data) ? response.data : []);
+                                  
+         if (!Array.isArray(updatedServicios)) {
+           console.warn("[handleRemoveServicio] Backend response did not contain a valid services array:", response.data);
+           toast.error('Respuesta inesperada del servidor al eliminar servicio.');
+         } else {
+           setEventos(prevEventos => 
+            prevEventos.map(e => 
+              e._id === selectedEventoId 
+              // Actualizar serviciosContratados
+              ? { ...e, serviciosContratados: updatedServicios }
+              : e
+            )
+          );
+          toast.success('Servicio eliminado correctamente del evento');
+         }
       } else {
-        toast.error(response.message || 'Error al eliminar el servicio');
+        toast.error(response.message || 'Error al eliminar el servicio del evento');
       }
     } catch (err) {
-      toast.error('Error de conexión al eliminar servicio');
+      toast.error('Error de conexión al eliminar servicio del evento');
+      console.error("Error en handleRemoveServicio:", err);
     } finally {
-      setLoadingServiciosDelTipo(false);
+      setLoadingEventoDetails(false);
     }
   };
 
-  // Renderizado condicional mientras cargan los datos iniciales
-  if (authLoading || loadingTiposEvento || loadingAllServicios) {
+  const getColorClassForServiceCount = (count) => {
+    if (count >= 5) return 'bg-green-100 hover:bg-green-200 border-green-300';
+    if (count > 0) return 'bg-yellow-100 hover:bg-yellow-200 border-yellow-300';
+    return 'bg-gray-100 hover:bg-gray-200 border-gray-300';
+  };
+
+  if (authLoading || loadingEventos || loadingAllServicios) {
     return <div className="p-6 text-center"><FaSpinner className="animate-spin mx-auto text-2xl text-gray-500" /> Cargando datos iniciales...</div>;
   }
 
-  // Log para verificar el estado antes de renderizar
-  console.log("[Render] Estado tiposEvento:", tiposEvento);
-  console.log("[Render] Estado allServicios:", allServicios);
-  // Log específico para los servicios del tipo seleccionado
-  console.log("[Render] Estado serviciosDelTipoEvento:", serviciosDelTipoEvento);
+  // console.log('[Render] Current eventos state:', eventos);
+  // console.log('[Render] Current selectedEvento state:', selectedEvento);
 
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Gestión de Servicios por Tipo de Evento</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Gestión de Servicios por Evento</h1>
       
       {error && (
          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
@@ -166,68 +255,122 @@ export default function ServiciosEventosAdminPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Columna 1: Selección de TIPO de Evento */}
-        <div className="md:col-span-1 bg-white p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-3">Seleccionar Tipo de Evento</h2>
-          <select 
-            value={selectedTipoEventoId}
-            onChange={(e) => handleTipoEventoSelect(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
-            disabled={loadingTiposEvento || loadingAllServicios}
-          >
-            <option value="">-- Seleccione un tipo de evento --</option>
-            {tiposEvento.map(tipo => (
-              <option key={tipo._id} value={tipo._id}>
-                {tipo.titulo || tipo.nombre || `Tipo ID: ${tipo._id}`}
-              </option>
-            ))}
-          </select>
+        <div className="md:col-span-1 bg-white p-4 rounded-lg shadow overflow-y-auto max-h-[80vh]">
+          <h2 className="text-lg font-semibold mb-3 sticky top-0 bg-white pb-2">Eventos Agendados</h2>
+          {eventosOrdenados.length === 0 ? (
+            <p className="text-sm text-gray-500">No hay eventos encontrados.</p>
+          ) : (
+            <div className="space-y-2">
+              {eventosOrdenados.map(evento => {
+                // Usar serviciosContratados.length
+                const numServicios = Array.isArray(evento.serviciosContratados) ? evento.serviciosContratados.length : 0;
+                const colorClass = getColorClassForServiceCount(numServicios);
+                const isSelected = evento._id === selectedEventoId;
+                const tituloEvento = evento.nombreEvento || evento.tipoEvento?.titulo || 'Evento sin título';
+                const fechaEvento = evento.fechaEvento || evento.fecha;
+                return (
+                  <button 
+                    key={evento._id}
+                    onClick={() => handleEventoSelect(evento._id)}
+                    className={`w-full text-left p-3 border rounded-md transition-colors duration-150 ${colorClass} ${isSelected ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                  >
+                    <div className="font-semibold text-sm text-gray-800">{tituloEvento}</div>
+                    <div className="text-xs text-gray-600 flex items-center">
+                      <FaCalendarAlt className="mr-1" /> {formatDate(fechaEvento)}
+                    </div>
+                    <div className="text-xs text-gray-600 flex items-center mt-1">
+                       <FaConciergeBell className="mr-1" /> {numServicios} servicio(s) contratado(s)
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Columna 2: Servicios Asociados y Añadir */}
         <div className="md:col-span-2 bg-white p-4 rounded-lg shadow">
-          <h2 className="text-lg font-semibold mb-3">
-            Servicios Asociados a: {tiposEvento.find(t => t._id === selectedTipoEventoId)?.titulo || 'N/A'}
-          </h2>
-          
-          {loadingServiciosDelTipo ? (
-            <div className="text-center py-4"><FaSpinner className="animate-spin mx-auto text-indigo-600" /></div>
-          ) : !selectedTipoEventoId ? (
-            <p className="text-sm text-gray-500 text-center py-4">Seleccione un tipo de evento para ver sus servicios asociados.</p>
+          {!selectedEvento ? (
+            <div className="flex flex-col items-center justify-center h-full text-gray-500">
+              <FaEye className="text-4xl mb-3" />
+              <p>Seleccione un evento de la lista para ver y editar sus servicios contratados.</p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {serviciosDelTipoEvento.length === 0 ? (
-                <p className="text-sm text-gray-500">Este tipo de evento no tiene servicios asociados.</p>
-              ) : (
-                serviciosDelTipoEvento.map((servicio, index) => (
-                  <div key={servicio._id || `servicio-${index}`} className="flex justify-between items-center p-2 border rounded bg-gray-50">
-                    <span className="text-sm font-medium text-gray-700">{servicio.nombre}</span>
-                    <button 
-                      onClick={() => handleRemoveServicio(servicio._id)}
-                      className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50"
-                      disabled={loadingServiciosDelTipo}
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
-                ))
-              )}
+            <div>
+              <h2 className="text-lg font-semibold mb-3 border-b pb-2">
+                Servicios para: <span className="text-indigo-700">{selectedEvento.nombreEvento || selectedEvento.tipoEvento?.titulo}</span>
+                <span className="text-sm text-gray-500 ml-2">({formatDate(selectedEvento.fechaEvento || selectedEvento.fecha)})</span>
+              </h2>
               
-              <div className="pt-4 border-t mt-4">
-                 <h3 className="text-md font-semibold mb-2">Añadir Servicio al Tipo de Evento</h3>
-                 <select 
-                    className="mt-1 w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100"
-                    onChange={(e) => e.target.value && handleAddServicio(e.target.value)}
-                    value=""
-                    disabled={loadingServiciosDelTipo || loadingAllServicios || !selectedTipoEventoId}
-                 >
-                     <option value="" disabled>-- Seleccionar servicio a añadir --</option>
-                     {allServicios
-                        .filter(s => !serviciosDelTipoEvento.some(se => se._id === s._id))
-                        .map(s => (
-                           <option key={s._id} value={s._id}>{s.nombre} ({s.precio})</option>
-                        ))}
-                 </select>
+              {loadingEventoDetails && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+                  <FaSpinner className="animate-spin text-indigo-600 text-3xl" />
+                </div>
+              )} 
+
+              <div className="mb-4">
+                 {/* Usar serviciosContratados */} 
+                 <h3 className="text-md font-semibold mb-2">Servicios Contratados ({(Array.isArray(selectedEvento.serviciosContratados) ? selectedEvento.serviciosContratados.length : 0)})</h3>
+                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                  {/* // console.log(`[Render] selectedEvento.serviciosContratados for ${selectedEvento._id}:`, selectedEvento.serviciosContratados) */} 
+                   {/* Usar serviciosContratados */} 
+                   {(!Array.isArray(selectedEvento.serviciosContratados) || selectedEvento.serviciosContratados.length === 0) ? (
+                     <p className="text-sm text-gray-500 italic">Este evento no tiene servicios contratados.</p>
+                   ) : (
+                     selectedEvento.serviciosContratados.map((servicio, index) => {
+                       // console.log(`[Render] Mapping servicioContratado[${index}]:`, servicio);
+                       // Asumimos que 'servicio' es ahora el objeto poblado o al menos tiene _id y nombre
+                       const servicioId = typeof servicio === 'object' && servicio !== null ? servicio._id : servicio;
+                       const servicioNombre = typeof servicio === 'object' && servicio !== null ? servicio.nombre : `ID: ${servicio}`; // Mostrar ID si no hay nombre
+                       
+                       // Podríamos intentar buscar el nombre en allServicios si solo tenemos el ID
+                       let finalNombre = servicioNombre;
+                       if (typeof servicio === 'string' && allServicios.length > 0) {
+                         const servicioCompleto = allServicios.find(s => s._id === servicio);
+                         if (servicioCompleto) finalNombre = servicioCompleto.nombre;
+                       }
+
+                       return (
+                         <div key={servicioId || `servicio-${index}`} className="flex justify-between items-center p-2 border rounded bg-gray-50">
+                           <span className="text-sm font-medium text-gray-700">{finalNombre}</span>
+                           <button 
+                             onClick={() => handleRemoveServicio(servicioId)}
+                             className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50 disabled:cursor-not-allowed" 
+                             disabled={loadingEventoDetails}
+                             aria-label={`Quitar servicio ${finalNombre}`}
+                           >
+                             <FaTrash />
+                           </button>
+                         </div>
+                       );
+                     })
+                  )}
+                </div>
+              </div>
+              
+              <div className="pt-4 border-t">
+                 <h3 className="text-md font-semibold mb-2">Añadir Servicio a este Evento</h3>
+                 {loadingAllServicios ? (
+                   <p className="text-sm text-gray-500">Cargando servicios disponibles...</p>
+                 ) : serviciosDisponiblesParaAnadir.length === 0 ? (
+                   <p className="text-sm text-gray-500 italic">No hay más servicios disponibles para añadir o ya están todos contratados.</p>
+                 ) : (
+                   <div className="flex items-center space-x-2">
+                      <select 
+                          className="flex-grow mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          onChange={(e) => { 
+                            if (e.target.value) handleAddServicio(e.target.value); 
+                            e.target.value = "";
+                          }}
+                          value=""
+                          disabled={loadingEventoDetails || loadingAllServicios}
+                      >
+                          <option value="" disabled>-- Seleccionar servicio a añadir --</option>
+                          {serviciosDisponiblesParaAnadir.map(s => (
+                              <option key={s._id} value={s._id}>{s.nombre} ({s.precio ? `${s.precio}€` : 'Precio no especificado'})</option>
+                          ))}
+                      </select>
+                   </div>
+                 )}
               </div>
             </div>
           )}

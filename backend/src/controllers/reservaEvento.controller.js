@@ -16,7 +16,7 @@ const Servicio = require('../models/Servicio');
  */
 exports.crearReservaEvento = async (req, res) => {
   try {
-    const { 
+    const {
       tipo_evento,
       fecha,
       nombre_contacto,
@@ -27,11 +27,12 @@ exports.crearReservaEvento = async (req, res) => {
       habitaciones,
       modo_gestion_habitaciones,
       modo_gestion_servicios,
-      servicios_adicionales
+      serviciosContratados,
+      _serviciosCompletosParaPrecio
     } = req.body;
-    
-    // Log para ver los datos de habitaciones recibidos
-    console.log('Datos de habitaciones recibidos:', JSON.stringify(habitaciones, null, 2));
+
+    // Log para ver qué llega
+    console.log("[crearReservaEvento] Body recibido:", req.body);
 
     // Validar campos obligatorios
     if (!tipo_evento || !fecha || !nombre_contacto || !email_contacto || !telefono_contacto) {
@@ -78,23 +79,28 @@ exports.crearReservaEvento = async (req, res) => {
       });
     }
 
-    // --- Calcular precio total incluyendo servicios --- 
-    // Obtener precio base del tipo de evento (asegurarse de que sea número)
+    // --- Calcular precio total incluyendo servicios ---
     const precioBaseEvento = Number(tipoEventoDoc.precioBase) || 0;
-    
-    // Calcular suma de precios de servicios adicionales (asumiendo que vienen con precio)
     let precioServicios = 0;
-    if (Array.isArray(req.body.servicios_adicionales)) {
-      precioServicios = req.body.servicios_adicionales.reduce((sum, servicio) => {
-        // Asegurarse de que el precio del servicio es un número válido
-        const precioServicio = Number(servicio?.precio) || 0; 
+
+    // Usar _serviciosCompletosParaPrecio si se envió (Opción 1)
+    if (Array.isArray(_serviciosCompletosParaPrecio)) {
+      precioServicios = _serviciosCompletosParaPrecio.reduce((sum, servicio) => {
+        const precioServicio = Number(servicio?.precio) || 0;
         return sum + precioServicio;
       }, 0);
+      console.log(`[crearReservaEvento] Precio de servicios calculado desde _serviciosCompletosParaPrecio: ${precioServicios}`);
     }
+    // Opción 2 (alternativa): Buscar precios en BD por ID si no se enviaron completos
+    /* else if (Array.isArray(serviciosContratados)) {
+        console.log(`[crearReservaEvento] Buscando precios para servicios contratados IDs: ${serviciosContratados.join(', ')}`);
+        const serviciosDocs = await Servicio.find({ '_id': { $in: serviciosContratados } }).select('precio');
+        precioServicios = serviciosDocs.reduce((sum, servicio) => sum + (Number(servicio.precio) || 0), 0);
+        console.log(`[crearReservaEvento] Precio de servicios calculado desde BD: ${precioServicios}`);
+    } */
     
-    // Calcular precio total final
     const precioTotalCalculado = precioBaseEvento + precioServicios;
-    console.log(`Precio calculado: Base Evento ${precioBaseEvento} + Servicios ${precioServicios} = Total ${precioTotalCalculado}`); // Log para depuración
+    console.log(`[crearReservaEvento] Precio Total Calculado: Base=${precioBaseEvento}, Servicios=${precioServicios}, Total=${precioTotalCalculado}`);
     // --------------------------------------------------
 
     // Calcular el total de habitaciones desde los datos recibidos
@@ -102,7 +108,6 @@ exports.crearReservaEvento = async (req, res) => {
     
     // Crear objeto para guardar
     const reservaData = {
-      // Solo incluir usuario si está autenticado
       ...(req.user && req.user.id ? { usuario: req.user.id } : {}),
       tipoEvento: tipoEventoDoc._id,
       nombreEvento: tipoEventoDoc.nombre || tipoEventoDoc.titulo || 'Evento sin nombre',
@@ -122,102 +127,49 @@ exports.crearReservaEvento = async (req, res) => {
       modoGestionHabitaciones: modo_gestion_habitaciones || 'usuario',
       modoGestionServicios: modo_gestion_servicios || 'usuario',
       totalHabitaciones,
-      serviciosAdicionales: servicios_adicionales || []
+      serviciosContratados: Array.isArray(serviciosContratados) ? serviciosContratados : []
     };
+
+    console.log("[crearReservaEvento] Datos a guardar (ReservaEvento):", reservaData);
 
     // Crear la reserva
     const reserva = await ReservaEvento.create(reservaData);
-
-    // Enviar email de confirmación al cliente
-    try {
-      await sendEmail({
-        email: email_contacto,
-        subject: 'Confirmación de Reserva - Hacienda San Carlos Borromeo',
-        html: confirmacionTemplate({
-          ...reservaData,
-          tipoEvento: tipo_evento,
-          nombreEvento: tipo_evento,
-          numeroConfirmacion: reserva._id
-        })
-      });
-
-      console.log(`Email de confirmación enviado a ${email_contacto}`);
-    } catch (emailError) {
-      console.error('Error al enviar email de confirmación:', emailError);
-      // No interrumpimos el flujo si falla el envío del email
-    }
-
-    // Enviar notificación a los administradores sobre la gestión de servicios/habitaciones
-    try {
-      // Verificar si el cliente ha elegido que los organizadores gestionen algo
-      if (modo_gestion_habitaciones === 'organizador' || modo_gestion_servicios === 'organizador') {
-        // Obtener email de administradores (en un entorno real, esto vendría de la base de datos)
-        const adminEmails = ['hdasancarlos@gmail.com']; // Email de ejemplo
-
-        // Enviar email a cada administrador
-        for (const adminEmail of adminEmails) {
-          await sendEmail({
-            email: adminEmail,
-            subject: 'Notificación de Gestión - Nueva Reserva',
-            html: notificacionGestionAdmin({
-              ...reservaData,
-              tipoEvento: tipo_evento,
-              fecha: fechaEvento,
-              modoGestionHabitaciones: modo_gestion_habitaciones,
-              modoGestionServicios: modo_gestion_servicios
-            })
-          });
-        }
-
-        console.log('Email de notificación de gestión enviado a los administradores');
-      }
-    } catch (notificationError) {
-      console.error('Error al enviar notificación de gestión:', notificationError);
-      // No interrumpimos el flujo si falla el envío de la notificación
-    }
+    console.log("[crearReservaEvento] Reserva Evento creada con ID:", reserva._id);
 
     // Crear las reservas de habitaciones asociadas iterando sobre 'habitaciones' de req.body
     const reservasHabitaciones = [];
-    if (habitaciones && habitaciones.length > 0) { // Verificar si hay habitaciones
-      for (const hab of habitaciones) { // Iterar sobre los datos originales del frontend
-        // Log para ver el objeto hab original
-        console.log('Procesando habitación recibida:', JSON.stringify(hab, null, 2));
-
+    if (Array.isArray(habitaciones) && habitaciones.length > 0) {
+      console.log("[crearReservaEvento] Creando habitaciones asociadas...");
+      for (const hab of habitaciones) {
         try {
-          const reservaHabitacion = await ReservaHabitacion.create({
+          const reservaHabitacionData = {
             tipoReserva: 'evento',
             reservaEvento: reserva._id,
-            habitacion: hab.habitacion, // Campo 'habitacion' del frontend (letra)
-            tipoHabitacion: hab.tipoHabitacion, // Campo 'tipoHabitacion' del frontend
-            categoriaHabitacion: hab.numHuespedes <= 2 ? 'sencilla' : 'doble', // Determinar categoría por numHuespedes
-            precio: hab.precio, // Campo 'precio' del frontend (ya es número)
-            numHuespedes: hab.numHuespedes, // Campo 'numHuespedes' del frontend
-            fechaEntrada: hab.fechaEntrada, // Campo 'fechaEntrada' del frontend (ya es Date)
-            fechaSalida: hab.fechaSalida, // Campo 'fechaSalida' del frontend (ya es Date)
-            estadoReserva: 'pendiente', // Cambiado de 'estado' a 'estadoReserva'
+            habitacion: hab.habitacion,
+            tipoHabitacion: hab.tipoHabitacion,
+            categoriaHabitacion: hab.numHuespedes <= 2 ? 'sencilla' : 'doble',
+            precio: hab.precio,
+            numHuespedes: hab.numHuespedes,
+            fechaEntrada: hab.fechaEntrada,
+            fechaSalida: hab.fechaSalida,
+            estadoReserva: 'pendiente',
             nombreContacto: nombre_contacto,
             apellidosContacto: apellidos_contacto,
             emailContacto: email_contacto,
             telefonoContacto: telefono_contacto,
-            fecha: fechaEvento, // Usar la fecha principal del evento
-            letraHabitacion: hab.habitacion // Guardar también la letra si es útil
-          });
+            fecha: fechaEvento,
+            letraHabitacion: hab.habitacion
+          };
+          const reservaHabitacion = await ReservaHabitacion.create(reservaHabitacionData);
           reservasHabitaciones.push(reservaHabitacion);
+          console.log(`[crearReservaEvento] Habitación asociada ${hab.habitacion} creada con ID: ${reservaHabitacion._id}`);
         } catch (validationError) {
-          console.error(`Error al validar/crear ReservaHabitacion para ${hab.habitacion}:`, validationError);
-          // Lanzar el error para detener el proceso y devolver 500
+          console.error(`[crearReservaEvento] Error al crear ReservaHabitacion para ${hab.habitacion}:`, validationError);
+          await ReservaEvento.findByIdAndDelete(reserva._id); // Limpieza
           throw new Error(`Error al procesar la habitación ${hab.habitacion}: ${validationError.message}`); 
         }
       }
     }
-
-    // Actualizar la reserva del evento con las referencias correctas
-    reserva.serviciosAdicionales = reservasHabitaciones.map(rh => ({
-      reservaHabitacionId: rh._id,
-      tipoHabitacion: rh.tipoHabitacion,
-      precio: rh.precio
-    }));
-    await reserva.save();
 
     // Enviar correo de confirmación al cliente
     try {
@@ -289,6 +241,35 @@ exports.crearReservaEvento = async (req, res) => {
       // No devolvemos error al cliente ya que la reserva se creó correctamente
     }
 
+    // Enviar notificación a los administradores sobre la gestión de servicios/habitaciones
+    try {
+      // Verificar si el cliente ha elegido que los organizadores gestionen algo
+      if (modo_gestion_habitaciones === 'organizador' || modo_gestion_servicios === 'organizador') {
+        // Obtener email de administradores (en un entorno real, esto vendría de la base de datos)
+        const adminEmails = ['hdasancarlos@gmail.com']; // Email de ejemplo
+
+        // Enviar email a cada administrador
+        for (const adminEmail of adminEmails) {
+          await sendEmail({
+            email: adminEmail,
+            subject: 'Notificación de Gestión - Nueva Reserva',
+            html: notificacionGestionAdmin({
+              ...reservaData,
+              tipoEvento: tipo_evento,
+              fecha: fechaEvento,
+              modoGestionHabitaciones: modo_gestion_habitaciones,
+              modoGestionServicios: modo_gestion_servicios
+            })
+          });
+        }
+
+        console.log('Email de notificación de gestión enviado a los administradores');
+      }
+    } catch (notificationError) {
+      console.error('Error al enviar notificación de gestión:', notificationError);
+      // No interrumpimos el flujo si falla el envío de la notificación
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -297,7 +278,7 @@ exports.crearReservaEvento = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error al crear reserva de evento:', error);
+    console.error('[crearReservaEvento] Error general:', error);
     res.status(500).json({
       success: false,
       message: 'Error al crear la reserva de evento',

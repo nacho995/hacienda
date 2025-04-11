@@ -7,6 +7,7 @@ import ModoSeleccionReserva from './ModoSeleccionReserva';
 import ModoSeleccionEvento from './ModoSeleccionEvento';
 import ModoGestionServicios from './ModoGestionServicios';
 import EventoMapaHabitacionesNuevo from './EventoMapaHabitacionesNuevo';
+import EventDateSelector from './EventDateSelector';
 import { toast } from 'sonner';
 import { crearReservaEvento } from '@/services/reservas.service';
 import { crearReservaHacienda } from '@/services/gestionHacienda.service';
@@ -46,6 +47,7 @@ const ReservaWizard = () => {
   };
 
   const validateStep = (step) => {
+    console.log(`[validateStep] Validando paso ${step} con formData:`, formData); // Log para depurar
     switch (step) {
       case 1:
         if (!formData.selectedTipoEvento) {
@@ -66,14 +68,8 @@ const ReservaWizard = () => {
         }
         break;
       case 4:
-        if (formData.serviciosSeleccionados.length === 0) {
+        if (!Array.isArray(formData.serviciosSeleccionados) || formData.serviciosSeleccionados.length === 0) {
           toast.error('Seleccione al menos un servicio');
-          return false;
-        }
-        break;
-      case 5:
-        if (formData.habitacionesSeleccionadas.length === 0) {
-          toast.error('Seleccione al menos una habitación');
           return false;
         }
         break;
@@ -94,11 +90,20 @@ const ReservaWizard = () => {
       setLoading(true);
       let response;
 
+      // Extraer solo los IDs de los servicios seleccionados
+      const serviciosIds = formData.serviciosSeleccionados?.map(s => s._id).filter(id => id) || [];
+      // Crear una copia para el cálculo de precio (con todos los datos)
+      const serviciosCompletos = formData.serviciosSeleccionados || [];
+
       const dataToSend = {
         ...formData,
         tipo_evento: formData.selectedTipoEvento?.titulo,
-        selectedTipoEvento: undefined
+        serviciosContratados: serviciosIds, // Enviar array de IDs con la clave correcta
+        selectedTipoEvento: undefined, // Eliminamos el objeto completo si no se necesita en el backend
+        // Pasar los servicios completos por separado si el backend los necesita para calcular precio
+        _serviciosCompletosParaPrecio: serviciosCompletos 
       };
+      console.log("Datos a enviar (handleSubmit):", dataToSend); // Log para verificar
 
       if (formData.modoReserva === 'hacienda') {
         response = await crearReservaHacienda({
@@ -161,7 +166,7 @@ const ReservaWizard = () => {
                  onEventTypeSelect={handleEventTypeSelect} 
                />;
       case 2:
-        return <div>Componente de Fecha</div>;
+        return <EventDateSelector />;
       case 3:
         return <ModoSeleccionReserva />;
       case 4:
@@ -174,7 +179,6 @@ const ReservaWizard = () => {
       case 5:
         return (
           <EventoMapaHabitacionesNuevo 
-            onRoomsChange={(habitaciones) => updateFormSection('habitacionesSeleccionadas', habitaciones)}
             eventDate={formData.fecha}
           />
         );
@@ -241,4 +245,4 @@ const ReservaWizard = () => {
   );
 };
 
-export default ReservaWizard; 
+export default ReservaWizard;

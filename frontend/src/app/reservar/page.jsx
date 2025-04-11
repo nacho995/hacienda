@@ -235,7 +235,7 @@ const ReservaWizard = () => {
         }) || [],
         modo_gestion_habitaciones: formData.modoGestionHabitaciones,
         modo_gestion_servicios: formData.modoGestionServicios,
-        servicios_adicionales: formData.serviciosSeleccionados
+        serviciosContratados: formData.serviciosSeleccionados
       };
 
       // Enviar datos al backend
