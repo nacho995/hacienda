@@ -10,7 +10,7 @@ const {
   assignReservaHabitacion,
   unassignReservaHabitacion,
   updateReservaHabitacionHuespedes,
-  asignarHabitacionAdmin
+  getAllHabitacionOccupiedDates
 } = require('../controllers/reservaHabitacionController');
 
 // Importar controladores para eventos
@@ -44,6 +44,7 @@ const router = express.Router();
 // ========================
 
 // Rutas públicas para habitaciones
+router.get('/habitaciones/fechas-ocupadas-todas', getAllHabitacionOccupiedDates);
 router.post('/habitaciones/disponibilidad', checkHabitacionAvailability);
 router.get('/habitaciones/fechas-ocupadas', getHabitacionOccupiedDates);
 router.post('/habitaciones', createReservaHabitacion);
@@ -55,7 +56,7 @@ router.patch('/habitaciones/:id', protectRoute, updateReservaHabitacion);
 router.delete('/habitaciones/:id', protectRoute, deleteReservaHabitacion);
 
 // Asignar/desasignar reserva a un usuario
-router.put('/habitaciones/:id/asignar', protectRoute, authorize('admin'), asignarHabitacionAdmin);
+router.put('/habitaciones/:id/asignar', protectRoute, authorize('admin'), assignReservaHabitacion);
 router.put('/habitaciones/:id/desasignar', protectRoute, unassignReservaHabitacion);
 
 // Nueva ruta para actualizar información de huéspedes (solo Admin)

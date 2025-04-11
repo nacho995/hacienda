@@ -634,6 +634,62 @@ exports.getHabitacionOccupiedDates = asyncHandler(async (req, res, next) => {
   }
 });
 
+// @desc    Obtener TODAS las fechas en las que CUALQUIER habitación está ocupada
+// @route   GET /api/reservas/habitaciones/fechas-ocupadas-todas
+// @access  Public
+exports.getAllHabitacionOccupiedDates = asyncHandler(async (req, res, next) => {
+  try {
+    const { fechaInicio, fechaFin } = req.query;
+
+    if (!fechaInicio || !fechaFin) {
+      return res.status(400).json({ success: false, message: 'Faltan los parámetros fechaInicio o fechaFin' });
+    }
+    
+    const fechaInicioObj = new Date(fechaInicio);
+    const fechaFinObj = new Date(fechaFin);
+    
+    if (isNaN(fechaInicioObj.getTime()) || isNaN(fechaFinObj.getTime())) {
+      return res.status(400).json({ success: false, message: 'Fechas inválidas' });
+    }
+
+    // Buscar todas las reservas activas que se solapen con el rango
+    const reservas = await ReservaHabitacion.find({
+      estadoReserva: { $in: ['confirmada', 'pendiente'] }, // Solo activas
+      $or: [
+        { fechaEntrada: { $lt: fechaFinObj }, fechaSalida: { $gt: fechaInicioObj } }, // Solapamiento
+      ]
+    });
+
+    const occupiedDatesSet = new Set();
+
+    reservas.forEach(reserva => {
+      let currentDate = new Date(reserva.fechaEntrada);
+      const endDate = new Date(reserva.fechaSalida);
+      
+      while (currentDate < endDate) {
+        if (currentDate >= fechaInicioObj && currentDate <= fechaFinObj) {
+          occupiedDatesSet.add(currentDate.toISOString().split('T')[0]);
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
+    
+    const occupiedDatesArray = Array.from(occupiedDatesSet);
+
+    res.status(200).json({
+      success: true,
+      data: occupiedDatesArray // Devolver array de strings YYYY-MM-DD
+    });
+  } catch (error) {
+    console.error('Error al obtener todas las fechas ocupadas de habitaciones:', error);
+    res.status(500).json({
+      success: false,
+      message: 'No se pudieron obtener todas las fechas ocupadas',
+      error: error.message
+    });
+  }
+});
+
 // @desc    Actualizar información de huéspedes para una reserva de habitación
 // @route   PUT /api/reservas/habitaciones/:id/huespedes
 // @access  Private

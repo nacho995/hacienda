@@ -921,6 +921,43 @@ export const getHabitacionOccupiedDates = async (params = {}) => {
   }
 };
 
+// Obtener TODAS las fechas ocupadas por CUALQUIER habitación
+export const getAllHabitacionOccupiedDates = async (params = {}) => {
+  try {
+    let url = '/reservas/habitaciones/fechas-ocupadas-todas';
+    const queryParams = [];
+    if (params.fechaInicio) {
+      queryParams.push(`fechaInicio=${params.fechaInicio}`);
+    }
+    if (params.fechaFin) {
+      queryParams.push(`fechaFin=${params.fechaFin}`);
+    }
+
+    if (queryParams.length > 0) {
+      url += `?${queryParams.join('&')}`;
+    } else {
+      // Podríamos lanzar un error o devolver vacío si no hay fechas
+      console.warn("getAllHabitacionOccupiedDates llamada sin rango de fechas.");
+      return { success: true, data: [] }; // Devolver vacío si no hay rango
+    }
+
+    const response = await apiClient.get(url);
+
+    if (response && response.success && Array.isArray(response.data)) {
+      // Convertir strings YYYY-MM-DD a objetos Date (UTC para evitar problemas de zona)
+      const dates = response.data.map(dateString => new Date(dateString + 'T00:00:00Z'));
+      return { success: true, data: dates };
+    } else {
+      console.warn('Respuesta no exitosa o datos inválidos para todas las fechas ocupadas de habitaciones:', response);
+      return { success: false, data: [], message: response?.message || 'Formato inesperado' };
+    }
+  } catch (error) {
+    console.error('Error en servicio getAllHabitacionOccupiedDates:', error);
+    // Devolver un objeto de error consistente
+    return { success: false, data: [], message: error.message || 'Error al obtener fechas ocupadas' };
+  }
+};
+
 // Eliminar reservas
 export const deleteHabitacionReservation = async (id) => {
   try {

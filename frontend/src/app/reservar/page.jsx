@@ -11,7 +11,8 @@ import { getTiposEvento } from '@/services/tiposEvento.service';
 import { // crearReservaEvento, // Comentado temporalmente
          createHabitacionReservation,
          createEventoReservation, // Posible reemplazo
-         getEventoOccupiedDates // Añadido para obtener fechas ocupadas
+         getEventoOccupiedDates, // Fechas ocupadas por eventos
+         getAllHabitacionOccupiedDates // Fechas ocupadas por habitaciones
        } from '@/services/reservationService'; 
 
 import ModoSeleccionEvento from '@/components/reservas/ModoSeleccionEvento';
@@ -82,43 +83,66 @@ const ReservaWizard = () => {
   const [selectedEventType, setSelectedEventType] = useState(formData.tipoEvento || null);
   const router = useRouter();
   
-  // --- Estados para fechas ocupadas por EVENTOS --- 
-  const [occupiedEventDates, setOccupiedEventDates] = useState([]);
-  const [loadingOccupiedEventDates, setLoadingOccupiedEventDates] = useState(false);
+  // --- Estados para fechas ocupadas (combinadas) --- 
+  const [occupiedDates, setOccupiedDates] = useState([]);
+  const [loadingOccupiedDates, setLoadingOccupiedDates] = useState(false);
 
-  // --- Función para cargar fechas ocupadas por EVENTOS --- 
-  const fetchOccupiedEventDates = useCallback(async (fechaInicioVisible, fechaFinVisible) => {
-    setLoadingOccupiedEventDates(true);
+  // --- Función para cargar fechas ocupadas (eventos Y habitaciones) --- 
+  const fetchOccupiedDates = useCallback(async (fechaInicioVisible, fechaFinVisible) => {
+    setLoadingOccupiedDates(true);
     try {
       const formatApiDate = (date) => date.toISOString().split('T')[0];
       const params = {
         fechaInicio: formatApiDate(fechaInicioVisible),
         fechaFin: formatApiDate(fechaFinVisible),
       };
-      // La función del servicio devuelve directamente el array de fechas ocupadas
-      const occupiedDatesArray = await getEventoOccupiedDates(params); 
+      
+      // Llamadas en paralelo
+      const [eventDatesResponse, roomDatesResponse] = await Promise.all([
+        getEventoOccupiedDates(params), // Devuelve array de objetos { fecha: Date }
+        getAllHabitacionOccupiedDates(params) // Devuelve { success: boolean, data: Date[] }
+      ]);
 
-      // MODIFICADO: Verificar si la respuesta es un array 
-      if (Array.isArray(occupiedDatesArray)) {
-        // La conversión a Date ya se hace en el servicio
-        // const occupiedDates = occupiedDatesArray.map(dateString => new Date(dateString)); <-- Ya no es necesario
-        // Asegurarse de que el array contiene objetos Date válidos
-        const validDates = occupiedDatesArray
-          .map(item => item?.fecha) // Extraer la fecha del objeto devuelto por el servicio
+      let combinedDates = [];
+
+      // Procesar fechas de eventos
+      if (Array.isArray(eventDatesResponse)) {
+        const validEventDates = eventDatesResponse
+          .map(item => item?.fecha) 
           .filter(date => date instanceof Date && !isNaN(date.getTime()));
-          
-        setOccupiedEventDates(validDates);
+        combinedDates.push(...validEventDates);
       } else {
-        // Esto no debería ocurrir si el servicio siempre devuelve un array
-        console.error('Respuesta inesperada al obtener fechas ocupadas de eventos (no es un array):', occupiedDatesArray);
-        setOccupiedEventDates([]);
+        console.error('Respuesta inesperada al obtener fechas ocupadas de eventos (no es un array):', eventDatesResponse);
       }
+
+      // Procesar fechas de habitaciones
+      if (roomDatesResponse?.success && Array.isArray(roomDatesResponse.data)) {
+        const validRoomDates = roomDatesResponse.data.filter(date => date instanceof Date && !isNaN(date.getTime()));
+        combinedDates.push(...validRoomDates);
+      } else {
+        console.error('Error al obtener fechas ocupadas de habitaciones:', roomDatesResponse?.message);
+      }
+
+      // Eliminar duplicados y asegurarse de que son objetos Date válidos
+      const uniqueDatesMap = new Map();
+      combinedDates.forEach(date => {
+        if (date instanceof Date && !isNaN(date.getTime())) {
+           // Usar YYYY-MM-DD como clave para unicidad
+           const key = date.toISOString().split('T')[0]; 
+           if (!uniqueDatesMap.has(key)) {
+             uniqueDatesMap.set(key, date);
+           }
+        }
+      });
+
+      const finalOccupiedDates = Array.from(uniqueDatesMap.values());
+
+      setOccupiedDates(finalOccupiedDates); // Actualizar estado combinado
     } catch (error) {
-      // Captura errores de la llamada al servicio o del procesamiento
-      console.error('Excepción al obtener fechas ocupadas de eventos:', error);
-      setOccupiedEventDates([]);
+      console.error('Excepción al obtener fechas ocupadas (eventos o habitaciones):', error);
+      setOccupiedDates([]); // Resetear en caso de error
     } finally {
-      setLoadingOccupiedEventDates(false);
+      setLoadingOccupiedDates(false);
     }
   }, []);
 
@@ -127,8 +151,8 @@ const ReservaWizard = () => {
     // Cargar fechas para los próximos 6 meses por defecto
     const hoy = new Date();
     const seisMesesDespues = new Date(hoy.getFullYear(), hoy.getMonth() + 6, hoy.getDate());
-    fetchOccupiedEventDates(hoy, seisMesesDespues);
-  }, [fetchOccupiedEventDates]);
+    fetchOccupiedDates(hoy, seisMesesDespues);
+  }, [fetchOccupiedDates]);
 
   // AÑADIDO: useEffect para resetear el formulario al montar el componente
   useEffect(() => {
@@ -190,7 +214,7 @@ const ReservaWizard = () => {
 
       // Crear un set de fechas ocupadas (en formato YYYY-MM-DD para comparación fácil)
       const occupiedSet = new Set(
-        occupiedEventDates.map(date => {
+        occupiedDates.map(date => {
           // Asegurarse de que 'date' sea un objeto Date válido
           if (date instanceof Date && !isNaN(date.getTime())) {
             const year = date.getFullYear();
@@ -222,6 +246,15 @@ const ReservaWizard = () => {
         }
         // Avanzar al día siguiente
         currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      // Añadido: Validar número de habitaciones (7-14)
+      const numHabitaciones = parseInt(formData.numeroHabitaciones, 10);
+      if (isNaN(numHabitaciones) || numHabitaciones < 7 || numHabitaciones > 14) {
+        setValidationErrorMessage("El número estimado de habitaciones debe estar entre 7 y 14.");
+        setShowValidationModal(true);
+        // Opcional: setValidationRedirectStep(2); // Para ofrecer ir al paso 2
+        return; // Detener el avance
       }
     }
 
@@ -317,7 +350,7 @@ const ReservaWizard = () => {
 
   const handleSubmit = async () => {
     // --- Inicio: Añadir validación y log ---
-    if (!formData.fecha || isNaN(new Date(formData.fecha).getTime())) {
+    if (!formData.fechaInicio || isNaN(new Date(formData.fechaInicio).getTime())) {
       toast.error('La fecha seleccionada no es válida. Por favor, selecciónela de nuevo.');
       setCurrentStep(2); // Volver al paso de fecha
       return;
@@ -325,25 +358,57 @@ const ReservaWizard = () => {
     console.log('Datos de habitaciones seleccionadas antes de mapear:', JSON.stringify(formData.habitacionesSeleccionadas, null, 2));
     // --- Fin: Añadir validación y log ---
     
+    // --- Reactivar lógica de envío --- 
     try {
-      // Comentar uso temporalmente
-      /*
-      if (modoReserva === 'hacienda') {
-        response = await crearReservaEvento({ 
-            // ... datos 
-        });
+      // ---- NUEVO LOG ----
+      console.log("Valor de formData.tipoEvento antes de construir reservaData:", JSON.stringify(formData.tipoEvento, null, 2));
+      // ---- FIN NUEVO LOG ----
+      
+      // Construir el objeto de datos para la reserva (AJUSTADO A EXPECTATIVAS DEL BACKEND)
+      const reservaData = {
+        tipo_evento: formData.tipoEvento?.titulo || formData.tipoEvento, // Campo backend: tipo_evento (Enviar título)
+        fecha: formData.fechaInicio, // Campo backend: fecha (usamos fechaInicio como principal)
+        // Campos de contacto mapeados:
+        nombre_contacto: formData.datosContacto?.nombre,
+        apellidos_contacto: formData.datosContacto?.apellidos,
+        email_contacto: formData.datosContacto?.email,
+        telefono_contacto: formData.datosContacto?.telefono,
+        mensaje: formData.datosContacto?.mensaje, // Campo backend: mensaje
+        // Modos de gestión mapeados:
+        modo_gestion_habitaciones: formData.modoGestionHabitaciones,
+        modo_gestion_servicios: formData.modoGestionServicios,
+        // Habitaciones y servicios (asegurarse de que el backend espera este formato)
+        habitaciones: formData.habitacionesSeleccionadas, // Campo backend: habitaciones
+        serviciosContratados: formData.serviciosSeleccionados.map(s => s._id || s), // Campo backend: serviciosContratados
+        // Incluir _serviciosCompletosParaPrecio si el modo es usuario para cálculo de precio en backend
+        ...(formData.modoGestionServicios === 'usuario' && { 
+             _serviciosCompletosParaPrecio: formData.serviciosSeleccionados 
+        })
+      };
+
+      console.log("Enviando datos de reserva:", reservaData);
+
+      // Llamar al servicio de creación de reserva de evento
+      // Asegúrate de que la función createEventoReservation esté importada correctamente
+      const response = await createEventoReservation(reservaData);
+
+      console.log("Respuesta del servidor:", response);
+
+      if (response && (response.success || response.data)) { // Verificar éxito (la estructura de respuesta puede variar)
+        toast.success('¡Reserva creada exitosamente!');
+        resetForm(); // Limpiar el formulario
+        // Opcional: Redirigir a página de confirmación o dashboard
+        // router.push('/reservar/confirmacion'); 
+        setCurrentStep(steps.length + 1); // Avanzar a un paso de "éxito" (si existe)
       } else {
-         // Lógica para reserva cliente (asumiendo que usa createHabitacionReservation)
-         response = await createHabitacionReservation({ 
-             // ... datos 
-         });
+        // Manejar error devuelto por el backend
+        toast.error(response?.message || 'Error al crear la reserva. Intente de nuevo.');
+        // Podrías querer volver a un paso anterior si el error lo justifica
+        // setCurrentStep(5); 
       }
-      */
-     console.log("Lógica de submit comentada temporalmente debido a importación faltante de crearReservaEvento");
-     toast.info("Funcionalidad de envío deshabilitada temporalmente.")
-      // ... resto de la lógica de submit (manejo de respuesta) ...
     } catch (error) {
-      // ... manejo de error ...
+      console.error('Error al enviar la reserva:', error);
+      toast.error(error.response?.data?.message || error.message || 'Error de conexión al crear la reserva.');
     }
   };
 
@@ -382,22 +447,25 @@ const ReservaWizard = () => {
                 startDate={formData.fechaInicio instanceof Date && !isNaN(formData.fechaInicio) ? formData.fechaInicio : null}
                 endDate={formData.fechaFin instanceof Date && !isNaN(formData.fechaFin) ? formData.fechaFin : null}
                 onChange={handleDateRangeChange} 
-                occupiedDates={occupiedEventDates}
-                loadingOccupiedDates={loadingOccupiedEventDates}
+                occupiedDates={occupiedDates}
+                loadingOccupiedDates={loadingOccupiedDates}
                 placeholderText="Seleccione el rango de fechas"
               />
             </div>
             <div>
-              <label htmlFor="numeroHabitaciones" className="block text-sm font-medium text-[#6B4F3A] mb-2">Número Estimado de Habitaciones</label>
-              <input 
-                type="number" 
+              <label htmlFor="numeroHabitaciones" className="block text-sm font-medium text-[#6B4F3A] mb-2">Número de Habitaciones Requeridas</label>
+              <select 
                 id="numeroHabitaciones" 
                 name="numeroHabitaciones" 
-                value={formData.numeroHabitaciones || 0} 
-                onChange={(e) => updateFormSection('numeroHabitaciones', parseInt(e.target.value, 10) || 0)} 
-                min="0" 
+                value={formData.numeroHabitaciones || 7}
+                onChange={(e) => updateFormSection('numeroHabitaciones', parseInt(e.target.value, 10))} 
                 className="w-full p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300"
-              />
+              >
+                {[...Array(14 - 7 + 1)].map((_, i) => {
+                  const value = 7 + i;
+                  return <option key={value} value={value}>{value}</option>;
+                })}
+              </select>
             </div>
           </div>
         );

@@ -221,11 +221,11 @@ exports.crearReservaEvento = async (req, res) => {
                 const reservaHabitacionData = {
                     tipoReserva: 'evento',
                     reservaEvento: reserva._id,
-                    habitacion: hab.habitacion,
-                    tipoHabitacion: hab.tipoHabitacion || 'Estándar',
-                    categoriaHabitacion: (hab.numHuespedes <= 2) ? 'sencilla' : 'doble',
-                    precio: hab.precio || 0,
-                    numHuespedes: hab.numHuespedes || 2,
+                    habitacion: hab.letra,
+                    tipoHabitacion: hab.tipoHabitacion?.nombre || hab.tipoHabitacion || 'Estándar',
+                    categoriaHabitacion: (hab.capacidad <= 2) ? 'sencilla' : 'doble',
+                    precio: hab.precioPorNoche || hab.precio || 0,
+                    numHuespedes: hab.capacidad || 2,
                     fechaEntrada: entrada,
                     fechaSalida: salida,
                     estadoReserva: 'pendiente',
@@ -234,8 +234,19 @@ exports.crearReservaEvento = async (req, res) => {
                     emailContacto: email_contacto,
                     telefonoContacto: telefono_contacto,
                     fecha: fechaEvento,
-                    letraHabitacion: hab.habitacion
+                    letraHabitacion: hab.letra
                 };
+                
+                console.log(`[crearReservaEvento] Datos para crear ReservaHabitacion (usuario):`, JSON.stringify(reservaHabitacionData)); // Log antes de crear
+
+                // VALIDACIÓN ADICIONAL ANTES DE CREAR
+                if (!reservaHabitacionData.habitacion) {
+                   console.error(`[crearReservaEvento] ERROR: Intento de crear ReservaHabitacion sin letra/identificador para el objeto:`, JSON.stringify(hab));
+                   // Podrías lanzar un error aquí o saltar esta iteración
+                   // throw new Error(`Falta la letra para una de las habitaciones seleccionadas.`); 
+                   continue; // Saltar esta habitación y continuar con las demás
+                }
+
                 const reservaHabitacion = await ReservaHabitacion.create(reservaHabitacionData);
                 reservasHabitacionesCreadas.push(reservaHabitacion); // Guardar para la respuesta
                 console.log(`[crearReservaEvento] Habitación Usuario ${hab.habitacion} creada con ID: ${reservaHabitacion._id}`);
@@ -1024,11 +1035,13 @@ exports.obtenerHabitacionesEvento = async (req, res) => {
     const habitaciones = await ReservaHabitacion.find({ reservaEvento: eventoId })
       .populate({ // Popular la información de la habitación física
         path: 'habitacion', // Campo que referencia al modelo Habitacion
-        select: 'nombre letra identificador piso -_id' // Seleccionar campos deseados
+        select: 'letra nombre tipo', // Seleccionar campos deseados
+        strictPopulate: false
       })
       .populate({ // Popular la información del tipo de habitación
         path: 'tipoHabitacion', // Campo que referencia al modelo TipoHabitacion
-        select: 'nombre precio -_id' // Seleccionar campos deseados
+        select: 'nombre precio -_id', // Seleccionar campos deseados
+        strictPopulate: false
       })
       .populate({ // Popular usuario asignado si existe
         path: 'asignadoA',
