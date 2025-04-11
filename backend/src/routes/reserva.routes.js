@@ -51,7 +51,7 @@ router.post('/habitaciones', createReservaHabitacion);
 // Rutas protegidas para habitaciones
 router.get('/habitaciones', protectRoute, getReservasHabitacion);
 router.get('/habitaciones/:id', protectRoute, getReservaHabitacion);
-router.put('/habitaciones/:id', protectRoute, updateReservaHabitacion);
+router.patch('/habitaciones/:id', protectRoute, updateReservaHabitacion);
 router.delete('/habitaciones/:id', protectRoute, deleteReservaHabitacion);
 
 // Asignar/desasignar reserva a un usuario

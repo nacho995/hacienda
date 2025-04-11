@@ -272,7 +272,7 @@ export const createHabitacionReservation = async (reservationData) => {
 
 export const updateHabitacionReservation = async (id, data) => {
   try {
-    const response = await apiClient.put(`/reservas/habitaciones/${id}`, data);
+    const response = await apiClient.patch(`/reservas/habitaciones/${id}`, data);
     return response;
   } catch (error) {
     console.error(`Error al actualizar reserva de habitación ${id}:`, error.message || error);
@@ -1017,63 +1017,11 @@ export const unassignHabitacionReservation = async (id) => {
       return await unassignEventoReservation(eventId);
     }
     
-    // Intentar primero verificar si esta habitación es parte de un evento
-    try {
-      // Obtener todos los eventos
-      const eventosResponse = await apiClient.get('/reservas/eventos');
-      if (eventosResponse?.data && Array.isArray(eventosResponse.data)) {
-        // Buscar un evento que contenga esta habitación
-        for (const evento of eventosResponse.data) {
-          if (evento.serviciosAdicionales?.habitaciones?.length > 0) {
-            const habitacionEnEvento = evento.serviciosAdicionales.habitaciones.find(
-              h => h._id === id || h.reservaHabitacionId === id
-            );
-            
-            if (habitacionEnEvento) {
-              console.log(`Habitación ${id} encontrada en evento ${evento._id}`);
-              // Si la habitación es parte de un evento, desasignar el evento
-              return await unassignEventoReservation(evento._id);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('Error al verificar eventos para la habitación:', error);
-      // Continuamos con el intento normal de desasignación
-    }
-    
-    // Verificar primero si la habitación existe
-    try {
-      const habitacionResponse = await apiClient.get(`/reservas/habitaciones/${id}`);
-      if (!habitacionResponse || !habitacionResponse.data) {
-        console.error(`Habitación ${id} no encontrada en la base de datos`);
-        throw {
-          success: false,
-          message: `La habitación con ID ${id} no existe o ha sido eliminada`,
-          status: 404
-        };
-      }
-    } catch (error) {
-      // Si es un error 404, podemos intentar con otra estrategia
-      if (error.status === 404) {
-        console.warn(`Habitación ${id} no encontrada. Verificando otras posibles soluciones...`);
-        
-        // Una opción es eliminar la asignación solo en el frontend
-        // Devolvemos un mensaje de éxito simulado
-        return {
-          success: true,
-          message: `Habitación ${id} marcada como desasignada localmente. Refresque la página para actualizar la vista.`,
-          data: { _id: id, asignadoA: null }
-        };
-      }
-      
-      throw error;
-    }
-    
-    // Caso normal: desasignar una reserva de habitación independiente
-    console.log(`Desasignando habitación independiente ${id}`);
+    // Caso normal: desasignar directamente la reserva de habitación independiente
+    console.log(`Desasignando habitación independiente ${id} directamente`);
     const response = await apiClient.put(`/reservas/habitaciones/${id}/desasignar`);
     return response;
+
   } catch (error) {
     console.error(`Error al desasignar reserva de habitación ${id}:`, error.message || error);
     

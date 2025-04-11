@@ -5,7 +5,7 @@ import { FaEdit, FaTrash, FaBed, FaUserFriends, FaCalendarAlt, FaSpinner, FaEye,
          FaSync, FaUserPlus, FaUserMinus, FaUserCheck, FaFilter, FaSort, FaSearch,
          FaTimes, FaChevronDown, FaChevronRight, FaMapMarkerAlt, FaEuroSign, FaArrowUp, FaArrowDown,
          FaEllipsisV, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
-import { assignHabitacionReservation, unassignHabitacionReservation } from '@/services/reservationService';
+import { assignHabitacionReservation, unassignHabitacionReservation, deleteHabitacionReservation } from '@/services/reservationService';
 import { useAuth } from '@/context/AuthContext';
 import { useReservation } from '@/context/ReservationContext';
 import { useRouter } from 'next/navigation';
@@ -305,90 +305,118 @@ export default function AdminHotelReservations() {
   // --- Handlers de Reserva (Adaptar y añadir nuevos) ---
   const handleConfirmarReserva = async (reservaId) => {
     console.log(`[AdminHotelReservations] INICIO handleConfirmarReserva (ID: ${reservaId})`);
-    setOpenActionMenu(null);
-    if (!reservaId) return;
+    if (!reservaId) {
+      toast.error('ID de reserva inválido.');
+      return;
+    }
+    setIsLoading(true);
     try {
-      console.log("[AdminHotelReservations] PRE-API CALL handleConfirmarReserva");
-      const response = await apiClient.patch(`/reservas/habitaciones/${reservaId}`, {
-        estadoReserva: 'confirmada'
-      });
-      if (response && response.data && response.data.success) {
-        toast.success('Reserva confirmada exitosamente.');
-        loadAllReservations(false); // Recargar datos
+      const payload = { estadoReserva: 'confirmada' };
+      const url = `/reservas/habitaciones/${reservaId}`;
+      console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, payload);
+      console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+      
+      if (response && response.success === true) {
+        toast.success('Reserva confirmada correctamente');
+        loadAllReservations(false); // Llamar sin await
       } else {
-        toast.error(response?.data?.message || 'Error al confirmar la reserva.');
+        throw new Error(response?.message || 'Error al confirmar la reserva');
       }
     } catch (error) {
-      toast.error('Error al confirmar la reserva de hotel');
       console.error('Error confirmando reserva hotel:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      toast.error('Error al confirmar reserva: ' + errorMessage);
+    } finally {
+      setIsLoading(false);
+      setOpenActionMenu(null); // Cerrar menú si estaba abierto
     }
   };
 
   const handleCancelarReserva = async (reservaId) => {
     console.log(`[AdminHotelReservations] INICIO handleCancelarReserva (ID: ${reservaId})`);
-    setOpenActionMenu(null);
-    if (!reservaId) return;
-    if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva de hotel?')) {
-        try {
-            console.log("[AdminHotelReservations] PRE-API CALL handleCancelarReserva");
-            const response = await apiClient.patch(`/reservas/habitaciones/${reservaId}`, {
-              estadoReserva: 'cancelada'
-            });
-            if (response && response.data && response.data.success) {
-              toast.success('Reserva cancelada exitosamente.');
-              loadAllReservations(false); // Recargar datos
-            } else {
-              toast.error(response?.data?.message || 'Error al cancelar la reserva.');
-            }
-        } catch (error) {
-            toast.error('Error al cancelar la reserva de hotel');
-            console.error('Error cancelando reserva hotel:', error);
-        }
+    if (!reservaId) {
+      toast.error('ID de reserva inválido.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const payload = { estadoReserva: 'cancelada' };
+      const url = `/reservas/habitaciones/${reservaId}`;
+      console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, payload);
+      console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+
+      if (response && response.success === true) {
+        toast.success('Reserva cancelada correctamente');
+        loadAllReservations(false); // Llamar sin await
+      } else {
+        throw new Error(response?.message || 'Error al cancelar la reserva');
+      }
+    } catch (error) {
+      console.error('Error cancelando reserva hotel:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      toast.error('Error al cancelar reserva: ' + errorMessage);
+    } finally {
+      setIsLoading(false);
+      setOpenActionMenu(null); // Cerrar menú si estaba abierto
     }
   };
 
   const handleEliminarReserva = async (reservaId) => {
-    console.log(`[AdminHotelReservations] INICIO handleEliminarReserva (ID: ${reservaId})`);
-    setOpenActionMenu(null);
-    if (!reservaId) return;
-    if (window.confirm('¡Acción irreversible! ¿Estás seguro de que quieres ELIMINAR esta reserva de hotel permanentemente?')) {
+    if (!reservaId) {
+      toast.error('ID inválido para eliminar.');
+      return;
+    }
+    const confirm = window.confirm('¿Seguro que quieres eliminar esta reserva?');
+    if (confirm) {
+      setIsLoading(true);
       try {
-        console.log("[AdminHotelReservations] PRE-API CALL handleEliminarReserva");
-        const response = await apiClient.delete(`/reservas/habitaciones/${reservaId}`);
-        if (response && response.data && response.data.success) {
-          toast.success('Reserva eliminada permanentemente.');
-          loadAllReservations(false); // Recargar datos
+        const response = await deleteHabitacionReservation(reservaId); // Usar función del servicio
+        if (response.success) {
+          toast.success('Reserva eliminada con éxito');
+          loadAllReservations(false); // Sin await
         } else {
-          toast.error(response?.data?.message || 'Error al eliminar la reserva.');
+          throw new Error(response.message || 'Error al eliminar');
         }
       } catch (error) {
-        toast.error('Error al eliminar la reserva de hotel');
-        console.error('Error eliminando reserva hotel:', error);
+        console.error('Error eliminando reserva:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        toast.error('Error al eliminar: ' + errorMessage);
+      } finally {
+        setIsLoading(false);
+        setOpenActionMenu(null);
       }
     }
   };
 
-  // NUEVA FUNCIÓN HANDLER para marcar como pendiente
   const handleMarcarPendiente = async (reservaId) => {
-    setOpenActionMenu(null);
-    if (!reservaId) return;
-    if (window.confirm('¿Estás seguro de que quieres marcar esta reserva de hotel como pendiente?')) {
-      try {
-        // Usamos la misma API que para confirmar/cancelar, solo cambia el estado
-        const response = await apiClient.put(`/reservas/habitaciones/${reservaId}`, {
-          estadoReserva: 'pendiente'
-        });
-        // Asumimos que apiClient devuelve {success: true/false, ...}
-        if (response && response.success) { 
-          toast.success('Reserva de hotel marcada como pendiente.');
-          loadAllReservations(false);
-        } else {
-          toast.error(response?.message || 'Error al marcar como pendiente.');
-        }
-      } catch (error) {
-        toast.error('Error al marcar como pendiente');
-        console.error('Error marcando reserva hotel como pendiente:', error);
+    console.log(`[AdminHotelReservations] INICIO handleMarcarPendiente (ID: ${reservaId})`);
+    if (!reservaId) {
+      toast.error('ID de reserva inválido.');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const payload = { estadoReserva: 'pendiente' };
+      const url = `/reservas/habitaciones/${reservaId}`;
+      console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, payload);
+      console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+
+      if (response && response.success === true) {
+        toast.success('Reserva marcada como pendiente');
+        loadAllReservations(false); // Llamar sin await
+      } else {
+        throw new Error(response?.message || 'Error al marcar como pendiente');
       }
+    } catch (error) {
+      console.error('Error marcando pendiente reserva hotel:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      toast.error('Error al marcar pendiente: ' + errorMessage);
+    } finally {
+      setIsLoading(false);
+      setOpenActionMenu(null); // Cerrar menú si estaba abierto
     }
   };
 
