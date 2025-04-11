@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useReservation } from '@/context/ReservationContext';
 import { useRouter } from 'next/navigation';
 import ModoSeleccionReserva from './ModoSeleccionReserva';
+import ModoSeleccionEvento from './ModoSeleccionEvento';
 import ModoGestionServicios from './ModoGestionServicios';
 import EventoMapaHabitacionesNuevo from './EventoMapaHabitacionesNuevo';
 import { toast } from 'sonner';
@@ -12,7 +13,7 @@ import { crearReservaHacienda } from '@/services/gestionHacienda.service';
 
 const ReservaWizard = () => {
   const router = useRouter();
-  const { formData, updateFormSection } = useReservation();
+  const { formData, updateFormSection, resetForm } = useReservation();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -25,6 +26,11 @@ const ReservaWizard = () => {
     { id: 5, title: 'Habitaciones' },
     { id: 6, title: 'Confirmación' }
   ];
+
+  const handleEventTypeSelect = (tipo) => {
+    console.log('Tipo de evento seleccionado:', tipo);
+    updateFormSection('selectedTipoEvento', tipo);
+  };
 
   const handleNextStep = async () => {
     // Validaciones específicas para cada paso
@@ -42,7 +48,7 @@ const ReservaWizard = () => {
   const validateStep = (step) => {
     switch (step) {
       case 1:
-        if (!formData.tipoEvento) {
+        if (!formData.selectedTipoEvento) {
           toast.error('Seleccione un tipo de evento');
           return false;
         }
@@ -88,13 +94,19 @@ const ReservaWizard = () => {
       setLoading(true);
       let response;
 
+      const dataToSend = {
+        ...formData,
+        tipo_evento: formData.selectedTipoEvento?.titulo,
+        selectedTipoEvento: undefined
+      };
+
       if (formData.modoReserva === 'hacienda') {
         response = await crearReservaHacienda({
-          ...formData,
+          ...dataToSend,
           estado: 'pendiente_gestion'
         });
       } else {
-        response = await crearReservaEvento(formData);
+        response = await crearReservaEvento(dataToSend);
       }
 
       if (response.success) {
@@ -109,7 +121,21 @@ const ReservaWizard = () => {
           });
         }
         
-        router.push(`/reservar/confirmacion?id=${response.data.id}`);
+        // Redirigir a la página de confirmación
+        // Asegurarse de que response.data.id o response.data.reserva._id existe
+        const reservaId = response.data?.id || response.data?.reserva?._id;
+        if (reservaId) {
+            router.push(`/reservar/confirmacion?id=${reservaId}`);
+        } else {
+            // Manejar caso donde no hay ID (poco probable si success es true)
+            console.error('No se encontró ID en la respuesta exitosa', response.data);
+            toast.warning('Reserva creada, pero hubo un problema al redirigir.');
+            router.push('/'); // Redirigir a inicio como fallback
+        }
+
+        // --- Llamar a resetForm DESPUÉS de la redirección --- 
+        resetForm(); 
+
       } else {
         toast.error('Error al crear la reserva', {
           description: response.message
@@ -128,7 +154,10 @@ const ReservaWizard = () => {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return <div>Componente de Tipo de Evento</div>;
+        return <ModoSeleccionEvento 
+                 selectedEventType={formData.selectedTipoEvento} 
+                 onEventTypeSelect={handleEventTypeSelect} 
+               />;
       case 2:
         return <div>Componente de Fecha</div>;
       case 3:
@@ -136,7 +165,7 @@ const ReservaWizard = () => {
       case 4:
         return (
           <ModoGestionServicios 
-            tipoEvento={formData.tipoEvento}
+            tipoEvento={formData.selectedTipoEvento}
             onServicesSelect={(servicios) => updateFormSection('serviciosSeleccionados', servicios)}
           />
         );

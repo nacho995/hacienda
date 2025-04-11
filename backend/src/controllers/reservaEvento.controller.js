@@ -362,6 +362,12 @@ exports.obtenerReservasEvento = async (req, res) => {
         path: 'tipoEvento',
         strictPopulate: false
       })
+      .populate({
+        path: 'serviciosAdicionales.reservaHabitacionId',
+        model: 'ReservaHabitacion',
+        select: '_id letraHabitacion',
+        strictPopulate: false
+      })
       .sort({ fecha: 1, horaInicio: 1 });
       
     res.status(200).json({
@@ -388,6 +394,7 @@ exports.obtenerReservaEvento = async (req, res) => {
   try {
     // Buscar la reserva de evento con los datos básicos populados
     const reserva = await ReservaEvento.findById(req.params.id)
+      .select('+precio +nombreEvento +nombreContacto +apellidosContacto +emailContacto +telefonoContacto +fecha +horaInicio +horaFin +numeroInvitados +espacioSeleccionado +peticionesEspeciales +estadoReserva')
       .populate({
         path: 'usuario',
         select: 'nombre apellidos email telefono',
@@ -580,6 +587,13 @@ exports.eliminarReservaEvento = async (req, res) => {
     //   });
     // }
     
+    // --- Añadido: Eliminar habitaciones asociadas ANTES de eliminar el evento --- 
+    const ReservaHabitacion = require('../models/ReservaHabitacion'); // Asegurarse de importar el modelo
+    const deleteResult = await ReservaHabitacion.deleteMany({ reservaEvento: reserva._id });
+    console.log(`Eliminadas ${deleteResult.deletedCount} habitaciones asociadas al evento ${reserva._id}`);
+    // -------------------------------------------------------------------------
+    
+    // Ahora eliminar el evento
     await reserva.deleteOne();
     
     res.status(200).json({
@@ -1191,5 +1205,112 @@ exports.removeEventoServicio = async (req, res, next) => {
   } catch (error) {
     console.error('Error al eliminar servicio del evento:', error);
     res.status(500).json({ success: false, message: 'Error del servidor' });
+  }
+};
+
+/**
+ * @desc    Añadir una reserva de habitación a una reserva de evento existente
+ * @route   POST /api/reservas/eventos/:eventoId/habitaciones
+ * @access  Admin
+ */
+exports.addHabitacionAEvento = async (req, res) => {
+  const { eventoId } = req.params;
+  const habitacionData = req.body; // Datos de la nueva habitación (ej: { letraHabitacion, tipoHabitacion, numHuespedes, fechaEntrada, fechaSalida, precio })
+
+  try {
+    const evento = await ReservaEvento.findById(eventoId);
+    if (!evento) {
+      return res.status(404).json({ success: false, message: 'Reserva de evento no encontrada.' });
+    }
+
+    // Validar datos de la habitación (puedes añadir más validaciones)
+    if (!habitacionData.letraHabitacion || !habitacionData.tipoHabitacion || !habitacionData.numHuespedes || !habitacionData.fechaEntrada || !habitacionData.fechaSalida || habitacionData.precio === undefined) {
+      return res.status(400).json({ success: false, message: 'Faltan datos obligatorios para la habitación.' });
+    }
+
+    // TODO: Verificar disponibilidad de la habitación para las fechas dadas
+    // (Implementar lógica similar a la de crearReservaHabitacion si es necesario)
+
+    // Crear la nueva reserva de habitación
+    const nuevaReservaHabitacion = await ReservaHabitacion.create({
+      ...habitacionData, // Incluye letra, tipo, huespedes, fechas, precio
+      reservaEvento: eventoId, // Asociar con el evento
+      tipoReserva: 'habitacion', // Asegurar el tipo correcto
+      // Copiar datos de contacto del evento principal
+      nombreContacto: evento.nombreContacto,
+      apellidosContacto: evento.apellidosContacto,
+      emailContacto: evento.emailContacto,
+      telefonoContacto: evento.telefonoContacto,
+      fecha: evento.fecha, // Usar fecha del evento si aplica
+      estadoReserva: 'pendiente' // Estado inicial
+    });
+
+    // Añadir la referencia de la nueva reserva de habitación al array del evento
+    // (Asegurándonos de que serviciosAdicionales existe y es un array)
+    if (!Array.isArray(evento.serviciosAdicionales)) {
+        evento.serviciosAdicionales = [];
+    }
+    evento.serviciosAdicionales.push({
+      reservaHabitacionId: nuevaReservaHabitacion._id,
+      tipoHabitacion: nuevaReservaHabitacion.tipoHabitacion,
+      precio: nuevaReservaHabitacion.precio
+      // Podrías añadir más detalles si son útiles aquí
+    });
+    
+    // Actualizar el contador si lo usas
+    evento.totalHabitaciones = (evento.totalHabitaciones || 0) + 1;
+    
+    await evento.save();
+
+    res.status(201).json({ success: true, data: nuevaReservaHabitacion });
+
+  } catch (error) {
+    console.error('Error añadiendo habitación a evento:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor.', error: error.message });
+  }
+};
+
+/**
+ * @desc    Eliminar una reserva de habitación asociada a un evento
+ * @route   DELETE /api/reservas/eventos/:eventoId/habitaciones/:habitacionId
+ * @access  Admin
+ */
+exports.removeHabitacionDeEvento = async (req, res) => {
+  const { eventoId, habitacionId } = req.params;
+
+  try {
+    // 1. Verificar que la reserva de habitación exista y esté asociada al evento
+    const reservaHabitacion = await ReservaHabitacion.findOne({
+      _id: habitacionId,
+      reservaEvento: eventoId
+    });
+
+    if (!reservaHabitacion) {
+      return res.status(404).json({ success: false, message: 'Reserva de habitación no encontrada o no pertenece a este evento.' });
+    }
+
+    // 2. Eliminar la reserva de habitación
+    await ReservaHabitacion.findByIdAndDelete(habitacionId);
+
+    // 3. Quitar la referencia de la reserva de habitación del array del evento
+    const evento = await ReservaEvento.findByIdAndUpdate(
+      eventoId,
+      { 
+        $pull: { serviciosAdicionales: { reservaHabitacionId: habitacionId } },
+        $inc: { totalHabitaciones: -1 } // Decrementar contador si lo usas
+      },
+      { new: true } // Opcional: devolver el evento actualizado
+    );
+    
+    if (!evento) {
+         console.warn(`Evento ${eventoId} no encontrado al intentar quitar referencia de habitación ${habitacionId}, pero la habitación fue eliminada.`);
+         // La habitación se eliminó, así que consideramos la operación exitosa
+    }
+
+    res.status(200).json({ success: true, message: 'Habitación eliminada del evento correctamente.' });
+
+  } catch (error) {
+    console.error('Error eliminando habitación de evento:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor.', error: error.message });
   }
 };

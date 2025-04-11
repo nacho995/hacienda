@@ -220,6 +220,16 @@ exports.getReservasHabitacion = asyncHandler(async (req, res, next) => {
         select: 'nombre apellidos email',
         strictPopulate: false
       })
+      .populate({
+        path: 'habitacion',
+        select: 'nombre letra',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'tipoHabitacion',
+        select: 'nombre',
+        strictPopulate: false
+      })
       .sort('-createdAt');
     
     res.status(200).json({
@@ -252,6 +262,15 @@ exports.getReservaHabitacion = asyncHandler(async (req, res, next) => {
         path: 'asignadoA',
         select: 'nombre apellidos email',
         strictPopulate: false
+      })
+      .populate({
+        path: 'reservaEvento',
+        select: 'nombreEvento tipoEvento',
+        strictPopulate: false,
+        populate: {
+           path: 'tipoEvento',
+           select: 'titulo nombre'
+        }
       });
     
     if (!reserva) {
@@ -288,46 +307,81 @@ exports.updateReservaHabitacion = asyncHandler(async (req, res, next) => {
       });
     }
     
-    // Si se está cambiando la fecha, tipo o número de habitaciones, verificar disponibilidad
-    if (
-      req.body.tipoHabitacion || 
-      req.body.fechaEntrada || 
-      req.body.fechaSalida || 
-      req.body.numeroHabitaciones
-    ) {
-      const tipoHabitacion = req.body.tipoHabitacion || reserva.tipoHabitacion;
-      const fechaEntrada = req.body.fechaEntrada || reserva.fechaEntrada;
-      const fechaSalida = req.body.fechaSalida || reserva.fechaSalida;
-      const numeroHabitaciones = req.body.numeroHabitaciones || reserva.numeroHabitaciones;
+    // Definir campos que requieren verificación de disponibilidad
+    const requiresAvailabilityCheck = 
+        req.body.hasOwnProperty('tipoHabitacion') || 
+        req.body.hasOwnProperty('fechaEntrada') || 
+        req.body.hasOwnProperty('fechaSalida') || 
+        req.body.hasOwnProperty('numeroHabitaciones');
+
+    // Si se está cambiando algún campo que afecta la disponibilidad
+    if (requiresAvailabilityCheck) {
+      console.log('Realizando chequeo de disponibilidad para la actualización...');
+      // Usar valores del body si existen, si no, los de la reserva original
+      const tipoHabitacion = req.body.tipoHabitacion !== undefined ? req.body.tipoHabitacion : reserva.tipoHabitacion;
+      const fechaEntrada = req.body.fechaEntrada !== undefined ? req.body.fechaEntrada : reserva.fechaEntrada;
+      const fechaSalida = req.body.fechaSalida !== undefined ? req.body.fechaSalida : reserva.fechaSalida;
+      // numeroHabitaciones no afecta directamente comprobarDisponibilidad por ahora
       
+      // Validar fechas antes de comprobar
+      if (new Date(fechaSalida) <= new Date(fechaEntrada)) {
+           return res.status(400).json({
+               success: false,
+               message: 'La fecha de salida debe ser posterior a la fecha de entrada.'
+           });
+      }
+
       const disponibilidad = await ReservaHabitacion.comprobarDisponibilidad(
-        tipoHabitacion,
-        fechaEntrada,
+        tipoHabitacion, 
+        fechaEntrada, 
         fechaSalida
       );
       
-      if (!disponibilidad.disponible) {
-        return res.status(400).json({
-          success: false,
-          message: 'No hay disponibilidad para las nuevas fechas o tipo de habitación'
-        });
+      // Importante: Excluir la reserva actual de la comprobación de solapamiento
+      const reservaActualId = req.params.id;
+      const haySolapamientoReal = disponibilidad.reservasExistentes.some(
+          reservaExistente => reservaExistente._id.toString() !== reservaActualId
+      );
+
+      if (haySolapamientoReal) {
+           console.warn('Conflicto de disponibilidad detectado al actualizar.');
+           return res.status(400).json({
+               success: false,
+               message: 'Conflicto de disponibilidad para las nuevas fechas o tipo de habitación.'
+           });
       }
+      console.log('Disponibilidad confirmada para la actualización.');
     }
     
-    reserva = await ReservaHabitacion.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
+    // Actualizar la reserva con los datos del body
+    // findByIdAndUpdate aplicará solo los campos presentes en req.body
+    const reservaActualizada = await ReservaHabitacion.findByIdAndUpdate(req.params.id, req.body, {
+      new: true, // Devolver el documento modificado
+      runValidators: true // Ejecutar validaciones del Schema
     });
     
+    // Verificar si la actualización fue exitosa (aunque findByIdAndUpdate devuelve null si no encuentra)
+     if (!reservaActualizada) {
+         // Esto no debería pasar si la reserva se encontró al principio, pero por si acaso
+         return res.status(404).json({ success: false, message: 'No se pudo actualizar la reserva.' });
+     }
+
+    console.log('Reserva actualizada exitosamente:', reservaActualizada._id);
     res.status(200).json({
       success: true,
-      data: reserva
+      data: reservaActualizada
     });
+
   } catch (error) {
-    console.error(error);
+    console.error('Error detallado al actualizar reserva:', error);
+    // Devolver un mensaje de error más específico si es un error de validación
+    if (error.name === 'ValidationError') {
+        return res.status(400).json({ success: false, message: error.message });
+    }
+    // Error genérico para otros casos
     res.status(500).json({
       success: false,
-      message: 'Error al actualizar la reserva de habitación'
+      message: error.message || 'Error al actualizar la reserva de habitación'
     });
   }
 });

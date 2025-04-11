@@ -45,34 +45,6 @@ const TablaReservaciones = ({
     }
   };
 
-  const getReservationType = (reservation) => {
-    if (reservation.tipo === 'habitacion') {
-      return 'Habitación';
-    } else if (reservation.tipo === 'evento') {
-      return 'Evento';
-    }
-    return 'No especificado';
-  };
-
-  // Obtener datos del cliente de forma segura
-  const getClienteInfo = (reservation) => {
-    // Verificar estructura normalizada
-    if (reservation.huesped) {
-      return {
-        nombre: reservation.huesped.nombre || 'No especificado',
-        email: reservation.huesped.email || '',
-        telefono: reservation.huesped.telefono || ''
-      };
-    }
-    
-    // Compatibilidad con estructura anterior
-    return {
-      nombre: reservation.nombreCompleto || 'No especificado',
-      email: reservation.email || '',
-      telefono: reservation.telefono || ''
-    };
-  };
-
   // Obtener el ID de forma segura
   const getReservationId = (reservation) => {
     return reservation._id || reservation.id;
@@ -173,8 +145,8 @@ const TablaReservaciones = ({
             // Verificar si la reserva tiene datos mínimos necesarios
             if (!reservation) return null;
             
-            // Obtener la información del cliente
-            const cliente = getClienteInfo(reservation);
+            // Obtener la información del cliente (ahora viene en reservation.clientePrincipal)
+            // const cliente = getClienteInfo(reservation);
             const reservationId = getReservationId(reservation);
             const reservationType = reservation.tipo;
             const currentStatus = reservation.estadoReserva || reservation.estado;
@@ -183,25 +155,42 @@ const TablaReservaciones = ({
               <tr key={reservation.uniqueId || `${reservation.tipo}_${reservationId}`} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {formatFecha(reservation.fechaEvento || reservation.fechaInicio)}
+                    {/* Usar fechaMostrada */} 
+                    {formatFecha(reservation.fechaMostrada)}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">
-                    {cliente.nombre}
+                    {/* Usar clientePrincipal */} 
+                    {reservation.clientePrincipal || 'No especificado'}
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {cliente.email}
-                  </div>
-                  {cliente.telefono && (
+                  {/* Mostrar email/teléfono si están disponibles en la reserva */} 
+                  {reservation.huesped?.email && (
+                    <div className="text-sm text-gray-500">
+                      {reservation.huesped.email}
+                    </div>
+                  )}
+                  {reservation.huesped?.telefono && (
                     <div className="text-xs text-gray-500">
-                      {cliente.telefono}
+                      {reservation.huesped.telefono}
+                    </div>
+                  )}
+                  {/* Compatibilidad con campos antiguos si es necesario */}
+                  {(!reservation.huesped?.email && reservation.email) && (
+                    <div className="text-sm text-gray-500">
+                      {reservation.email}
+                    </div>
+                  )}
+                  {(!reservation.huesped?.telefono && reservation.telefono) && (
+                    <div className="text-xs text-gray-500">
+                      {reservation.telefono}
                     </div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {getReservationType(reservation)}
+                    {/* Usar nombreMostrado */} 
+                    {reservation.nombreMostrado || 'No especificado'}
                   </div>
                   {reservation.modoReserva && (
                     <div className="text-xs text-gray-500">

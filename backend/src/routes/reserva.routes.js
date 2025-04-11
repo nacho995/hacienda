@@ -27,7 +27,9 @@ const {
   actualizarHabitacionEvento,
   getEventoServicios,
   addEventoServicio,
-  removeEventoServicio
+  removeEventoServicio,
+  addHabitacionAEvento,
+  removeHabitacionDeEvento
 } = require('../controllers/reservaEvento.controller');
 
 const { protectRoute, authorize } = require('../middleware/auth');
@@ -84,7 +86,17 @@ router.put('/eventos/:eventoId/habitaciones/:letraHabitacion', protectRoute, act
 router.get('/eventos/:id/habitaciones', protectRoute, obtenerHabitacionesEvento);
 router.put('/eventos/:eventoId/habitaciones/:letraHabitacion', protectRoute, actualizarHabitacionEvento);
 
-// --- NUEVAS RUTAS PARA GESTIONAR SERVICIOS DE UN EVENTO ---
+// --- RUTAS PARA GESTIONAR HABITACIONES DE UN EVENTO (ADMIN) ---
+router.get('/eventos/:id/habitaciones', protectRoute, authorize('admin'), obtenerHabitacionesEvento);
+// Añadir una habitación a un evento
+router.post('/eventos/:eventoId/habitaciones', protectRoute, authorize('admin'), addHabitacionAEvento);
+// Eliminar una habitación específica de un evento
+router.delete('/eventos/:eventoId/habitaciones/:habitacionId', protectRoute, authorize('admin'), removeHabitacionDeEvento);
+// NOTA: La ruta PUT para actualizar una habitación individual ya existe en la sección de habitaciones:
+// router.put('/habitaciones/:id', protectRoute, authorize('admin'), updateReservaHabitacion);
+// Podemos reutilizarla desde el frontend pasando el ID de la ReservaHabitacion.
+
+// --- RUTAS PARA GESTIONAR SERVICIOS DE UN EVENTO (ADMIN) ---
 router.get('/eventos/:id/servicios', protectRoute, authorize('admin'), getEventoServicios);
 router.post('/eventos/:id/servicios', protectRoute, authorize('admin'), addEventoServicio); 
 router.delete('/eventos/:id/servicios/:servicioId', protectRoute, authorize('admin'), removeEventoServicio);

@@ -46,10 +46,10 @@ export default function EventoReservationDetail({ params }) {
           
           try {
             const responseHabitaciones = await getEventoHabitaciones(id);
-            if (responseHabitaciones && responseHabitaciones.success && Array.isArray(responseHabitaciones.data)) {
-              setHabitacionesEvento(responseHabitaciones.data);
+            if (responseHabitaciones && responseHabitaciones.success && Array.isArray(responseHabitaciones.data?.habitaciones)) {
+              setHabitacionesEvento(responseHabitaciones.data.habitaciones);
               const initialEdits = {};
-              responseHabitaciones.data.forEach(hab => {
+              responseHabitaciones.data.habitaciones.forEach(hab => {
                 initialEdits[hab._id] = {
                   numHuespedes: hab.numHuespedes || 1,
                   nombres: (hab.infoHuespedes?.nombres || []).join('\n'),
@@ -279,9 +279,9 @@ export default function EventoReservationDetail({ params }) {
           <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
             <div>
               <h2 className="text-2xl font-bold text-gray-800">
-                Reserva #{reservation._id ? reservation._id.substring(0, 8) : 'Sin ID'}
+                {reservation.nombreEvento || 'Evento sin nombre'}
               </h2>
-              <p className="text-gray-600 mt-1">Creada el {formatDate(reservation.createdAt)}</p>
+              <p className="text-gray-600 mt-1">Reservado por: {reservation.nombreContacto} {reservation.apellidosContacto}</p>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-gray-700 font-medium">Estado:</span>
@@ -310,17 +310,6 @@ export default function EventoReservationDetail({ params }) {
                   <div>
                     <p className="text-sm text-gray-500">Nombre del Evento</p>
                     <p className="font-medium">{reservation.nombreEvento || 'No especificado'}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FaGlassCheers className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Tipo de Evento</p>
-                    <p className="font-medium">
-                      {typeof reservation.tipoEvento === 'object' 
-                        ? reservation.tipoEvento?.titulo || 'No especificado'
-                        : reservation.tipoEvento || 'No especificado'}
-                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -370,9 +359,9 @@ export default function EventoReservationDetail({ params }) {
                 <div className="flex items-start gap-3">
                   <FaMoneyBillWave className="text-gray-500 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Presupuesto Estimado</p>
+                    <p className="text-sm text-gray-500">Presupuesto Base</p>
                     <p className="font-medium">
-                      ${reservation.presupuestoEstimado ? reservation.presupuestoEstimado.toLocaleString('es-MX') : 'No especificado'}
+                      ${reservation.precio ? reservation.precio.toLocaleString('es-MX') : 'No especificado'}
                     </p>
                   </div>
                 </div>
@@ -451,8 +440,10 @@ export default function EventoReservationDetail({ params }) {
             <p className="text-gray-500 text-sm">No hay habitaciones asociadas a este evento.</p>
           ) : (
             habitacionesEvento.map((hab) => (
-              <div key={hab._id} className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
-                <h4 className="font-medium text-gray-700 mb-4 text-lg">Habitación: {hab.letraHabitacion || hab.tipoHabitacion || hab._id.substring(0, 6)}</h4>
+              <div key={hab?._id || Math.random()} className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
+                <h4 className="font-medium text-gray-700 mb-4 text-lg">
+                  Habitación: {hab.letraHabitacion || hab.tipoHabitacion || (hab?._id ? hab._id.substring(0, 6) : 'ID Desconocido')}
+                </h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Número de Huéspedes */}

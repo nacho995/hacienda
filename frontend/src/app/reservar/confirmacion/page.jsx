@@ -94,7 +94,7 @@ export default function ConfirmacionReserva() {
                 <FaUser className="text-[#A5856A]" />
                 <div>
                   <p className="font-medium">Tipo de Evento</p>
-                  <p className="text-gray-600">{reserva.tipo_evento}</p>
+                  <p className="text-gray-600">{reserva.tipoEvento?.titulo || reserva.tipoEvento?.nombre || 'No especificado'}</p>
                 </div>
               </div>
 
@@ -130,7 +130,7 @@ export default function ConfirmacionReserva() {
                 <FaUser className="text-[#A5856A]" />
                 <div>
                   <p className="font-medium">Nombre Completo</p>
-                  <p className="text-gray-600">{reserva.nombre_contacto} {reserva.apellidos_contacto}</p>
+                  <p className="text-gray-600">{reserva.nombreContacto} {reserva.apellidosContacto}</p>
                 </div>
               </div>
 
@@ -138,7 +138,7 @@ export default function ConfirmacionReserva() {
                 <FaEnvelope className="text-[#A5856A]" />
                 <div>
                   <p className="font-medium">Correo Electrónico</p>
-                  <p className="text-gray-600">{reserva.email_contacto}</p>
+                  <p className="text-gray-600">{reserva.emailContacto}</p>
                 </div>
               </div>
 
@@ -146,7 +146,7 @@ export default function ConfirmacionReserva() {
                 <FaPhone className="text-[#A5856A]" />
                 <div>
                   <p className="font-medium">Teléfono</p>
-                  <p className="text-gray-600">{reserva.telefono_contacto}</p>
+                  <p className="text-gray-600">{reserva.telefonoContacto}</p>
                 </div>
               </div>
             </div>
@@ -154,7 +154,7 @@ export default function ConfirmacionReserva() {
 
           <div className="mt-8 p-4 bg-[#F9F5F2] rounded-lg">
             <p className="text-center text-gray-700">
-              Hemos enviado un correo electrónico de confirmación a {reserva.email_contacto} con todos los detalles de tu reserva.
+              Hemos enviado un correo electrónico de confirmación a {reserva.emailContacto} con todos los detalles de tu reserva.
               <br />
               Si tienes alguna pregunta, no dudes en contactarnos.
             </p>

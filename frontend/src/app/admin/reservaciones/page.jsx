@@ -9,6 +9,13 @@ import { FaSpinner, FaSearch, FaFilter, FaCalendarAlt, FaExclamationTriangle, Fa
 import { toast } from 'sonner';
 import TablaReservaciones from '@/components/admin/TablaReservaciones';
 import userService from '@/services/userService';
+// --- Importar funciones de servicio necesarias ---
+import {
+  updateEventoReservation,
+  updateHabitacionReservation,
+  deleteEventoReservation,
+  deleteHabitacionReservation
+} from '@/services/reservationService';
 
 export default function ReservacionesPage() {
   const router = useRouter();
@@ -67,8 +74,10 @@ export default function ReservacionesPage() {
     eventoReservations.forEach(evento => {
       if (evento.serviciosAdicionales && Array.isArray(evento.serviciosAdicionales)) {
         evento.serviciosAdicionales.forEach(servicio => {
-          if (servicio && servicio.reservaHabitacionId) {
-            habitacionesEventosIds.add(servicio.reservaHabitacionId.toString());
+          // Asegurarse de que reservaHabitacionId existe y es un string o puede ser convertido
+          const habitacionId = servicio?.reservaHabitacion?._id || servicio?.reservaHabitacionId;
+          if (habitacionId) {
+            habitacionesEventosIds.add(habitacionId.toString());
           }
         });
       }
@@ -77,26 +86,52 @@ export default function ReservacionesPage() {
     // Log para verificar los IDs recolectados
     console.log('IDs de habitaciones asociadas a eventos:', Array.from(habitacionesEventosIds));
 
-    // Filtrar habitaciones que no están asociadas a eventos
-    const habitacionesIndependientes = habitacionReservations.filter(hab => {
-      const habId = (hab._id || hab.id)?.toString(); // Convertir a string para comparar con el Set
-      // Log para depuración
-      // console.log(`Verificando Habitación ID: ${habId}, ¿Está en Set?: ${habitacionesEventosIds.has(habId)}`);
-      return habId && !habitacionesEventosIds.has(habId);
-    });
+    // Ya no filtramos, usamos todas las habitaciones
+    // const habitacionesIndependientes = habitacionReservations.filter(hab => { ... });
 
-    // Combinar eventos y habitaciones independientes
+    // Combinar eventos y TODAS las habitaciones
     const allReservations = [
       ...eventoReservations.map(res => ({
         ...res,
         tipo: 'evento',
+        fechaMostrada: res.fechaEvento, // Fecha principal para eventos
+        // Usar nombreContacto para el cliente del evento
+        clientePrincipal: res.nombreContacto || res.usuario?.nombre || 'No especificado',
+        nombreMostrado: `Evento: ${res.nombreEvento || 'Sin nombre'}`, // Nombre para la columna TIPO
         uniqueId: `evento_${res._id || res.id}`
       })),
-      ...habitacionesIndependientes.map(res => ({
-        ...res,
-        tipo: 'habitacion',
-        uniqueId: `habitacion_${res._id || res.id}`
-      }))
+      ...habitacionReservations.map(res => {
+        const habId = (res._id || res.id)?.toString();
+        // Verificar si serviciosAdicionales y la reserva populada existen
+        const servicioAsociado = eventoReservations.find(evento => 
+          Array.isArray(evento.serviciosAdicionales) && evento.serviciosAdicionales.some(servicio => 
+            servicio.reservaHabitacionId?._id?.toString() === habId
+          )
+        );
+        const asociada = !!servicioAsociado;
+        
+        const letra = res.letraHabitacion || res.habitacion?.nombre || 'N/A';
+        // Intentar obtener el primer huésped o el nombre general
+        const primerHuesped = res.infoHuespedes?.nombres?.[0] || res.nombreHuespedes || res.huesped?.nombre;
+        // Usar email como fallback si no hay nombre
+        const clienteFinal = primerHuesped || res.huesped?.email || res.email || 'No especificado';
+        let nombreTipo = `Habitación ${letra}`;
+        if (asociada) {
+          // Podríamos buscar el evento asociado si fuera necesario mostrar más info aquí
+          nombreTipo += ' (Evento)'; 
+        }
+        
+        return {
+          ...res,
+          tipo: 'habitacion',
+          fechaMostrada: res.fechaEntrada, // Fecha principal para habitaciones
+          clientePrincipal: clienteFinal, // Cliente principal de la habitación (con fallback de email)
+          nombreMostrado: nombreTipo, // Nombre para la columna TIPO
+          asociadaAEvento: asociada, // Marcar si está asociada
+          letraHabitacionReal: letra, // Guardar la letra para posible uso futuro
+          uniqueId: `habitacion_${habId}`
+        };
+      })
     ];
 
     console.log('Reservas combinadas:', allReservations.length);
@@ -106,19 +141,14 @@ export default function ReservacionesPage() {
       // Verificar si la reserva tiene los campos mínimos necesarios
       if (!reservation) return false;
       
-      // Buscar en diferentes campos según la estructura normalizada
+      // Buscar en el cliente principal
       const matchesSearch = searchTerm ? (
-        // Buscar en datos de huésped (estructura normalizada)
-        (reservation.huesped?.nombre && reservation.huesped.nombre.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (reservation.huesped?.email && reservation.huesped.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (reservation.huesped?.telefono && reservation.huesped.telefono.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        // Compatibilidad con estructura anterior
-        (reservation.nombreCompleto && reservation.nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (reservation.email && reservation.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (reservation.telefono && reservation.telefono.toLowerCase().includes(searchTerm.toLowerCase()))
+        reservation.clientePrincipal && reservation.clientePrincipal.toLowerCase().includes(searchTerm.toLowerCase())
       ) : true;
 
-      const matchesStatus = filterStatus === 'all' || reservation.estado === filterStatus;
+      // Usar estadoReserva o estado
+      const currentStatus = reservation.estadoReserva || reservation.estado;
+      const matchesStatus = filterStatus === 'all' || currentStatus?.toLowerCase() === filterStatus;
       const matchesType = filterType === 'all' || reservation.tipo === filterType;
       
       // Filtrar por usuario asignado
@@ -141,8 +171,9 @@ export default function ReservacionesPage() {
 
     // Ordenar reservaciones
     filtered.sort((a, b) => {
-      const aValue = a[sortConfig.key] || a.fechaInicio || a.fechaEvento;
-      const bValue = b[sortConfig.key] || b.fechaInicio || b.fechaEvento;
+      // Usar la fecha principal definida al combinar
+      const aValue = a.fechaMostrada;
+      const bValue = b.fechaMostrada;
 
       if (!aValue || !bValue) return 0;
 
@@ -230,87 +261,62 @@ export default function ReservacionesPage() {
     const userConfirmed = window.confirm('¿Estás seguro de que deseas eliminar esta reservación permanentemente?');
     
     if (userConfirmed) {
-      setIsLoading(true); // Mostrar indicador de carga
+      setIsLoading(true);
       try {
-        const apiUrl = `/api/reservas/${tipo === 'evento' ? 'eventos' : 'habitaciones'}/${id}`;
-        const response = await fetch(apiUrl, {
-          method: 'DELETE',
-          headers: {
-            // Asumiendo que necesitas autenticación (ajusta según tu middleware)
-            'Authorization': `Bearer ${localStorage.getItem('token')}` 
-          }
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.message || 'Error al eliminar la reservación');
+        let response;
+        if (tipo === 'evento') {
+          response = await deleteEventoReservation(id);
+        } else { // tipo === 'habitacion'
+          response = await deleteHabitacionReservation(id);
         }
 
-        toast.success('Reservación eliminada correctamente');
-        
-        // Actualizar estado local para reflejar el cambio
-        setFilteredReservations(prev => prev.filter(res => (res._id || res.id) !== id));
-        // Opcionalmente, podrías recargar todo si la lógica es compleja:
-        // await loadAllReservations(); 
-
-      } catch (err) {
-        console.error('Error al eliminar reservación:', err);
-        toast.error(err.message || 'Error al eliminar la reservación');
+        if (response && response.success) {
+          toast.success('Reservación eliminada correctamente');
+          await loadAllReservations(); // Recarga los datos
+        } else {
+          // Usar el mensaje de error de la respuesta si existe
+          throw new Error(response?.message || 'Error al eliminar la reservación'); 
+        }
+      } catch (error) {
+        console.error('Error al eliminar reservación:', error);
+        toast.error('Error al eliminar la reservación: ' + error.message);
       } finally {
-        setIsLoading(false); // Ocultar indicador de carga
+        setIsLoading(false);
       }
     }
-  }, []); // Dependencias si usas estado externo
+  }, [loadAllReservations]);
 
-  const handleChangeReservationStatus = useCallback(async (tipo, id, nuevoEstado) => {
-    if (!id || !tipo || !nuevoEstado) {
-        toast.error('Datos inválidos para actualizar estado.');
-        return;
+  const handleChangeReservationStatus = useCallback(async (tipo, id, newStatus) => {
+    if (!id || !newStatus) {
+      toast.error('Datos inválidos para actualizar estado.');
+      return;
     }
     
-    setIsLoading(true); // Mostrar indicador de carga
+    setIsLoading(true);
     try {
-      const apiUrl = '/api/reservas/estado'; // Endpoint genérico que añadimos
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          // Asumiendo autenticación
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          tipoReserva: tipo, // 'evento' o 'habitacion'
-          id: id,
-          estadoReserva: nuevoEstado // 'pendiente', 'confirmada', 'cancelada'
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Error al actualizar el estado');
+      let response;
+      const payload = { estadoReserva: newStatus.toLowerCase() };
+      
+      if (tipo === 'evento') {
+        response = await updateEventoReservation(id, payload);
+      } else { // tipo === 'habitacion'
+        response = await updateHabitacionReservation(id, payload);
       }
 
-      toast.success(`Estado de la reservación actualizado a ${nuevoEstado}`);
-      
-      // Actualizar estado local
-      setFilteredReservations(prev => prev.map(res => {
-        if ((res._id || res.id) === id) {
-          return { ...res, estado: nuevoEstado, estadoReserva: nuevoEstado }; // Actualizar ambos por si acaso
-        }
-        return res;
-      }));
-      // Opcionalmente, recargar todo:
-      // await loadAllReservations();
-
-    } catch (err) {
-      console.error('Error al actualizar estado:', err);
-      toast.error(err.message || 'Error al actualizar el estado');
+      if (response && response.success) {
+        toast.success(`Estado de la reserva actualizado a ${newStatus}`);
+        await loadAllReservations(); // Recarga los datos
+      } else {
+        // Usar el mensaje de error de la respuesta si existe
+        throw new Error(response?.message || 'Error al actualizar estado'); 
+      }
+    } catch (error) {
+      console.error('Error al actualizar estado:', error);
+      toast.error('Error al actualizar estado: ' + error.message);
     } finally {
-      setIsLoading(false); // Ocultar indicador de carga
+      setIsLoading(false);
     }
-  }, []); // Dependencias si usas estado externo
+  }, [loadAllReservations]);
 
   // --- FIN: Nuevas funciones Handler ---
 
