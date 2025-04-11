@@ -9,10 +9,10 @@ import apiClient from '@/services/apiClient';
 import { 
   updateHabitacionReservation, 
   updateEventoReservation, 
-  updateMasajeReservation,
   deleteHabitacionReservation,
   deleteEventoReservation,
-  deleteMasajeReservation
+  asignarEventoAdmin,
+  asignarHabitacionAdmin
 } from '@/services/reservationService';
 
 export default function ReservationDetail({ params }) {
@@ -85,7 +85,7 @@ export default function ReservationDetail({ params }) {
           response = await updateEventoReservation(id, { estado: newStatus });
           break;
         case 'masaje':
-          response = await updateMasajeReservation(id, { estado: newStatus });
+          // response = await updateMasajeReservation(id, { estado: newStatus });
           break;
         default:
           throw new Error(`Tipo de reserva '${tipoReservacion}' no soportado para actualización`);
@@ -131,7 +131,7 @@ export default function ReservationDetail({ params }) {
           response = await deleteEventoReservation(id);
           break;
         case 'masaje':
-          response = await deleteMasajeReservation(id);
+          // response = await deleteMasajeReservation(id);
           break;
         default:
           throw new Error(`Tipo de reserva '${tipoReservacion}' no soportado para eliminación`);

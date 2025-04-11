@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { FaMusic, FaGuitar, FaFireAlt, FaShoppingBag, FaCheck, FaUtensils, FaCamera, FaWineGlassAlt } from 'react-icons/fa';
-import { MdOutlineDecorations, MdOutlineLocalFlorist } from 'react-icons/md';
+import { MdOutlineFestival, MdOutlineLocalFlorist } from 'react-icons/md';
 import { IoMusicalNotes } from 'react-icons/io5';
 import { BsCameraVideo } from 'react-icons/bs';
 import { getAllServicios } from '@/services/servicios.service';
@@ -18,7 +18,7 @@ const ServicioCard = ({ servicio, index }) => {
       icon = <FaUtensils className="text-[var(--color-brown-dark)] text-xl mr-2" />;
       break;
     case 'decoracion':
-      icon = <MdOutlineDecorations className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      icon = <MdOutlineFestival className="text-[var(--color-brown-dark)] text-xl mr-2" />;
       break;
     case 'musica':
       icon = <IoMusicalNotes className="text-[var(--color-brown-dark)] text-xl mr-2" />;
@@ -44,7 +44,7 @@ const ServicioCard = ({ servicio, index }) => {
       icon = <FaUtensils className="text-[var(--color-brown-dark)] text-xl mr-2" />;
       break;
     case 'montaje':
-      icon = <MdOutlineDecorations className="text-[var(--color-brown-dark)] text-xl mr-2" />;
+      icon = <MdOutlineFestival className="text-[var(--color-brown-dark)] text-xl mr-2" />;
       break;
     case 'coordinacion':
       icon = <FaCheck className="text-[var(--color-brown-dark)] text-xl mr-2" />;

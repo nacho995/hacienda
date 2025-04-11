@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaSpinner, FaSave, FaBed, FaUsers, FaBuilding } from 'react-icons/fa';
-import { apiClient } from '@/services/apiClient';
+import { FaSpinner, FaSave, FaBed, FaUsers, FaBuilding, FaPlus, FaTrash } from 'react-icons/fa';
+import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
+import apiClient from '@/services/apiClient';
+import DatePicker from 'react-datepicker';
 
 export default function HabitacionesEventoForm({ eventoId }) {
   const [habitaciones, setHabitaciones] = useState([]);

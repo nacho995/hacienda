@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaSpinner, FaArrowLeft } from 'react-icons/fa';
-import { apiClient } from '@/services/apiClient';
+import apiClient from '@/services/apiClient';
 import HabitacionesEventoForm from '@/components/eventos/HabitacionesEventoForm';
 import Link from 'next/link';
 
