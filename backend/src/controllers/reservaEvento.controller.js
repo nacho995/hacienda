@@ -2,6 +2,7 @@ const ReservaEvento = require('../models/ReservaEvento');
 const User = require('../models/User');
 const TipoEvento = require('../models/TipoEvento');
 const ReservaHabitacion = require('../models/ReservaHabitacion');
+const Habitacion = require('../models/Habitacion');
 const mongoose = require('mongoose');
 const sendEmail = require('../utils/email');
 const confirmacionTemplate = require('../emails/confirmacionReserva');
@@ -15,6 +16,9 @@ const Servicio = require('../models/Servicio');
  * @access  Public
  */
 exports.crearReservaEvento = async (req, res) => {
+  let reserva; // Declarar fuera del try para usar en el catch del rollback
+  const reservasHabitacionesCreadas = []; // Para devolver al final
+
   try {
     const {
       tipo_evento,
@@ -104,7 +108,7 @@ exports.crearReservaEvento = async (req, res) => {
     // --------------------------------------------------
 
     // Calcular el total de habitaciones desde los datos recibidos
-    const totalHabitaciones = habitaciones?.length || 0;
+    const totalHabitaciones = (modo_gestion_habitaciones === 'hacienda') ? 14 : (habitaciones?.length || 0);
     
     // Crear objeto para guardar
     const reservaData = {
@@ -133,42 +137,97 @@ exports.crearReservaEvento = async (req, res) => {
     console.log("[crearReservaEvento] Datos a guardar (ReservaEvento):", reservaData);
 
     // Crear la reserva
-    const reserva = await ReservaEvento.create(reservaData);
+    reserva = await ReservaEvento.create(reservaData);
     console.log("[crearReservaEvento] Reserva Evento creada con ID:", reserva._id);
 
     // Crear las reservas de habitaciones asociadas iterando sobre 'habitaciones' de req.body
-    const reservasHabitaciones = [];
-    if (Array.isArray(habitaciones) && habitaciones.length > 0) {
-      console.log("[crearReservaEvento] Creando habitaciones asociadas...");
-      for (const hab of habitaciones) {
-        try {
+    if (modo_gestion_habitaciones === 'hacienda') {
+      console.log("[crearReservaEvento] Modo Hacienda: Creando 14 habitaciones asociadas...");
+      // 1. Obtener las 14 habitaciones estándar (ajusta el query si es necesario)
+      const habitacionesEstandar = await Habitacion.find({ estado: 'Disponible' }) // O un criterio mejor para identificar las 14
+         .limit(14)
+         .select('letra tipo capacidad precioPorNoche _id'); // Campos necesarios
+         
+      if (habitacionesEstandar.length < 14) {
+           console.warn(`[crearReservaEvento] Se esperaban 14 habitaciones estándar, pero se encontraron ${habitacionesEstandar.length}`);
+           // Podrías lanzar un error o continuar con las que encontraste
+           // throw new Error('No se encontraron suficientes habitaciones estándar disponibles.');
+      }
+
+      // 2. Iterar y crear ReservaHabitacion para cada una
+      for (const habInfo of habitacionesEstandar) {
+          const entrada = new Date(fechaEvento); // Fecha del evento
+          const salida = new Date(entrada);
+          salida.setDate(entrada.getDate() + 1); // Asumimos 1 noche
+
           const reservaHabitacionData = {
-            tipoReserva: 'evento',
-            reservaEvento: reserva._id,
-            habitacion: hab.habitacion,
-            tipoHabitacion: hab.tipoHabitacion,
-            categoriaHabitacion: hab.numHuespedes <= 2 ? 'sencilla' : 'doble',
-            precio: hab.precio,
-            numHuespedes: hab.numHuespedes,
-            fechaEntrada: hab.fechaEntrada,
-            fechaSalida: hab.fechaSalida,
+            tipoReserva: 'habitacion', // Marcamos como reserva de habitación
+            reservaEvento: reserva._id, // Link al evento
+            habitacion: habInfo._id, // ID de la habitación física
+            letraHabitacion: habInfo.letra, 
+            tipoHabitacion: habInfo.tipo, 
+            categoriaHabitacion: (habInfo.capacidad <= 2) ? 'sencilla' : 'doble', // Asignar categoría
+            precio: habInfo.precioPorNoche || 0, // Precio por noche de la habitación
+            numHuespedes: habInfo.capacidad || 2, // Capacidad por defecto
+            fechaEntrada: entrada,
+            fechaSalida: salida,
             estadoReserva: 'pendiente',
+            // Copiar datos de contacto del evento
             nombreContacto: nombre_contacto,
             apellidosContacto: apellidos_contacto,
             emailContacto: email_contacto,
             telefonoContacto: telefono_contacto,
-            fecha: fechaEvento,
-            letraHabitacion: hab.habitacion
+            fecha: fechaEvento, // Fecha principal del evento
           };
           const reservaHabitacion = await ReservaHabitacion.create(reservaHabitacionData);
-          reservasHabitaciones.push(reservaHabitacion);
-          console.log(`[crearReservaEvento] Habitación asociada ${hab.habitacion} creada con ID: ${reservaHabitacion._id}`);
-        } catch (validationError) {
-          console.error(`[crearReservaEvento] Error al crear ReservaHabitacion para ${hab.habitacion}:`, validationError);
-          await ReservaEvento.findByIdAndDelete(reserva._id); // Limpieza
-          throw new Error(`Error al procesar la habitación ${hab.habitacion}: ${validationError.message}`); 
-        }
+          reservasHabitacionesCreadas.push(reservaHabitacion); // Guardar para la respuesta
+          console.log(`[crearReservaEvento] Habitación Hacienda ${habInfo.letra} creada con ID: ${reservaHabitacion._id}`);
       }
+
+    } else { // modo_gestion_habitaciones === 'usuario' (o por defecto)
+        console.log("[crearReservaEvento] Modo Usuario: Creando habitaciones seleccionadas...");
+        // Usar la lógica existente que itera sobre el array `habitaciones` de req.body
+        if (Array.isArray(habitaciones) && habitaciones.length > 0) {
+            for (const hab of habitaciones) {
+                // --- Calcular fecha de salida (día siguiente a la entrada) --- 
+                // ¡Asegúrate de que hab.fechaEntrada existe o usa fechaEvento!
+                let entrada, salida;
+                if (hab.fechaEntrada) {
+                   entrada = new Date(hab.fechaEntrada);
+                   salida = new Date(entrada);
+                   salida.setDate(entrada.getDate() + (hab.noches || 1)); // Usar noches si viene, sino 1
+                } else {
+                   entrada = new Date(fechaEvento);
+                   salida = new Date(entrada);
+                   salida.setDate(entrada.getDate() + 1); // Default 1 noche si no hay fechaEntrada específica
+                }
+                // --- Fin cálculo fechas --- 
+
+                const reservaHabitacionData = {
+                    tipoReserva: 'habitacion', // Asegurar tipo
+                    reservaEvento: reserva._id, // Link al evento
+                    habitacion: hab.habitacion, // Aquí debería venir el ID o letra de la Habitación seleccionada
+                    tipoHabitacion: hab.tipoHabitacion || 'Estándar',
+                    categoriaHabitacion: (hab.numHuespedes <= 2) ? 'sencilla' : 'doble',
+                    precio: hab.precio || 0,
+                    numHuespedes: hab.numHuespedes || 2,
+                    fechaEntrada: entrada,
+                    fechaSalida: salida,
+                    estadoReserva: 'pendiente',
+                    nombreContacto: nombre_contacto,
+                    apellidosContacto: apellidos_contacto,
+                    emailContacto: email_contacto,
+                    telefonoContacto: telefono_contacto,
+                    fecha: fechaEvento,
+                    letraHabitacion: hab.habitacion // Asumiendo que hab.habitacion es la letra
+                };
+                const reservaHabitacion = await ReservaHabitacion.create(reservaHabitacionData);
+                reservasHabitacionesCreadas.push(reservaHabitacion); // Guardar para la respuesta
+                console.log(`[crearReservaEvento] Habitación Usuario ${hab.habitacion} creada con ID: ${reservaHabitacion._id}`);
+            }
+        } else {
+            console.log("[crearReservaEvento] Modo Usuario: No se seleccionaron habitaciones.");
+        }
     }
 
     // Enviar correo de confirmación al cliente
@@ -274,15 +333,34 @@ exports.crearReservaEvento = async (req, res) => {
       success: true,
       data: {
         reserva,
-        habitaciones: reservasHabitaciones
+        habitaciones: reservasHabitacionesCreadas
       }
     });
+
   } catch (error) {
     console.error('[crearReservaEvento] Error general:', error);
+    
+    // --- ROLLBACK si falló después de crear el evento principal ---
+    if (reserva && reserva._id) {
+        try {
+            console.warn(`[ROLLBACK] Error durante la creación de habitaciones. Eliminando evento principal ${reserva._id}`);
+            await ReservaEvento.findByIdAndDelete(reserva._id);
+            // También podrías intentar eliminar las ReservaHabitacion que sí se crearon
+            const idsCreadas = reservasHabitacionesCreadas.map(h => h._id);
+            if (idsCreadas.length > 0) {
+                await ReservaHabitacion.deleteMany({ _id: { $in: idsCreadas } });
+                console.warn(`[ROLLBACK] Eliminadas ${idsCreadas.length} habitaciones asociadas.`);
+            }
+        } catch (rollbackError) {
+            console.error('[ROLLBACK] Falló el rollback:', rollbackError);
+        }
+    }
+    // --- Fin Rollback ---
+
     res.status(500).json({
       success: false,
-      message: 'Error al crear la reserva de evento',
-      error: error.message
+      message: 'Error al crear la reserva de evento', 
+      error: error.message 
     });
   }
 };

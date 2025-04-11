@@ -44,14 +44,14 @@ export const ReservationProvider = ({ children }) => {
   });
 
   // Funciones para el formulario de reserva
-  const updateFormSection = (section, data) => {
+  const updateFormSection = useCallback((section, data) => {
     setFormData(prev => ({
       ...prev,
       [section]: data
     }));
-  };
+  }, []);
 
-  const updateGestionHacienda = (data) => {
+  const updateGestionHacienda = useCallback((data) => {
     setFormData(prev => ({
       ...prev,
       gestionHacienda: {
@@ -59,9 +59,10 @@ export const ReservationProvider = ({ children }) => {
         ...data
       }
     }));
-  };
+  }, []);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
+    console.log("[ReservationContext] Reseteando formData");
     setFormData({
       tipoEvento: null,
       fecha: null,
@@ -77,7 +78,7 @@ export const ReservationProvider = ({ children }) => {
         estadoGestion: 'pendiente'
       }
     });
-  };
+  }, []);
 
   // Normalizar IDs para evitar problemas de comparación
   const normalizeId = (obj) => {

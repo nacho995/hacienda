@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle } from 'react-icons/fa';
+import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle, FaUsers, FaUserCog } from 'react-icons/fa';
 import { toast } from 'sonner';
 
 import ModoSeleccionEvento from '@/components/reservas/ModoSeleccionEvento';
@@ -67,17 +67,19 @@ const ValidationModal = ({ isOpen, onClose, message, setCurrentStep, redirectToS
 // --- Fin nuevo componente Modal ---
 
 const ReservaWizard = () => {
-  const { formData, updateFormSection } = useReservation();
+  const { formData, updateFormSection, resetForm } = useReservation();
   const [currentStep, setCurrentStep] = useState(1);
-  const [showModoSeleccionServiciosModal, setShowModoSeleccionServiciosModal] = useState(false);
-  const [showModoSeleccionHabitacionesModal, setShowModoSeleccionHabitacionesModal] = useState(false);
-  // Estados para el nuevo modal de validación
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState('');
   const [validationRedirectStep, setValidationRedirectStep] = useState(null);
-  // Mantener el objeto completo para la selección, pero manejar el renderizado con cuidado
   const [selectedEventType, setSelectedEventType] = useState(formData.tipoEvento || null);
   const router = useRouter();
+
+  // AÑADIDO: useEffect para resetear el formulario al montar el componente
+  useEffect(() => {
+    console.log("Reseteando formulario de reserva al montar ReservaWizard...");
+    resetForm();
+  }, [resetForm]); // Dependencia para evitar warnings de lint, asumiendo que resetForm es estable
 
   // Estilos para el contenedor principal del wizard
   const wizardContainerStyle = {
@@ -128,43 +130,42 @@ const ReservaWizard = () => {
       toast.error('Por favor, seleccione una fecha para su evento');
       return;
     }
-    
-    // Si estamos en el paso 1 y no hay un modo de gestión de servicios seleccionado,
-    // mostramos el modal en lugar de avanzar al siguiente paso
-    if (currentStep === 1 && !formData.modoGestionServicios) {
-      setShowModoSeleccionServiciosModal(true);
-      return;
+
+    // AÑADIDO: Validación para asegurar que se elija un modo en paso 3 antes de avanzar con 'Siguiente'
+    if (currentStep === 3 && !formData.modoGestionHabitaciones) {
+       toast.error('Por favor, seleccione un modo de gestión para las habitaciones.');
+       return;
     }
     
-    // Si estamos en el paso 2 y no hay un modo de gestión de habitaciones seleccionado,
-    // mostramos el modal en lugar de avanzar al siguiente paso
-    if (currentStep === 2 && !formData.modoGestionHabitaciones) {
-      setShowModoSeleccionHabitacionesModal(true);
-      return;
+    // Validación si modo organizador está seleccionado en paso 3 (Podrías añadir más validaciones aquí si ModoGestionHabitaciones lo requiere)
+    if (currentStep === 3 && formData.modoGestionHabitaciones === 'usuario' && (!formData.habitacionesSeleccionadas || formData.habitacionesSeleccionadas.length === 0)) {
+       toast.warn('Se recomienda seleccionar al menos una habitación si gestiona usted mismo.');
+       // Permitimos avanzar pero con aviso, o podrías poner return; si es obligatorio.
     }
     
-    // Si estamos en el paso 4 (servicios) y no hay servicios seleccionados
-    if (currentStep === 4 && formData.modoGestionServicios === 'usuario' && formData.serviciosSeleccionados.length === 0) {
-      toast.error('Por favor, seleccione al menos un servicio');
-      return;
+    // AÑADIDO: Validación para asegurar que se elija un modo en paso 4 antes de avanzar con 'Siguiente'
+    if (currentStep === 4 && !formData.modoGestionServicios) {
+       toast.error('Por favor, seleccione un modo de gestión para los servicios.');
+       return;
+    }
+
+    // Validación si modo organizador está seleccionado en paso 4
+    if (currentStep === 4 && formData.modoGestionServicios === 'usuario' && (!formData.serviciosSeleccionados || formData.serviciosSeleccionados.length === 0)) {
+      toast.warn('No ha seleccionado ningún servicio adicional.');
+      // Permitimos avanzar pero con aviso.
     }
     
-    // Si estamos en el paso 5 (contacto) validamos los campos requeridos
     if (currentStep === 5) {
       const { nombre, apellidos, email, telefono } = formData.datosContacto;
       if (!nombre || !apellidos || !email || !telefono) {
-        toast.error('Por favor, complete todos los campos obligatorios');
+        toast.error('Por favor, complete todos los campos obligatorios de contacto');
         return;
       }
-      
-      // Validar formato de email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
         toast.error('Por favor, ingrese un email válido');
         return;
       }
-      
-      // Validar formato de teléfono (al menos 9 dígitos)
       const telefonoRegex = /^\d{9,}$/;
       if (!telefonoRegex.test(telefono.replace(/\s+/g, ''))) {
         toast.error('Por favor, ingrese un número de teléfono válido (mínimo 9 dígitos)');
@@ -172,13 +173,11 @@ const ReservaWizard = () => {
       }
     }
     
-    // Si estamos en el paso 6 (resumen), enviamos el formulario
     if (currentStep === 6) {
       handleSubmit();
       return;
     }
     
-    // Avanzar al siguiente paso
     setCurrentStep(prev => prev + 1);
   };
 
@@ -186,16 +185,24 @@ const ReservaWizard = () => {
     updateFormSection('serviciosSeleccionados', servicios);
   };
   
-  const handleModoServiciosSelect = (modo) => {
-    updateFormSection('modoGestionServicios', modo);
-    setShowModoSeleccionServiciosModal(false);
-    setCurrentStep(prev => prev + 1);
+  // AÑADIDO: Manejador para selección directa de modo habitaciones
+  const handleModoHabitacionesSelectDirect = (mode) => {
+    updateFormSection('modoGestionHabitaciones', mode);
+    if (mode === 'hacienda') {
+      // Saltar al siguiente paso si eligen la hacienda
+      setCurrentStep(prev => prev + 1); 
+    }
+    // Si es 'usuario', no hacemos nada aquí, el componente se mostrará
   };
-  
-  const handleModoHabitacionesSelect = (modo) => {
-    updateFormSection('modoGestionHabitaciones', modo);
-    setShowModoSeleccionHabitacionesModal(false);
-    setCurrentStep(prev => prev + 1);
+
+  // AÑADIDO: Manejador para selección directa de modo servicios
+  const handleModoServiciosSelectDirect = (mode) => {
+    updateFormSection('modoGestionServicios', mode);
+    if (mode === 'hacienda') {
+      // Saltar al siguiente paso si eligen la hacienda
+      setCurrentStep(prev => prev + 1); 
+    }
+    // Si es 'usuario', no hacemos nada aquí, el componente se mostrará
   };
 
   const handleSubmit = async () => {
@@ -243,7 +250,9 @@ const ReservaWizard = () => {
       
       if (response.success) {
         toast.success('Reserva creada exitosamente');
-        // Redirigir a la página de confirmación usando la estructura correcta
+        // Opcional: También podrías resetear aquí justo antes de redirigir,
+        // pero hacerlo en el mount es más general.
+        // resetForm(); 
         router.push(`/reservar/confirmacion?id=${response.data.data.reserva._id}`);
       } else {
         throw new Error(response.message || 'Error al crear la reserva');
@@ -391,23 +400,138 @@ const ReservaWizard = () => {
         );
       
       case 3:
-        // Paso 3: Gestión de habitaciones
+        // --- Paso 3: Gestión de habitaciones MODIFICADO ---
         return (
-          <ModoGestionHabitaciones
-            onModeSelect={() => setCurrentStep(prev => prev + 1)}
-            numeroHabitaciones={formData.numeroHabitaciones}
-          />
+          <div>
+            {!formData.modoGestionHabitaciones ? (
+              // Mostrar selección de modo si aún no se ha elegido
+              <div className="max-w-2xl mx-auto">
+                <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">¿Cómo desea gestionar las habitaciones?</h3>
+                <p className="text-[#8A6E52] mb-6 italic">Elija quién se encargará de la asignación de habitaciones.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  {/* Opción 1: Gestión por el Organizador */}
+                  <div
+                    onClick={() => handleModoHabitacionesSelectDirect('usuario')}
+                    className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-primary)]/50 bg-white/80 backdrop-blur-sm shadow-md"
+                  >
+                    <div className="flex items-center mb-4">
+                       <div className="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-4">
+                          <FaUsers className="w-8 h-8 text-[var(--color-primary)]" />
+                       </div>
+                       <div>
+                          <h4 className="text-lg font-semibold">Gestionar yo mismo</h4>
+                          <p className="text-sm text-gray-500">Asignaré las habitaciones a mis huéspedes</p>
+                       </div>
+                    </div>
+                    <div className="text-sm text-gray-500 italic mt-2">
+                       Ideal si ya sabe quién se alojará en cada habitación.
+                    </div>
+                  </div>
+                  {/* Opción 2: Gestión por la Hacienda */}
+                  <div
+                    onClick={() => handleModoHabitacionesSelectDirect('hacienda')}
+                    className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-accent)]/50 bg-white/80 backdrop-blur-sm shadow-md"
+                  >
+                     <div className="flex items-center mb-4">
+                       <div className="w-16 h-16 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-4">
+                          <FaUserCog className="w-8 h-8 text-[var(--color-accent)]" />
+                       </div>
+                       <div>
+                          <h4 className="text-lg font-semibold">Que gestione la Hacienda</h4>
+                          <p className="text-sm text-gray-500">El personal asignará las habitaciones</p>
+                       </div>
+                    </div>
+                     <div className="text-sm text-gray-500 italic mt-2">
+                        Nos pondremos en contacto para los detalles de los huéspedes.
+                     </div>
+                  </div>
+                </div>
+              </div>
+            ) : formData.modoGestionHabitaciones === 'usuario' ? (
+              // Mostrar componente de gestión si se eligió 'usuario'
+              <ModoGestionHabitaciones
+                numeroHabitaciones={formData.numeroHabitaciones}
+              />
+            ) : (
+              // Mostrar mensaje si se eligió 'hacienda' (el paso ya avanzó)
+               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                 <FaInfoCircle className="text-blue-500 text-2xl mx-auto mb-2" />
+                 <p className="text-blue-700">
+                   Ha seleccionado que la Hacienda gestione las habitaciones.
+                   Continuando al siguiente paso...
+                 </p>
+               </div>
+            )}
+          </div>
         );
         
       case 4:
-        // Paso 4: Selección de servicios adicionales
+         // --- Paso 4: Gestión de servicios MODIFICADO ---
         return (
-          <ModoGestionServicios 
-            tipoEvento={typeof formData.tipoEvento === 'object' ? formData.tipoEvento.titulo : formData.tipoEvento}
-            onServicesSelect={handleServicesSelect}
-            modoGestion={formData.modoGestionServicios}
-            serviciosSeleccionados={formData.serviciosSeleccionados}
-          />
+          <div>
+            {!formData.modoGestionServicios ? (
+              // Mostrar selección de modo si aún no se ha elegido
+               <div className="max-w-2xl mx-auto">
+                 <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">¿Cómo desea gestionar los servicios adicionales?</h3>
+                 <p className="text-[#8A6E52] mb-6 italic">Elija si desea seleccionar los servicios ahora o consultarlo con nosotros.</p>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    {/* Opción 1: Gestión por el Organizador */}
+                    <div
+                      onClick={() => handleModoServiciosSelectDirect('usuario')}
+                      className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-primary)]/50 bg-white/80 backdrop-blur-sm shadow-md"
+                    >
+                      <div className="flex items-center mb-4">
+                        <div className="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-4">
+                          <FaUser className="w-8 h-8 text-[var(--color-primary)]" />
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-semibold">Seleccionar servicios ahora</h4>
+                          <p className="text-sm text-gray-500">Elegiré los servicios que deseo</p>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-500 italic mt-2">
+                        Puede ver y añadir servicios a su reserva.
+                      </div>
+                    </div>
+                    {/* Opción 2: Gestión por la Hacienda */}
+                    <div
+                      onClick={() => handleModoServiciosSelectDirect('hacienda')}
+                      className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-accent)]/50 bg-white/80 backdrop-blur-sm shadow-md"
+                    >
+                      <div className="flex items-center mb-4">
+                        <div className="w-16 h-16 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-4">
+                          <FaUtensils className="w-8 h-8 text-[var(--color-accent)]" />
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-semibold">Consultar con la Hacienda</h4>
+                          <p className="text-sm text-gray-500">El personal me asesorará</p>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-500 italic mt-2">
+                        Un coordinador de eventos le contactará para definir los servicios.
+                      </div>
+                    </div>
+                 </div>
+               </div>
+            ) : formData.modoGestionServicios === 'usuario' ? (
+              // Mostrar componente de gestión si se eligió 'usuario'
+              <ModoGestionServicios 
+                tipoEvento={typeof formData.tipoEvento === 'object' ? formData.tipoEvento.titulo : formData.tipoEvento}
+                onServicesSelect={handleServicesSelect}
+                modoGestion={formData.modoGestionServicios}
+                serviciosSeleccionados={formData.serviciosSeleccionados}
+              />
+            ) : (
+              // Mostrar mensaje si se eligió 'hacienda' (el paso ya avanzó)
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                 <FaInfoCircle className="text-blue-500 text-2xl mx-auto mb-2" />
+                 <p className="text-blue-700">
+                   Ha seleccionado consultar los servicios con la Hacienda.
+                   Continuando al siguiente paso...
+                 </p>
+              </div>
+            )}
+          </div>
         );
       
       case 5:
@@ -743,112 +867,8 @@ const ReservaWizard = () => {
       <NavbarReservar />
       <main className="relative z-10 container mx-auto px-4 py-8 min-h-screen flex flex-col">
         <div className="flex-grow max-w-7xl mx-auto w-full">
-        {/* Modal para selección de modo de gestión de servicios */}
-        {showModoSeleccionServiciosModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white rounded-xl p-6 max-w-4xl w-full">
-              <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-4">
-                Selección de Servicios
-              </h2>
-              <p className="text-gray-600 mb-6">
-                ¿Cómo desea gestionar la selección de servicios para su evento?
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Opción 1: Selección por el usuario */}
-                <div
-                  onClick={() => handleModoServiciosSelect('usuario')}
-                  className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-primary)]/50"
-                >
-                  <div className="flex items-center mb-4">
-                    <div className="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-4">
-                      <FaUser className="w-8 h-8 text-[var(--color-primary)]" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Seleccionar servicios ahora</h3>
-                      <p className="text-sm text-gray-500">Usted elige los servicios que desea para su evento</p>
-                    </div>
-                  </div>
-                  
-                  <ul className="space-y-2 text-gray-600 mb-4">
-                    <li className="flex items-start">
-                      <span className="w-5 h-5 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
-                      </span>
-                      <span>Elija entre nuestros paquetes y servicios individuales</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="w-5 h-5 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
-                      </span>
-                      <span>Vea precios y descripciones detalladas</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="w-5 h-5 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]"></span>
-                      </span>
-                      <span>Personalice su evento según sus preferencias</span>
-                    </li>
-                  </ul>
-                  
-                  <div className="text-sm text-gray-500 italic">
-                    Recomendado si ya tiene una idea clara de lo que desea para su evento
-                  </div>
-                </div>
-
-                {/* Opción 2: Gestión por la hacienda */}
-                <div
-                  onClick={() => handleModoServiciosSelect('hacienda')}
-                  className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-primary)]/50"
-                >
-                  <div className="flex items-center mb-4">
-                    <div className="w-16 h-16 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-4">
-                      <FaUtensils className="w-8 h-8 text-[var(--color-accent)]" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Consultar con la Hacienda</h3>
-                      <p className="text-sm text-gray-500">Nuestro equipo le asesorará sobre los servicios</p>
-                    </div>
-                  </div>
-                  
-                  <ul className="space-y-2 text-gray-600 mb-4">
-                    <li className="flex items-start">
-                      <span className="w-5 h-5 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]"></span>
-                      </span>
-                      <span>Un coordinador de eventos se pondrá en contacto con usted</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="w-5 h-5 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]"></span>
-                      </span>
-                      <span>Reciba asesoramiento personalizado según su presupuesto</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="w-5 h-5 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--color-accent)]"></span>
-                      </span>
-                      <span>Flexibilidad para modificar servicios más adelante</span>
-                    </li>
-                  </ul>
-                  
-                  <div className="text-sm text-gray-500 italic">
-                    Recomendado si prefiere recibir orientación profesional
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         
-        {/* Modal para selección de modo de gestión de habitaciones */}
-        <ModalModoGestionHabitaciones 
-          isOpen={showModoSeleccionHabitacionesModal} 
-          onClose={() => setShowModoSeleccionHabitacionesModal(false)} 
-          onModeSelect={handleModoHabitacionesSelect} 
-        />
-        
-        {/* --- Modal de Error de Validación --- */}
+        {/* --- Modal de Error de Validación (se mantiene) --- */}
         <ValidationModal
           isOpen={showValidationModal}
           onClose={() => setShowValidationModal(false)}
@@ -906,8 +926,8 @@ const ReservaWizard = () => {
             {renderStepContent()}
           </div>
           
-                    {/* Navigation Buttons */}
-                    <div className="flex justify-between items-center mt-8">
+          {/* Navigation Buttons */}
+          <div className="flex justify-between items-center mt-8">
             <div>
               {currentStep > 1 && currentStep <= steps.length + 1 && (
                 <button
@@ -928,8 +948,9 @@ const ReservaWizard = () => {
                 className="px-8 py-3 rounded-lg transition-all duration-300 flex items-center space-x-2 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5" style={{
                   background: 'linear-gradient(145deg, #A5856A, #8B6B4F)',
                 }}
+                disabled={(currentStep === 3 && !formData.modoGestionHabitaciones) || (currentStep === 4 && !formData.modoGestionServicios)}
               >
-                                <span>{currentStep === steps.length ? 'Finalizar' : 'Siguiente'}</span>
+                <span>{currentStep === steps.length ? 'Finalizar' : 'Siguiente'}</span>
                 <FaChevronRight />
               </button>
             )}

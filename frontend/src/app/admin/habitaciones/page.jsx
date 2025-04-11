@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
 import { FaEdit, FaTrash, FaBed, FaUserFriends, FaCalendarAlt, FaSpinner, FaEye, 
          FaSync, FaUserPlus, FaUserMinus, FaUserCheck, FaFilter, FaSort, FaSearch,
-         FaTimes, FaChevronDown, FaChevronRight, FaMapMarkerAlt, FaEuroSign, FaArrowUp, FaArrowDown } from 'react-icons/fa';
-import { obtenerHabitacionesConReservas } from '@/services/habitaciones.service';
+         FaTimes, FaChevronDown, FaChevronRight, FaMapMarkerAlt, FaEuroSign, FaArrowUp, FaArrowDown, FaEllipsisV, FaCheck } from 'react-icons/fa';
 import { assignHabitacionReservation, unassignHabitacionReservation } from '@/services/reservationService';
 import { useAuth } from '@/context/AuthContext';
 import { useReservation } from '@/context/ReservationContext';
@@ -13,35 +12,32 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import apiClient from '@/services/apiClient';
 
-export default function AdminRooms() {
+export default function AdminEventRooms() {
   const router = useRouter();
   const { isAuthenticated, isAdmin, user, loading: authLoading } = useAuth();
-  const { loadAllReservations } = useReservation();
-  const [habitaciones, setHabitaciones] = useState([]);
+  const { loadAllReservations, habitacionReservations } = useReservation();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [usuarios, setUsuarios] = useState([]);
   const [loadingUsuarios, setLoadingUsuarios] = useState(false);
-  const [selectedHabitacion, setSelectedHabitacion] = useState(null);
+  const [selectedReserva, setSelectedReserva] = useState(null);
   const [isAsignando, setIsAsignando] = useState(false);
   const [showAsignarModal, setShowAsignarModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState('todos');
-  const [sortBy, setSortBy] = useState('letra');
-  const [sortOrder, setSortOrder] = useState('asc');
+  const [sortBy, setSortBy] = useState('fecha');
+  const [sortOrder, setSortOrder] = useState('desc');
   const [showFilters, setShowFilters] = useState(false);
-  const [vistaActiva, setVistaActiva] = useState('grid'); // grid o tabla
   const [selectedPiso, setSelectedPiso] = useState('todos');
   const [expandedRoom, setExpandedRoom] = useState(null);
   const [showDropdownFilter, setShowDropdownFilter] = useState(false);
   const [showDropdownSort, setShowDropdownSort] = useState(false);
+  const [openActionMenu, setOpenActionMenu] = useState(null);
 
-  // Cargar usuarios para asignación
   const cargarUsuarios = useCallback(async () => {
     try {
       setLoadingUsuarios(true);
-      // Usar apiClient para la petición
       const response = await apiClient.get('/users');
       
       if (response && response.data && Array.isArray(response.data)) {
@@ -52,72 +48,45 @@ export default function AdminRooms() {
       }
     } catch (error) {
       console.error('Error al cargar usuarios:', error.response?.data?.message || error.message);
-      // No mostrar toast para no molestar al usuario
       setUsuarios([]);
     } finally {
       setLoadingUsuarios(false);
     }
   }, []);
 
-  // Cargar habitaciones y sus reservas
-  const fetchRooms = useCallback(async () => {
-    if (authLoading) return;
-    
+  const loadInitialData = useCallback(async () => {
+    if (authLoading || !isAuthenticated || !isAdmin) return;
+
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Primero, cargar todas las reservas al contexto
-      await loadAllReservations(false);
-      
-      // Luego, obtener las habitaciones con sus reservas
-      const habitacionesConReservas = await obtenerHabitacionesConReservas();
-      
-      // --- DEBUG: Log detallado de cada habitación recibida ---
-      if (Array.isArray(habitacionesConReservas)) {
-        // Log para verificar los datos ANTES de setear el estado
-        console.log('[Habitaciones Page] Datos recibidos del servicio:', JSON.stringify(habitacionesConReservas.map(h => ({id: h._id || h.id, letra: h.letra, nombre: h.nombre, disponible: h.disponible, estado: h.estado, reservas: h.reservas?.length})), null, 2));
-        setHabitaciones(habitacionesConReservas);
-      } else {
-        console.warn('[Habitaciones Page] La respuesta de obtenerHabitacionesConReservas no es un array:', habitacionesConReservas);
-      }
-      
-      if (Array.isArray(habitacionesConReservas)) {
-        setHabitaciones(habitacionesConReservas);
-      } else {
-        console.error('Formato de respuesta inválido para habitaciones:', habitacionesConReservas);
-        setError('Formato de respuesta inválido al cargar habitaciones');
-        toast.error('Error al procesar los datos de habitaciones');
-      }
-    } catch (error) {
-      console.error('Error al cargar habitaciones:', error);
-      setError(error.message || 'No se pudieron cargar las habitaciones y sus reservas');
-      toast.error('Error al cargar las habitaciones');
+      await loadAllReservations(false); 
+      await cargarUsuarios();
+      setInitialLoadDone(true);
+    } catch (err) {
+      console.error("Error en carga inicial (Habitaciones Evento):", err);
+      setError("Error cargando datos iniciales.");
+      toast.error("Error al cargar datos iniciales.");
     } finally {
       setIsLoading(false);
-      setInitialLoadDone(true);
     }
-  }, [authLoading, loadAllReservations]);
+  }, [authLoading, isAuthenticated, isAdmin, loadAllReservations, cargarUsuarios]);
 
-  // Efectos para cargar datos, actualización automática y redireccionamiento
   useEffect(() => {
     if (!authLoading && isAuthenticated && isAdmin && !initialLoadDone) {
-      fetchRooms();
-      cargarUsuarios();
+      loadInitialData();
     }
-  }, [fetchRooms, cargarUsuarios, authLoading, isAuthenticated, isAdmin, initialLoadDone]);
+  }, [loadInitialData, authLoading, isAuthenticated, isAdmin, initialLoadDone]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-
     const interval = setInterval(() => {
       if (!isLoading) {
-        fetchRooms();
+         loadAllReservations(false);
       }
-    }, 300000); // 5 minutos
-
+    }, 300000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, isLoading, fetchRooms]);
+  }, [isAuthenticated, isLoading, loadAllReservations]);
 
   useEffect(() => {
     if (!authLoading && (!isAuthenticated || !isAdmin)) {
@@ -125,245 +94,217 @@ export default function AdminRooms() {
     }
   }, [authLoading, isAuthenticated, isAdmin, router]);
 
-  const handleAsignarHabitacion = async (habitacionId, usuarioId) => {
+  const handleAsignarHabitacion = async (reservaId, usuarioId) => {
     try {
       setIsAsignando(true);
-      
-      if (!habitacionId || !usuarioId) {
-        toast.error('Datos incompletos para la asignación');
-        return;
+      if (!reservaId || !usuarioId) {
+        toast.error('Datos incompletos para la asignación.'); return;
       }
-      
-      const response = await assignHabitacionReservation(habitacionId, usuarioId);
-      
+      const response = await assignHabitacionReservation(reservaId, usuarioId);
       if (response.success) {
-        toast.success('Habitación asignada correctamente');
-        // Actualizar la lista de habitaciones
-        fetchRooms();
+        toast.success('Reserva de evento asignada correctamente');
+        loadAllReservations(false);
       } else {
-        toast.error(response.message || 'Error al asignar la habitación');
+        toast.error(response.message || 'Error al asignar la reserva del evento');
       }
     } catch (error) {
-      console.error('Error al asignar habitación:', error);
-      toast.error('No se pudo asignar la habitación');
+      console.error('Error asignando reserva de evento:', error);
+      toast.error('No se pudo asignar la reserva del evento');
     } finally {
       setIsAsignando(false);
       setShowAsignarModal(false);
+      setOpenActionMenu(null);
     }
   };
 
-  const handleDesasignarHabitacion = async (habitacionId) => {
+  const handleDesasignarHabitacion = async (reservaId) => {
     try {
       setIsAsignando(true);
-      
-      const response = await unassignHabitacionReservation(habitacionId);
-      
+      const response = await unassignHabitacionReservation(reservaId);
       if (response.success) {
-        toast.success('Habitación desasignada correctamente');
-        // Actualizar la lista de habitaciones
-        fetchRooms();
+        toast.success('Reserva de evento desasignada correctamente');
+        loadAllReservations(false);
       } else {
-        toast.error(response.message || 'Error al desasignar la habitación');
+        toast.error(response.message || 'Error al desasignar la reserva del evento');
       }
     } catch (error) {
-      console.error('Error al desasignar habitación:', error);
-      toast.error('No se pudo desasignar la habitación');
+      console.error('Error desasignando reserva de evento:', error);
+      toast.error('No se pudo desasignar la reserva del evento');
     } finally {
       setIsAsignando(false);
+      setOpenActionMenu(null);
     }
   };
 
-  const abrirModalAsignar = (habitacion) => {
-    setSelectedHabitacion(habitacion);
+  const abrirModalAsignar = (reservaHabitacion) => {
+    setSelectedReserva(reservaHabitacion);
     setShowAsignarModal(true);
   };
 
-  const toggleRoomExpand = (habitacionId) => {
-    if (expandedRoom === habitacionId) {
-      setExpandedRoom(null);
-    } else {
-      setExpandedRoom(habitacionId);
+  const toggleRoomExpand = (reservaId) => {
+    setExpandedRoom(prev => (prev === reservaId ? null : reservaId));
+  };
+
+  const getStatusColor = (reserva) => {
+    switch (reserva?.estadoReserva?.toLowerCase()) {
+      case 'confirmada': return 'bg-blue-100 text-blue-800';
+      case 'pagada': return 'bg-green-100 text-green-800';
+      case 'cancelada': return 'bg-red-100 text-red-800 line-through';
+      case 'completada': return 'bg-gray-100 text-gray-500';
+      case 'pendiente':
+      default: return 'bg-yellow-100 text-yellow-800';
     }
   };
 
-  const getStatusColor = (habitacion) => {
-    if (habitacion.estado === 'Mantenimiento') {
-      return 'bg-yellow-100 text-yellow-800';
-    } else if (habitacion.estado === 'No Disponible') {
-      return 'bg-red-100 text-red-800';
-    } else if (!habitacion.disponible) {
-      return 'bg-red-100 text-red-800';
-    }
-    return 'bg-green-100 text-green-800';
+  const getStatusText = (reserva) => {
+    return reserva?.estadoReserva?.charAt(0).toUpperCase() + reserva?.estadoReserva?.slice(1) || 'Desconocido';
   };
 
-  const getStatusText = (habitacion) => {
-    if (habitacion.estado === 'Mantenimiento') {
-      return 'En Mantenimiento';
-    } else if (habitacion.estado === 'No Disponible') {
-      return 'No Disponible';
-    } else if (!habitacion.disponible) {
-      return 'Ocupada';
+  const getNombreUsuarioAsignado = (reserva) => {
+    if (!reserva?.asignadoA) return 'Sin asignar';
+    if (loadingUsuarios) return 'Cargando...';
+    if (typeof reserva.asignadoA === 'string') {
+      const usuarioAsignado = usuarios.find(u => u._id === reserva.asignadoA);
+      return usuarioAsignado ? `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos || ''}` : 'Usuario desc.';
     }
-    return 'Disponible';
-  };
-
-  const getNombreUsuarioAsignado = (habitacion) => {
-    if (!habitacion || !habitacion.reservas || habitacion.reservas.length === 0) {
-      return 'Sin asignar';
+    if (typeof reserva.asignadoA === 'object' && reserva.asignadoA !== null) {
+      return `${reserva.asignadoA.nombre || ''} ${reserva.asignadoA.apellidos || ''}`.trim() || 'Usuario desc.';
     }
-    
-    const reservaActiva = habitacion.reservas.find(r => r.asignadoA);
-    
-    if (!reservaActiva || !reservaActiva.asignadoA) {
-      return 'Sin asignar';
-    }
-    
-    // Si asignadoA es un ID
-    if (typeof reservaActiva.asignadoA === 'string') {
-      const usuarioAsignado = usuarios.find(u => u._id === reservaActiva.asignadoA || u.id === reservaActiva.asignadoA);
-      return usuarioAsignado ? `${usuarioAsignado.nombre} ${usuarioAsignado.apellidos || ''}` : 'Usuario desconocido';
-    }
-    
-    // Si asignadoA es un objeto
-    if (typeof reservaActiva.asignadoA === 'object' && reservaActiva.asignadoA !== null) {
-      return `${reservaActiva.asignadoA.nombre || ''} ${reservaActiva.asignadoA.apellidos || ''}`;
-    }
-    
     return 'Sin asignar';
   };
 
-  // Función robusta para obtener la letra de la habitación de todas las posibles fuentes
-  const getLetraHabitacion = (habitacion) => {
-    // Si la habitación tiene una propiedad letra, usarla directamente
-    if (habitacion?.letra) { // Añadido optional chaining por seguridad
-      return habitacion.letra;
+  const formatearFecha = (fecha) => {
+    if (!fecha) return 'N/A';
+    try { return new Date(fecha).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }); }
+    catch (e) { console.error("Error formateando fecha:", fecha, e); return String(fecha); }
+  };
+
+  const getLetraHabitacion = (reserva) => {
+    if (reserva?.letra) {
+      return reserva.letra;
     }
 
-    // Si tiene una propiedad habitacion que es un string, usarla
-    if (habitacion?.habitacion && typeof habitacion.habitacion === 'string') { // Añadido optional chaining
-      return habitacion.habitacion;
+    if (reserva?.habitacion && typeof reserva.habitacion === 'string') {
+      return reserva.habitacion;
     }
 
-    // Si tiene una propiedad habitacion que es un objeto, buscar letra dentro
-    if (habitacion?.habitacion && typeof habitacion.habitacion === 'object' && habitacion.habitacion !== null) { // Añadido optional chaining
-      if (habitacion.habitacion.letra) {
-        return habitacion.habitacion.letra;
+    if (reserva?.habitacion && typeof reserva.habitacion === 'object' && reserva.habitacion !== null) {
+      if (reserva.habitacion.letra) {
+        return reserva.habitacion.letra;
       }
     }
 
-    // Intentar letraHabitacion
-    if (habitacion?.letraHabitacion) { // Añadido optional chaining
-      return habitacion.letraHabitacion;
+    if (reserva?.letraHabitacion) {
+      return reserva.letraHabitacion;
     }
 
-    // Intentar extraer del identificador
-    if (habitacion?.identificador) { // Añadido optional chaining
-      return habitacion.identificador;
+    if (reserva?.identificador) {
+      return reserva.identificador;
     }
 
-    // Si tiene tipo de habitación, usar la primera letra
-    if (habitacion?.tipoHabitacion && typeof habitacion.tipoHabitacion === 'string') { // Añadido optional chaining
-      const firstChar = habitacion.tipoHabitacion.charAt(0).toUpperCase();
-      if (/[A-Z]/.test(firstChar)) {
-        return firstChar;
-      }
+    if (reserva?.tipoHabitacion && typeof reserva.tipoHabitacion === 'string' && reserva.tipoHabitacion.length === 1) {
+        const char = reserva.tipoHabitacion.toUpperCase();
+        if (/[A-Z]/.test(char)) return char;
     }
 
-    // Como último recurso, intentar extraer una letra del ID
-    const id = habitacion?._id || habitacion?.id; // Añadido optional chaining
+    const id = reserva?._id || reserva?.id;
     if (id) {
       const match = String(id).match(/([A-Z])/);
       if (match) return match[1];
     }
 
-    // Si todo falla, devolver ?
-    console.warn('[getLetraHabitacion] No se pudo determinar la letra para la habitación:', habitacion);
-    return '?'; // Devolver '?' como string para evitar errores en .toLowerCase()
+    console.warn('[getLetraHabitacion] No se pudo determinar la letra para la reserva:', reserva);
+    return '?';
   };
 
-  // Mejorar la visualización de las reservas
-  const formatearFecha = (fecha) => {
-    if (!fecha) return '';
-    const date = new Date(fecha);
-    const options = { day: '2-digit', month: 'short', year: 'numeric' };
-    return date.toLocaleDateString('es-ES', options);
-  };
-
-  // Obtener pisos únicos para filtrado
   const pisosDisponibles = useMemo(() => {
-    const pisos = habitaciones
-      .map(hab => hab.planta || 'No especificado')
-      .filter((piso, index, self) => self.indexOf(piso) === index);
+    const pisos = [...new Set(habitacionReservations
+      .filter(r => r.tipoReserva === 'evento')
+      .map(r => {
+        const letra = getLetraHabitacion(r);
+        if (!letra || letra === '?') return null;
+        return (['A', 'B', 'C', 'D', 'E', 'F'].includes(letra.toUpperCase())) ? 'baja' : 'alta';
+      })
+      .filter(p => p !== null)
+    )];
+    pisos.sort((a, b) => a === 'baja' ? -1 : (b === 'baja' ? 1 : 0));
     return ['todos', ...pisos];
-  }, [habitaciones]);
+  }, [habitacionReservations]);
 
-  // Filtrar y ordenar habitaciones
-  const habitacionesFiltradas = habitaciones
-    .filter(habitacion => {
-      // Obtener letra de habitación para búsqueda y ordenamiento
-      const letraHabitacion = getLetraHabitacion(habitacion); // Asegurarse que devuelve string
+  const filteredAndSortedReservations = useMemo(() => {
+    let currentList = habitacionReservations.filter(r => r.tipoReserva === 'evento'); 
 
-      // Filtrar por término de búsqueda
-      const searchTermLower = searchTerm.toLowerCase();
-      const matchesSearch =
-        (letraHabitacion && letraHabitacion.toLowerCase().includes(searchTermLower)) || // Verificar que letraHabitacion no sea null/undefined
-        (habitacion.nombre && habitacion.nombre.toLowerCase().includes(searchTermLower)) ||
-        (habitacion.descripcion && habitacion.descripcion.toLowerCase().includes(searchTermLower));
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      currentList = currentList.filter(r =>
+        r.nombreContacto?.toLowerCase().includes(lowerSearch) ||
+        r.apellidosContacto?.toLowerCase().includes(lowerSearch) ||
+        r.emailContacto?.toLowerCase().includes(lowerSearch) ||
+        r.telefonoContacto?.includes(lowerSearch) ||
+        getLetraHabitacion(r)?.toLowerCase().includes(lowerSearch) ||
+        getNombreUsuarioAsignado(r)?.toLowerCase().includes(lowerSearch)
+      );
+    }
 
-      // Filtrar por estado
-      const matchesEstado =
-        filterEstado === 'todos' ||
-        (filterEstado === 'disponible' && habitacion.disponible === true) || // Comparación explícita
-        (filterEstado === 'ocupada' && habitacion.disponible === false) || // Comparación explícita
-        (filterEstado === 'mantenimiento' && habitacion.estado === 'Mantenimiento');
+    if (filterEstado !== 'todos') {
+      currentList = currentList.filter(r => r.estadoReserva === filterEstado);
+    }
+    
+    if (selectedPiso !== 'todos') {
+      currentList = currentList.filter(r => {
+        const letra = getLetraHabitacion(r);
+        if (!letra) return false;
+        const piso = (['A', 'B', 'C', 'D', 'E', 'F'].includes(letra.toUpperCase())) ? 'baja' : 'alta';
+        return piso === selectedPiso;
+      });
+    }
 
-      // Filtrar por piso
-      const matchesPiso =
-        selectedPiso === 'todos' ||
-        (habitacion.planta && habitacion.planta === selectedPiso) ||
-        (!habitacion.planta && selectedPiso === 'No especificado');
-
-      return matchesSearch && matchesEstado && matchesPiso;
-    })
-    .sort((a, b) => {
-      // Ordenar por el campo seleccionado
-      let comparacion = 0;
-
+    currentList.sort((a, b) => {
+      let valA, valB;
       switch (sortBy) {
         case 'letra':
-          comparacion = getLetraHabitacion(a).localeCompare(getLetraHabitacion(b));
+          valA = getLetraHabitacion(a) || '';
+          valB = getLetraHabitacion(b) || '';
+          break;
+        case 'fecha':
+          valA = a.fechaEntrada || a.fecha ? new Date(a.fechaEntrada || a.fecha).getTime() : 0;
+          valB = b.fechaEntrada || b.fecha ? new Date(b.fechaEntrada || b.fecha).getTime() : 0;
+          break;
+        case 'nombre':
+          valA = `${a.nombreContacto || ''} ${a.apellidosContacto || ''}`.trim().toLowerCase();
+          valB = `${b.nombreContacto || ''} ${b.apellidosContacto || ''}`.trim().toLowerCase();
           break;
         case 'estado':
-          comparacion = getStatusText(a).localeCompare(getStatusText(b));
+          valA = a.estadoReserva || '';
+          valB = b.estadoReserva || '';
           break;
-        case 'capacidad':
-          comparacion = (a.capacidad || 0) - (b.capacidad || 0);
-          break;
-        case 'precio':
-          comparacion = (a.precioPorNoche || 0) - (b.precioPorNoche || 0);
-          break;
-        case 'reservas':
-          comparacion = (a.reservas?.length || 0) - (b.reservas?.length || 0);
-          break;
+        case 'asignado':
+           valA = getNombreUsuarioAsignado(a)?.toLowerCase() || '';
+           valB = getNombreUsuarioAsignado(b)?.toLowerCase() || '';
+           break;
         default:
-          comparacion = getLetraHabitacion(a).localeCompare(getLetraHabitacion(b));
+          valA = a.fechaEntrada || a.fecha ? new Date(a.fechaEntrada || a.fecha).getTime() : 0;
+          valB = b.fechaEntrada || b.fecha ? new Date(b.fechaEntrada || b.fecha).getTime() : 0;
+          if (valA < valB) return sortOrder === 'asc' ? 1 : -1;
+          if (valA > valB) return sortOrder === 'asc' ? -1 : 1;
+          return 0;
       }
-
-      // Aplicar orden (ascendente o descendente)
-      return sortOrder === 'asc' ? comparacion : -comparacion;
+      if (valA < valB || valA === undefined || valA === null || valA === '') return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB || valB === undefined || valB === null || valB === '') return sortOrder === 'asc' ? 1 : -1;
+      return 0;
     });
 
+    return currentList;
+  }, [habitacionReservations, searchTerm, filterEstado, selectedPiso, sortBy, sortOrder, usuarios, loadingUsuarios]);
+
   const handleRetry = () => {
-    fetchRooms();
+    loadInitialData();
   };
 
   const handleSortChange = (campo) => {
     if (sortBy === campo) {
-      // Si ya estamos ordenando por este campo, cambiamos el orden
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
-      // Si cambiamos el campo, empezamos en orden ascendente
       setSortBy(campo);
       setSortOrder('asc');
     }
@@ -373,52 +314,84 @@ export default function AdminRooms() {
   const renderSortIcon = (campo) => {
     if (sortBy !== campo) return null;
     
-    return sortOrder === 'asc' ? <FaArrowUp className="ml-1 inline-block" /> : <FaArrowDown className="ml-1 inline-block" />;
+    return sortOrder === 'asc' ? <FaArrowUp className="ml-1 inline-block w-3 h-3" /> : <FaArrowDown className="ml-1 inline-block w-3 h-3" />;
   };
 
-  // Mostrar carga durante autenticación
+  const handleConfirmarReserva = async (reservaId) => {
+    setOpenActionMenu(null);
+    if (!reservaId) return;
+    try {
+      console.log(`Confirmando reserva ${reservaId}...`);
+      toast.info('Funcionalidad "Confirmar" pendiente de API.');
+    } catch (error) {
+      toast.error('Error al confirmar la reserva');
+      console.error('Error confirmando reserva:', error);
+    }
+  };
+
+  const handleCancelarReserva = async (reservaId) => {
+    setOpenActionMenu(null);
+    if (!reservaId) return;
+    if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
+        try {
+            console.log(`Cancelando reserva ${reservaId}...`);
+            toast.info('Funcionalidad "Cancelar" pendiente de API.');
+        } catch (error) {
+            toast.error('Error al cancelar la reserva');
+            console.error('Error cancelando reserva:', error);
+        }
+    }
+  };
+
+  const handleEliminarReserva = async (reservaId) => {
+    setOpenActionMenu(null);
+    if (!reservaId) return;
+    if (window.confirm('¡Acción irreversible! ¿Estás seguro de que quieres ELIMINAR esta reserva permanentemente?')) {
+      try {
+        console.log(`Eliminando reserva ${reservaId}...`);
+        toast.info('Funcionalidad "Eliminar" pendiente de API.');
+      } catch (error) {
+        toast.error('Error al eliminar la reserva');
+        console.error('Error eliminando reserva:', error);
+      }
+    }
+  };
+
   if (authLoading) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Gestión de Habitaciones</h1>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-spin text-purple-600">
-            <FaSpinner className="h-12 w-12" />
-          </div>
-        </div>
+      <div className="p-6 flex justify-center items-center min-h-screen">
+        <FaSpinner className="animate-spin text-purple-600 h-12 w-12" />
       </div>
     );
   }
 
-  // Mostrar indicador de carga
-  if (isLoading) {
+  if (isLoading && !initialLoadDone) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Gestión de Habitaciones</h1>
+      <div className="p-4 md:p-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Gestión de Habitaciones de Eventos</h1>
         <div className="flex flex-col items-center justify-center py-12">
-          <div className="animate-spin text-purple-600 mb-4">
-            <FaSpinner className="h-12 w-12" />
-          </div>
-          <p className="text-gray-600">Cargando habitaciones...</p>
+          <FaSpinner className="animate-spin text-purple-600 h-10 w-10 mb-4" />
+          <p className="text-gray-600">Cargando reservas de eventos...</p>
         </div>
       </div>
     );
   }
 
-  // Mostrar mensaje de error si hay algún problema
   if (error) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Gestión de Habitaciones</h1>
-        <div className="flex flex-col items-center justify-center py-12 bg-white rounded-lg shadow p-6">
+      <div className="p-4 md:p-6">
+         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Gestión de Habitaciones de Eventos</h1>
+        <div className="flex flex-col items-center justify-center py-12 bg-white rounded-lg shadow p-6 border border-red-200">
           <div className="text-red-500 mb-4">
             <FaBed className="w-12 h-12" />
           </div>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button 
+          <p className="text-gray-700 font-semibold mb-2">Error al cargar datos</p>
+          <p className="text-gray-600 text-sm mb-4 text-center">{error}</p>
+          <button
             onClick={handleRetry}
-            className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+            className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center"
           >
+            <FaSync className="mr-2" />
             Intentar de nuevo
           </button>
         </div>
@@ -426,327 +399,261 @@ export default function AdminRooms() {
     );
   }
 
-  // Renderizar contenido principal
+  const estadosReservaOptions = [
+      { value: 'todos', label: 'Todos los estados' },
+      { value: 'pendiente', label: 'Pendiente' },
+      { value: 'confirmada', label: 'Confirmada' },
+      { value: 'pagada', label: 'Pagada' },
+      { value: 'cancelada', label: 'Cancelada' },
+      { value: 'completada', label: 'Completada' },
+  ];
+
   return (
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-      {/* Log antes de filtrar */}
-      {console.log('[Habitaciones Page] Estado actual de habitaciones (antes de filtrar):', JSON.stringify(habitaciones.map(h => ({id: h._id || h.id, letra: h.letra, nombre: h.nombre, disponible: h.disponible, estado: h.estado, planta: h.planta, reservas: h.reservas?.length})), null, 2))}
-      {console.log('[Habitaciones Page] Filtros actuales:', { searchTerm, filterEstado, selectedPiso })}
-      
-      {/* Cabecera */}
-      <div className="bg-white rounded-xl shadow-sm mb-6">
-        <div className="p-4 md:p-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Gestión de Habitaciones</h1>
-            <div className="flex items-center gap-2">
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Gestión de Habitaciones de Eventos</h1>
+
+      <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="flex flex-col md:flex-row gap-4 mb-4 items-center">
+          <div className="relative flex-grow w-full md:w-auto">
+             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FaSearch className="text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar por contacto, email, tfno, letra..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-10 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+            />
+            {searchTerm && (
               <button
-                onClick={() => setVistaActiva(vistaActiva === 'grid' ? 'tabla' : 'grid')}
-                className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded-lg transition duration-200"
-              >
-                {vistaActiva === 'grid' ? 'Vista de Tabla' : 'Vista de Tarjetas'}
-              </button>
-              <button 
-                onClick={() => fetchRooms()} 
-                className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center"
-              >
-                <FaSync className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} /> 
-                Actualizar
-              </button>
-            </div>
-          </div>
-          
-          {/* Barra de búsqueda y botón de filtros */}
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="relative flex-grow">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FaSearch className="text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Buscar habitación..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-              {searchTerm && (
-                <button 
-                  onClick={() => setSearchTerm('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                >
-                  <FaTimes className="text-gray-400 hover:text-gray-600" />
-                </button>
-              )}
-            </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center"
-            >
-              <FaFilter className="mr-2" />
-              Filtros {showFilters ? '▲' : '▼'}
-            </button>
-          </div>
-          
-          {/* Panel de filtros expandible */}
-          {showFilters && (
-            <div className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Filtro de Estado */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                <button
-                  onClick={() => setShowDropdownFilter(!showDropdownFilter)}
-                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-left flex items-center justify-between shadow-sm"
-                >
-                  <span>
-                    {filterEstado === 'todos' ? 'Todos los estados' : 
-                     filterEstado === 'disponible' ? 'Disponible' :
-                     filterEstado === 'ocupada' ? 'Ocupada' : 'En mantenimiento'}
-                  </span>
-                  <FaChevronDown className={`transition-transform ${showDropdownFilter ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {showDropdownFilter && (
-                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-lg border border-gray-200 py-1">
-                    <button 
-                      onClick={() => { setFilterEstado('todos'); setShowDropdownFilter(false); }}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100"
-                    >
-                      Todos los estados
-                    </button>
-                    <button 
-                      onClick={() => { setFilterEstado('disponible'); setShowDropdownFilter(false); }}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100"
-                    >
-                      Disponible
-                    </button>
-                    <button 
-                      onClick={() => { setFilterEstado('ocupada'); setShowDropdownFilter(false); }}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100"
-                    >
-                      Ocupada
-                    </button>
-                    <button 
-                      onClick={() => { setFilterEstado('mantenimiento'); setShowDropdownFilter(false); }}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100"
-                    >
-                      En mantenimiento
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              {/* Filtro de Piso */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Piso/Planta</label>
-                <select
-                  value={selectedPiso}
-                  onChange={(e) => setSelectedPiso(e.target.value)}
-                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  {pisosDisponibles.map(piso => (
-                    <option key={piso} value={piso}>
-                      {piso === 'todos' ? 'Todos los pisos' : piso}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Orden */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
-                <button
-                  onClick={() => setShowDropdownSort(!showDropdownSort)}
-                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-left flex items-center justify-between shadow-sm"
-                >
-                  <span>
-                    {sortBy === 'letra' ? 'Letra' : 
-                     sortBy === 'estado' ? 'Estado' :
-                     sortBy === 'capacidad' ? 'Capacidad' :
-                     sortBy === 'precio' ? 'Precio' : 'Reservas'}
-                    {renderSortIcon(sortBy)}
-                  </span>
-                  <FaChevronDown className={`transition-transform ${showDropdownSort ? 'rotate-180' : ''}`} />
-                </button>
-                
-                {showDropdownSort && (
-                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-lg border border-gray-200 py-1">
-                    <button 
-                      onClick={() => handleSortChange('letra')}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
-                    >
-                      <span>Letra</span>
-                      {sortBy === 'letra' && (sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />)}
-                    </button>
-                    <button 
-                      onClick={() => handleSortChange('estado')}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
-                    >
-                      <span>Estado</span>
-                      {sortBy === 'estado' && (sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />)}
-                    </button>
-                    <button 
-                      onClick={() => handleSortChange('capacidad')}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
-                    >
-                      <span>Capacidad</span>
-                      {sortBy === 'capacidad' && (sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />)}
-                    </button>
-                    <button 
-                      onClick={() => handleSortChange('precio')}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
-                    >
-                      <span>Precio</span>
-                      {sortBy === 'precio' && (sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />)}
-                    </button>
-                    <button 
-                      onClick={() => handleSortChange('reservas')}
-                      className="block w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
-                    >
-                      <span>Reservas</span>
-                      {sortBy === 'reservas' && (sortOrder === 'asc' ? <FaArrowUp /> : <FaArrowDown />)}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Resumen de resultados */}
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-gray-600">
-              Mostrando {habitacionesFiltradas.length} de {habitaciones.length} habitaciones
-            </p>
-            {(searchTerm || filterEstado !== 'todos' || selectedPiso !== 'todos') && (
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterEstado('todos');
-                  setSelectedPiso('todos');
-                }}
-                className="text-sm text-purple-600 hover:text-purple-800"
-              >
-                Limpiar filtros
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Contenido principal - Sin habitaciones */}
-      {habitacionesFiltradas.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl shadow-sm">
-          <FaBed className="mx-auto text-gray-400 text-5xl mb-4" />
-          <h2 className="text-lg font-medium text-gray-900">No hay habitaciones disponibles</h2>
-          <p className="text-gray-500 mt-2">
-            {searchTerm || filterEstado !== 'todos' || selectedPiso !== 'todos'
-              ? 'No se encontraron habitaciones con los filtros aplicados.' 
-              : 'No se encontraron habitaciones en el sistema.'}
-          </p>
-        </div>
-      ) : (
-        // Contenido principal - Se muestra vista grid o tabla según selección
-        vistaActiva === 'grid' ? (
-          // Vista de tarjetas grid
-          <RoomGridView 
-            habitaciones={habitacionesFiltradas} 
-            getStatusText={getStatusText}
-            getStatusColor={getStatusColor}
-            getLetraHabitacion={getLetraHabitacion}
-            formatearFecha={formatearFecha}
-            expandedRoom={expandedRoom}
-            toggleRoomExpand={toggleRoomExpand}
-            handleAsignarHabitacion={handleAsignarHabitacion}
-            handleDesasignarHabitacion={handleDesasignarHabitacion}
-            user={user}
-          />
-        ) : (
-          // Vista de tabla
-          <RoomTableView 
-            habitaciones={habitacionesFiltradas}
-            getStatusText={getStatusText}
-            getStatusColor={getStatusColor}
-            getLetraHabitacion={getLetraHabitacion}
-            formatearFecha={formatearFecha}
-            handleAsignarHabitacion={handleAsignarHabitacion}
-            handleDesasignarHabitacion={handleDesasignarHabitacion}
-            user={user}
-            expandedRoom={expandedRoom}
-            toggleRoomExpand={toggleRoomExpand}
-          />
-        )
-      )}
-      
-      {/* Modal para asignar */}
-      {showAsignarModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="text-lg font-medium">Asignar habitación {selectedHabitacion?.letra}</h3>
-              <button 
-                onClick={() => setShowAsignarModal(false)}
-                className="text-gray-400 hover:text-gray-500"
+                onClick={() => setSearchTerm('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                aria-label="Limpiar búsqueda"
               >
                 <FaTimes />
               </button>
-            </div>
-            
-            <div className="p-4">
-              {loadingUsuarios ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin text-stone-600 mx-auto mb-2">
-                    <FaSpinner className="h-8 w-8" />
-                  </div>
-                  <p className="mt-2">Cargando usuarios...</p>
+            )}
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full md:w-auto flex-shrink-0 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center text-sm"
+            aria-expanded={showFilters}
+          >
+            <FaFilter className="mr-2" />
+            Filtros
+            <FaChevronDown className={`ml-1 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
+          <button
+            onClick={() => loadAllReservations(true)}
+            disabled={isLoading}
+            className="w-full md:w-auto flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+             <FaSync className={`mr-2 ${isLoading && initialLoadDone ? 'animate-spin' : ''}`} />
+             {isLoading && initialLoadDone ? 'Recargando...' : 'Recargar'}
+          </button>
+        </div>
+
+        {showFilters && (
+          <div className="border-t border-gray-200 pt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <label htmlFor="filter-estado" className="block text-sm font-medium text-gray-700 mb-1">Estado Reserva</label>
+              <button
+                 id="filter-estado"
+                 onClick={() => setShowDropdownFilter(!showDropdownFilter)}
+                 className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-left flex items-center justify-between shadow-sm text-sm"
+                 aria-haspopup="listbox"
+                 aria-expanded={showDropdownFilter}
+              >
+                <span>{estadosReservaOptions.find(o => o.value === filterEstado)?.label || 'Seleccionar'}</span>
+                <FaChevronDown className={`text-gray-400 transition-transform ${showDropdownFilter ? 'rotate-180' : ''}`} />
+              </button>
+              {showDropdownFilter && (
+                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-lg border border-gray-200 py-1 max-h-60 overflow-y-auto">
+                  {estadosReservaOptions.map(option => (
+                     <button
+                        key={option.value}
+                        onClick={() => { setFilterEstado(option.value); setShowDropdownFilter(false); }}
+                        className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${filterEstado === option.value ? 'font-semibold bg-gray-50' : ''}`}
+                        role="option"
+                        aria-selected={filterEstado === option.value}
+                     >
+                       {option.label}
+                     </button>
+                  ))}
                 </div>
-              ) : (
-                <>
-                  <p className="mb-4">
-                    Selecciona un usuario para asignar la habitación {selectedHabitacion?.letra}
-                  </p>
-                  {usuarios.length === 0 ? (
-                    <div className="text-center py-4">
-                      <p>No hay usuarios disponibles</p>
-                    </div>
-                  ) : (
-                    <div className="max-h-60 overflow-y-auto space-y-2">
-                      {usuarios.map(usuario => (
-                        <button
-                          key={usuario._id || usuario.id}
-                          className="w-full bg-white hover:bg-gray-50 border border-gray-200 rounded-lg p-3 text-left transition duration-200"
-                          onClick={() => {
-                            if (selectedHabitacion?.reservas?.length > 0) {
-                              const reservaActiva = selectedHabitacion.reservas[0];
-                              handleAsignarHabitacion(
-                                reservaActiva._id || reservaActiva.id, 
-                                usuario._id || usuario.id
-                              );
-                            }
-                          }}
-                        >
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-stone-100 text-stone-600 flex items-center justify-center mr-3">
-                              {usuario.nombre.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-medium">{usuario.nombre} {usuario.apellidos || ''}</div>
-                              <div className="text-xs text-gray-500">{usuario.email}</div>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
               )}
             </div>
-            
-            <div className="border-t p-4 flex justify-end">
-              <button
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition duration-200"
-                onClick={() => setShowAsignarModal(false)}
+
+            <div>
+              <label htmlFor="filter-piso" className="block text-sm font-medium text-gray-700 mb-1">Piso</label>
+              <select
+                 id="filter-piso"
+                 value={selectedPiso}
+                 onChange={(e) => setSelectedPiso(e.target.value)}
+                 className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
               >
-                Cancelar
-              </button>
+                {pisosDisponibles.map(piso => (
+                  <option key={piso} value={piso}>
+                    {piso === 'todos' ? 'Todos los pisos' : (piso === 'baja' ? 'Planta Baja' : 'Planta Alta')}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div className="relative">
+              <label htmlFor="sort-by" className="block text-sm font-medium text-gray-700 mb-1">Ordenar por</label>
+              <button
+                id="sort-by"
+                onClick={() => setShowDropdownSort(!showDropdownSort)}
+                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-left flex items-center justify-between shadow-sm text-sm"
+                aria-haspopup="listbox"
+                aria-expanded={showDropdownSort}
+              >
+                <span>
+                  {sortBy === 'letra' ? 'Letra Hab.' :
+                   sortBy === 'fecha' ? 'Fecha Entrada' :
+                   sortBy === 'nombre' ? 'Nombre Contacto' :
+                   sortBy === 'estado' ? 'Estado Reserva' :
+                   sortBy === 'asignado' ? 'Admin Asignado' : 'Fecha Entrada'}
+                  {renderSortIcon(sortBy)}
+                </span>
+                 <FaChevronDown className={`text-gray-400 transition-transform ${showDropdownSort ? 'rotate-180' : ''}`} />
+              </button>
+              {showDropdownSort && (
+                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-lg border border-gray-200 py-1">
+                  {[
+                    { value: 'fecha', label: 'Fecha Entrada' },
+                    { value: 'letra', label: 'Letra Hab.' },
+                    { value: 'nombre', label: 'Nombre Contacto' },
+                    { value: 'estado', label: 'Estado Reserva' },
+                    { value: 'asignado', label: 'Admin Asignado' },
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleSortChange(option.value)}
+                      className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center justify-between ${sortBy === option.value ? 'font-semibold bg-gray-50' : ''}`}
+                      role="option"
+                      aria-selected={sortBy === option.value}
+                    >
+                      <span>{option.label}</span>
+                      {sortBy === option.value && renderSortIcon(option.value)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {(searchTerm || filterEstado !== 'todos' || selectedPiso !== 'todos') && showFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200 flex justify-start">
+             <button
+              onClick={() => {
+                setSearchTerm('');
+                setFilterEstado('todos');
+                setSelectedPiso('todos');
+              }}
+              className="text-sm text-purple-600 hover:text-purple-800 flex items-center"
+            >
+              <FaTimes className="mr-1" />
+              Limpiar filtros
+            </button>
+          </div>
+        )}
+      </div>
+
+      {isLoading && !initialLoadDone ? (
+           <div className="text-center py-10 text-gray-500">Cargando...</div>
+      ) : filteredAndSortedReservations.length === 0 ? (
+        <div className="text-center py-10 bg-white rounded-lg shadow border border-gray-200">
+          <FaBed className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No se encontraron reservas de eventos</h3>
+          <p className="mt-1 text-sm text-gray-500">
+             No hay reservas de habitaciones asociadas a eventos que coincidan con los filtros actuales.
+          </p>
+        </div>
+      ) : (
+         <RoomTableView
+           habitaciones={filteredAndSortedReservations}
+           getStatusText={getStatusText}
+           getStatusColor={getStatusColor}
+           getLetraHabitacion={getLetraHabitacion}
+           formatearFecha={formatearFecha}
+           user={user}
+           usuarios={usuarios}
+           getNombreUsuarioAsignado={getNombreUsuarioAsignado}
+           expandedRoom={expandedRoom}
+           toggleRoomExpand={toggleRoomExpand}
+           handleSortChange={handleSortChange}
+           renderSortIcon={renderSortIcon}
+           sortBy={sortBy}
+           sortOrder={sortOrder}
+           totalReservationsCount={habitacionReservations.length}
+           loadingUsuarios={loadingUsuarios}
+           openActionMenu={openActionMenu}
+           setOpenActionMenu={setOpenActionMenu}
+           onConfirmarReserva={handleConfirmarReserva}
+           onCancelarReserva={handleCancelarReserva}
+           onEliminarReserva={handleEliminarReserva}
+           onAsignarReserva={abrirModalAsignar}
+           onDesasignarReserva={handleDesasignarHabitacion}
+         />
+      )}
+
+      {showAsignarModal && selectedReserva && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-lg shadow-xl p-5 max-w-lg w-full mx-auto">
+             <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
+                 <h3 className="text-lg font-semibold text-gray-800">
+                    Asignar Reserva Evento (Hab. {getLetraHabitacion(selectedReserva)})
+                 </h3>
+                 <button onClick={() => setShowAsignarModal(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+             </div>
+
+             {loadingUsuarios ? (
+                 <div className="text-center py-4">
+                    <FaSpinner className="animate-spin text-purple-600 mx-auto h-8 w-8 mb-2" />
+                    <p className="text-sm text-gray-600">Cargando administradores...</p>
+                 </div>
+             ) : usuarios.length > 0 ? (
+                 <>
+                    <p className="text-sm text-gray-600 mb-3">Selecciona un administrador para asignar esta reserva:</p>
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-2 -mr-2">
+                        {usuarios.filter(u => u.role === 'admin').map(u => (
+                            <button
+                                key={u._id}
+                                onClick={() => handleAsignarHabitacion(selectedReserva._id, u._id)}
+                                disabled={isAsignando}
+                                className={`w-full p-3 border rounded-lg text-left flex items-center gap-3 transition duration-150 ${
+                                    isAsignando ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-purple-50 hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1'
+                                }`}
+                            >
+                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                                    {u.nombre?.charAt(0).toUpperCase()}{u.apellidos?.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="flex-grow">
+                                    <span className="block font-medium text-sm text-gray-800">{u.nombre} {u.apellidos || ''}</span>
+                                    <span className="block text-xs text-gray-500">{u.email}</span>
+                                </div>
+                                {isAsignando && <FaSpinner className="animate-spin text-purple-600 ml-auto h-4 w-4"/>}
+                            </button>
+                        ))}
+                    </div>
+                 </>
+             ) : (
+                 <p className="text-sm text-center text-gray-500 py-4">No se encontraron otros administradores.</p>
+             )}
+
+             <div className="mt-5 pt-4 border-t border-gray-200 flex justify-end">
+                 <button
+                    onClick={() => setShowAsignarModal(false)}
+                    disabled={isAsignando}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg text-sm transition duration-150 disabled:opacity-50"
+                 >
+                    Cancelar
+                 </button>
+             </div>
           </div>
         </div>
       )}
@@ -754,348 +661,299 @@ export default function AdminRooms() {
   );
 }
 
-// Componente para vista de tarjetas
-function RoomGridView({ 
-  habitaciones, 
-  getStatusText, 
-  getStatusColor, 
+function RoomTableView({
+  habitaciones,
+  getStatusText,
+  getStatusColor,
   getLetraHabitacion,
   formatearFecha,
+  user,
+  usuarios,
+  getNombreUsuarioAsignado,
   expandedRoom,
   toggleRoomExpand,
-  handleAsignarHabitacion,
-  handleDesasignarHabitacion,
-  user
+  handleSortChange,
+  renderSortIcon,
+  sortBy,
+  sortOrder,
+  totalReservationsCount,
+  loadingUsuarios,
+  openActionMenu,
+  setOpenActionMenu,
+  onConfirmarReserva,
+  onCancelarReserva,
+  onEliminarReserva,
+  onAsignarReserva,
+  onDesasignarReserva
 }) {
+  const handleToggleMenu = (reservaId) => {
+    setOpenActionMenu(prev => (prev === reservaId ? null : reservaId));
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {habitaciones.map((habitacion) => {
-        const roomId = habitacion._id || habitacion.id || `habitacion-${habitacion.letra}`;
-        const isExpanded = expandedRoom === roomId;
-        const hasReservas = habitacion.reservas && habitacion.reservas.length > 0;
-        const statusColor = getStatusColor(habitacion);
-        const statusText = getStatusText(habitacion);
-        const letraHabitacion = getLetraHabitacion(habitacion);
-        
-        return (
-          <div
-            key={roomId}
-            className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
-          >
-            <div className="p-4">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-start">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-stone-300 text-stone-800 font-bold text-xl mr-3">
-                    {letraHabitacion}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">
-                      {habitacion.nombre || `Habitación ${letraHabitacion}`}
-                    </h3>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
-                      {statusText}
-                    </span>
-                  </div>
-                </div>
-                {hasReservas && (
-                  <button 
-                    className="text-gray-400 hover:text-gray-600 p-1"
-                    onClick={() => toggleRoomExpand(roomId)}
-                    title={isExpanded ? "Ocultar reservas" : "Mostrar reservas"}
-                  >
-                    {isExpanded ? <FaChevronDown /> : <FaChevronRight />}
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs font-medium text-gray-500 mb-1">Capacidad</p>
-                  <div className="flex items-center">
-                    <FaUserFriends className="mr-2 text-stone-500" />
-                    <span className="font-semibold">{habitacion.capacidad ? `${habitacion.capacidad} personas` : 'N/A'}</span>
-                  </div>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs font-medium text-gray-500 mb-1">Precio</p>
-                  <div className="flex items-center">
-                    <FaEuroSign className="mr-1 text-stone-500" />
-                    <span className="font-semibold">{habitacion.precioPorNoche ? `${habitacion.precioPorNoche} / noche` : 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-lg mt-3">
-                <p className="text-xs font-medium text-gray-500 mb-1">Ubicación</p>
-                <div className="flex items-center">
-                  <FaMapMarkerAlt className="mr-2 text-stone-500" />
-                  <p className="font-semibold">
-                    {habitacion.planta || 'Planta no especificada'}{habitacion.ubicacion && ` - ${habitacion.ubicacion}`}
-                  </p>
-                </div>
-              </div>
-              
-              {hasReservas && (
-                <div className="border-t mt-4 pt-4">
-                  <button
-                      className="w-full flex justify-between items-center text-left text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
-                      onClick={() => toggleRoomExpand(roomId)}
-                  >
-                      <span>Reservas ({habitacion.reservas?.length || 0})</span>
-                      {isExpanded ? <FaChevronDown /> : <FaChevronRight />}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1 border-t pt-2 mt-2">
-                      {habitacion.reservas.map((reserva) => {
-                        const reservaId = reserva._id || reserva.id;
-                        const estadoReserva = reserva.estadoReserva || 'pendiente';
-                        const asignadoAEstaReserva = reserva.asignadoA;
-                        const estaAsignada = !!asignadoAEstaReserva;
-                        const asignadaAlUsuarioActual =
-                          (typeof asignadoAEstaReserva === 'object' && asignadoAEstaReserva?._id === user?.id) ||
-                          (typeof asignadoAEstaReserva === 'string' && asignadoAEstaReserva === user?.id);
-                        const nombreAsignado = estaAsignada
-                          ? (typeof asignadoAEstaReserva === 'object' ? `${asignadoAEstaReserva.nombre || ''} ${asignadoAEstaReserva.apellidos || ''}`.trim() : 'Otro Admin')
-                          : 'Sin asignar';
-
-                        // Corrección en la URL para eventos
-                        const reservaUrl = reserva.eventoId || reserva.reservaEvento 
-                          ? `/admin/reservaciones/evento/${reserva.eventoId || reserva.reservaEvento}` 
-                          : `/admin/reservaciones/habitacion/${reservaId}`;
-
-                        return (
-                          <div key={reservaId} className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg shadow-sm">
-                            <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <div className="font-medium text-gray-800">
-                                      {reserva.nombreCompleto || reserva.nombreContacto || 'Cliente Desconocido'}
-                                  </div>
-                                  <div className="text-gray-500">
-                                      {formatearFecha(reserva.fechaEntrada)} - {formatearFecha(reserva.fechaSalida)}
-                                  </div>
-                                  <span className={`mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                        estadoReserva === 'confirmada' ? 'bg-green-100 text-green-800' :
-                                        estadoReserva === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                                        estadoReserva === 'cancelada' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                                  }`}>
-                                      {estadoReserva.charAt(0).toUpperCase() + estadoReserva.slice(1)}
-                                  </span>
-                                </div>
-                                <Link 
-                                  href={reservaUrl}
-                                  title="Ver Detalles de Reserva"
-                                  className="text-stone-500 hover:text-stone-700 p-1 rounded-full hover:bg-gray-200"
-                                >
-                                  <FaEye />
-                                </Link>
-                            </div>
-
-                            <div className="border-t pt-2 mt-2 flex items-center justify-between gap-2">
-                                <div className="text-xs">
-                                  <span className="font-medium text-gray-500">Asignado a:</span>
-                                  <span className={`ml-1 font-medium ${!estaAsignada ? 'text-gray-500' : 'text-gray-800'}`}>{nombreAsignado}</span>
-                                </div>
-
-                                <div className="flex gap-1">
-                                  {estadoReserva !== 'cancelada' && !estaAsignada && (
-                                      <button
-                                          title="Asignar a mi cuenta"
-                                          className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition"
-                                          onClick={() => handleAsignarHabitacion(reservaId, user?.id)}
-                                      >
-                                          <FaUserPlus size={12} />
-                                      </button>
-                                  )}
-                                  {estadoReserva !== 'cancelada' && asignadaAlUsuarioActual && (
-                                      <button
-                                          title="Desasignar de mi cuenta"
-                                          className="p-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded transition"
-                                          onClick={() => handleDesasignarHabitacion(reservaId)}
-                                      >
-                                          <FaUserMinus size={12} />
-                                      </button>
-                                  )}
-                                </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {isExpanded && !hasReservas && (
-                      <p className="text-center text-gray-500 text-xs mt-2 pt-2 border-t">No hay reservas registradas para esta habitación.</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Componente para vista de tabla
-function RoomTableView({ 
-  habitaciones, 
-  getStatusText, 
-  getStatusColor, 
-  getLetraHabitacion,
-  formatearFecha,
-  handleAsignarHabitacion,
-  handleDesasignarHabitacion,
-  user,
-  expandedRoom,
-  toggleRoomExpand
-}) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Habitación</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado Físico</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacidad</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles / Reservas</th>
+              <th className="px-2 py-3 w-10"></th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                 <button onClick={() => handleSortChange('letra')} className="flex items-center hover:text-gray-700">
+                    Hab. {renderSortIcon('letra')}
+                 </button>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button onClick={() => handleSortChange('nombre')} className="flex items-center hover:text-gray-700">
+                     Contacto {renderSortIcon('nombre')}
+                  </button>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button onClick={() => handleSortChange('fecha')} className="flex items-center hover:text-gray-700">
+                     Fechas {renderSortIcon('fecha')}
+                  </button>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button onClick={() => handleSortChange('estado')} className="flex items-center hover:text-gray-700">
+                    Estado {renderSortIcon('estado')}
+                  </button>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                   <button onClick={() => handleSortChange('asignado')} className="flex items-center hover:text-gray-700">
+                     Asignado {renderSortIcon('asignado')}
+                   </button>
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {habitaciones.map((habitacion) => {
-              const roomId = habitacion._id || habitacion.id || `habitacion-${habitacion.letra}`;
-              const isExpanded = expandedRoom === roomId;
-              const hasReservas = habitacion.reservas && habitacion.reservas.length > 0;
-              const statusColorClass = getStatusColor(habitacion);
-              const statusText = getStatusText(habitacion);
-              const letraHabitacion = getLetraHabitacion(habitacion);
+          <tbody className="bg-white divide-y divide-gray-100">
+            {habitaciones.map((reserva) => {
+              const reservaId = reserva._id;
+              const isExpanded = expandedRoom === reservaId;
+              const statusColorClass = getStatusColor(reserva);
+              const statusText = getStatusText(reserva);
+              const letraHabitacion = getLetraHabitacion(reserva);
+              const nombreAsignado = getNombreUsuarioAsignado(reserva);
+              const estaAsignada = nombreAsignado !== 'Sin asignar' && nombreAsignado !== 'Cargando...';
+              const asignadaAlUsuarioActual = estaAsignada && (
+                  (typeof reserva.asignadoA === 'object' && reserva.asignadoA?._id === user?.id) ||
+                  (typeof reserva.asignadoA === 'string' && reserva.asignadoA === user?.id)
+              );
+              const isMenuOpen = openActionMenu === reservaId;
+
+              const eventoId = reserva.eventoId?._id || reserva.eventoId || (typeof reserva.reservaEvento === 'object' ? reserva.reservaEvento?._id : reserva.reservaEvento);
+              const detalleUrl = eventoId ? `/admin/reservaciones/evento/${eventoId}` : '#';
+              const canViewDetails = eventoId;
+              const canConfirm = reserva.estadoReserva === 'pendiente';
+              const canCancel = !['cancelada', 'completada'].includes(reserva.estadoReserva);
+              const canDelete = true;
+              const canAssign = reserva.estadoReserva !== 'cancelada';
 
               return (
-                <Fragment key={roomId}>
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-stone-300 text-stone-800 font-bold text-sm mr-3">{letraHabitacion}</div>
-                        <div className="text-sm font-medium text-gray-900">{habitacion.nombre || `Habitación ${letraHabitacion}`}</div>
-                      </div>
+                <Fragment key={reservaId}>
+                  <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-gray-50' : ''}`}>
+                    <td className="px-2 py-2 whitespace-nowrap text-center">
+                       <button
+                         onClick={() => toggleRoomExpand(reservaId)}
+                         className={`text-gray-400 hover:text-purple-600 p-1 rounded ${isExpanded ? 'bg-purple-100 text-purple-700' : ''}`}
+                         title={isExpanded ? "Ocultar detalles" : "Mostrar detalles"}
+                         aria-expanded={isExpanded}
+                       >
+                         {isExpanded ? <FaChevronDown size={12} /> : <FaChevronRight size={12} />}
+                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColorClass}`}>{statusText}</span></td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{habitacion.capacidad ? `${habitacion.capacidad} pers.` : 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{habitacion.precioPorNoche ? `${habitacion.precioPorNoche}€` : 'N/A'}</td>
+                     <td className="px-4 py-3 whitespace-nowrap">
+                       <div className="flex items-center">
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${statusColorClass.replace('text-', 'bg-').split(' ')[0].replace('bg-opacity-50','')} bg-opacity-20 mr-3 flex-shrink-0`}>
+                            <span className={`font-bold text-sm ${statusColorClass.split(' ')[1]}`}>{letraHabitacion}</span>
+                         </div>
+                       </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                       <div className="text-sm font-medium text-gray-900">{reserva.nombreContacto} {reserva.apellidosContacto}</div>
+                       <div className="text-xs text-gray-500">{reserva.emailContacto}</div>
+                       <div className="text-xs text-gray-500">{reserva.telefonoContacto}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                        <div>Ent: {formatearFecha(reserva.fechaEntrada)}</div>
+                        <div>Sal: {formatearFecha(reserva.fechaSalida)}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColorClass}`}>
+                         {statusText}
+                       </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                        <span className={`${!estaAsignada ? 'italic text-gray-400' : ''}`}>
+                           {nombreAsignado}
+                        </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                       <div className="relative inline-block text-left">
+                          <button
+                             onClick={() => handleToggleMenu(reservaId)}
+                             type="button"
+                             className="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-purple-500"
+                             id={`menu-button-${reservaId}`}
+                             aria-expanded={isMenuOpen}
+                             aria-haspopup="true"
+                          >
+                             <FaEllipsisV className="h-4 w-4" aria-hidden="true" />
+                          </button>
 
-                    {/* Columna Detalles / Reservas */}
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                       {hasReservas ? (
-                           <button
-                               onClick={() => toggleRoomExpand(roomId)}
-                               className="text-purple-600 hover:text-purple-800 text-xs font-medium p-1 rounded hover:bg-purple-50"
-                               title={isExpanded ? "Ocultar reservas" : "Mostrar reservas"}
+                         {isMenuOpen && (
+                           <div
+                              className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 focus:outline-none"
+                              role="menu"
+                              aria-orientation="vertical"
+                              aria-labelledby={`menu-button-${reservaId}`}
+                              tabIndex="-1"
                            >
-                               {isExpanded ? <FaChevronDown /> : <FaChevronRight />} ({habitacion.reservas.length})
-                           </button>
-                       ) : (
-                           <span className="text-xs text-gray-400 italic">Sin reservas</span>
-                       )}
+                             <div className="py-1" role="none">
+                                {canViewDetails && (
+                                    <Link href={detalleUrl} legacyBehavior>
+                                        <a 
+                                           role="menuitem" 
+                                           tabIndex="-1" 
+                                           className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center"
+                                           onClick={() => setOpenActionMenu(null)}
+                                        >
+                                            <FaEye className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
+                                            Ver Detalles
+                                        </a>
+                                    </Link>
+                                )}
+                                {canConfirm && (
+                                    <button
+                                        onClick={() => onConfirmarReserva(reservaId)}
+                                        className="text-green-700 block px-4 py-2 text-sm hover:bg-green-50 hover:text-green-900 w-full text-left flex items-center"
+                                        role="menuitem"
+                                        tabIndex="-1"
+                                    >
+                                        <FaCheck className="mr-3 h-4 w-4" aria-hidden="true" />
+                                        Confirmar
+                                    </button>
+                                )}
+                                {canCancel && (
+                                    <button
+                                        onClick={() => onCancelarReserva(reservaId)}
+                                        className="text-red-700 block px-4 py-2 text-sm hover:bg-red-50 hover:text-red-900 w-full text-left flex items-center"
+                                        role="menuitem"
+                                        tabIndex="-1"
+                                    >
+                                        <FaTimes className="mr-3 h-4 w-4" aria-hidden="true" />
+                                        Cancelar
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button
+                                        onClick={() => onEliminarReserva(reservaId)}
+                                        className="text-red-700 block px-4 py-2 text-sm hover:bg-red-50 hover:text-red-900 w-full text-left flex items-center"
+                                        role="menuitem"
+                                        tabIndex="-1"
+                                    >
+                                         <FaTrash className="mr-3 h-4 w-4" aria-hidden="true" />
+                                         Eliminar
+                                    </button>
+                                )}
+                                <div className="border-t border-gray-100 my-1"></div>
+                                {canAssign && (
+                                    <>
+                                        {!estaAsignada ? (
+                                            <button
+                                                onClick={() => { onAsignarReserva(reserva); setOpenActionMenu(null); }}
+                                                disabled={loadingUsuarios}
+                                                className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center disabled:opacity-50"
+                                                role="menuitem"
+                                                tabIndex="-1"
+                                            >
+                                                 <FaUserPlus className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
+                                                 Asignar Admin
+                                            </button>
+                                        ) : asignadaAlUsuarioActual ? (
+                                            <button
+                                                onClick={() => { onDesasignarReserva(reservaId); setOpenActionMenu(null); }}
+                                                className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center"
+                                                role="menuitem"
+                                                tabIndex="-1"
+                                            >
+                                                <FaUserMinus className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
+                                                Desasignarme
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => { onAsignarReserva(reserva); setOpenActionMenu(null); }}
+                                                disabled={loadingUsuarios}
+                                                className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center disabled:opacity-50"
+                                                role="menuitem"
+                                                tabIndex="-1"
+                                            >
+                                                <FaUserCheck className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
+                                                Reasignar Admin
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                             </div>
+                           </div>
+                         )}
+                       </div>
                     </td>
                   </tr>
 
-                  {/* Fila expandida para mostrar reservas */}
-                  {isExpanded && hasReservas && (
-                    <tr className="bg-gray-50">
-                      <td colSpan="5" className="px-6 py-4"> {/* Ajustar colSpan al número de columnas visibles */}
-                        <div className="space-y-3 max-h-64 overflow-y-auto p-2">
-                           <h4 className="text-sm font-semibold text-gray-700 mb-2">Reservas para Habitación {letraHabitacion}</h4>
-                           {habitacion.reservas.map((reserva) => {
-                              const reservaId = reserva._id || reserva.id;
-                              const estadoReserva = reserva.estadoReserva || 'pendiente';
-                              const asignadoAEstaReserva = reserva.asignadoA;
-                              const estaAsignada = !!asignadoAEstaReserva;
-                              const asignadaAlUsuarioActual =
-                                 (typeof asignadoAEstaReserva === 'object' && asignadoAEstaReserva?._id === user?.id) ||
-                                 (typeof asignadoAEstaReserva === 'string' && asignadoAEstaReserva === user?.id);
-                              const nombreAsignado = estaAsignada
-                                 ? (typeof asignadoAEstaReserva === 'object' ? `${asignadoAEstaReserva.nombre || ''} ${asignadoAEstaReserva.apellidos || ''}`.trim() : 'Otro Admin')
-                                 : 'Sin asignar';
-                                 
-                              const reservaUrl = reserva.eventoId || reserva.reservaEvento 
-                                ? `/admin/reservaciones/evento/${reserva.eventoId || reserva.reservaEvento}` 
-                                : `/admin/reservaciones/habitacion/${reservaId}`;
-
-                              return (
-                                <div key={reservaId} className="text-xs bg-white p-3 rounded-md border border-gray-200 shadow-sm">
-                                   <div className="flex justify-between items-start mb-2 gap-2">
-                                      {/* Info Reserva */}
-                                      <div>
-                                         <div className="font-medium text-gray-800 text-sm">
-                                             {reserva.nombreCompleto || reserva.nombreContacto || 'Cliente Desconocido'}
-                                         </div>
-                                         <div className="text-gray-500 text-xs">
-                                             {formatearFecha(reserva.fechaEntrada)} - {formatearFecha(reserva.fechaSalida)}
-                                         </div>
-                                          <span className={`mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                              estadoReserva === 'confirmada' ? 'bg-green-100 text-green-800' :
-                                              estadoReserva === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                                              estadoReserva === 'cancelada' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                                         }`}>
-                                             {estadoReserva.charAt(0).toUpperCase() + estadoReserva.slice(1)}
-                                         </span>
-                                      </div>
-                                      {/* Link a Detalles */}
-                                       <Link 
-                                          href={reservaUrl}
-                                          title="Ver Detalles de Reserva"
-                                          className="text-stone-500 hover:text-stone-700 p-1 rounded-full hover:bg-gray-100 flex-shrink-0"
-                                       >
-                                          <FaEye />
-                                       </Link>
-                                   </div>
-                                   {/* Info Asignación y Acciones */}
-                                   <div className="border-t border-gray-100 pt-2 mt-2 flex items-center justify-between gap-2">
-                                       <div className="text-[11px]">
-                                          <span className="font-medium text-gray-500">Asignado:</span>
-                                          <span className={`ml-1 font-medium ${!estaAsignada ? 'text-gray-500' : 'text-gray-800'}`}>{nombreAsignado}</span>
-                                       </div>
-                                       <div className="flex gap-1">
-                                          {estadoReserva !== 'cancelada' && !estaAsignada && (
-                                             <button
-                                                 title="Asignar a mi cuenta"
-                                                 className="p-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition"
-                                                 onClick={() => handleAsignarHabitacion(reservaId, user?.id)}
-                                             >
-                                                 <FaUserPlus size={10} />
-                                             </button>
-                                          )}
-                                          {estadoReserva !== 'cancelada' && asignadaAlUsuarioActual && (
-                                             <button
-                                                 title="Desasignar de mi cuenta"
-                                                 className="p-1 bg-red-100 text-red-700 hover:bg-red-200 rounded transition"
-                                                 onClick={() => handleDesasignarHabitacion(reservaId)}
-                                             >
-                                                 <FaUserMinus size={10} />
-                                             </button>
-                                          )}
-                                       </div>
-                                   </div>
+                  {isExpanded && (
+                    <tr className="bg-white border-l-4 border-purple-200">
+                      <td colSpan="7" className="px-4 py-3">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-3 text-xs p-2">
+                            <div>
+                               <h4 className="font-semibold text-gray-600 mb-1">Detalles Contacto</h4>
+                               <p><span className="text-gray-500">Nombre:</span> {reserva.nombreContacto} {reserva.apellidosContacto}</p>
+                               <p><span className="text-gray-500">Email:</span> {reserva.emailContacto || 'N/A'}</p>
+                               <p><span className="text-gray-500">Teléfono:</span> {reserva.telefonoContacto || 'N/A'}</p>
+                               {reserva.dniContacto && <p><span className="text-gray-500">DNI:</span> {reserva.dniContacto}</p>}
+                            </div>
+                            <div>
+                                <h4 className="font-semibold text-gray-600 mb-1">Detalles Reserva</h4>
+                                <p><span className="text-gray-500">ID Reserva:</span> <span className="font-mono text-[11px]">{reserva._id}</span></p>
+                                <p><span className="text-gray-500">Tipo:</span> {reserva.tipoReserva}</p>
+                                <p><span className="text-gray-500">Estado:</span> {reserva.estadoReserva}</p>
+                                <p><span className="text-gray-500">Fecha Creación:</span> {formatearFecha(reserva.createdAt)}</p>
+                                <p><span className="text-gray-500">Num Huéspedes:</span> {reserva.numHuespedes || 'N/A'}</p>
+                                {typeof reserva.precioTotal === 'number' && <p><span className="text-gray-500">Precio:</span> {reserva.precioTotal.toFixed(2)} €</p>}
+                            </div>
+                            {eventoId && reserva.eventoId && (
+                                <div>
+                                     <h4 className="font-semibold text-gray-600 mb-1">Evento Asociado</h4>
+                                     <p><span className="text-gray-500">ID Evento:</span> <span className="font-mono text-[11px]">{eventoId}</span></p>
+                                     {typeof reserva.eventoId === 'object' && reserva.eventoId !== null ? (
+                                         <>
+                                             <p><span className="text-gray-500">Nombre Evento:</span> {reserva.eventoId.nombreEvento || 'N/A'}</p>
+                                             <p><span className="text-gray-500">Fecha Evento:</span> {formatearFecha(reserva.eventoId.fechaEvento)}</p>
+                                             <p><span className="text-gray-500">Tipo Evento:</span> {reserva.eventoId.tipoEvento || 'N/A'}</p>
+                                             <Link href={`/admin/reservaciones/evento/${eventoId}`} legacyBehavior>
+                                                 <a className="text-blue-600 hover:underline text-xs mt-1 inline-block">Ver detalles del evento &rarr;</a>
+                                             </Link>
+                                         </>
+                                     ) : (
+                                          <Link href={`/admin/reservaciones/evento/${eventoId}`} legacyBehavior>
+                                              <a className="text-blue-600 hover:underline text-xs mt-1 inline-block">Ver detalles del evento &rarr;</a>
+                                          </Link>
+                                     )}
                                 </div>
-                              );
-                           })}
-                        </div>
+                            )}
+                         </div>
                       </td>
                     </tr>
                   )}
-                   {isExpanded && !hasReservas && (
-                       <tr className="bg-gray-50">
-                           <td colSpan="5" className="text-center text-gray-500 text-xs py-4 px-6 italic">
-                               No hay reservas registradas para esta habitación.
-                           </td>
-                       </tr>
-                   )}
                 </Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
+       <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
+            Mostrando {habitaciones.length} reservas de eventos
+            {totalReservationsCount > habitaciones.length && ` (filtradas de ${totalReservationsCount} total)`}
+        </div>
     </div>
   );
 } 

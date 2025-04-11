@@ -108,12 +108,12 @@ const reservaEventoSchema = new mongoose.Schema({
   },
   modoGestionHabitaciones: {
     type: String,
-    enum: ['usuario', 'organizador'],
+    enum: ['usuario', 'organizador', 'hacienda'],
     default: 'usuario'
   },
   modoGestionServicios: {
     type: String,
-    enum: ['usuario', 'organizador'],
+    enum: ['usuario', 'organizador', 'hacienda'],
     default: 'usuario'
   },
   serviciosAdicionales: {

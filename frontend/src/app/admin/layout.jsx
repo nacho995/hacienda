@@ -13,7 +13,8 @@ import {
   FaBars,
   FaTimes,
   FaChartPie,
-  FaBoxOpen
+  FaBoxOpen,
+  FaHotel
 } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
@@ -111,7 +112,8 @@ export default function AdminLayout({ children }) {
   const sidebarLinks = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: <FaChartPie /> },
     { name: 'Reservaciones', href: '/admin/reservaciones', icon: <FaCalendarAlt /> },
-    { name: 'Habitaciones', href: '/admin/habitaciones', icon: <FaBed /> },
+    { name: 'Habitaciones eventos', href: '/admin/habitaciones', icon: <FaBed /> },
+    { name: 'Reservas Hotel', href: '/admin/reservas-hotel', icon: <FaHotel /> },
     { name: 'Servicios Eventos', href: '/admin/servicios-eventos', icon: <FaBoxOpen /> },
     { name: 'Usuarios', href: '/admin/usuarios', icon: <FaUsers /> },
     { name: 'Configuración', href: '/admin/configuracion', icon: <FaCog /> },
