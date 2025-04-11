@@ -567,65 +567,62 @@ exports.checkHabitacionAvailability = asyncHandler(async (req, res, next) => {
   }
 });
 
-// @desc    Obtener fechas ocupadas para habitaciones
+// @desc    Obtener fechas ocupadas para UNA habitación específica (identificada por su letra)
 // @route   GET /api/reservas/habitaciones/fechas-ocupadas
 // @access  Public
 exports.getHabitacionOccupiedDates = asyncHandler(async (req, res, next) => {
   try {
-    // Parámetros opcionales para filtrar por tipo de habitación y fechas
-    const { tipoHabitacion, fechaInicio, fechaFin } = req.query;
-    
-    // Construir el query
-    const query = {
-      estadoReserva: { $ne: 'cancelada' }
-    };
-    
-    // Si se especifica un tipo de habitación, filtrar por él
-    if (tipoHabitacion) {
-      query.tipoHabitacion = tipoHabitacion;
+    // MODIFICADO: Esperar habitacionLetra en lugar de habitacionId
+    const { habitacionLetra, fechaInicio, fechaFin } = req.query;
+
+    // MODIFICADO: Validar habitacionLetra
+    if (!habitacionLetra) { 
+        return res.status(400).json({ success: false, message: 'Falta el parámetro habitacionLetra' });
+    }
+    if (!fechaInicio || !fechaFin) {
+        return res.status(400).json({ success: false, message: 'Faltan los parámetros fechaInicio o fechaFin' });
     }
     
-    // Si hay fechas de inicio y fin, filtrar el rango
-    if (fechaInicio && fechaFin) {
-      // Para habitaciones, hay que considerar todo el rango de fechas (entrada a salida)
-      query.$or = [
-        // Fecha entrada está dentro del rango solicitado
-        {
-          fechaEntrada: {
-            $gte: new Date(fechaInicio),
-            $lte: new Date(fechaFin)
-          }
-        },
-        // Fecha salida está dentro del rango solicitado
-        {
-          fechaSalida: {
-            $gte: new Date(fechaInicio),
-            $lte: new Date(fechaFin)
-          }
-        },
-        // El rango solicitado está completamente dentro de la estancia
-        {
-          fechaEntrada: { $lte: new Date(fechaInicio) },
-          fechaSalida: { $gte: new Date(fechaFin) }
+    const fechaInicioObj = new Date(fechaInicio);
+    const fechaFinObj = new Date(fechaFin);
+    
+    if (isNaN(fechaInicioObj.getTime()) || isNaN(fechaFinObj.getTime())) {
+      return res.status(400).json({ success: false, message: 'Fechas inválidas' });
+    }
+
+    // Buscar reservas activas para esa letra de habitación que se solapen con el rango
+    // MODIFICADO: Buscar por el campo 'habitacion' usando habitacionLetra
+    const reservas = await ReservaHabitacion.find({
+      habitacion: habitacionLetra, 
+      estadoReserva: { $in: ['confirmada', 'pendiente'] }, // Considerar confirmadas y pendientes
+      $or: [
+        { fechaEntrada: { $lt: fechaFinObj }, fechaSalida: { $gt: fechaInicioObj } }, // Solapamiento
+      ]
+    });
+
+    const occupiedDatesSet = new Set();
+
+    reservas.forEach(reserva => {
+      let currentDate = new Date(reserva.fechaEntrada);
+      const endDate = new Date(reserva.fechaSalida);
+      
+      // Iterar por cada día de la reserva
+      while (currentDate < endDate) {
+        // Añadir solo si está dentro del rango solicitado por el frontend
+        if (currentDate >= fechaInicioObj && currentDate <= fechaFinObj) {
+          // Guardar como YYYY-MM-DD string
+          occupiedDatesSet.add(currentDate.toISOString().split('T')[0]);
         }
-      ];
-    } 
+        // Avanzar al día siguiente
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
     
-    // Proyectar solo los campos necesarios
-    const reservas = await ReservaHabitacion.find(query, 'fechaEntrada fechaSalida tipoHabitacion numeroHabitaciones')
-      .sort({ fechaEntrada: 1 });
-    
-    // Preparar datos para el frontend
-    const fechasOcupadas = reservas.map(reserva => ({
-      fechaEntrada: reserva.fechaEntrada,
-      fechaSalida: reserva.fechaSalida,
-      tipoHabitacion: reserva.tipoHabitacion,
-      numeroHabitaciones: reserva.numeroHabitaciones
-    }));
-    
+    const occupiedDatesArray = Array.from(occupiedDatesSet);
+
     res.status(200).json({
       success: true,
-      data: fechasOcupadas
+      data: occupiedDatesArray // Devolver array de strings YYYY-MM-DD
     });
   } catch (error) {
     console.error('Error al obtener fechas ocupadas de habitaciones:', error);

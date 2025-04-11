@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { FaCalendarAlt, FaWifi, FaUserFriends, FaEnvelope, FaPhone, FaSpinner, FaBed, FaEuroSign, FaBuilding } from 'react-icons/fa';
 import { toast } from 'sonner';
-import { createMultipleReservaciones } from '@/services/reservationService';
+import { createMultipleReservaciones, getHabitacionOccupiedDates } from '@/services/reservationService';
 import { useAuth } from '@/context/AuthContext';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -27,6 +27,8 @@ export default function BookingFormSection({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reservationError, setReservationError] = useState(null);
   const [fechasPorHabitacion, setFechasPorHabitacion] = useState({});
+  const [fechasOcupadasPorHabitacion, setFechasOcupadasPorHabitacion] = useState({});
+  const [loadingFechasOcupadas, setLoadingFechasOcupadas] = useState({});
   const [metodoPago, setMetodoPago] = useState('');
   const [mostrarPago, setMostrarPago] = useState(false);
   const [mostrarFormularioTarjeta, setMostrarFormularioTarjeta] = useState(false);
@@ -43,10 +45,68 @@ export default function BookingFormSection({
   
   const [multipleReservationConfirmations, setMultipleReservationConfirmations] = useState([]);
   
+  const fetchOccupiedDates = useCallback(async (roomLetra, fechaInicioVisible, fechaFinVisible) => {
+    if (!roomLetra) { 
+      console.warn("fetchOccupiedDates llamado sin roomLetra válida.");
+      return; 
+    }
+      
+    setLoadingFechasOcupadas(prev => ({ ...prev, [roomLetra]: true }));
+    try {
+      const formatApiDate = (date) => date.toISOString().split('T')[0];
+      
+      const params = { 
+        habitacionLetra: roomLetra, 
+        fechaInicio: formatApiDate(fechaInicioVisible), 
+        fechaFin: formatApiDate(fechaFinVisible)
+      };
+      
+      const response = await getHabitacionOccupiedDates(params);
+      
+      if (response && response.success && Array.isArray(response.data)) {
+        const occupiedDates = response.data.map(dateString => new Date(dateString + 'T00:00:00'));
+        setFechasOcupadasPorHabitacion(prev => ({ ...prev, [roomLetra]: occupiedDates }));
+      } else {
+        console.error(`Error al obtener fechas ocupadas para habitación ${roomLetra}:`, response?.message || 'Respuesta inválida del servicio');
+        setFechasOcupadasPorHabitacion(prev => ({ ...prev, [roomLetra]: [] }));
+      }
+    } catch (error) {
+      console.error(`Excepción al obtener fechas ocupadas para habitación ${roomLetra}:`, error?.message || error);
+      setFechasOcupadasPorHabitacion(prev => ({ ...prev, [roomLetra]: [] }));
+    } finally {
+      setLoadingFechasOcupadas(prev => ({ ...prev, [roomLetra]: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoadingDetails && selectedRooms.length > 0) { 
+      selectedRooms.forEach(room => {
+        if (room && room.letra) { 
+          const hoy = new Date();
+          const fechaFinRango = new Date(hoy.getFullYear(), hoy.getMonth() + 2, hoy.getDate()); 
+          fetchOccupiedDates(room.letra, hoy, fechaFinRango); 
+        } else {
+          console.warn("Intento de buscar fechas para una habitación sin letra:", room);
+        }
+      });
+    }
+    
+    const currentRoomLetras = new Set(selectedRooms.map(r => r.letra).filter(Boolean));
+    setFechasOcupadasPorHabitacion(prev => {
+      const newState = { ...prev };
+      Object.keys(newState).forEach(roomLetra => {
+        if (!currentRoomLetras.has(roomLetra)) {
+          delete newState[roomLetra];
+        }
+      });
+      return newState;
+    });
+  }, [selectedRooms, fetchOccupiedDates, isLoadingDetails]);
+
   useEffect(() => {
     const initialFechas = {};
     selectedRooms.forEach(room => {
-      initialFechas[room._id] = fechasPorHabitacion[room._id] || { fechaEntrada: null, fechaSalida: null };
+      initialFechas[room.letra] = fechasPorHabitacion[room.letra] || { fechaEntrada: null, fechaSalida: null };
     });
     setFechasPorHabitacion(initialFechas);
     validateForm(formData, initialFechas);
@@ -59,12 +119,12 @@ export default function BookingFormSection({
     if (selectedRooms.length === 0) return 0;
 
     selectedRooms.forEach(room => {
-      const fechas = fechasPorHabitacion[room._id];
+      const fechas = fechasPorHabitacion[room.letra];
       if (fechas && fechas.fechaEntrada && fechas.fechaSalida) {
         if (fechas.fechaSalida > fechas.fechaEntrada) {
           const noches = Math.ceil((fechas.fechaSalida - fechas.fechaEntrada) / (1000 * 60 * 60 * 24));
           if (noches > 0) {
-            precioTotalCalculado += (room.precio || 0) * noches;
+            precioTotalCalculado += (room.precioPorNoche || 0) * noches;
           } else {
             todasFechasValidas = false;
           }
@@ -92,11 +152,11 @@ export default function BookingFormSection({
     validateForm(newFormData, fechasPorHabitacion);
   };
 
-  const handleFechasHabitacionChange = (roomId, dates) => {
+  const handleFechasHabitacionChange = (roomLetra, dates) => {
     const [start, end] = dates;
     const newFechasPorHabitacion = {
       ...fechasPorHabitacion,
-      [roomId]: { fechaEntrada: start, fechaSalida: end },
+      [roomLetra]: { fechaEntrada: start, fechaSalida: end },
     };
     setFechasPorHabitacion(newFechasPorHabitacion);
   };
@@ -114,7 +174,7 @@ export default function BookingFormSection({
         allDatesSetAndValid = false;
     } else {
         selectedRooms.forEach(room => {
-          const fechas = currentFechasPorHabitacion[room._id];
+          const fechas = currentFechasPorHabitacion[room.letra];
           if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
             allDatesSetAndValid = false;
           }
@@ -144,12 +204,12 @@ export default function BookingFormSection({
     
     try {
       const reservas = selectedRooms.map(room => {
-        const fechas = fechasPorHabitacion[room._id];
+        const fechas = fechasPorHabitacion[room.letra];
         if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
-           throw new Error(`Fechas inválidas o faltantes para la habitación ${room.nombre}`);
+           throw new Error(`Fechas inválidas o faltantes para la habitación ${room.letra}`);
         }
         const noches = Math.ceil((fechas.fechaSalida - fechas.fechaEntrada) / (1000 * 60 * 60 * 24));
-        const precioTotalHabitacion = (room.precio || 0) * noches;
+        const precioTotalHabitacion = (room.precioPorNoche || 0) * noches;
 
         return {
           nombreContacto: formData.nombre,
@@ -160,24 +220,24 @@ export default function BookingFormSection({
           mensaje: formData.mensaje,
           habitacion: room.letra,
           tipoHabitacion: room.tipoHabitacion,
-          precioPorNoche: room.precio,
+          precioPorNoche: room.precioPorNoche || 0,
           fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
           fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
-          precioTotal: precioTotalHabitacion,
-            numeroHabitaciones: 1,
-            metodoPago: 'tarjeta',
+          precio: precioTotalHabitacion,
+          numeroHabitaciones: 1,
+          metodoPago: 'tarjeta',
           tipoReserva: 'hotel',
           estadoReserva: 'confirmada',
-            infoPago: {
-              ultimosDigitos: datosTarjeta.numeroTarjeta.slice(-4),
-              titular: datosTarjeta.nombreTitular
-            }
-          };
+          infoPago: {
+            ultimosDigitos: datosTarjeta.numeroTarjeta.slice(-4),
+            titular: datosTarjeta.nombreTitular
+          }
+        };
       });
         
       console.log('Datos de reservas múltiples con tarjeta (fechas individuales):', reservas);
-        const response = await createMultipleReservaciones(reservas);
-        
+      const response = await createMultipleReservaciones(reservas);
+      
       if (response.success && Array.isArray(response.data)) {
           setMultipleReservationConfirmations(response.data);
           setShowReservationSuccess(true);
@@ -211,12 +271,12 @@ export default function BookingFormSection({
     
     try {
        const reservas = selectedRooms.map(room => {
-         const fechas = fechasPorHabitacion[room._id];
+         const fechas = fechasPorHabitacion[room.letra];
          if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
-            throw new Error(`Fechas inválidas o faltantes para la habitación ${room.nombre}`);
+            throw new Error(`Fechas inválidas o faltantes para la habitación ${room.letra}`);
          }
          const noches = Math.ceil((fechas.fechaSalida - fechas.fechaEntrada) / (1000 * 60 * 60 * 24));
-         const precioTotalHabitacion = (room.precio || 0) * noches;
+         const precioTotalHabitacion = (room.precioPorNoche || 0) * noches;
 
          return {
             nombreContacto: formData.nombre,
@@ -227,14 +287,14 @@ export default function BookingFormSection({
             mensaje: formData.mensaje,
             habitacion: room.letra,
             tipoHabitacion: room.tipoHabitacion,
-            precioPorNoche: room.precio,
+            precioPorNoche: room.precioPorNoche || 0,
             fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
             fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
-            precioTotal: precioTotalHabitacion,
+            precio: precioTotalHabitacion,
             numeroHabitaciones: 1,
             metodoPago: metodo,
             tipoReserva: 'hotel',
-            estadoReserva: 'pendiente',
+            estadoReserva: metodo === 'tarjeta' ? 'confirmada' : 'pendiente',
          };
       });
        
@@ -322,12 +382,13 @@ export default function BookingFormSection({
                   </div>
           ) : selectedRooms.length > 0 ? (
             <ul className="space-y-5">
-              {selectedRooms.map(room => {
-                const roomDates = fechasPorHabitacion[room._id] || { fechaEntrada: null, fechaSalida: null };
+              {selectedRooms.map((room, index) => {
+                const roomLetra = room.letra;
+                const roomDates = fechasPorHabitacion[roomLetra] || { fechaEntrada: null, fechaSalida: null };
                 const hasValidDates = roomDates.fechaEntrada && roomDates.fechaSalida && roomDates.fechaSalida > roomDates.fechaEntrada;
 
                 return (
-                  <li key={room._id} className={`p-4 bg-white rounded shadow-sm border ${!hasValidDates && roomDates.fechaEntrada ? 'border-red-300' : 'border-gray-100'}`}>
+                  <li key={room._id || roomLetra || index} className={`p-4 bg-white rounded shadow-sm border ${!hasValidDates && roomDates.fechaEntrada ? 'border-red-300' : 'border-gray-100'}`}>
                      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-3">
                        <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden border border-gray-200">
                           <Image 
@@ -340,28 +401,28 @@ export default function BookingFormSection({
                   </div>
                        <div className="flex-grow">
                          <p className="font-semibold text-gray-800 text-lg">{room.nombre}</p>
-                         <p className="text-sm text-gray-600">Tipo: {room.tipo}</p>
-                         <p className="font-semibold text-[var(--color-primary)] mt-1">${room.precio || 0} / noche</p>
+                         <p className="text-sm text-gray-600">Tipo: {room.tipo || room.tipoHabitacion}</p>
+                         <p className="font-semibold text-[var(--color-primary)] mt-1">${room.precioPorNoche || 0} / noche</p>
                     </div>
                        <div className="w-full md:w-auto md:min-w-[280px]">
-                          <label htmlFor={`fechas-${room._id}`} className="block text-xs font-medium text-gray-600 mb-1">Fechas para {room.nombre} *</label>
+                          <label htmlFor={`fechas-${roomLetra}`} className="block text-xs font-medium text-gray-600 mb-1">Fechas para Habitación {roomLetra} *</label>
                           <DatePicker
                             selected={roomDates.fechaEntrada}
-                            onChange={(dates) => handleFechasHabitacionChange(room._id, dates)}
+                            onChange={(dates) => handleFechasHabitacionChange(roomLetra, dates)}
                             startDate={roomDates.fechaEntrada}
                             endDate={roomDates.fechaSalida}
+                            excludeDates={fechasOcupadasPorHabitacion[roomLetra] || []}
                             selectsRange
-                            monthsShown={1}
+                            inline
+                            minDate={new Date()}
+                            monthsShown={2}
                             locale="es"
                             dateFormat="dd/MM/yyyy"
-                            minDate={new Date()}
                             placeholderText="Entrada - Salida"
-                            className={`w-full p-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm ${!hasValidDates && roomDates.fechaEntrada ? 'border-red-500' : 'border-gray-300'}`}
-                            wrapperClassName="w-full"
-                            calendarClassName="shadow-lg border rounded-lg bg-white text-xs"
-                            popperPlacement="bottom-end"
-                        required
-                      />
+                          />
+                          {loadingFechasOcupadas[roomLetra] && (
+                            <p className="text-xs text-gray-500 mt-1">Cargando disponibilidad...</p>
+                          )}
                           {!hasValidDates && roomDates.fechaEntrada && (
                               <p className="text-xs text-red-600 mt-1">La fecha de salida debe ser posterior a la de entrada.</p>
                           )}

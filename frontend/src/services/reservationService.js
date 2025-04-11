@@ -881,8 +881,11 @@ export const getHabitacionOccupiedDates = async (params = {}) => {
     
     // Añadir parámetros a la URL si existen
     const queryParams = [];
-    if (params.tipoHabitacion) {
-      queryParams.push(`tipoHabitacion=${encodeURIComponent(params.tipoHabitacion)}`);
+    if (params.habitacionLetra) { 
+      queryParams.push(`habitacionLetra=${params.habitacionLetra}`);
+    } else {
+      console.error("Llamada a getHabitacionOccupiedDates sin habitacionLetra.");
+      throw new Error("Falta el parámetro habitacionLetra para obtener fechas ocupadas");
     }
     if (params.fechaInicio) {
       queryParams.push(`fechaInicio=${params.fechaInicio}`);
@@ -892,25 +895,29 @@ export const getHabitacionOccupiedDates = async (params = {}) => {
     }
     
     // Añadir parámetros a la URL
-    if (queryParams.length > 0) {
+    if (queryParams.length > 1) {
       url += `?${queryParams.join('&')}`;
+    } else {
+      console.error("Llamada a getHabitacionOccupiedDates sin fechas?");
+      throw new Error("Faltan fechas para obtener fechas ocupadas");
     }
     
     const response = await apiClient.get(url);
     
     // Transformar las fechas a objetos Date para facilitar su uso en el frontend
     if (response && response.success && Array.isArray(response.data)) {
-      return response.data.map(item => ({
-        ...item,
-        fechaEntrada: new Date(item.fechaEntrada),
-        fechaSalida: new Date(item.fechaSalida)
-      }));
+      // Devolver directamente los datos si la estructura es correcta
+      // (La conversión a Date se hará en el componente que llama)
+      return { success: true, data: response.data };
+    } else {
+      // Si la respuesta no tiene éxito o datos, devolver un objeto de fallo
+      console.warn('Respuesta no exitosa o datos inválidos para fechas ocupadas:', response);
+      return { success: false, data: [], message: response?.message || 'Formato de respuesta inesperado' };
     }
     
-    return [];
   } catch (error) {
-    console.error('Error fetching occupied dates for habitaciones:', error);
-    return []; // Devolver array vacío en caso de error
+    console.error('Error en servicio getHabitacionOccupiedDates, relanzando:', error);
+    throw error; 
   }
 };
 

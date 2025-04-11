@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle, FaUsers, FaUserCog } from 'react-icons/fa';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ import CalendarioReserva from '@/components/reservas/CalendarioReserva';
 import { useReservation } from '@/context/ReservationContext';
 import NavbarReservar from '@/components/layout/NavbarReservar';
 import Footer from '@/components/layout/Footer';
-import { crearReservaEvento } from '@/services/reservas.service';
+import { crearReservaEvento, getEventoOccupiedDates } from '@/services/reservas.service';
 
 const ReservarPage = () => {
   return (
@@ -74,6 +74,43 @@ const ReservaWizard = () => {
   const [validationRedirectStep, setValidationRedirectStep] = useState(null);
   const [selectedEventType, setSelectedEventType] = useState(formData.tipoEvento || null);
   const router = useRouter();
+  
+  // --- Estados para fechas ocupadas por EVENTOS --- 
+  const [occupiedEventDates, setOccupiedEventDates] = useState([]);
+  const [loadingOccupiedEventDates, setLoadingOccupiedEventDates] = useState(false);
+
+  // --- Función para cargar fechas ocupadas por EVENTOS --- 
+  const fetchOccupiedEventDates = useCallback(async (fechaInicioVisible, fechaFinVisible) => {
+    setLoadingOccupiedEventDates(true);
+    try {
+      const formatApiDate = (date) => date.toISOString().split('T')[0];
+      const params = {
+        fechaInicio: formatApiDate(fechaInicioVisible),
+        fechaFin: formatApiDate(fechaFinVisible),
+      };
+      const response = await getEventoOccupiedDates(params);
+      if (response && response.success && Array.isArray(response.data)) {
+        const occupiedDates = response.data.map(dateString => new Date(dateString));
+        setOccupiedEventDates(occupiedDates);
+      } else {
+        console.error('Error al obtener fechas ocupadas de eventos:', response?.message);
+        setOccupiedEventDates([]);
+      }
+    } catch (error) {
+      console.error('Excepción al obtener fechas ocupadas de eventos:', error);
+      setOccupiedEventDates([]);
+    } finally {
+      setLoadingOccupiedEventDates(false);
+    }
+  }, []);
+
+  // --- Efecto para cargar fechas ocupadas al inicio --- 
+  useEffect(() => {
+    // Cargar fechas para los próximos 6 meses por defecto
+    const hoy = new Date();
+    const seisMesesDespues = new Date(hoy.getFullYear(), hoy.getMonth() + 6, hoy.getDate());
+    fetchOccupiedEventDates(hoy, seisMesesDespues);
+  }, [fetchOccupiedEventDates]);
 
   // AÑADIDO: useEffect para resetear el formulario al montar el componente
   useEffect(() => {
@@ -327,10 +364,11 @@ const ReservaWizard = () => {
               
               <div className="mb-6">
                 <label className="block text-[#5D4B3A] font-medium mb-2">Fecha del evento</label>
-                <CalendarioReserva 
-                  value={formData.fecha || ''}
-                  onChange={(fecha) => updateFormSection('fecha', fecha)}
-                  min={new Date().toISOString().split('T')[0]}
+                <CalendarioReserva
+                  selectedDate={formData.fecha ? new Date(formData.fecha) : null}
+                  onDateChange={(date) => updateFormSection('fecha', date)}
+                  occupiedDates={occupiedEventDates}
+                  loadingOccupiedDates={loadingOccupiedEventDates}
                 />
                 <p className="text-sm text-[#8A6E52] mt-2 italic">
                   Seleccione la fecha en la que desea celebrar su {typeof selectedEventType === 'object' ? selectedEventType?.titulo?.toLowerCase() || 'evento' : 'evento'}
