@@ -250,31 +250,33 @@ const TablaReservaciones = ({
                             </MenuButton>
                           )}
                           
-                          {onUnassign && reservation.asignadoA?._id && String(reservation.asignadoA._id) === user?.id && (
-                             <MenuButton onClick={() => { onUnassign(reservationType, reservationId); setOpenMenuId(null); }}>
+                          {onUnassign && reservation.asignadoA && (reservation.asignadoA === user?.id || reservation.asignadoA?._id === user?.id) && (
+                            <MenuButton onClick={() => { onUnassign(reservationType, reservationId); setOpenMenuId(null); }}>
                               <FaUndo className="inline mr-2"/> Desasignar de mi cuenta
                             </MenuButton>
                           )}
                           
-                          {currentStatus !== 'confirmada' && (
-                            <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'confirmada'); setOpenMenuId(null); }}>
-                               <FaCheckCircle className="inline mr-2"/> Confirmar
-                            </MenuButton>
+                          {onChangeStatus && currentStatus !== 'confirmada' && (
+                              <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'confirmada'); setOpenMenuId(null); }}>
+                                  <FaCheckCircle className="inline mr-2 text-green-500"/> Confirmar Reserva
+                              </MenuButton>
                           )}
-                          {currentStatus !== 'cancelada' && (
-                             <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'cancelada'); setOpenMenuId(null); }}>
-                               <FaTimesCircle className="inline mr-2"/> Cancelar
-                            </MenuButton>
+                          {onChangeStatus && currentStatus !== 'cancelada' && (
+                              <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'cancelada'); setOpenMenuId(null); }}>
+                                  <FaTimesCircle className="inline mr-2 text-orange-500"/> Cancelar Reserva
+                              </MenuButton>
                           )}
-                           {currentStatus !== 'pendiente' && (
-                             <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'pendiente'); setOpenMenuId(null); }}>
-                               <FaHourglassHalf className="inline mr-2"/> Marcar Pendiente
-                            </MenuButton>
+                          {onChangeStatus && currentStatus !== 'pendiente' && (
+                              <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'pendiente'); setOpenMenuId(null); }}>
+                                  <FaHourglassHalf className="inline mr-2 text-yellow-500"/> Marcar Pendiente
+                              </MenuButton>
                           )}
                           
-                          <MenuButton onClick={() => { onDelete(reservationType, reservationId); setOpenMenuId(null); }}>
-                             <FaTrashAlt className="inline mr-2 text-red-600"/> Eliminar
-                          </MenuButton>
+                          {onDelete && (
+                            <MenuButton onClick={() => { onDelete(reservationType, reservationId); setOpenMenuId(null); }}>
+                              <FaTrashAlt className="inline mr-2 text-red-500"/> Eliminar Reserva
+                            </MenuButton>
+                          )}
                         </div>
                       </div>
                     )}

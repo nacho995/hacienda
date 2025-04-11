@@ -650,13 +650,13 @@ export default function AdminRooms() {
             habitaciones={habitacionesFiltradas} 
             getStatusText={getStatusText}
             getStatusColor={getStatusColor}
-            getNombreUsuarioAsignado={getNombreUsuarioAsignado}
             getLetraHabitacion={getLetraHabitacion}
             formatearFecha={formatearFecha}
             expandedRoom={expandedRoom}
             toggleRoomExpand={toggleRoomExpand}
-            abrirModalAsignar={abrirModalAsignar}
+            handleAsignarHabitacion={handleAsignarHabitacion}
             handleDesasignarHabitacion={handleDesasignarHabitacion}
+            user={user}
           />
         ) : (
           // Vista de tabla
@@ -664,11 +664,13 @@ export default function AdminRooms() {
             habitaciones={habitacionesFiltradas}
             getStatusText={getStatusText}
             getStatusColor={getStatusColor}
-            getNombreUsuarioAsignado={getNombreUsuarioAsignado}
             getLetraHabitacion={getLetraHabitacion}
             formatearFecha={formatearFecha}
-            abrirModalAsignar={abrirModalAsignar}
+            handleAsignarHabitacion={handleAsignarHabitacion}
             handleDesasignarHabitacion={handleDesasignarHabitacion}
+            user={user}
+            expandedRoom={expandedRoom}
+            toggleRoomExpand={toggleRoomExpand}
           />
         )
       )}
@@ -757,13 +759,13 @@ function RoomGridView({
   habitaciones, 
   getStatusText, 
   getStatusColor, 
-  getNombreUsuarioAsignado,
   getLetraHabitacion,
   formatearFecha,
   expandedRoom,
   toggleRoomExpand,
-  abrirModalAsignar,
-  handleDesasignarHabitacion 
+  handleAsignarHabitacion,
+  handleDesasignarHabitacion,
+  user
 }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -773,8 +775,6 @@ function RoomGridView({
         const hasReservas = habitacion.reservas && habitacion.reservas.length > 0;
         const statusColor = getStatusColor(habitacion);
         const statusText = getStatusText(habitacion);
-        const usuarioAsignado = getNombreUsuarioAsignado(habitacion);
-        const isAsignado = usuarioAsignado !== 'Sin asignar';
         const letraHabitacion = getLetraHabitacion(habitacion);
         
         return (
@@ -783,7 +783,7 @@ function RoomGridView({
             className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden"
           >
             <div className="p-4">
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start mb-4">
                 <div className="flex items-start">
                   <div className="w-12 h-12 rounded-full flex items-center justify-center bg-stone-300 text-stone-800 font-bold text-xl mr-3">
                     {letraHabitacion}
@@ -797,15 +797,18 @@ function RoomGridView({
                     </span>
                   </div>
                 </div>
-                <button 
-                  className="text-gray-400 hover:text-gray-600 p-1"
-                  onClick={() => toggleRoomExpand(roomId)}
-                >
-                  {isExpanded ? <FaChevronDown /> : <FaChevronRight />}
-                </button>
+                {hasReservas && (
+                  <button 
+                    className="text-gray-400 hover:text-gray-600 p-1"
+                    onClick={() => toggleRoomExpand(roomId)}
+                    title={isExpanded ? "Ocultar reservas" : "Mostrar reservas"}
+                  >
+                    {isExpanded ? <FaChevronDown /> : <FaChevronRight />}
+                  </button>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <p className="text-xs font-medium text-gray-500 mb-1">Capacidad</p>
                   <div className="flex items-center">
@@ -813,7 +816,6 @@ function RoomGridView({
                     <span className="font-semibold">{habitacion.capacidad ? `${habitacion.capacidad} personas` : 'N/A'}</span>
                   </div>
                 </div>
-                
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <p className="text-xs font-medium text-gray-500 mb-1">Precio</p>
                   <div className="flex items-center">
@@ -822,7 +824,6 @@ function RoomGridView({
                   </div>
                 </div>
               </div>
-              
               <div className="bg-gray-50 p-3 rounded-lg mt-3">
                 <p className="text-xs font-medium text-gray-500 mb-1">Ubicación</p>
                 <div className="flex items-center">
@@ -833,163 +834,96 @@ function RoomGridView({
                 </div>
               </div>
               
-              {habitacion.descripcion && isExpanded && (
-                <div className="mt-3 bg-gray-50 p-3 rounded-lg">
-                  <p className="text-xs font-medium text-gray-500 mb-1">Descripción</p>
-                  <p className="text-sm text-gray-600">{habitacion.descripcion}</p>
-                </div>
-              )}
-              
-              <div className="border-t mt-4 pt-4">
-                <div className="flex justify-between items-center mb-3">
-                  <p className="font-medium text-gray-700 text-sm">Asignado a:</p>
-                  
-                  {isAsignado ? (
-                    <div className="flex items-center">
-                      <div className="w-6 h-6 rounded-full bg-stone-100 text-stone-600 flex items-center justify-center mr-2 text-xs">
-                        {usuarioAsignado.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-sm font-medium">{usuarioAsignado}</span>
-                    </div>
-                  ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                      Sin asignar
-                    </span>
-                  )}
-                </div>
-                
-                <div className="flex justify-between gap-2">
-                  <button 
-                    className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-700 py-1.5 px-3 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center"
-                    onClick={() => abrirModalAsignar(habitacion)}
-                  >
-                    <FaUserPlus className="mr-1.5" /> Asignar
-                  </button>
-                  
-                  {isAsignado && (
-                    <button 
-                      className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 py-1.5 px-3 rounded-lg text-sm font-medium transition duration-200 flex items-center justify-center"
-                      onClick={() => {
-                        const reservaAsignada = habitacion.reservas.find(r => r.asignadoA);
-                        if (reservaAsignada) {
-                          handleDesasignarHabitacion(reservaAsignada._id || reservaAsignada.id);
-                        }
-                      }}
-                    >
-                      <FaUserMinus className="mr-1.5" /> Desasignar
-                    </button>
-                  )}
-                </div>
-              </div>
-              
               {hasReservas && (
-                <div className={`mt-4 border-t pt-4 ${!isExpanded && 'max-h-24 overflow-hidden relative'}`}>
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-medium text-gray-700">Próximas reservas:</h4>
-                    <span className="text-xs font-medium bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full">
-                      {habitacion.reservas.length}
-                    </span>
-                  </div>
-                  
-                  {isExpanded ? (
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {habitacion.reservas.map((reserva, index) => {
-                        // Determinar la URL correcta según el tipo de reserva
+                <div className="border-t mt-4 pt-4">
+                  <button
+                      className="w-full flex justify-between items-center text-left text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
+                      onClick={() => toggleRoomExpand(roomId)}
+                  >
+                      <span>Reservas ({habitacion.reservas?.length || 0})</span>
+                      {isExpanded ? <FaChevronDown /> : <FaChevronRight />}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1 border-t pt-2 mt-2">
+                      {habitacion.reservas.map((reserva) => {
                         const reservaId = reserva._id || reserva.id;
+                        const estadoReserva = reserva.estadoReserva || 'pendiente';
+                        const asignadoAEstaReserva = reserva.asignadoA;
+                        const estaAsignada = !!asignadoAEstaReserva;
+                        const asignadaAlUsuarioActual =
+                          (typeof asignadoAEstaReserva === 'object' && asignadoAEstaReserva?._id === user?.id) ||
+                          (typeof asignadoAEstaReserva === 'string' && asignadoAEstaReserva === user?.id);
+                        const nombreAsignado = estaAsignada
+                          ? (typeof asignadoAEstaReserva === 'object' ? `${asignadoAEstaReserva.nombre || ''} ${asignadoAEstaReserva.apellidos || ''}`.trim() : 'Otro Admin')
+                          : 'Sin asignar';
+
+                        // Corrección en la URL para eventos
                         const reservaUrl = reserva.eventoId || reserva.reservaEvento 
-                          ? `/admin/reservas/${reserva.eventoId || reserva.reservaEvento}` 
+                          ? `/admin/reservaciones/evento/${reserva.eventoId || reserva.reservaEvento}` 
                           : `/admin/reservaciones/habitacion/${reservaId}`;
-                        
+
                         return (
-                          <div key={reservaId || index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded flex justify-between items-center hover:bg-gray-100">
-                            <div>
-                              <div className="font-medium">{reserva.nombreCompleto || reserva.nombreContacto || (reserva.huesped?.nombre || 'Sin información')}</div>
-                              <div className="flex items-center text-gray-500 mt-1">
-                                <div className="flex items-center mr-2">
-                                  <FaCalendarAlt size={10} className="text-stone-400 mr-1" />
-                                  <span>Entrada:</span>
-                                </div>
-                                <span className="font-medium">
-                                  {formatearFecha(reserva.fechaInicio || reserva.fechaEvento || reserva.fechaEntrada)}
-                                </span>
-                              </div>
-                              {(reserva.fechaFin || reserva.fechaSalida) && (
-                                <div className="flex items-center text-gray-500 mt-1">
-                                  <div className="flex items-center mr-2">
-                                    <FaCalendarAlt size={10} className="text-stone-400 mr-1" />
-                                    <span>Salida:</span>
+                          <div key={reservaId} className="text-xs text-gray-600 bg-gray-50 p-3 rounded-lg shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <div className="font-medium text-gray-800">
+                                      {reserva.nombreCompleto || reserva.nombreContacto || 'Cliente Desconocido'}
                                   </div>
-                                  <span className="font-medium">
-                                    {formatearFecha(reserva.fechaFin || reserva.fechaSalida)}
+                                  <div className="text-gray-500">
+                                      {formatearFecha(reserva.fechaEntrada)} - {formatearFecha(reserva.fechaSalida)}
+                                  </div>
+                                  <span className={`mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                        estadoReserva === 'confirmada' ? 'bg-green-100 text-green-800' :
+                                        estadoReserva === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                                        estadoReserva === 'cancelada' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                      {estadoReserva.charAt(0).toUpperCase() + estadoReserva.slice(1)}
                                   </span>
                                 </div>
-                              )}
+                                <Link 
+                                  href={reservaUrl}
+                                  title="Ver Detalles de Reserva"
+                                  className="text-stone-500 hover:text-stone-700 p-1 rounded-full hover:bg-gray-200"
+                                >
+                                  <FaEye />
+                                </Link>
                             </div>
-                            <Link 
-                              href={reservaUrl}
-                              className="text-stone-500 hover:text-stone-700 p-1 rounded-full hover:bg-gray-200"
-                            >
-                              <FaEye />
-                            </Link>
+
+                            <div className="border-t pt-2 mt-2 flex items-center justify-between gap-2">
+                                <div className="text-xs">
+                                  <span className="font-medium text-gray-500">Asignado a:</span>
+                                  <span className={`ml-1 font-medium ${!estaAsignada ? 'text-gray-500' : 'text-gray-800'}`}>{nombreAsignado}</span>
+                                </div>
+
+                                <div className="flex gap-1">
+                                  {estadoReserva !== 'cancelada' && !estaAsignada && (
+                                      <button
+                                          title="Asignar a mi cuenta"
+                                          className="p-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition"
+                                          onClick={() => handleAsignarHabitacion(reservaId, user?.id)}
+                                      >
+                                          <FaUserPlus size={12} />
+                                      </button>
+                                  )}
+                                  {estadoReserva !== 'cancelada' && asignadaAlUsuarioActual && (
+                                      <button
+                                          title="Desasignar de mi cuenta"
+                                          className="p-1.5 bg-red-100 text-red-700 hover:bg-red-200 rounded transition"
+                                          onClick={() => handleDesasignarHabitacion(reservaId)}
+                                      >
+                                          <FaUserMinus size={12} />
+                                      </button>
+                                  )}
+                                </div>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        {habitacion.reservas.slice(0, 1).map((reserva, index) => {
-                          const reservaId = reserva._id || reserva.id;
-                          const reservaUrl = reserva.eventoId || reserva.reservaEvento 
-                            ? `/admin/reservas/${reserva.eventoId || reserva.reservaEvento}` 
-                            : `/admin/reservaciones/habitacion/${reservaId}`;
-                          
-                          return (
-                            <div key={reservaId || index} className="text-xs text-gray-600 bg-gray-50 p-2 rounded flex justify-between items-center hover:bg-gray-100">
-                              <div>
-                                <div className="font-medium">{reserva.nombreCompleto || reserva.nombreContacto || (reserva.huesped?.nombre || 'Sin información')}</div>
-                                <div className="flex items-center text-gray-500 mt-1">
-                                  <div className="flex items-center mr-2">
-                                    <FaCalendarAlt size={10} className="text-stone-400 mr-1" />
-                                    <span>Entrada:</span>
-                                  </div>
-                                  <span className="font-medium">
-                                    {formatearFecha(reserva.fechaInicio || reserva.fechaEvento || reserva.fechaEntrada)}
-                                  </span>
-                                </div>
-                                {(reserva.fechaFin || reserva.fechaSalida) && (
-                                  <div className="flex items-center text-gray-500 mt-1">
-                                    <div className="flex items-center mr-2">
-                                      <FaCalendarAlt size={10} className="text-stone-400 mr-1" />
-                                      <span>Salida:</span>
-                                    </div>
-                                    <span className="font-medium">
-                                      {formatearFecha(reserva.fechaFin || reserva.fechaSalida)}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                              <Link 
-                                href={reservaUrl}
-                                className="text-stone-500 hover:text-stone-700 p-1 rounded-full hover:bg-gray-200"
-                              >
-                                <FaEye />
-                              </Link>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {habitacion.reservas.length > 1 && (
-                        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent flex justify-center items-end">
-                          <button 
-                            onClick={() => toggleRoomExpand(roomId)}
-                            className="text-xs text-stone-600 hover:text-stone-800"
-                          >
-                            Ver todas ({habitacion.reservas.length})
-                          </button>
-                        </div>
-                      )}
-                    </>
+                  )}
+                  {isExpanded && !hasReservas && (
+                      <p className="text-center text-gray-500 text-xs mt-2 pt-2 border-t">No hay reservas registradas para esta habitación.</p>
                   )}
                 </div>
               )}
@@ -1006,11 +940,13 @@ function RoomTableView({
   habitaciones, 
   getStatusText, 
   getStatusColor, 
-  getNombreUsuarioAsignado,
   getLetraHabitacion,
   formatearFecha,
-  abrirModalAsignar,
-  handleDesasignarHabitacion 
+  handleAsignarHabitacion,
+  handleDesasignarHabitacion,
+  user,
+  expandedRoom,
+  toggleRoomExpand
 }) {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -1018,131 +954,143 @@ function RoomTableView({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Habitación
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Estado
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Capacidad
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Precio
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Asignado a
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Reservas
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Acciones
-              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Habitación</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado Físico</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacidad</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles / Reservas</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {habitaciones.map((habitacion) => {
               const roomId = habitacion._id || habitacion.id || `habitacion-${habitacion.letra}`;
+              const isExpanded = expandedRoom === roomId;
               const hasReservas = habitacion.reservas && habitacion.reservas.length > 0;
               const statusColorClass = getStatusColor(habitacion);
               const statusText = getStatusText(habitacion);
-              const usuarioAsignado = getNombreUsuarioAsignado(habitacion);
-              const isAsignado = usuarioAsignado !== 'Sin asignar';
               const letraHabitacion = getLetraHabitacion(habitacion);
-              
+
               return (
-                <tr key={roomId} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-stone-300 text-stone-800 font-bold text-sm mr-3">
-                        {letraHabitacion}
-                      </div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {habitacion.nombre || `Habitación ${letraHabitacion}`}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColorClass}`}>
-                      {statusText}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {habitacion.capacidad ? `${habitacion.capacidad} personas` : 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {habitacion.precioPorNoche ? `${habitacion.precioPorNoche}€ / noche` : 'N/A'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {isAsignado ? (
+                <Fragment key={roomId}>
+                  <tr className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-6 h-6 rounded-full bg-stone-100 text-stone-600 flex items-center justify-center mr-2 text-xs">
-                          {usuarioAsignado.charAt(0).toUpperCase()}
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-stone-300 text-stone-800 font-bold text-sm mr-3">{letraHabitacion}</div>
+                        <div className="text-sm font-medium text-gray-900">{habitacion.nombre || `Habitación ${letraHabitacion}`}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColorClass}`}>{statusText}</span></td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{habitacion.capacidad ? `${habitacion.capacidad} pers.` : 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{habitacion.precioPorNoche ? `${habitacion.precioPorNoche}€` : 'N/A'}</td>
+
+                    {/* Columna Detalles / Reservas */}
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                       {hasReservas ? (
+                           <button
+                               onClick={() => toggleRoomExpand(roomId)}
+                               className="text-purple-600 hover:text-purple-800 text-xs font-medium p-1 rounded hover:bg-purple-50"
+                               title={isExpanded ? "Ocultar reservas" : "Mostrar reservas"}
+                           >
+                               {isExpanded ? <FaChevronDown /> : <FaChevronRight />} ({habitacion.reservas.length})
+                           </button>
+                       ) : (
+                           <span className="text-xs text-gray-400 italic">Sin reservas</span>
+                       )}
+                    </td>
+                  </tr>
+
+                  {/* Fila expandida para mostrar reservas */}
+                  {isExpanded && hasReservas && (
+                    <tr className="bg-gray-50">
+                      <td colSpan="5" className="px-6 py-4"> {/* Ajustar colSpan al número de columnas visibles */}
+                        <div className="space-y-3 max-h-64 overflow-y-auto p-2">
+                           <h4 className="text-sm font-semibold text-gray-700 mb-2">Reservas para Habitación {letraHabitacion}</h4>
+                           {habitacion.reservas.map((reserva) => {
+                              const reservaId = reserva._id || reserva.id;
+                              const estadoReserva = reserva.estadoReserva || 'pendiente';
+                              const asignadoAEstaReserva = reserva.asignadoA;
+                              const estaAsignada = !!asignadoAEstaReserva;
+                              const asignadaAlUsuarioActual =
+                                 (typeof asignadoAEstaReserva === 'object' && asignadoAEstaReserva?._id === user?.id) ||
+                                 (typeof asignadoAEstaReserva === 'string' && asignadoAEstaReserva === user?.id);
+                              const nombreAsignado = estaAsignada
+                                 ? (typeof asignadoAEstaReserva === 'object' ? `${asignadoAEstaReserva.nombre || ''} ${asignadoAEstaReserva.apellidos || ''}`.trim() : 'Otro Admin')
+                                 : 'Sin asignar';
+                                 
+                              const reservaUrl = reserva.eventoId || reserva.reservaEvento 
+                                ? `/admin/reservaciones/evento/${reserva.eventoId || reserva.reservaEvento}` 
+                                : `/admin/reservaciones/habitacion/${reservaId}`;
+
+                              return (
+                                <div key={reservaId} className="text-xs bg-white p-3 rounded-md border border-gray-200 shadow-sm">
+                                   <div className="flex justify-between items-start mb-2 gap-2">
+                                      {/* Info Reserva */}
+                                      <div>
+                                         <div className="font-medium text-gray-800 text-sm">
+                                             {reserva.nombreCompleto || reserva.nombreContacto || 'Cliente Desconocido'}
+                                         </div>
+                                         <div className="text-gray-500 text-xs">
+                                             {formatearFecha(reserva.fechaEntrada)} - {formatearFecha(reserva.fechaSalida)}
+                                         </div>
+                                          <span className={`mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                              estadoReserva === 'confirmada' ? 'bg-green-100 text-green-800' :
+                                              estadoReserva === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                                              estadoReserva === 'cancelada' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                                         }`}>
+                                             {estadoReserva.charAt(0).toUpperCase() + estadoReserva.slice(1)}
+                                         </span>
+                                      </div>
+                                      {/* Link a Detalles */}
+                                       <Link 
+                                          href={reservaUrl}
+                                          title="Ver Detalles de Reserva"
+                                          className="text-stone-500 hover:text-stone-700 p-1 rounded-full hover:bg-gray-100 flex-shrink-0"
+                                       >
+                                          <FaEye />
+                                       </Link>
+                                   </div>
+                                   {/* Info Asignación y Acciones */}
+                                   <div className="border-t border-gray-100 pt-2 mt-2 flex items-center justify-between gap-2">
+                                       <div className="text-[11px]">
+                                          <span className="font-medium text-gray-500">Asignado:</span>
+                                          <span className={`ml-1 font-medium ${!estaAsignada ? 'text-gray-500' : 'text-gray-800'}`}>{nombreAsignado}</span>
+                                       </div>
+                                       <div className="flex gap-1">
+                                          {estadoReserva !== 'cancelada' && !estaAsignada && (
+                                             <button
+                                                 title="Asignar a mi cuenta"
+                                                 className="p-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition"
+                                                 onClick={() => handleAsignarHabitacion(reservaId, user?.id)}
+                                             >
+                                                 <FaUserPlus size={10} />
+                                             </button>
+                                          )}
+                                          {estadoReserva !== 'cancelada' && asignadaAlUsuarioActual && (
+                                             <button
+                                                 title="Desasignar de mi cuenta"
+                                                 className="p-1 bg-red-100 text-red-700 hover:bg-red-200 rounded transition"
+                                                 onClick={() => handleDesasignarHabitacion(reservaId)}
+                                             >
+                                                 <FaUserMinus size={10} />
+                                             </button>
+                                          )}
+                                       </div>
+                                   </div>
+                                </div>
+                              );
+                           })}
                         </div>
-                        <span className="text-sm">{usuarioAsignado}</span>
-                      </div>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Sin asignar
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {hasReservas ? (
-                      <div className="flex items-center">
-                        <span className="text-xs font-medium bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full mr-2">
-                          {habitacion.reservas.length}
-                        </span>
-                        {habitacion.reservas[0] && (
-                          <div className="flex flex-col">
-                            <div className="text-xs font-medium">
-                              {habitacion.reservas[0].nombreCompleto || habitacion.reservas[0].nombreContacto || 'Sin información'}
-                            </div>
-                            <div className="text-xs text-gray-500 flex items-center">
-                              <FaCalendarAlt size={8} className="mr-1 text-stone-400" />
-                              {formatearFecha(habitacion.reservas[0].fechaEntrada || habitacion.reservas[0].fechaInicio)}
-                            </div>
-                            <Link 
-                              href={
-                                habitacion.reservas[0].eventoId || habitacion.reservas[0].reservaEvento 
-                                  ? `/admin/reservas/${habitacion.reservas[0].eventoId || habitacion.reservas[0].reservaEvento}` 
-                                  : `/admin/reservaciones/habitacion/${habitacion.reservas[0]._id || habitacion.reservas[0].id}`
-                              }
-                              className="text-stone-500 hover:text-stone-700 mt-1 text-xs underline"
-                            >
-                              Ver detalles
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-500">Sin reservas</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    <button
-                      onClick={() => abrirModalAsignar(habitacion)}
-                      className="text-stone-600 hover:text-stone-900 bg-stone-50 hover:bg-stone-100 p-1.5 rounded"
-                    >
-                      <FaUserPlus />
-                    </button>
-                    
-                    {isAsignado && (
-                      <button 
-                        onClick={() => {
-                          const reservaAsignada = habitacion.reservas.find(r => r.asignadoA);
-                          if (reservaAsignada) {
-                            handleDesasignarHabitacion(reservaAsignada._id || reservaAsignada.id);
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 p-1.5 rounded"
-                      >
-                        <FaUserMinus />
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                      </td>
+                    </tr>
+                  )}
+                   {isExpanded && !hasReservas && (
+                       <tr className="bg-gray-50">
+                           <td colSpan="5" className="text-center text-gray-500 text-xs py-4 px-6 italic">
+                               No hay reservas registradas para esta habitación.
+                           </td>
+                       </tr>
+                   )}
+                </Fragment>
               );
             })}
           </tbody>

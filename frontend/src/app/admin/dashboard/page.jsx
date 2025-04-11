@@ -221,12 +221,19 @@ export default function AdminDashboard() {
       if (Array.isArray(eventoReservations)) {
         totalReservations += eventoReservations.length;
         
+        // ---> DEBUG: Log de eventos antes de contar <---
+        console.log('[loadDashboardData] EventoReservations para contar:', eventoReservations.map(r => ({ id: r._id, estado: r.estadoReserva || r.estado })));
+
         eventoReservations.forEach(reserva => {
-          const estado = reserva.estado?.toLowerCase() || '';
+          const estado = (reserva.estadoReserva || reserva.estado)?.toLowerCase() || ''; // Usar estadoReserva primero
           if (estado === 'pendiente') pendingReservations++;
           else if (estado === 'confirmada') confirmedReservations++;
           else if (estado === 'cancelada') cancelledReservations++;
         });
+
+        // ---> DEBUG: Log del resultado del conteo <---
+        console.log('[loadDashboardData] Conteo de pendientes (eventos): ', pendingReservations);
+
       }
       
       // Procesar reservas de habitaciones independientes (que no pertenecen a eventos)
@@ -776,51 +783,55 @@ export default function AdminDashboard() {
     return dayReservations;
   };
   
-  // Renderizar letra de habitación o indicador de evento
+  // Renderizar letra de habitación o indicador de evento (MODIFICADO)
   const renderReservationIndicator = (reserva) => {
     const idReserva = reserva._id || 'temp-' + Math.random();
-    let tipoIndicador = 'E'; // Por defecto: Evento
-    let colorIndicador = 'bg-green-500'; // Verde por defecto para evento
-    let letraDetalle = reserva.nombreEvento?.charAt(0).toUpperCase() || 'E';
-    let tooltipText = `Evento: ${reserva.nombreEvento || 'Sin nombre'}`;
+    let indicator = null; // Por defecto, no renderizar nada
 
-    if (reserva.tipo === 'habitacion') {
-      if (reserva.reservaEvento || reserva.tipoReserva === 'evento') { // Si está vinculada a un evento
-        tipoIndicador = 'H';
-        colorIndicador = 'bg-purple-500'; // Morado para habitación de evento
-        letraDetalle = reserva.letraHabitacion || reserva.habitacion || '?';
-        tooltipText = `Hab. Evento ${letraDetalle}: ${reserva.nombreContacto || 'Sin contacto'}`;
-      } else { // Habitación independiente (hotel)
-        tipoIndicador = 'H';
-        colorIndicador = 'bg-blue-500'; // Azul para habitación de hotel
-        letraDetalle = reserva.letraHabitacion || reserva.habitacion || '?';
-        tooltipText = `Hab. Hotel ${letraDetalle}: ${reserva.nombreContacto || 'Sin contacto'}`;
-      }
-    }
-    
-    // Asegurar que la letra detalle sea una sola letra
-    if (letraDetalle.length > 1) {
-      letraDetalle = letraDetalle.charAt(0).toUpperCase();
-    }
-
-    return (
-      <div 
-        key={idReserva}
-        className="relative group cursor-pointer m-0.5 flex-shrink-0" // Añadido flex-shrink-0
-      >
-        <span 
-          className={`w-6 h-6 rounded-full ${colorIndicador} text-white flex items-center justify-center text-xs font-bold shadow`} // <-- Usa colorIndicador
+    // --- 1. Mostrar Indicador de EVENTO ---
+    if (reserva.tipo === 'evento') {
+      const nombreEvento = reserva.nombreEvento || 'Evento';
+      const tooltipText = `Evento: ${nombreEvento} (${reserva.nombreContacto || 'Cliente Desc.'})`;
+      indicator = (
+        <div
+          key={`event-${idReserva}`}
+          className="relative group cursor-pointer my-1 flex-shrink-0 w-full" // Ocupa ancho
+          title={tooltipText} // Tooltip básico del navegador
         >
-          {tipoIndicador}{letraDetalle}
-        </span>
-        {/* Tooltip */}
-        <div className="absolute bottom-full mb-1 left-1/2 transform -translate-x-1/2 w-max max-w-xs 
-                      bg-gray-800 text-white text-xs rounded py-1 px-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-        >
-          {tooltipText}
+          {/* Estilo más prominente para eventos */}
+          <div className={`p-1.5 rounded ${COLORES_PASTEL_PIEDRA.estadoConfirmado} text-center shadow-sm border ${COLORES_PASTEL_PIEDRA.borde}`}>
+            <FaGlassCheers className="inline-block mr-1" size={10}/>
+            <span className="font-semibold text-[10px] leading-tight">{nombreEvento}</span>
+          </div>
+          {/* Tooltip detallado (opcional, si se mantiene el estilo anterior) */}
+          {/* <div className="absolute ...">{tooltipText}</div> */}
         </div>
-      </div>
-    );
+      );
+    }
+    // --- 2. Mostrar Indicador de Habitación de HOTEL (Independiente) ---
+    else if (reserva.tipo === 'habitacion' && !reserva.reservaEvento) {
+        const letraHabitacion = reserva.letraHabitacion || reserva.habitacion || '?';
+        const tooltipText = `Hab. Hotel ${letraHabitacion}: ${reserva.nombreContacto || 'Sin contacto'}`;
+        indicator = (
+          <div
+            key={`room-${idReserva}`}
+            className="relative group cursor-pointer m-0.5 flex-shrink-0"
+            title={tooltipText}
+          >
+            {/* Estilo diferente y más grande para habitaciones de hotel */}
+            <span
+              className={`w-7 h-7 rounded ${COLORES_PASTEL_PIEDRA.letraHabitacion} flex items-center justify-center text-xs font-bold shadow border ${COLORES_PASTEL_PIEDRA.borde}`}
+            >
+              {letraHabitacion}
+            </span>
+             {/* Tooltip detallado (opcional) */}
+            {/* <div className="absolute ...">{tooltipText}</div> */}
+          </div>
+        );
+    }
+    // --- 3. Habitaciones de Evento: No se renderizan (indicator sigue siendo null) ---
+
+    return indicator;
   };
 
   // --- Fin Lógica del Calendario ---
@@ -1119,48 +1130,12 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-          
-          {/* Widget de resumen de actividad */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                <FaUsers className="text-stone-500 mr-2" />
-                Resumen de Actividad
-              </h3>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-stone-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Usuarios activos</p>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-gray-900 text-lg">{stats.totalUsers}</span>
-                    <FaUsers className="text-stone-500" />
-                  </div>
-                </div>
-                
-                <div className="bg-stone-50 p-3 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Eventos pendientes</p>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-gray-900 text-lg">{stats.pendingReservations}</span>
-                    <FaListAlt className="text-amber-500" />
-                  </div>
-                </div>
-              </div>
-
-              <Link
-                href="/admin/reservaciones"
-                className="block text-center bg-stone-100 hover:bg-stone-200 text-stone-700 py-2 px-4 rounded-lg mt-2 transition-colors"
-              >
-                Ver todas las reservas
-              </Link>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Fila Inferior (Lista de Ocupación por fecha y Resumen Actividad) */}
+      {/* Fila Inferior (Lista de Ocupación por fecha y Resumen Actividad CORRECTO) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        {/* Ocupación por fecha (Lista) */}
+        {/* Ocupación por fecha (Columna Izquierda) */}
         <div className={`lg:col-span-2 ${COLORES_PASTEL_PIEDRA.fondoContenedor} rounded-xl shadow p-4 ${COLORES_PASTEL_PIEDRA.borde} border`}>
           <div className="flex justify-between items-center mb-4">
             <h3 className={`text-lg font-semibold ${COLORES_PASTEL_PIEDRA.textoPrincipal} flex items-center`}><FaListAlt className="mr-2" /> Ocupación por fecha</h3>
@@ -1218,7 +1193,7 @@ export default function AdminDashboard() {
           )}
         </div>
 
-        {/* Resumen de Actividad (Columna derecha) */}
+        {/* Resumen de Actividad (Columna derecha - ESTE ES EL QUE SE QUEDA) */}
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100">
@@ -1228,7 +1203,7 @@ export default function AdminDashboard() {
               </h3>
             </div>
             <div className="p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="bg-stone-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-500 mb-1">Usuarios activos</p>
                   <div className="flex items-center justify-between">
@@ -1244,6 +1219,15 @@ export default function AdminDashboard() {
                     <FaListAlt className="text-amber-500" />
                   </div>
                 </div>
+
+                <div className="bg-stone-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Eventos Totales</p>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900 text-lg">{eventoReservations?.length ?? 0}</span>
+                    <FaGlassCheers className="text-indigo-500" />
+                  </div>
+                </div>
+
               </div>
 
               <Link
@@ -1366,10 +1350,8 @@ function CalendarMonthView({ currentDate, getCalendarDays, getReservationsForDay
               </span>
               {/* Contenedor de indicadores con flex-wrap */}
               <div className="mt-4 flex flex-wrap items-start justify-start gap-0.5">
-                {dayReservations.slice(0, 6).map(reserva => renderReservationIndicator(reserva))}
-                {dayReservations.length > 6 && (
-                   <span className="text-[9px] text-stone-500 ml-1">+{dayReservations.length - 6} más</span>
-                )}
+                {/* Procesar TODAS las reservas del día; renderReservationIndicator decidirá qué mostrar */}
+                {dayReservations.map(reserva => renderReservationIndicator(reserva))}
               </div>
             </div>
           );
