@@ -718,4 +718,51 @@ exports.updateReservaHabitacionHuespedes = asyncHandler(async (req, res, next) =
     console.error('Error al actualizar huéspedes de reserva:', error);
     next(error);
   }
+});
+
+// @desc    Asignar una reserva de habitación a un administrador
+// @route   PUT /api/reservas/habitaciones/:id/asignar
+// @access  Private (Admin)
+exports.asignarHabitacionAdmin = asyncHandler(async (req, res, next) => {
+  try {
+    const habitacionId = req.params.id;
+    const adminId = req.user.id; // ID del admin haciendo la petición
+
+    // 1. Buscar la habitación
+    const habitacion = await ReservaHabitacion.findById(habitacionId);
+    if (!habitacion) {
+      return next(new ErrorResponse('Reserva de habitación no encontrada', 404));
+    }
+
+    // 2. Asignar la habitación al admin
+    habitacion.asignadoA = adminId;
+    console.log(`Habitación ${habitacionId} asignada a admin ${adminId}`);
+
+    // 3. Si la habitación está asociada a un evento, asignar también el evento
+    if (habitacion.reservaEvento) {
+      const ReservaEvento = require('../models/ReservaEvento'); // Asegurar modelo disponible
+      const evento = await ReservaEvento.findById(habitacion.reservaEvento);
+      if (evento && !evento.asignadoA) { // Solo asignar el evento si no tiene ya alguien
+        evento.asignadoA = adminId;
+        await evento.save();
+        console.log(`Evento ${habitacion.reservaEvento} asociado también asignado a admin ${adminId}`);
+      } else if (evento && evento.asignadoA && evento.asignadoA.toString() !== adminId) {
+        console.warn(`La habitación ${habitacionId} pertenece al evento ${habitacion.reservaEvento} que ya está asignado a otro admin (${evento.asignadoA}). No se reasigna el evento.`);
+        // Podrías decidir si quieres permitir reasignar el evento aquí o no
+      }
+    }
+    
+    // Guardar la habitación (después de potencial cambio en evento)
+    await habitacion.save();
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Habitación asignada correctamente.', 
+      data: habitacion // Opcional: devolver la habitación actualizada
+    });
+
+  } catch (error) {
+    console.error('Error asignando habitación a admin:', error);
+    next(error); // Pasar el error al manejador de errores global
+  }
 }); 

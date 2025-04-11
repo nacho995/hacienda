@@ -378,6 +378,29 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
           {habitaciones.map((habitacion) => {
             const isRoomSelected = isSelected(habitacion.letra);
             
+            // --- Inferir Planta y Tipo --- 
+            let planta = 'Desconocida';
+            let tipoHab = 'Estándar'; // Tipo general por defecto
+            let categoria = 'Doble'; // Sencilla o Doble
+            
+            if (['A', 'B'].includes(habitacion.letra)) {
+              planta = 'Primera Planta';
+              categoria = 'Sencilla'; // Asumiendo A, B son sencillas
+            } else if (['C', 'D', 'E', 'F'].includes(habitacion.letra)) {
+              planta = 'Segunda Planta';
+              categoria = 'Doble'; // Asumiendo C-F son dobles
+            } else if (['G', 'H', 'I', 'J'].includes(habitacion.letra)) {
+              planta = 'Tercera Planta';
+              categoria = 'Doble'; // Asumiendo G-J son dobles
+            } else if (['K', 'L', 'M', 'O'].includes(habitacion.letra)) {
+              planta = 'Primera/Tercera Planta'; // K,L (1a), M,O (3a) - ajustar si es necesario
+              // Asignar planta más específicamente si es posible
+              if (['K', 'L'].includes(habitacion.letra)) planta = 'Primera Planta';
+              if (['M', 'O'].includes(habitacion.letra)) planta = 'Tercera Planta';
+              categoria = 'Sencilla'; // Asumiendo K, L, M, O son sencillas
+            }
+            // ------------------------------
+            
             return (
               <div 
                 key={habitacion.letra}
@@ -389,16 +412,16 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center mr-3 bg-[#6366F1] text-white">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center mr-3 bg-gray-200 text-gray-800"> 
                       <span className="font-bold">{habitacion.letra}</span>
                     </div>
                     <div>
                       <h4 className="font-semibold">Habitación {habitacion.letra}</h4>
                       <p className="text-sm text-gray-600">
-                        {habitacion.tipo}
+                        {planta} • {categoria} 
                       </p>
                       <p className="text-xs text-gray-500">
-                        {habitacion.capacidad} personas • {habitacion.precioPorNoche}€/noche
+                        {habitacion.capacidad} personas
                       </p>
                     </div>
                   </div>

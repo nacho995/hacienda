@@ -1,13 +1,27 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   FaSort, FaSortUp, FaSortDown, FaSpinner, FaUserCircle,
-  FaEye, FaTrashAlt, FaCheckCircle, FaTimesCircle, FaHourglassHalf
+  FaEye, FaTrashAlt, FaCheckCircle, FaTimesCircle, FaHourglassHalf,
+  FaHandPointer,
+  FaUndo,
+  FaEllipsisV
 } from 'react-icons/fa';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+
+// --- Componente para el botón de menú --- 
+const MenuButton = ({ children, onClick }) => (
+  <button 
+    onClick={onClick}
+    className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+  >
+    {children}
+  </button>
+);
 
 const TablaReservaciones = ({ 
   reservations,
@@ -16,8 +30,13 @@ const TablaReservaciones = ({
   isLoading,
   usuarios = [],
   onDelete,
-  onChangeStatus
+  onChangeStatus,
+  onAssign,
+  onUnassign
 }) => {
+  const { user } = useAuth();
+  const [openMenuId, setOpenMenuId] = useState(null);
+
   const getSortIcon = (key) => {
     if (sortConfig.key !== key) return <FaSort />;
     return sortConfig.direction === 'asc' ? <FaSortUp /> : <FaSortDown />;
@@ -54,20 +73,13 @@ const TablaReservaciones = ({
   const getUsuarioAsignado = (asignadoA) => {
     if (!asignadoA) return 'Sin asignar';
     
-    const usuario = usuarios.find(u => u._id === asignadoA);
+    // --- Extraer ID de forma más robusta --- 
+    const usuarioId = (typeof asignadoA === 'object' && asignadoA !== null) ? asignadoA._id : asignadoA;
+    // ----------------------------------------
+    
+    const usuario = usuarios.find(u => u._id === usuarioId);
     return usuario ? (usuario.nombre || usuario.email || 'Usuario') : 'Usuario desconocido';
   };
-
-  // Componente auxiliar para los botones de acción
-  const ActionButton = ({ onClick, icon: Icon, colorClass, tooltip }) => (
-    <button
-      onClick={onClick}
-      className={`p-1 rounded hover:opacity-75 transition ${colorClass}`}
-      title={tooltip}
-    >
-      <Icon />
-    </button>
-  );
 
   if (isLoading) {
     return (
@@ -209,46 +221,62 @@ const TablaReservaciones = ({
                     {getUsuarioAsignado(reservation.asignadoA)}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Link 
-                      href={`/admin/reservaciones/${reservationType}/${reservationId}`}
-                      className="p-1 rounded text-blue-600 hover:text-blue-800 transition" 
-                      title="Ver Detalles"
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                  <div className="relative inline-block text-left">
+                    <button
+                      onClick={() => setOpenMenuId(openMenuId === reservationId ? null : reservationId)}
+                      className="p-2 rounded-full text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
-                      <FaEye />
-                    </Link>
-                    
-                    <ActionButton
-                      onClick={() => onDelete(reservationType, reservationId)}
-                      icon={FaTrashAlt}
-                      colorClass="text-red-600 hover:text-red-800"
-                      tooltip="Eliminar"
-                    />
+                      <FaEllipsisV />
+                    </button>
 
-                    {currentStatus !== 'confirmada' && (
-                      <ActionButton
-                        onClick={() => onChangeStatus(reservationType, reservationId, 'confirmada')}
-                        icon={FaCheckCircle}
-                        colorClass="text-green-600 hover:text-green-800"
-                        tooltip="Confirmar"
-                      />
-                    )}
-                    {currentStatus !== 'cancelada' && (
-                      <ActionButton
-                        onClick={() => onChangeStatus(reservationType, reservationId, 'cancelada')}
-                        icon={FaTimesCircle}
-                        colorClass="text-orange-600 hover:text-orange-800"
-                        tooltip="Cancelar"
-                      />
-                    )}
-                    {currentStatus !== 'pendiente' && (
-                      <ActionButton
-                        onClick={() => onChangeStatus(reservationType, reservationId, 'pendiente')}
-                        icon={FaHourglassHalf}
-                        colorClass="text-yellow-600 hover:text-yellow-800"
-                        tooltip="Marcar como Pendiente"
-                      />
+                    {openMenuId === reservationId && (
+                      <div 
+                        className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10"
+                        role="menu" 
+                        aria-orientation="vertical" 
+                        aria-labelledby="menu-button"
+                      >
+                        <div className="py-1" role="none">
+                          <Link href={`/admin/reservaciones/${reservationType}/${reservationId}`} passHref>
+                            <MenuButton onClick={() => setOpenMenuId(null)}> 
+                              <FaEye className="inline mr-2"/> Ver Detalles
+                            </MenuButton>
+                          </Link>
+                          
+                          {onAssign && !reservation.asignadoA && (
+                            <MenuButton onClick={() => { onAssign(reservationType, reservationId); setOpenMenuId(null); }}>
+                              <FaHandPointer className="inline mr-2"/> Asignar a mi cuenta
+                            </MenuButton>
+                          )}
+                          
+                          {onUnassign && reservation.asignadoA?._id && String(reservation.asignadoA._id) === user?.id && (
+                             <MenuButton onClick={() => { onUnassign(reservationType, reservationId); setOpenMenuId(null); }}>
+                              <FaUndo className="inline mr-2"/> Desasignar de mi cuenta
+                            </MenuButton>
+                          )}
+                          
+                          {currentStatus !== 'confirmada' && (
+                            <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'confirmada'); setOpenMenuId(null); }}>
+                               <FaCheckCircle className="inline mr-2"/> Confirmar
+                            </MenuButton>
+                          )}
+                          {currentStatus !== 'cancelada' && (
+                             <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'cancelada'); setOpenMenuId(null); }}>
+                               <FaTimesCircle className="inline mr-2"/> Cancelar
+                            </MenuButton>
+                          )}
+                           {currentStatus !== 'pendiente' && (
+                             <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'pendiente'); setOpenMenuId(null); }}>
+                               <FaHourglassHalf className="inline mr-2"/> Marcar Pendiente
+                            </MenuButton>
+                          )}
+                          
+                          <MenuButton onClick={() => { onDelete(reservationType, reservationId); setOpenMenuId(null); }}>
+                             <FaTrashAlt className="inline mr-2 text-red-600"/> Eliminar
+                          </MenuButton>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </td>

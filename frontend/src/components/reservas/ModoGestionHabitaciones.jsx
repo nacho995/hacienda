@@ -526,10 +526,7 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
                         <span>Capacidad:</span>
                         <span className="font-medium">{habitacion.capacidad || 2} personas</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Precio:</span>
-                        <span className="font-medium">{habitacion.precioPorNoche || habitacion.precio || '2400€/noche'}</span>
-                      </div>
+                      
                       {habitacion.descripcion && (
                         <div className="mt-2 text-xs text-gray-500">
                           {habitacion.descripcion.substring(0, 100)}{habitacion.descripcion.length > 100 ? '...' : ''}
@@ -555,37 +552,7 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
             )}
           </div>
 
-          {/* Leyenda del mapa con los nuevos colores verdes */}
-          <div className="mt-4 space-y-2">
-            <div className="text-lg font-semibold mb-3">Leyenda del Mapa</div>
-            
-            {/* Primera Planta */}
-            <div className="flex items-center space-x-2">
-              <div className="flex space-x-2">
-                <div className="w-6 h-6 rounded border-2 border-[#9DDFD3] bg-[#E5F6F3]"></div>
-                <div className="w-6 h-6 rounded bg-[#9DDFD3]"></div>
-              </div>
-              <span className="text-sm text-gray-600">Primera Planta - Habitaciones A, B</span>
-            </div>
-            
-            {/* Segunda Planta */}
-            <div className="flex items-center space-x-2">
-              <div className="flex space-x-2">
-                <div className="w-6 h-6 rounded border-2 border-[#B5D8C7] bg-[#EAF5F0]"></div>
-                <div className="w-6 h-6 rounded bg-[#B5D8C7]"></div>
-              </div>
-              <span className="text-sm text-gray-600">Segunda Planta - Habitaciones C, D, E, F</span>
-            </div>
-            
-            {/* Tercera Planta */}
-            <div className="flex items-center space-x-2">
-              <div className="flex space-x-2">
-                <div className="w-6 h-6 rounded border-2 border-[#C7E2B7] bg-[#F0F7EB]"></div>
-                <div className="w-6 h-6 rounded bg-[#C7E2B7]"></div>
-              </div>
-              <span className="text-sm text-gray-600">Tercera Planta - Habitaciones G-O</span>
-            </div>
-          </div>
+        
         </div>
       )}
 

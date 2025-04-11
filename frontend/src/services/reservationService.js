@@ -1268,4 +1268,32 @@ export const removeEventoServicio = async (eventoId, servicioId) => {
       message: error.response?.data?.message || 'Error al eliminar servicio del evento'
     };
   }
+};
+
+// --- NUEVA: Asignar reserva de evento al admin actual --- 
+export const asignarEventoAdmin = async (id) => {
+  if (!id) return { success: false, message: 'ID de evento no válido' };
+  try {
+    // La ruta PUT /eventos/:id/asignar ahora usa el controlador asignarEventoAdmin
+    const response = await apiClient.put(`/reservas/eventos/${id}/asignar`); 
+    // No se envía body, el backend usa req.user.id
+    return response; // Suponiendo que apiClient devuelve { success: true, ... } o lanza error
+  } catch (error) {
+    console.error(`Error al asignar evento ${id} al admin:`, error.response || error);
+    return { success: false, message: error.response?.data?.message || 'Error al asignar el evento' };
+  }
+};
+
+// --- NUEVA: Asignar reserva de habitación al admin actual --- 
+export const asignarHabitacionAdmin = async (id) => {
+  if (!id) return { success: false, message: 'ID de habitación no válido' };
+  try {
+    // La ruta PUT /habitaciones/:id/asignar ahora usa el controlador asignarHabitacionAdmin
+    const response = await apiClient.put(`/reservas/habitaciones/${id}/asignar`);
+    // No se envía body, el backend usa req.user.id
+    return response; // Suponiendo que apiClient devuelve { success: true, ... } o lanza error
+  } catch (error) {
+    console.error(`Error al asignar habitación ${id} al admin:`, error.response || error);
+    return { success: false, message: error.response?.data?.message || 'Error al asignar la habitación' };
+  }
 }; 

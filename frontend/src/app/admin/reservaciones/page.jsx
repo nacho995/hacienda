@@ -14,7 +14,13 @@ import {
   updateEventoReservation,
   updateHabitacionReservation,
   deleteEventoReservation,
-  deleteHabitacionReservation
+  deleteHabitacionReservation,
+  // --- Importar funciones de asignación a admin --- 
+  asignarEventoAdmin,
+  asignarHabitacionAdmin,
+  // --- Importar funciones de desasignación --- 
+  unassignEventoReservation,
+  unassignHabitacionReservation
 } from '@/services/reservationService';
 
 export default function ReservacionesPage() {
@@ -62,6 +68,15 @@ export default function ReservacionesPage() {
       eventoReservations
     });
 
+    // --- Log para inspeccionar eventoReservations y sus servicios --- 
+    if (eventoReservations && eventoReservations.length > 0) {
+      console.log('[Debug Filtro] Primer evento:', eventoReservations[0]);
+      if (eventoReservations[0].serviciosAdicionales && eventoReservations[0].serviciosAdicionales.length > 0) {
+        console.log('[Debug Filtro] Primer servicio del primer evento:', eventoReservations[0].serviciosAdicionales[0]);
+      }
+    }
+    // ---------------------------------------------------------------
+
     // Verificar que los datos sean válidos
     if (!Array.isArray(habitacionReservations) || !Array.isArray(eventoReservations)) {
       console.error('Datos de reservaciones inválidos:', { habitacionReservations, eventoReservations });
@@ -94,7 +109,7 @@ export default function ReservacionesPage() {
       ...eventoReservations.map(res => ({
         ...res,
         tipo: 'evento',
-        fechaMostrada: res.fechaEvento, // Fecha principal para eventos
+        fechaMostrada: res.fecha,
         // Usar nombreContacto para el cliente del evento
         clientePrincipal: res.nombreContacto || res.usuario?.nombre || 'No especificado',
         nombreMostrado: `Evento: ${res.nombreEvento || 'Sin nombre'}`, // Nombre para la columna TIPO
@@ -102,23 +117,28 @@ export default function ReservacionesPage() {
       })),
       ...habitacionReservations.map(res => {
         const habId = (res._id || res.id)?.toString();
-        // Verificar si serviciosAdicionales y la reserva populada existen
-        const servicioAsociado = eventoReservations.find(evento => 
-          Array.isArray(evento.serviciosAdicionales) && evento.serviciosAdicionales.some(servicio => 
-            servicio.reservaHabitacionId?._id?.toString() === habId
-          )
-        );
-        const asociada = !!servicioAsociado;
+        
+        // --- Buscar evento asociado directamente usando el ID --- 
+        let asociada = false;
+        let eventoEncontrado = null;
+        if (res.reservaEvento) { // Si la habitación tiene ID de evento asociado
+           eventoEncontrado = eventoReservations.find(evento => 
+                // Comparar IDs como string por seguridad
+                String(evento._id || evento.id) === String(res.reservaEvento)
+           );
+           asociada = !!eventoEncontrado; // Marcar como asociada si se encontró el evento
+        }
+        // -----------------------------------------------------
         
         const letra = res.letraHabitacion || res.habitacion?.nombre || 'N/A';
-        // Intentar obtener el primer huésped o el nombre general
         const primerHuesped = res.infoHuespedes?.nombres?.[0] || res.nombreHuespedes || res.huesped?.nombre;
-        // Usar email como fallback si no hay nombre
         const clienteFinal = primerHuesped || res.huesped?.email || res.email || 'No especificado';
         let nombreTipo = `Habitación ${letra}`;
-        if (asociada) {
-          // Podríamos buscar el evento asociado si fuera necesario mostrar más info aquí
-          nombreTipo += ' (Evento)'; 
+        if (asociada && eventoEncontrado) { // Usar el evento encontrado
+          const nombreEventoAsociado = eventoEncontrado.nombreEvento || 'Sin nombre';
+          // Eliminar log anterior que ya no aplica
+          // console.log(`[Debug Hab ${habId}] Asociada: ${asociada}, Evento Encontrado:`, servicioAsociado, `Nombre: ${nombreEventoAsociado}`);
+          nombreTipo += ` (Evento: ${nombreEventoAsociado})`; 
         }
         
         return {
@@ -156,13 +176,13 @@ export default function ReservacionesPage() {
       if (filterUsuario !== 'all') {
         if (filterUsuario === 'mine') {
           // Mostrar solo reservas asignadas al usuario actual
-          matchesUsuario = reservation.asignadoA === user?.id;
+          matchesUsuario = reservation.asignadoA?._id === user?.id;
         } else if (filterUsuario === 'unassigned') {
           // Mostrar solo reservas sin asignar
           matchesUsuario = !reservation.asignadoA;
         } else {
           // Mostrar reservas asignadas a un usuario específico
-          matchesUsuario = reservation.asignadoA === filterUsuario;
+          matchesUsuario = reservation.asignadoA?._id === filterUsuario;
         }
       }
 
@@ -318,6 +338,71 @@ export default function ReservacionesPage() {
     }
   }, [loadAllReservations]);
 
+  // --- NUEVA FUNCIÓN --- 
+  const handleAssignReservation = useCallback(async (tipo, id) => {
+    if (!id) {
+      toast.error('ID de reserva inválido para asignar.');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      let response;
+      if (tipo === 'evento') {
+        response = await asignarEventoAdmin(id);
+      } else { // tipo === 'habitacion'
+        response = await asignarHabitacionAdmin(id);
+      }
+
+      if (response && response.success) {
+        toast.success('Reserva asignada a tu cuenta correctamente');
+        await loadAllReservations(); // Recargar para reflejar el cambio y el filtro
+        // --- Log para verificar datos post-recarga ---
+        console.log('[Asignar] Datos después de recarga:', { habitacionReservations, eventoReservations });
+      } else {
+        throw new Error(response?.message || 'Error al asignar la reserva');
+      }
+    } catch (error) {
+      console.error('Error al asignar reserva:', error);
+      toast.error('Error al asignar reserva: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadAllReservations]);
+
+  // --- NUEVA FUNCIÓN --- 
+  const handleUnassignReservation = useCallback(async (tipo, id) => {
+    if (!id) {
+      toast.error('ID de reserva inválido para desasignar.');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      let response;
+      if (tipo === 'evento') {
+        response = await unassignEventoReservation(id);
+      } else { // tipo === 'habitacion'
+        response = await unassignHabitacionReservation(id);
+      }
+
+      if (response && response.success) {
+        toast.success('Reserva desasignada correctamente');
+        await loadAllReservations(); // Recargar para reflejar el cambio y el filtro
+        // --- Log para verificar datos post-recarga ---
+        console.log('[Desasignar] Datos después de recarga:', { habitacionReservations, eventoReservations });
+      } else {
+        // Usar el mensaje de error de la respuesta si existe
+        throw new Error(response?.message || 'Error al desasignar la reserva'); 
+      }
+    } catch (error) {
+      console.error('Error al desasignar reserva:', error);
+      toast.error('Error al desasignar reserva: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadAllReservations]);
+
   // --- FIN: Nuevas funciones Handler ---
 
   // Manejo de estados de carga
@@ -423,6 +508,8 @@ export default function ReservacionesPage() {
           usuarios={usuarios}
           onDelete={handleDeleteReservation}
           onChangeStatus={handleChangeReservationStatus}
+          onAssign={handleAssignReservation}
+          onUnassign={handleUnassignReservation}
         />
 
         {/* Mensaje cuando no hay resultados para los filtros aplicados */}

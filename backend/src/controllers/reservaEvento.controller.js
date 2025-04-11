@@ -78,6 +78,25 @@ exports.crearReservaEvento = async (req, res) => {
       });
     }
 
+    // --- Calcular precio total incluyendo servicios --- 
+    // Obtener precio base del tipo de evento (asegurarse de que sea número)
+    const precioBaseEvento = Number(tipoEventoDoc.precioBase) || 0;
+    
+    // Calcular suma de precios de servicios adicionales (asumiendo que vienen con precio)
+    let precioServicios = 0;
+    if (Array.isArray(req.body.servicios_adicionales)) {
+      precioServicios = req.body.servicios_adicionales.reduce((sum, servicio) => {
+        // Asegurarse de que el precio del servicio es un número válido
+        const precioServicio = Number(servicio?.precio) || 0; 
+        return sum + precioServicio;
+      }, 0);
+    }
+    
+    // Calcular precio total final
+    const precioTotalCalculado = precioBaseEvento + precioServicios;
+    console.log(`Precio calculado: Base Evento ${precioBaseEvento} + Servicios ${precioServicios} = Total ${precioTotalCalculado}`); // Log para depuración
+    // --------------------------------------------------
+
     // Calcular el total de habitaciones desde los datos recibidos
     const totalHabitaciones = habitaciones?.length || 0;
     
@@ -96,7 +115,7 @@ exports.crearReservaEvento = async (req, res) => {
       horaFin: '18:00',
       espacioSeleccionado: 'jardin',
       numInvitados: 50, // Valor por defecto
-      precio: tipoEventoDoc.precioBase || 0,
+      precio: precioTotalCalculado,
       peticionesEspeciales: mensaje || '',
       estadoReserva: 'pendiente',
       metodoPago: 'pendiente',
@@ -363,10 +382,12 @@ exports.obtenerReservasEvento = async (req, res) => {
         strictPopulate: false
       })
       .populate({
-        path: 'serviciosAdicionales.reservaHabitacionId',
-        model: 'ReservaHabitacion',
-        select: '_id letraHabitacion',
-        strictPopulate: false
+        path: 'serviciosAdicionales',
+        populate: {
+           path: 'reservaHabitacionId',
+           model: 'ReservaHabitacion',
+           select: '_id letraHabitacion'
+        }
       })
       .sort({ fecha: 1, horaInicio: 1 });
       
@@ -394,7 +415,7 @@ exports.obtenerReservaEvento = async (req, res) => {
   try {
     // Buscar la reserva de evento con los datos básicos populados
     const reserva = await ReservaEvento.findById(req.params.id)
-      .select('+precio +nombreEvento +nombreContacto +apellidosContacto +emailContacto +telefonoContacto +fecha +horaInicio +horaFin +numeroInvitados +espacioSeleccionado +peticionesEspeciales +estadoReserva')
+      .select('+precio +nombreEvento +nombreContacto +apellidosContacto +emailContacto +telefonoContacto +fecha +horaInicio +horaFin +numeroInvitados +espacioSeleccionado +peticionesEspeciales +estadoReserva +numInvitados')
       .populate({
         path: 'usuario',
         select: 'nombre apellidos email telefono',
@@ -1311,6 +1332,48 @@ exports.removeHabitacionDeEvento = async (req, res) => {
 
   } catch (error) {
     console.error('Error eliminando habitación de evento:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor.', error: error.message });
+  }
+};
+
+// --- NUEVA FUNCIÓN --- 
+/**
+ * @desc    Asignar una reserva de evento a un administrador
+ * @route   PUT /api/reservas/eventos/:id/asignar
+ * @access  Private (Admin)
+ */
+exports.asignarEventoAdmin = async (req, res) => {
+  try {
+    const eventoId = req.params.id;
+    const adminId = req.user.id; // ID del admin haciendo la petición
+
+    // 1. Buscar el evento
+    const evento = await ReservaEvento.findById(eventoId);
+    if (!evento) {
+      return res.status(404).json({ success: false, message: 'Reserva de evento no encontrada.' });
+    }
+
+    // 2. Asignar el evento al admin
+    evento.asignadoA = adminId;
+    await evento.save();
+    console.log(`Evento ${eventoId} asignado a admin ${adminId}`);
+
+    // 3. Buscar y asignar habitaciones asociadas
+    const ReservaHabitacion = require('../models/ReservaHabitacion'); // Asegurar que el modelo está disponible
+    const updateResult = await ReservaHabitacion.updateMany(
+      { reservaEvento: eventoId }, // Condición: que pertenezcan a este evento
+      { $set: { asignadoA: adminId } } // Actualización: asignar al mismo admin
+    );
+    console.log(`Actualizadas ${updateResult.modifiedCount} habitaciones asociadas al evento ${eventoId} para asignar a admin ${adminId}`);
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Evento y habitaciones asociadas asignadas correctamente.', 
+      data: evento // Opcional: devolver el evento actualizado
+    });
+
+  } catch (error) {
+    console.error('Error asignando evento y habitaciones a admin:', error);
     res.status(500).json({ success: false, message: 'Error interno del servidor.', error: error.message });
   }
 };

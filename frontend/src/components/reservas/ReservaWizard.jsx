@@ -121,8 +121,13 @@ const ReservaWizard = () => {
           });
         }
         
+        // --- Resetear estado y localStorage ANTES de redirigir ---
+        resetForm(); 
+        localStorage.removeItem('reservaFormData'); // Limpieza explícita
+        console.log('Formulario reseteado y localStorage limpiado.'); // Log para confirmar
+        // ---------------------------------------------------------
+
         // Redirigir a la página de confirmación
-        // Asegurarse de que response.data.id o response.data.reserva._id existe
         const reservaId = response.data?.id || response.data?.reserva?._id;
         if (reservaId) {
             router.push(`/reservar/confirmacion?id=${reservaId}`);
@@ -132,9 +137,6 @@ const ReservaWizard = () => {
             toast.warning('Reserva creada, pero hubo un problema al redirigir.');
             router.push('/'); // Redirigir a inicio como fallback
         }
-
-        // --- Llamar a resetForm DESPUÉS de la redirección --- 
-        resetForm(); 
 
       } else {
         toast.error('Error al crear la reserva', {

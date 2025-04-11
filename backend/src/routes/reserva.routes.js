@@ -9,7 +9,8 @@ const {
   deleteReservaHabitacion,
   assignReservaHabitacion,
   unassignReservaHabitacion,
-  updateReservaHabitacionHuespedes
+  updateReservaHabitacionHuespedes,
+  asignarHabitacionAdmin
 } = require('../controllers/reservaHabitacionController');
 
 // Importar controladores para eventos
@@ -29,7 +30,8 @@ const {
   addEventoServicio,
   removeEventoServicio,
   addHabitacionAEvento,
-  removeHabitacionDeEvento
+  removeHabitacionDeEvento,
+  asignarEventoAdmin
 } = require('../controllers/reservaEvento.controller');
 
 const { protectRoute, authorize } = require('../middleware/auth');
@@ -53,7 +55,7 @@ router.put('/habitaciones/:id', protectRoute, updateReservaHabitacion);
 router.delete('/habitaciones/:id', protectRoute, deleteReservaHabitacion);
 
 // Asignar/desasignar reserva a un usuario
-router.put('/habitaciones/:id/asignar', protectRoute, assignReservaHabitacion);
+router.put('/habitaciones/:id/asignar', protectRoute, authorize('admin'), asignarHabitacionAdmin);
 router.put('/habitaciones/:id/desasignar', protectRoute, unassignReservaHabitacion);
 
 // Nueva ruta para actualizar información de huéspedes (solo Admin)
@@ -75,7 +77,7 @@ router.put('/eventos/:id', protectRoute, actualizarReservaEvento);
 router.delete('/eventos/:id', protectRoute, eliminarReservaEvento);
 
 // Asignar/desasignar reserva a un usuario
-router.put('/eventos/:id/asignar', protectRoute, assignReservaEvento);
+router.put('/eventos/:id/asignar', protectRoute, authorize('admin'), asignarEventoAdmin);
 router.put('/eventos/:id/desasignar', protectRoute, unassignReservaEvento);
 
 // Rutas protegidas para eventos (solo admin o cliente autenticado)
