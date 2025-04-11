@@ -47,7 +47,7 @@ export default function HotelGallerySection() {
   const galleryRef = useRef(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [currentCategory, setCurrentCategory] = useState('todas');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'slider'
+  const [viewMode, setViewMode] = useState('slider'); // Cambiar a 'slider' por defecto
   const [currentSlide, setCurrentSlide] = useState(0);
   
   // Filtrar fotos según la categoría seleccionada

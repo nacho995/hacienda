@@ -137,13 +137,27 @@ export default function Navbar() {
                     <div className="absolute top-6 left-1 right-1 h-[2px] bg-slate-200"></div>
                     <div className="absolute bottom-6 left-1 right-1 h-[2px] bg-slate-200"></div>
                   </div>
-                  {/* Almenas superiores con líneas */}
-                  <div className="absolute top-0 w-full flex justify-center space-x-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="relative w-4 h-4 bg-white/80 backdrop-blur-sm rounded-t-lg shadow-[0_0_15px_rgba(255,255,255,0.5)]">
-                        <div className="absolute top-1 left-1 right-1 h-[1px] bg-slate-200"></div>
-                      </div>
-                    ))}
+                  {/* Almenas superiores con líneas y curva MUY pronunciada - bajadas (5 almenas) */}
+                  <div className="absolute top-1 w-full flex justify-center items-end space-x-1">
+                    {[...Array(5)].map((_, i) => {
+                      const totalAlmenas = 5;
+                      const centerIndex = Math.floor(totalAlmenas / 2);
+                      const distanceFromCenter = Math.abs(i - centerIndex); 
+                      const maxCurveDepth = 10;
+                      const translateYValue = (centerIndex === 0) ? 0 : -maxCurveDepth * (1 - distanceFromCenter / centerIndex);
+                      
+                      return (
+                        <div 
+                          key={i} 
+                          className="relative w-4 h-4 bg-white/80 backdrop-blur-sm rounded-t-lg shadow-[0_0_15px_rgba(255,255,255,0.5)] transition-transform duration-300"
+                          style={{
+                            transform: `translateY(${translateYValue}px)` 
+                          }}
+                        >
+                          <div className="absolute top-1 left-1 right-1 h-[1px] bg-slate-200"></div>
+                        </div>
+                      );
+                    })}
                   </div>
                   {/* Arco decorativo */}
                   <div className="absolute top-9 left-1/2 transform -translate-x-1/2 w-24 h-24 border-t-2 border-slate-200 rounded-full"></div>
