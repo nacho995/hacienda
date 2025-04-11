@@ -51,8 +51,8 @@ export default function EventoReservationDetail({ params }) {
               const initialEdits = {};
               responseHabitaciones.data.habitaciones.forEach(hab => {
                 initialEdits[hab._id] = {
-                  numHuespedes: hab.numHuespedes || 1,
-                  nombres: (hab.infoHuespedes?.nombres || []).join('\n'),
+                  nombres: hab.infoHuespedes?.nombres || [],
+                  currentGuestName: '',
                   detalles: hab.infoHuespedes?.detalles || ''
                 };
               });
@@ -139,16 +139,48 @@ export default function EventoReservationDetail({ params }) {
     }));
   };
   
+  const handleAddGuest = (habitacionId) => {
+    const nameToAdd = huespedesEditados[habitacionId]?.currentGuestName?.trim();
+    if (!nameToAdd) {
+        toast.warning("Por favor, ingrese un nombre de huésped.");
+        return;
+    }
+    setHuespedesEditados(prev => {
+        const currentHabData = prev[habitacionId] || { nombres: [], currentGuestName: '', detalles: '' };
+        const newNombres = [...currentHabData.nombres, nameToAdd];
+        return {
+            ...prev,
+            [habitacionId]: {
+                ...currentHabData,
+                nombres: newNombres,
+                currentGuestName: ''
+            }
+        };
+    });
+  };
+  
+  const handleRemoveGuest = (habitacionId, indexToRemove) => {
+    setHuespedesEditados(prev => {
+        const currentHabData = prev[habitacionId] || { nombres: [], currentGuestName: '', detalles: '' };
+        const newNombres = currentHabData.nombres.filter((_, index) => index !== indexToRemove);
+        return {
+            ...prev,
+            [habitacionId]: {
+                ...currentHabData,
+                nombres: newNombres,
+            }
+        };
+    });
+  };
+  
   const handleGuardarHuespedes = async (habitacionId) => {
     const datosEditados = huespedesEditados[habitacionId];
     if (!datosEditados) return;
-
-    const nombresArray = datosEditados.nombres.split('\n').map(n => n.trim()).filter(n => n); 
     
     const updateData = {
-      numHuespedes: parseInt(datosEditados.numHuespedes, 10) || 1,
+      numHuespedes: datosEditados.nombres.length || 1,
       infoHuespedes: {
-        nombres: nombresArray,
+        nombres: datosEditados.nombres || [],
         detalles: datosEditados.detalles || ''
       }
     };
@@ -323,23 +355,14 @@ export default function EventoReservationDetail({ params }) {
                   <FaClock className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Horario</p>
-                    <p className="font-medium">
-                      {reservation.horaInicio} - {reservation.horaFin}
-                    </p>
+                    <p className="font-medium">{reservation.horaInicio} - {reservation.horaFin}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <FaUserFriends className="text-gray-500 mt-1" />
                   <div>
                     <p className="text-sm text-gray-500">Número de Invitados</p>
-                    <p className="font-medium">{reservation.numeroInvitados}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FaUserFriends className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Espacio Seleccionado</p>
-                    <p className="font-medium">{reservation.espacioSeleccionado || 'No especificado'}</p>
+                    <p className="font-medium">{reservation.numInvitados ?? 'No especificado'}</p>
                   </div>
                 </div>
                 {reservation.peticionesEspeciales && (
@@ -442,7 +465,9 @@ export default function EventoReservationDetail({ params }) {
             habitacionesEvento.map((hab) => (
               <div key={hab?._id || Math.random()} className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm">
                 <h4 className="font-medium text-gray-700 mb-4 text-lg">
-                  Habitación: {hab.letraHabitacion || hab.tipoHabitacion || (hab?._id ? hab._id.substring(0, 6) : 'ID Desconocido')}
+                  Habitación: {hab.habitacion || 'Sin Letra'}
+                  {hab?._id && <span className="text-sm text-gray-500 ml-2">(ID: {hab._id.substring(0, 6)})</span>}
+                  {hab.tipoHabitacion?.nombre && <span className="text-sm text-gray-500 ml-2">[{hab.tipoHabitacion.nombre}]</span>}
                 </h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -459,19 +484,52 @@ export default function EventoReservationDetail({ params }) {
                     />
                   </div>
                   
-                  {/* Nombres Huéspedes */}
-                  <div className="md:col-span-2">
-                    <label htmlFor={`nombresHuespedes_${hab._id}`} className="block text-sm font-medium text-gray-600 mb-1">Nombres Huéspedes (uno por línea)</label>
-                    <textarea 
-                      id={`nombresHuespedes_${hab._id}`}
-                      rows="3"
-                      value={huespedesEditados[hab._id]?.nombres || ''}
-                      onChange={(e) => handleHuespedChange(hab._id, 'nombres', e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-                      placeholder="Ej:
-Juan Pérez
-Maria García"
-                    />
+                  {/* Nombres Huéspedes (Inputs) */}
+                  <div className="md:col-span-3">
+                    <p className="block text-sm font-medium text-gray-600 mb-1">
+                      Huéspedes ({huespedesEditados[hab._id]?.nombres?.length || 0})
+                    </p>
+                    <div className="mt-1 space-y-3">
+                      {/* Input para nuevo huésped */}
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="text"
+                          value={huespedesEditados[hab._id]?.currentGuestName || ''}
+                          onChange={(e) => handleHuespedChange(hab._id, 'currentGuestName', e.target.value)}
+                          className="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          placeholder="Nombre Apellido Nuevo Huésped"
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => handleAddGuest(hab._id)}
+                          className="p-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition"
+                          title="Añadir Huésped"
+                        >
+                          <FaPlus size={14}/>
+                        </button>
+                      </div>
+                      {/* Lista de huéspedes añadidos */}
+                      {(huespedesEditados[hab._id]?.nombres?.length ?? 0) > 0 && (
+                        <ul className="list-disc list-inside pl-1 text-sm space-y-1 max-h-40 overflow-y-auto border rounded p-3 bg-white">
+                          {huespedesEditados[hab._id].nombres.map((name, index) => (
+                            <li key={`${hab._id}-guest-${index}`} className="flex justify-between items-center text-gray-800 py-1">
+                              <span>{name}</span>
+                              <button 
+                                type="button"
+                                onClick={() => handleRemoveGuest(hab._id, index)}
+                                className="p-1 text-red-500 hover:text-red-700"
+                                title="Eliminar Huésped"
+                              >
+                                <FaTrash size={12}/>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {(huespedesEditados[hab._id]?.nombres?.length ?? 0) === 0 && (
+                        <p className="text-xs text-gray-400 italic px-1">No hay huéspedes añadidos para esta habitación.</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* (Opcional) Detalles Huéspedes */}

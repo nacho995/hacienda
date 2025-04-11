@@ -879,12 +879,12 @@ exports.unassignReservaEvento = async (req, res) => {
 /**
  * @desc    Obtener todas las habitaciones asignadas a un evento
  * @route   GET /api/reservas/eventos/:id/habitaciones
- * @access  Private
+ * @access  Private (admin o propietario)
  */
 exports.obtenerHabitacionesEvento = async (req, res) => {
   try {
     const eventoId = req.params.id;
-    
+
     // Validar que el ID sea válido para MongoDB
     if (!eventoId.match(/^[0-9a-fA-F]{24}$/)) {
       return res.status(400).json({
@@ -892,67 +892,75 @@ exports.obtenerHabitacionesEvento = async (req, res) => {
         message: 'ID de evento no válido'
       });
     }
-    
-    // Verificar que el evento existe
+
+    // Verificar que el evento existe (populamos datos necesarios para contexto)
     const evento = await ReservaEvento.findById(eventoId)
       .populate({
         path: 'usuario',
         select: 'nombre apellidos email telefono',
+        strictPopulate: false // Permite populación aunque no esté definido en el schema
+      })
+      .populate({
+        path: 'tipoEvento', // Populamos el tipo de evento
         strictPopulate: false
       })
       .populate({
-        path: 'tipoEvento',
+        path: 'asignadoA', // Populamos el usuario asignado
+        select: 'nombre email',
         strictPopulate: false
-      });
-    
+      })
+      .select('+numInvitados'); // Asegurarse de seleccionar numInvitados si es necesario mostrarlo
+
     if (!evento) {
       return res.status(404).json({
         success: false,
         message: 'Evento no encontrado'
       });
     }
-    
-    // Verificar que el usuario es propietario del evento o admin
-    if (
-      evento.usuario && 
-      evento.usuario.toString() !== req.user.id && 
-      (!evento.asignadoA || evento.asignadoA.toString() !== req.user.id) && 
-      req.user.role !== 'admin'
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: 'No está autorizado para ver las habitaciones de este evento'
-      });
+
+    // Verificar autorización (admin o propietario del evento)
+    // (Asumiendo que req.user está disponible desde protectRoute)
+    const esPropietario = evento.usuario && evento.usuario._id.toString() === req.user.id;
+    const estaAsignado = evento.asignadoA && evento.asignadoA._id.toString() === req.user.id;
+    const esAdmin = req.user.role === 'admin';
+
+    if (!esPropietario && !estaAsignado && !esAdmin) {
+        return res.status(403).json({
+            success: false,
+            message: 'No está autorizado para ver las habitaciones de este evento'
+        });
     }
-    
-    // Crear un array con las 14 habitaciones
-    const habitaciones = Array(14).fill().map((_, index) => ({
-      numero: index + 1,
-      tipo: index < 6 ? '1 cama king size' : 'Dos matrimoniales',
-      categoria: index < 6 ? 'sencilla' : 'doble',
-      precio: index < 6 ? 2400 : 2600,
-      estado: 'pendiente',
-      fechaEntrada: evento.fecha,
-      fechaSalida: new Date(evento.fecha.getTime() + 24 * 60 * 60 * 1000), // +1 día
-      infoHuespedes: {
-        nombres: [],
-        detalles: ''
-      }
-    }));
-    
+
+    // Buscar las reservaciones de habitación asociadas a este evento
+    const habitaciones = await ReservaHabitacion.find({ reservaEvento: eventoId })
+      .populate({ // Popular la información de la habitación física
+        path: 'habitacion', // Campo que referencia al modelo Habitacion
+        select: 'nombre letra identificador piso -_id' // Seleccionar campos deseados
+      })
+      .populate({ // Popular la información del tipo de habitación
+        path: 'tipoHabitacion', // Campo que referencia al modelo TipoHabitacion
+        select: 'nombre precio -_id' // Seleccionar campos deseados
+      })
+      .populate({ // Popular usuario asignado si existe
+        path: 'asignadoA',
+        select: 'nombre email',
+        strictPopulate: false
+      })
+      .lean(); // Usar lean() para obtener objetos JS planos si no se necesita modificar
+
     res.status(200).json({
       success: true,
       data: {
-        evento,
-        habitaciones
+        evento, // Devolver el evento para contexto si es necesario en el frontend
+        habitaciones // Devolver las habitaciones encontradas
       }
     });
   } catch (error) {
     console.error('Error al obtener las habitaciones del evento:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener las habitaciones del evento',
-      error: error.message
+      message: 'Error interno del servidor al obtener las habitaciones del evento.',
+      error: error.message // Devolver mensaje de error en desarrollo
     });
   }
 };
