@@ -13,7 +13,7 @@ import CalendarioReserva from '@/components/reservas/CalendarioReserva';
 import { useReservation } from '@/context/ReservationContext';
 import NavbarReservar from '@/components/layout/NavbarReservar';
 import Footer from '@/components/layout/Footer';
-import { crearReservaEvento, getEventoOccupiedDates } from '@/services/reservas.service';
+import { crearReservaEvento, getEventoOccupiedDates } from '@/services/reservationService';
 
 const ReservarPage = () => {
   return (
@@ -88,15 +88,26 @@ const ReservaWizard = () => {
         fechaInicio: formatApiDate(fechaInicioVisible),
         fechaFin: formatApiDate(fechaFinVisible),
       };
-      const response = await getEventoOccupiedDates(params);
-      if (response && response.success && Array.isArray(response.data)) {
-        const occupiedDates = response.data.map(dateString => new Date(dateString));
-        setOccupiedEventDates(occupiedDates);
+      // La función del servicio devuelve directamente el array de fechas ocupadas
+      const occupiedDatesArray = await getEventoOccupiedDates(params); 
+
+      // MODIFICADO: Verificar si la respuesta es un array 
+      if (Array.isArray(occupiedDatesArray)) {
+        // La conversión a Date ya se hace en el servicio
+        // const occupiedDates = occupiedDatesArray.map(dateString => new Date(dateString)); <-- Ya no es necesario
+        // Asegurarse de que el array contiene objetos Date válidos
+        const validDates = occupiedDatesArray
+          .map(item => item?.fecha) // Extraer la fecha del objeto devuelto por el servicio
+          .filter(date => date instanceof Date && !isNaN(date.getTime()));
+          
+        setOccupiedEventDates(validDates);
       } else {
-        console.error('Error al obtener fechas ocupadas de eventos:', response?.message);
+        // Esto no debería ocurrir si el servicio siempre devuelve un array
+        console.error('Respuesta inesperada al obtener fechas ocupadas de eventos (no es un array):', occupiedDatesArray);
         setOccupiedEventDates([]);
       }
     } catch (error) {
+      // Captura errores de la llamada al servicio o del procesamiento
       console.error('Excepción al obtener fechas ocupadas de eventos:', error);
       setOccupiedEventDates([]);
     } finally {
@@ -341,99 +352,41 @@ const ReservaWizard = () => {
         );
       
       case 2:
-        // Paso 2: Selección de fecha y número de habitaciones
-        const isEvento = selectedEventType && 
-          (typeof selectedEventType === 'object' ? 
-            (selectedEventType.titulo !== 'hospedaje' && selectedEventType.nombre !== 'hospedaje') : 
-            selectedEventType !== 'hospedaje');
-        const minHabitaciones = isEvento ? 7 : 1;
-        const maxHabitaciones = isEvento ? 14 : 20;
-        
-        // Generar opciones para el selector de habitaciones
-        const habitacionesOptions = [];
-        for (let i = minHabitaciones; i <= maxHabitaciones; i++) {
-          habitacionesOptions.push(
-            <option key={i} value={i}>{i} habitaciones</option>
-          );
-        }
-        
         return (
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-gradient-to-r from-[#F0E8DC] to-[#E6DCC6] p-6 rounded-xl shadow-md mb-8 border border-[#D1B59B]">
-              <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Detalles del evento</h3>
-              
-              <div className="mb-6">
-                <label className="block text-[#5D4B3A] font-medium mb-2">Fecha del evento</label>
-                <CalendarioReserva
-                  selectedDate={formData.fecha ? new Date(formData.fecha) : null}
-                  onDateChange={(date) => updateFormSection('fecha', date)}
-                  occupiedDates={occupiedEventDates}
-                  loadingOccupiedDates={loadingOccupiedEventDates}
-                />
-                <p className="text-sm text-[#8A6E52] mt-2 italic">
-                  Seleccione la fecha en la que desea celebrar su {typeof selectedEventType === 'object' ? selectedEventType?.titulo?.toLowerCase() || 'evento' : 'evento'}
-                </p>
-              </div>
-              
-              <div className="mb-6">
-                <label className="block text-[#5D4B3A] font-medium mb-2">Número de habitaciones</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <FaBed className="text-[#A5856A]" />
-                  </div>
-                  {isEvento ? (
-                    <select
-                      value={formData.numeroHabitaciones || minHabitaciones}
-                      onChange={(e) => updateFormSection('numeroHabitaciones', parseInt(e.target.value))}
-                      className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow appearance-none"
-                    >
-                      {habitacionesOptions}
-                    </select>
-                  ) : (
-                    <input 
-                      type="number" 
-                      value={formData.numeroHabitaciones || 1} 
-                      onChange={(e) => {
-                        const value = parseInt(e.target.value) || 1;
-                        updateFormSection('numeroHabitaciones', Math.max(1, Math.min(value, 20)));
-                      }}
-                      min="1"
-                      max="20"
-                      className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
-                    />
-                  )}
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <div className="text-[#A5856A] text-sm font-medium">
-                      {isEvento ? '7-14' : '1-20'}
-                    </div>
-                  </div>
-                </div>
-                {isEvento ? (
-                  <p className="text-sm text-[#8A6E52] mt-2 italic">
-                    Para eventos, se requiere un mínimo de 7 y un máximo de 14 habitaciones
-                  </p>
-                ) : (
-                  <p className="text-sm text-[#8A6E52] mt-2 italic">
-                    Seleccione el número de habitaciones que necesitará
-                  </p>
-                )}
-              </div>
-            </div>
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-[#5C4A3C] mb-4">Selección de Fecha y Huéspedes</h3>
+            <p className="text-sm text-[#8A6E52] mb-6">Seleccione la fecha principal para su evento y estime el número de huéspedes.</p>
             
-            <div className="bg-[#F5F0E8] border-l-4 border-[#A5856A] rounded-lg p-5 shadow-sm">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <FaCalendarAlt className="h-5 w-5 text-[#A5856A]" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-[#5D4B3A]">Información importante</h3>
-                  <div className="mt-2 text-sm text-[#8A6E52]">
-                    <p>
-                      La disponibilidad de habitaciones está sujeta a confirmación. Nuestro equipo se pondrá en contacto con usted para confirmar la reserva.
-                    </p>
-                  </div>
-                </div>
+            <CalendarioReserva
+              selectedDate={formData.fecha ? new Date(formData.fecha) : null}
+              onDateChange={(date) => updateFormSection('fecha', date)}
+              occupiedDates={occupiedEventDates}
+              loadingOccupiedDates={loadingOccupiedEventDates}
+              placeholderText="Seleccione la fecha del evento"
+            />
+            
+            <div className="mt-6 pt-6 border-t border-[#D1B59B]/50">
+              <label htmlFor="numHuespedesEvento" className="block text-[#5D4B3A] font-medium mb-2">Número Estimado de Huéspedes</label>
+              <div className="relative">
+                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                   <FaUsers className="text-[#A5856A]" />
+                 </div>
+                 <input 
+                   type="number" 
+                   id="numHuespedesEvento"
+                   value={formData.numHuespedes || ''} 
+                   onChange={(e) => {
+                     const value = parseInt(e.target.value) || 0;
+                     updateFormSection('numHuespedes', Math.max(0, value)); // Permitir 0 o más
+                   }}
+                   min="0"
+                   className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
+                   placeholder="Ej: 50"
+                 />
               </div>
+              <p className="text-sm text-[#8A6E52] mt-2 italic">
+                Indique una estimación del total de asistentes al evento.
+              </p>
             </div>
           </div>
         );
