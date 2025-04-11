@@ -547,6 +547,21 @@ exports.actualizarReservaEvento = async (req, res) => {
       }
     }
     
+    // Ensure correct casing (lowercase) if 'estadoReserva' is being updated
+    if (req.body.estadoReserva) {
+        const estadoInput = String(req.body.estadoReserva).toLowerCase(); // Convert to string and lowercase
+        if (['pendiente', 'confirmada', 'pagada', 'cancelada', 'completada'].includes(estadoInput)) {
+           // Set the lowercase version directly
+           req.body.estadoReserva = estadoInput;
+        } else {
+           // If input is not a valid enum value, maybe don't update or return error?
+           // For now, let's keep the original invalid value to let validation handle it.
+           // Or delete it: delete req.body.estadoReserva; 
+           console.warn(`[actualizarReservaEvento] Estado '${req.body.estadoReserva}' no es un valor enum válido.`);
+        }
+        console.log(`[actualizarReservaEvento] Estado normalizado a: ${req.body.estadoReserva}`);
+    }
+
     // Actualizar la reserva
     reserva = await ReservaEvento.findByIdAndUpdate(
       req.params.id,

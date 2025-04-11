@@ -80,16 +80,21 @@ export default function EventoReservationDetail({ params }) {
   }, [id]);
   
   const handleStatusChange = async (newStatus) => {
+    const statusToSend = String(newStatus).toLowerCase();
     setUpdating(true);
     setStatusUpdated(false);
     try {
-      const response = await updateEventoReservation(id, { estado: newStatus });
+      const response = await updateEventoReservation(id, { estadoReserva: statusToSend });
+      console.log('[handleStatusChange] Response from backend:', response);
       if (response && response.success) {
-        toast.success(`Estado de la reserva cambiado a: ${newStatus}`);
+        const displayStatus = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+        toast.success(`Estado de la reserva cambiado a: ${displayStatus}`);
+        console.log('[handleStatusChange] response.data:', response.data);
         if (response.data) {
           setReservation(response.data);
         } else {
-          setReservation(prev => ({...prev, estado: newStatus}));
+          console.warn('[handleStatusChange] Backend did not return data object.');
+          setReservation(prev => ({...prev, estadoReserva: statusToSend}));
         }
         setStatusUpdated(true);
         
@@ -271,17 +276,17 @@ export default function EventoReservationDetail({ params }) {
             <FaSpinner className="animate-spin text-[var(--color-primary)]" />
           ) : (
             <>
-              {reservation.estado !== 'Confirmada' && (
+              {reservation.estadoReserva !== 'confirmada' && (
                 <button 
-                  onClick={() => handleStatusChange('Confirmada')}
+                  onClick={() => handleStatusChange('confirmada')}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
                 >
                   Confirmar
                 </button>
               )}
-              {reservation.estado !== 'Cancelada' && (
+              {reservation.estadoReserva !== 'cancelada' && (
                 <button 
-                  onClick={() => handleStatusChange('Cancelada')}
+                  onClick={() => handleStatusChange('cancelada')}
                   className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition"
                 >
                   Cancelar
@@ -319,14 +324,14 @@ export default function EventoReservationDetail({ params }) {
               <span className="text-gray-700 font-medium">Estado:</span>
               <span
                 className={`px-3 py-1 inline-flex text-sm font-semibold rounded-full ${
-                  reservation.estado === 'Confirmada'
+                  reservation.estadoReserva === 'confirmada'
                     ? 'bg-green-100 text-green-800'
-                    : reservation.estado === 'Pendiente'
+                    : reservation.estadoReserva === 'pendiente'
                     ? 'bg-yellow-100 text-yellow-800'
                     : 'bg-red-100 text-red-800'
                 }`}
               >
-                {reservation.estado || 'Pendiente'}
+                {(reservation.estadoReserva && reservation.estadoReserva.charAt(0).toUpperCase() + reservation.estadoReserva.slice(1)) || 'Pendiente'}
               </span>
             </div>
           </div>
