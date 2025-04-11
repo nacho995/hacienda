@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { FaChevronDown, FaAngleLeft, FaAngleRight, FaPlay } from 'react-icons/fa';
+import { motion } from "framer-motion";
 
 // Datos de carrusel mejorados
 const carouselData = [
@@ -268,7 +269,7 @@ export default function HeroSection() {
                   {/* Medallón */}
                   <div className="relative w-48 h-48 mx-auto mb-8">
                     <Image
-                      src="/logo.svg"
+                      src="/logo.png"
                       alt="Hacienda San Carlos"
                       fill
                       className="object-contain"
@@ -367,6 +368,19 @@ export default function HeroSection() {
           <FaAngleRight className="h-5 w-5" />
         </button>
       </div>
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.8 }} 
+        animate={{ opacity: 1, scale: 1 }} 
+        transition={{ duration: 1, delay: 0.8 }}
+        className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-32 h-32 md:w-40 md:h-40 z-20"
+      >
+        <Image 
+          src="/logo.png" 
+          alt="Hacienda San Carlos Logo" 
+          layout="fill"
+        />
+      </motion.div>
     </section>
   );
 } 

@@ -126,7 +126,7 @@ export default function HotelPage() {
             </div>
           </div>
         </div>
-
+        
         <PoliciesSection scrollY={scrollY} />
         <FAQSection />
       </main>

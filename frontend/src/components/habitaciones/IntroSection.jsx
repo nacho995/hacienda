@@ -1,3 +1,8 @@
+import dynamic from 'next/dynamic'; // Necesario para importación dinámica
+
+// Importar la galería dinámicamente
+const HotelGallerySection = dynamic(() => import('@/components/habitaciones/HotelGallerySection'), { ssr: false });
+
 export default function IntroSection() {
   return (
     <section className="py-16 bg-[var(--color-cream-light)]">
@@ -7,12 +12,15 @@ export default function IntroSection() {
             Un Descanso con Historia
           </h2>
           <div className="w-16 h-[1px] bg-[var(--color-primary)] mx-auto mb-8"></div>
-          <p className="text-gray-700 mb-8">
+          <p className="text-gray-700 mb-12">
             Nuestras habitaciones han sido cuidadosamente restauradas para preservar la esencia histórica de la hacienda, 
             mientras ofrecen todas las comodidades modernas que garantizan una estancia placentera. Cada habitación cuenta 
             con un carácter único, manteniendo elementos originales que relatan la historia centenaria de este lugar mágico.
           </p>
         </div>
+        
+        <HotelGallerySection />
+        
       </div>
     </section>
   );

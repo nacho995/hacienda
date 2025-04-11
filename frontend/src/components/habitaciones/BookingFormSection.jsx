@@ -15,6 +15,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 registerLocale('es', es);
 setDefaultLocale('es');
 
+// Función auxiliar para obtener la imagen de la habitación - CORREGIR RUTA
+const getHabitacionImage = (letra) => {
+  const placeholder = '/placeholder/room-default.svg'; // Placeholder genérico
+  if (!letra || typeof letra !== 'string' || letra.length !== 1) {
+    return placeholder;
+  }
+  const letterIndex = letra.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+  if (letterIndex < 0 || letterIndex > 13) { 
+      return placeholder; 
+  }
+  const imageNumber = (letterIndex % 6) + 1;
+  // Corregir ruta base:
+  return `/Habitacion${imageNumber}.jpeg`; 
+};
+
 export default function BookingFormSection({ 
   selectedRooms = [], 
   isLoadingDetails,
@@ -392,7 +407,7 @@ export default function BookingFormSection({
                      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-3">
                        <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden border border-gray-200">
                           <Image 
-                            src={room.imagen || '/images/placeholder/room.jpg'} 
+                            src={getHabitacionImage(room.letra)}
                             alt={room.nombre}
                             width={80}
                             height={80}

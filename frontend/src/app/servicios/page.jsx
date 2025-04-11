@@ -51,7 +51,7 @@ export default function ServiciosPage() {
           <div className="absolute inset-0 bg-black/40 z-10"></div>
           <div className="absolute inset-0">
             <Image 
-              src="/images/servicios-hero.jpg" 
+              src="/platopresentacion.JPG" 
               alt="Servicios en Hacienda San Carlos" 
               layout="fill"
               objectFit="cover"

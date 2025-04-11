@@ -29,7 +29,7 @@ export default function HeroSection({ scrollY, title = "Habitaciones de Ensueño
         className="absolute inset-0 h-full w-full z-0"
         style={{ 
           transform: `translateY(${parallax}px)`,
-          backgroundImage: `url('/images/habitaciones/hero-background.jpg')`,
+          backgroundImage: `url('/Entrada-hotel.jpeg')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           filter: 'brightness(0.65)',
