@@ -572,10 +572,8 @@ exports.checkHabitacionAvailability = asyncHandler(async (req, res, next) => {
 // @access  Public
 exports.getHabitacionOccupiedDates = asyncHandler(async (req, res, next) => {
   try {
-    // MODIFICADO: Esperar habitacionLetra en lugar de habitacionId
     const { habitacionLetra, fechaInicio, fechaFin } = req.query;
 
-    // MODIFICADO: Validar habitacionLetra
     if (!habitacionLetra) { 
         return res.status(400).json({ success: false, message: 'Falta el parámetro habitacionLetra' });
     }
@@ -585,39 +583,58 @@ exports.getHabitacionOccupiedDates = asyncHandler(async (req, res, next) => {
     
     const fechaInicioObj = new Date(fechaInicio);
     const fechaFinObj = new Date(fechaFin);
+    // Ajustar fechaFinObj para incluir el día final completo en la comparación <
+    fechaFinObj.setDate(fechaFinObj.getDate() + 1);
     
     if (isNaN(fechaInicioObj.getTime()) || isNaN(fechaFinObj.getTime())) {
       return res.status(400).json({ success: false, message: 'Fechas inválidas' });
     }
 
-    // Buscar reservas activas para esa letra de habitación que se solapen con el rango
-    // MODIFICADO: Buscar por el campo 'habitacion' usando habitacionLetra
-    const reservas = await ReservaHabitacion.find({
-      habitacion: habitacionLetra, 
-      estadoReserva: { $in: ['confirmada', 'pendiente'] }, // Considerar confirmadas y pendientes
-      $or: [
-        { fechaEntrada: { $lt: fechaFinObj }, fechaSalida: { $gt: fechaInicioObj } }, // Solapamiento
-      ]
-    });
-
     const occupiedDatesSet = new Set();
 
-    reservas.forEach(reserva => {
+    // --- 1. Buscar reservas de HABITACIÓN para esa letra específica --- 
+    const reservasHabitacion = await ReservaHabitacion.find({
+      habitacion: habitacionLetra, 
+      estadoReserva: { $in: ['confirmada', 'pendiente'] },
+      // Buscar reservas cuya duración se solape con el rango solicitado
+      fechaEntrada: { $lt: fechaFinObj }, 
+      fechaSalida: { $gt: fechaInicioObj } 
+    }).select('fechaEntrada fechaSalida'); // Seleccionar solo fechas
+
+    reservasHabitacion.forEach(reserva => {
       let currentDate = new Date(reserva.fechaEntrada);
       const endDate = new Date(reserva.fechaSalida);
       
-      // Iterar por cada día de la reserva
       while (currentDate < endDate) {
-        // Añadir solo si está dentro del rango solicitado por el frontend
-        if (currentDate >= fechaInicioObj && currentDate <= fechaFinObj) {
-          // Guardar como YYYY-MM-DD string
+        // Añadir solo si está dentro del rango solicitado (original, sin ajustar fechaFinObj)
+        if (currentDate >= new Date(fechaInicio) && currentDate < new Date(fechaFin).setDate(new Date(fechaFin).getDate() + 1) ) {
           occupiedDatesSet.add(currentDate.toISOString().split('T')[0]);
         }
-        // Avanzar al día siguiente
         currentDate.setDate(currentDate.getDate() + 1);
       }
     });
+
+    // --- 2. Buscar reservas de EVENTO activas en el rango --- 
+    const reservasEvento = await ReservaEvento.find({
+      estadoReserva: { $in: ['confirmada', 'pendiente'] },
+      fecha: { // Asumiendo que 'fecha' es la fecha principal del evento
+        $gte: fechaInicioObj, 
+        $lt: fechaFinObj 
+      }
+    }).select('fecha'); // Seleccionar solo la fecha del evento
+
+    reservasEvento.forEach(evento => {
+      // Asumimos que un evento bloquea al menos el día de su 'fecha'
+      const eventoDate = new Date(evento.fecha);
+       // Añadir solo si está dentro del rango solicitado (original)
+       if (eventoDate >= new Date(fechaInicio) && eventoDate < new Date(fechaFin).setDate(new Date(fechaFin).getDate() + 1) ) {
+          occupiedDatesSet.add(eventoDate.toISOString().split('T')[0]);
+       }
+      // NOTA: Si los eventos pueden durar más de un día, se necesitaría lógica adicional 
+      // para calcular la fecha de fin del evento y añadir todos los días intermedios.
+    });
     
+    // --- 3. Combinar y devolver --- 
     const occupiedDatesArray = Array.from(occupiedDatesSet);
 
     res.status(200).json({
