@@ -24,10 +24,11 @@ connectDB();
 // Importar la aplicación Express ya configurada
 const app = require('./app');
 
-// Puerto
-const PORT = process.env.PORT || 5000;
+// Puerto - Usar 8080 como defecto, que es común en Beanstalk con Nginx
+const PORT = process.env.PORT || 8080;
 
-// Comprobar si el puerto está en uso
+// --- Lógica de comprobación de puerto comentada --- 
+/*
 const net = require('net');
 const testServer = net.createServer()
   .once('error', err => {
@@ -44,6 +45,10 @@ const testServer = net.createServer()
     startServer(PORT);
   })
   .listen(PORT);
+*/
+
+// Iniciar el servidor directamente en el puerto definido
+startServer(PORT);
 
 function startServer(port) {
   const server = app.listen(port, () => {
@@ -53,6 +58,11 @@ function startServer(port) {
   // Manejar rechazos de promesas no capturadas
   process.on('unhandledRejection', (err, promise) => {
     console.log(`Error: ${err.message}`.red);
-    server.close(() => process.exit(1));
+    // Asegurarse que el servidor existe antes de intentar cerrarlo
+    if (server) {
+      server.close(() => process.exit(1));
+    } else {
+      process.exit(1);
+    }
   });
 } 

@@ -169,6 +169,44 @@ export default function BookingFormSection({
 
   const handleFechasHabitacionChange = (roomLetra, dates) => {
     const [start, end] = dates;
+
+    if (start && end) {
+      const occupiedDatesForRoom = fechasOcupadasPorHabitacion[roomLetra] || [];
+      const occupiedSet = new Set(
+        occupiedDatesForRoom.map(date => {
+          if (date instanceof Date && !isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          }
+          return null;
+        }).filter(Boolean)
+      );
+
+      let currentDate = new Date(start);
+      const endDate = new Date(end);
+      currentDate.setHours(0, 0, 0, 0); 
+      endDate.setHours(0, 0, 0, 0); 
+
+      while (currentDate <= endDate) {
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const dateString = `${year}-${month}-${day}`;
+
+        if (occupiedSet.has(dateString)) {
+          toast.error(`La habitación ${roomLetra} no está disponible en el rango seleccionado.`);
+          setFechasPorHabitacion(prev => ({
+            ...prev,
+            [roomLetra]: { fechaEntrada: null, fechaSalida: null },
+          }));
+          return;
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    }
+
     const newFechasPorHabitacion = {
       ...fechasPorHabitacion,
       [roomLetra]: { fechaEntrada: start, fechaSalida: end },
@@ -421,23 +459,47 @@ export default function BookingFormSection({
                     </div>
                        <div className="w-full md:w-auto md:min-w-[280px]">
                           <label htmlFor={`fechas-${roomLetra}`} className="block text-xs font-medium text-gray-600 mb-1">Fechas para Habitación {roomLetra} *</label>
-                          <DatePicker
-                            selected={roomDates.fechaEntrada}
-                            onChange={(dates) => handleFechasHabitacionChange(roomLetra, dates)}
-                            startDate={roomDates.fechaEntrada}
-                            endDate={roomDates.fechaSalida}
-                            excludeDates={fechasOcupadasPorHabitacion[roomLetra] || []}
-                            selectsRange
-                            inline
-                            minDate={new Date()}
-                            monthsShown={2}
-                            locale="es"
-                            dateFormat="dd/MM/yyyy"
-                            placeholderText="Entrada - Salida"
-                          />
-                          {loadingFechasOcupadas[roomLetra] && (
-                            <p className="text-xs text-gray-500 mt-1">Cargando disponibilidad...</p>
-                          )}
+                          <div className="w-full relative">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none z-10">
+                              <FaCalendarAlt className="text-[#A5856A]" />
+                            </div>
+                            <DatePicker
+                              selected={roomDates.fechaEntrada}
+                              onChange={(dates) => handleFechasHabitacionChange(roomLetra, dates)}
+                              startDate={roomDates.fechaEntrada}
+                              endDate={roomDates.fechaSalida}
+                              selectsRange={true}
+                              filterDate={date => {
+                                const roomOccupiedDates = fechasOcupadasPorHabitacion[roomLetra] || [];
+                                return !roomOccupiedDates.some(occupiedDate => 
+                                  occupiedDate.getDate() === date.getDate() &&
+                                  occupiedDate.getMonth() === date.getMonth() &&
+                                  occupiedDate.getFullYear() === date.getFullYear()
+                                );
+                              }}
+                              minDate={new Date()}
+                              locale="es"
+                              dateFormat="dd/MM/yyyy"
+                              placeholderText="Check-in / Check-out"
+                              className="w-full pl-10 p-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow cursor-pointer"
+                              wrapperClassName="w-full"
+                              calendarClassName="border-gray-300 shadow-lg rounded-lg"
+                              dayClassName={date => {
+                                const roomOccupiedDates = fechasOcupadasPorHabitacion[roomLetra] || [];
+                                return roomOccupiedDates.some(occupiedDate => 
+                                  occupiedDate.getDate() === date.getDate() &&
+                                  occupiedDate.getMonth() === date.getMonth() &&
+                                  occupiedDate.getFullYear() === date.getFullYear()
+                                ) ? 'react-datepicker__day--disabled occupied-date' : undefined;
+                              }}
+                              popperPlacement="bottom-start"
+                            />
+                             {loadingFechasOcupadas[roomLetra] && (
+                              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <FaSpinner className="animate-spin text-[#A5856A]" />
+                              </div>
+                            )}
+                          </div>
                           {!hasValidDates && roomDates.fechaEntrada && (
                               <p className="text-xs text-red-600 mt-1">La fecha de salida debe ser posterior a la de entrada.</p>
                           )}

@@ -10,7 +10,8 @@ import { useReservation } from '@/context/ReservationContext';
 import { getTiposEvento } from '@/services/tiposEvento.service';
 import { // crearReservaEvento, // Comentado temporalmente
          createHabitacionReservation,
-         createEventoReservation // Posible reemplazo
+         createEventoReservation, // Posible reemplazo
+         getEventoOccupiedDates // Añadido para obtener fechas ocupadas
        } from '@/services/reservationService'; 
 
 import ModoSeleccionEvento from '@/components/reservas/ModoSeleccionEvento';
@@ -180,9 +181,48 @@ const ReservaWizard = () => {
       return;
     }
     
-    if (currentStep === 2 && !formData.fecha) {
-      toast.error('Por favor, seleccione una fecha para su evento');
-      return;
+    // MODIFICADO: Validar rango de fechas y fechas ocupadas
+    if (currentStep === 2) {
+      if (!formData.fechaInicio || !formData.fechaFin) {
+        toast.error('Por favor, seleccione un rango de fechas para su evento');
+        return;
+      }
+
+      // Crear un set de fechas ocupadas (en formato YYYY-MM-DD para comparación fácil)
+      const occupiedSet = new Set(
+        occupiedEventDates.map(date => {
+          // Asegurarse de que 'date' sea un objeto Date válido
+          if (date instanceof Date && !isNaN(date.getTime())) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          }
+          return null; // Ignorar fechas inválidas
+        }).filter(Boolean) // Filtrar nulos
+      );
+
+      // Iterar sobre el rango seleccionado
+      let currentDate = new Date(formData.fechaInicio);
+      const endDate = new Date(formData.fechaFin);
+      currentDate.setHours(0, 0, 0, 0); // Normalizar hora para la comparación
+      endDate.setHours(0, 0, 0, 0); // Normalizar hora
+
+      while (currentDate <= endDate) {
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const dateString = `${year}-${month}-${day}`;
+
+        if (occupiedSet.has(dateString)) {
+          setValidationErrorMessage("El rango de fechas seleccionado contiene días que no están disponibles para eventos.");
+          setShowValidationModal(true);
+          // setValidationRedirectStep(2); // Opcional: redirigir al paso 2
+          return; // Detener el avance
+        }
+        // Avanzar al día siguiente
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
     }
 
     // AÑADIDO: Validación para asegurar que se elija un modo en paso 3 antes de avanzar con 'Siguiente'
@@ -232,7 +272,23 @@ const ReservaWizard = () => {
       return;
     }
     
+    // Si todas las validaciones pasan, limpiar estado del modal (por si acaso)
+    setShowValidationModal(false);
+    setValidationErrorMessage('');
+    // setValidationRedirectStep(null);
+    
     setCurrentStep(prev => prev + 1);
+  };
+
+  // Añadido: Manejador para el cambio de rango de fechas
+  const handleDateRangeChange = (dates) => {
+    const [start, end] = dates;
+    // Asegurarse de que las fechas sean válidas antes de actualizar
+    const startDate = start instanceof Date && !isNaN(start) ? start : null;
+    const endDate = end instanceof Date && !isNaN(end) ? end : null;
+    
+    updateFormSection('fechaInicio', startDate);
+    updateFormSection('fechaFin', endDate);
   };
 
   const handleServicesSelect = (servicios) => {
@@ -318,39 +374,30 @@ const ReservaWizard = () => {
       case 2:
         return (
           <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-[#5C4A3C] mb-4">Selección de Fecha y Huéspedes</h3>
-            <p className="text-sm text-[#8A6E52] mb-6">Seleccione la fecha principal para su evento y estime el número de huéspedes.</p>
-            
-            <CalendarioReserva
-              selectedDate={formData.fecha ? new Date(formData.fecha) : null}
-              onDateChange={(date) => updateFormSection('fecha', date)}
-              occupiedDates={occupiedEventDates}
-              loadingOccupiedDates={loadingOccupiedEventDates}
-              placeholderText="Seleccione la fecha del evento"
-            />
-            
-            <div className="mt-6 pt-6 border-t border-[#D1B59B]/50">
-              <label htmlFor="numHuespedesEvento" className="block text-[#5D4B3A] font-medium mb-2">Número Estimado de Huéspedes</label>
-              <div className="relative">
-                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                   <FaUsers className="text-[#A5856A]" />
-                 </div>
-                 <input 
-                   type="number" 
-                   id="numHuespedesEvento"
-                   value={formData.numHuespedes || ''} 
-                   onChange={(e) => {
-                     const value = parseInt(e.target.value) || 0;
-                     updateFormSection('numHuespedes', Math.max(0, value)); // Permitir 0 o más
-                   }}
-                   min="0"
-                   className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
-                   placeholder="Ej: 50"
-                 />
-              </div>
-              <p className="text-sm text-[#8A6E52] mt-2 italic">
-                Indique una estimación del total de asistentes al evento.
-              </p>
+            <h3 className="text-xl font-semibold text-center text-[#4A3728]">Seleccione la Fecha y Número de Habitaciones</h3>
+            <div>
+              <label className="block text-sm font-medium text-[#6B4F3A] mb-2">Fechas del Evento</label>
+              <CalendarioReserva 
+                // MODIFICADO: Pasar props para rango
+                startDate={formData.fechaInicio instanceof Date && !isNaN(formData.fechaInicio) ? formData.fechaInicio : null}
+                endDate={formData.fechaFin instanceof Date && !isNaN(formData.fechaFin) ? formData.fechaFin : null}
+                onChange={handleDateRangeChange} 
+                occupiedDates={occupiedEventDates}
+                loadingOccupiedDates={loadingOccupiedEventDates}
+                placeholderText="Seleccione el rango de fechas"
+              />
+            </div>
+            <div>
+              <label htmlFor="numeroHabitaciones" className="block text-sm font-medium text-[#6B4F3A] mb-2">Número Estimado de Habitaciones</label>
+              <input 
+                type="number" 
+                id="numeroHabitaciones" 
+                name="numeroHabitaciones" 
+                value={formData.numeroHabitaciones || 0} 
+                onChange={(e) => updateFormSection('numeroHabitaciones', parseInt(e.target.value, 10) || 0)} 
+                min="0" 
+                className="w-full p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300"
+              />
             </div>
           </div>
         );

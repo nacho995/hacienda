@@ -22,13 +22,27 @@ app.use(express.json());
 // Cookie parser
 app.use(cookieParser());
 
-// Habilitar CORS con opciones más específicas
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+// Configuración de CORS basada en la variable de entorno
+const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS ? process.env.CORS_ALLOWED_ORIGINS.split(',') : [];
+
+console.log('Orígenes CORS permitidos:', allowedOrigins); // Log para depuración
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Permitir solicitudes sin origen (como Postman o curl) o si el origen está en la lista blanca
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.error(`Origen CORS no permitido: ${origin}`); // Log de error
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
-}));
+};
+
+app.use(cors(corsOptions));
 
 // Logging en desarrollo
 if (process.env.NODE_ENV === 'development') {

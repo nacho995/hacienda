@@ -13,8 +13,9 @@ registerLocale('es', es);
  */
 // MODIFICADO: Cambiar las props recibidas
 const CalendarioReserva = ({ 
-  selectedDate, 
-  onDateChange, 
+  startDate, 
+  endDate, 
+  onChange, // Espera una función que recibe [start, end]
   occupiedDates = [], 
   loadingOccupiedDates = false, 
   placeholderText = "Seleccione una fecha" 
@@ -23,15 +24,27 @@ const CalendarioReserva = ({
   // Eliminamos el estado interno y la lógica de carga/estilos, 
   // ya que ahora se manejan en el componente padre (ReservaWizard)
 
+  // Función para determinar si una fecha debe estar deshabilitada
+  const isDateOccupied = (date) => {
+    return occupiedDates.some(occupied => 
+      occupied.getDate() === date.getDate() &&
+      occupied.getMonth() === date.getMonth() &&
+      occupied.getFullYear() === date.getFullYear()
+    );
+  };
+
   return (
     <div className="w-full relative">
       <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none z-10">
         <FaCalendarAlt className="text-[#A5856A]" />
       </div>
       <DatePicker
-        selected={selectedDate} // Prop para la fecha seleccionada
-        onChange={onDateChange} // Prop para manejar el cambio
-        excludeDates={occupiedDates} // Prop para deshabilitar fechas
+        selected={startDate} // Usar startDate como la fecha "seleccionada" inicial
+        onChange={onChange} // La función que actualiza [startDate, endDate]
+        startDate={startDate}
+        endDate={endDate}
+        selectsRange={true} // Habilitar selección de rango
+        filterDate={date => !isDateOccupied(date)} // Deshabilitar fechas ocupadas
         minDate={new Date()} // No permitir fechas pasadas
         locale="es" // Usar español
         dateFormat="dd/MM/yyyy" // Formato de fecha
@@ -40,12 +53,8 @@ const CalendarioReserva = ({
         wrapperClassName="w-full" // Asegurar que el wrapper ocupe todo el ancho
         calendarClassName="border-[#D1B59B] shadow-lg rounded-lg" // Estilos para el popover del calendario
         dayClassName={date => 
-          occupiedDates.some(occupied => 
-            occupied.getDate() === date.getDate() &&
-            occupied.getMonth() === date.getMonth() &&
-            occupied.getFullYear() === date.getFullYear()
-          ) ? 'react-datepicker__day--disabled bg-red-200 opacity-70' : undefined
-        } // Clases para días (opcional, excludeDates ya deshabilita)
+          isDateOccupied(date) ? 'react-datepicker__day--disabled occupied-date' : undefined
+        } // Clases para días (opcional, filterDate ya deshabilita)
         popperPlacement="bottom-start" // Posición del calendario
       />
       {/* Indicador de carga */} 

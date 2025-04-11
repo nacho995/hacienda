@@ -29,7 +29,8 @@ export const ReservationProvider = ({ children }) => {
   // Estado del formulario de reserva actual
   const [formData, setFormData] = useState({
     tipoEvento: null,
-    fecha: null,
+    fechaInicio: null,
+    fechaFin: null,
     numeroHabitaciones: 0,
     habitacionesSeleccionadas: [],
     serviciosSeleccionados: [],
@@ -65,7 +66,8 @@ export const ReservationProvider = ({ children }) => {
     console.log("[ReservationContext] Reseteando formData");
     setFormData({
       tipoEvento: null,
-      fecha: null,
+      fechaInicio: null,
+      fechaFin: null,
       numeroHabitaciones: 0,
       habitacionesSeleccionadas: [],
       serviciosSeleccionados: [],
