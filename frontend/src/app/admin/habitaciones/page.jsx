@@ -180,39 +180,33 @@ export default function AdminEventRooms() {
   };
 
   const getLetraHabitacion = (reserva) => {
+    // 1. Priorizar letraHabitacion si existe
+    if (reserva?.letraHabitacion) {
+      return reserva.letraHabitacion;
+    }
+
+    // 2. Comprobar el campo 'habitacion' - solo si parece una letra
+    if (reserva?.habitacion && typeof reserva.habitacion === 'string') {
+        // Verificar si es una sola letra mayúscula (o minúscula)
+        if (reserva.habitacion.length === 1 && /^[A-Z]$/i.test(reserva.habitacion)) {
+            return reserva.habitacion.toUpperCase();
+        }
+        // Podría ser un ID o un nombre más largo, lo ignoramos por ahora
+    }
+
+    // 3. Intentar con el campo 'letra' (si existe en algún caso)
     if (reserva?.letra) {
       return reserva.letra;
     }
-
-    if (reserva?.habitacion && typeof reserva.habitacion === 'string') {
-      return reserva.habitacion;
-    }
-
+    
+    // 4. Intentar obtener de un objeto habitacion populado (caso menos probable aquí)
     if (reserva?.habitacion && typeof reserva.habitacion === 'object' && reserva.habitacion !== null) {
       if (reserva.habitacion.letra) {
         return reserva.habitacion.letra;
       }
     }
 
-    if (reserva?.letraHabitacion) {
-      return reserva.letraHabitacion;
-    }
-
-    if (reserva?.identificador) {
-      return reserva.identificador;
-    }
-
-    if (reserva?.tipoHabitacion && typeof reserva.tipoHabitacion === 'string' && reserva.tipoHabitacion.length === 1) {
-        const char = reserva.tipoHabitacion.toUpperCase();
-        if (/[A-Z]/.test(char)) return char;
-    }
-
-    const id = reserva?._id || reserva?.id;
-    if (id) {
-      const match = String(id).match(/([A-Z])/);
-      if (match) return match[1];
-    }
-
+    // 5. Fallback final
     console.warn('[getLetraHabitacion] No se pudo determinar la letra para la reserva:', reserva);
     return '?';
   };

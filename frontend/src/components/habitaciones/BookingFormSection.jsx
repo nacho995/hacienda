@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { FaCalendarAlt, FaCheck, FaWifi, FaCoffee, FaTv, FaSnowflake, FaUserFriends, FaDoorOpen, FaEnvelope, FaPhone, FaPen, FaSpinner } from 'react-icons/fa';
+import { FaCalendarAlt, FaWifi, FaUserFriends, FaEnvelope, FaPhone, FaSpinner, FaBed, FaEuroSign, FaBuilding } from 'react-icons/fa';
 import { toast } from 'sonner';
-import { createReservacion, createMultipleReservaciones, getHabitacionOccupiedDates } from '@/services/reservationService';
-import { obtenerHabitaciones } from '@/services/habitaciones.service';
+import { createMultipleReservaciones } from '@/services/reservationService';
 import { useAuth } from '@/context/AuthContext';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -17,26 +16,17 @@ registerLocale('es', es);
 setDefaultLocale('es');
 
 export default function BookingFormSection({ 
-  selectedRoom, 
   selectedRooms = [], 
-  onSelectRoom, 
+  isLoadingDetails,
   formData, 
   setFormData,
-  onTipoReservaChange
 }) {
   const { user } = useAuth();
   const [isFormValid, setIsFormValid] = useState(false);
   const [showReservationSuccess, setShowReservationSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reservationError, setReservationError] = useState(null);
-  const [reservationConfirmation, setReservationConfirmation] = useState(null);
-  const [fechasOcupadas, setFechasOcupadas] = useState([]);
-  const [fechaEntrada, setFechaEntrada] = useState(null);
-  const [fechaSalida, setFechaSalida] = useState(null);
-  const [ocultarOpcionesCategoriaHabitacion, setOcultarOpcionesCategoriaHabitacion] = useState(false);
-  const [esReservaMultiple, setEsReservaMultiple] = useState(false);
-
-  const [categoriaHabitacion, setCategoriaHabitacion] = useState('doble');
+  const [fechasPorHabitacion, setFechasPorHabitacion] = useState({});
   const [metodoPago, setMetodoPago] = useState('');
   const [mostrarPago, setMostrarPago] = useState(false);
   const [mostrarFormularioTarjeta, setMostrarFormularioTarjeta] = useState(false);
@@ -51,980 +41,507 @@ export default function BookingFormSection({
     estado: ''
   });
   
-  // Precios predeterminados según categoría
-  const precioSencilla = 2400;
-  const precioDoble = 2600;
-
-  // Estado adicional para la confirmación de reserva múltiple
   const [multipleReservationConfirmations, setMultipleReservationConfirmations] = useState([]);
-  const [currentRoomIndex, setCurrentRoomIndex] = useState(0);
-  const [processingMultipleRooms, setProcessingMultipleRooms] = useState(false);
   
-  // Estado para el número de habitaciones para eventos
-  const [totalHabitaciones, setTotalHabitaciones] = useState(7);
-
-  // Efecto para actualizar formData cuando se selecciona una habitación
   useEffect(() => {
-    if (selectedRoom) {
-      setFormData(prev => ({
-        ...prev,
-        habitacion: selectedRoom._id,
-        tipoHabitacion: selectedRoom.tipo,
-        precioPorNoche: categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble
-      }));
-    }
-  }, [selectedRoom, categoriaHabitacion, setFormData]);
-  
-  // Efecto para actualizar el precio cuando cambia la categoría
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      precioPorNoche: categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble,
-      categoriaHabitacion
-    }));
-  }, [categoriaHabitacion]);
-  
+    const initialFechas = {};
+    selectedRooms.forEach(room => {
+      initialFechas[room._id] = fechasPorHabitacion[room._id] || { fechaEntrada: null, fechaSalida: null };
+    });
+    setFechasPorHabitacion(initialFechas);
+    validateForm(formData, initialFechas);
+  }, [selectedRooms]);
 
+  const calcularPrecioTotal = () => {
+    let precioTotalCalculado = 0;
+    let todasFechasValidas = true;
 
-  // Cargar fechas ocupadas desde el backend
-  useEffect(() => {
-    const cargarFechasOcupadas = async () => {
-      if (!selectedRoom) return;
+    if (selectedRooms.length === 0) return 0;
 
-      try {
-        const params = {
-          tipoHabitacion: selectedRoom.tipo,
-          habitacion: selectedRoom.nombre
-        };
-        
-        const fechas = await getHabitacionOccupiedDates(params);
-        if (Array.isArray(fechas) && fechas.length > 0) {
-          setFechasOcupadas(fechas);
+    selectedRooms.forEach(room => {
+      const fechas = fechasPorHabitacion[room._id];
+      if (fechas && fechas.fechaEntrada && fechas.fechaSalida) {
+        if (fechas.fechaSalida > fechas.fechaEntrada) {
+          const noches = Math.ceil((fechas.fechaSalida - fechas.fechaEntrada) / (1000 * 60 * 60 * 24));
+          if (noches > 0) {
+            precioTotalCalculado += (room.precio || 0) * noches;
+          } else {
+            todasFechasValidas = false;
+          }
+        } else {
+          todasFechasValidas = false;
         }
-      } catch (error) {
-        console.error("Error al cargar fechas ocupadas:", error);
+      } else {
+        todasFechasValidas = false;
       }
-    };
-    
-    cargarFechasOcupadas();
-  }, [selectedRoom]);
+    });
 
-  // Convertir fechas de entrada/salida a formato ISO para el formulario al seleccionarlas
+    return todasFechasValidas ? precioTotalCalculado : 0;
+  };
+
   useEffect(() => {
-    if (fechaEntrada) {
-      setFormData(prev => ({
-        ...prev,
-        fechaEntrada: fechaEntrada.toISOString().split('T')[0]
-      }));
-    }
-    
-    if (fechaSalida) {
-      setFormData(prev => ({
-        ...prev,
-        fechaSalida: fechaSalida.toISOString().split('T')[0]
-      }));
-    }
-  }, [fechaEntrada, fechaSalida, setFormData]);
+    const precio = calcularPrecioTotal();
+    setFormData(prev => ({ ...prev, precioTotal: precio }));
+    validateForm(formData, fechasPorHabitacion);
+  }, [fechasPorHabitacion, formData.nombre, formData.apellidos, formData.email, formData.telefono, formData.huespedes]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
-    if (name === 'totalHabitaciones') {
-      const numValue = parseInt(value);
-      if (numValue >= 7 && numValue <= 14) {
-        setTotalHabitaciones(numValue);
-        setFormData(prev => ({
-          ...prev,
-          totalHabitaciones: numValue
-        }));
-      }
-      return;
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Validar formulario
-    const { nombre, apellidos, email, telefono } = {
-      ...formData,
-      [name]: value
-    };
-    setIsFormValid(
-      nombre !== '' && 
-      apellidos !== '' &&
-      email !== '' && 
-      telefono !== ''
-    );
+    const newFormData = { ...formData, [name]: value };
+    setFormData(newFormData);
+    validateForm(newFormData, fechasPorHabitacion);
   };
 
-  // Procesar pago con tarjeta
+  const handleFechasHabitacionChange = (roomId, dates) => {
+    const [start, end] = dates;
+    const newFechasPorHabitacion = {
+      ...fechasPorHabitacion,
+      [roomId]: { fechaEntrada: start, fechaSalida: end },
+    };
+    setFechasPorHabitacion(newFechasPorHabitacion);
+  };
+
+  const handleCardInputChange = (e) => {
+    const { name, value } = e.target;
+    setDatosTarjeta(prev => ({ ...prev, [name]: value }));
+  };
+
+  const validateForm = (currentFormData, currentFechasPorHabitacion) => {
+    const { nombre, apellidos, email, telefono, huespedes } = currentFormData;
+    let allDatesSetAndValid = selectedRooms.length > 0;
+    
+    if (selectedRooms.length === 0) {
+        allDatesSetAndValid = false;
+    } else {
+        selectedRooms.forEach(room => {
+          const fechas = currentFechasPorHabitacion[room._id];
+          if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
+            allDatesSetAndValid = false;
+          }
+        });
+    }
+
+    const isValid = 
+      nombre?.trim() !== '' && 
+      apellidos?.trim() !== '' &&
+      email?.trim() !== '' && 
+      telefono?.trim() !== '' &&
+      huespedes > 0 && 
+      allDatesSetAndValid;
+      
+    setIsFormValid(isValid);
+    return isValid;
+  };
+
   const procesarPagoTarjeta = async () => {
-    // Validar datos de la tarjeta
     if (!datosTarjeta.numeroTarjeta || !datosTarjeta.nombreTitular || !datosTarjeta.fechaExpiracion || !datosTarjeta.cvv) {
       setReservationError('Por favor, complete todos los campos obligatorios de la tarjeta');
       return;
     }
     
     setIsSubmitting(true);
+    setReservationError(null);
     
     try {
-      // Aquí se integraría con un procesador de pagos real
-      console.log('Procesando pago con tarjeta:', datosTarjeta);
-      
-      // Simulamos un procesamiento exitoso
-      // En una implementación real, aquí se enviarían los datos a un procesador de pagos
-      
-      // Preparar los datos para enviar al backend
-      let reservaData = {
-        ...formData,
-        habitacion: selectedRoom?._id,
-        tipoHabitacion: selectedRoom?.tipo,
-        metodoPago: 'tarjeta',
-        categoriaHabitacion: categoriaHabitacion,
-        precioPorNoche: categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble,
-        // Información de pago (en producción, no se enviarían datos sensibles como el CVV)
-        infoPago: {
-          ultimosDigitos: datosTarjeta.numeroTarjeta.slice(-4),
-          titular: datosTarjeta.nombreTitular
+      const reservas = selectedRooms.map(room => {
+        const fechas = fechasPorHabitacion[room._id];
+        if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
+           throw new Error(`Fechas inválidas o faltantes para la habitación ${room.nombre}`);
         }
-      };
-      
-      // Si es reserva múltiple, preparar datos de todas las habitaciones
-      if (esReservaMultiple && selectedRooms.length > 0) {
-        console.log('Procesando reserva múltiple con tarjeta:', selectedRooms.length, 'habitaciones');
-        const reservas = [];
-        
-        for (const room of selectedRooms) {
-          const reservaIndividual = {
-            ...formData,
-            habitacion: room._id,
-            tipoHabitacion: room.tipo,
+        const noches = Math.ceil((fechas.fechaSalida - fechas.fechaEntrada) / (1000 * 60 * 60 * 24));
+        const precioTotalHabitacion = (room.precio || 0) * noches;
+
+        return {
+          nombreContacto: formData.nombre,
+          apellidosContacto: formData.apellidos,
+          emailContacto: formData.email,
+          telefonoContacto: formData.telefono,
+          numHuespedes: formData.huespedes,
+          mensaje: formData.mensaje,
+          habitacion: room.letra,
+          precioPorNoche: room.precio,
+          fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
+          fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
+          precioTotal: precioTotalHabitacion,
             numeroHabitaciones: 1,
             metodoPago: 'tarjeta',
-                categoriaHabitacion: room.categoriaHabitacion || categoriaHabitacion,
-            precioPorNoche: room.precio || (room.categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble),
+          tipoReserva: 'hotel',
+          estadoReserva: 'confirmada',
             infoPago: {
               ultimosDigitos: datosTarjeta.numeroTarjeta.slice(-4),
               titular: datosTarjeta.nombreTitular
             }
           };
-          reservas.push(reservaIndividual);
-        }
+      });
         
-        console.log('Datos de reservas múltiples con tarjeta:', reservas);
+      console.log('Datos de reservas múltiples con tarjeta (fechas individuales):', reservas);
         const response = await createMultipleReservaciones(reservas);
         
-        if (response.success) {
+      if (response.success && Array.isArray(response.data)) {
           setMultipleReservationConfirmations(response.data);
           setShowReservationSuccess(true);
           toast.success('Pago procesado correctamente. Sus habitaciones han sido reservadas con éxito');
         } else {
           console.error('Error en la respuesta:', response);
-          setReservationError(response.message || 'Error al procesar su reserva');
-        }
-      } else {
-        // Reserva individual
-        console.log('Datos de reserva individual con tarjeta:', reservaData);
-        const response = await createReservacion(reservaData);
-        
-        if (response.success) {
-          setReservationConfirmation(response.data);
-          setShowReservationSuccess(true);
-          toast.success('Pago procesado correctamente. Su habitación ha sido reservada con éxito');
-        } else {
-          console.error('Error en la respuesta:', response);
-          setReservationError(response.message || 'Error al procesar su reserva');
-        }
+        setReservationError(response.message || 'Error al procesar su reserva múltiple');
+        toast.error(response.message || 'Error al procesar la reserva múltiple');
       }
     } catch (error) {
-      console.error('Error al procesar el pago con tarjeta:', error);
-      setReservationError(error.message || 'Error al procesar el pago. Por favor, inténtelo de nuevo.');
+      console.error('Error al preparar o procesar el pago múltiple con tarjeta:', error);
+      setReservationError(error.message || 'Error al procesar el pago. Verifique las fechas e inténtelo de nuevo.');
+      toast.error(error.message || 'Error de red o datos inválidos al procesar el pago');
     } finally {
       setIsSubmitting(false);
-      setMostrarFormularioTarjeta(false);
     }
   };
 
-  // Modificar handleSubmit para mostrar opciones de pago
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!isFormValid || isSubmitting) return;
-    
-    // Validar que se ingresaron fechas de entrada y salida
-    if (!formData.fechaEntrada || !formData.fechaSalida) {
-      setReservationError('Por favor, seleccione fechas de entrada y salida');
+    if (!validateForm(formData, fechasPorHabitacion)) {
+      toast.warning('Por favor, complete todos los campos requeridos y seleccione fechas válidas (salida posterior a entrada) para todas las habitaciones.');
       return;
     }
-    
-    // Verificar que se ha seleccionado al menos una habitación
-    if (selectedRooms.length === 0 && !selectedRoom) {
-      setReservationError('Por favor, seleccione al menos una habitación para reservar');
-      return;
-    }
-    
     setMostrarPago(true);
   };
 
-  // Procesar pago de la reserva
   const procesarPago = async (metodo) => {
-    if (!formData.fechaEntrada || !formData.fechaSalida) {
-      setReservationError('Por favor, seleccione fechas de entrada y salida');
-      return;
-    }
-    
-    setMetodoPago(metodo);
+    setIsSubmitting(true);
     setReservationError(null);
     
-    // Si el método es tarjeta, mostrar el formulario de tarjeta
-    if (metodo === 'tarjeta') {
-      setMostrarFormularioTarjeta(true);
-      return;
-    }
-    
-    // Si es efectivo, continuar con el proceso normal
-    setIsSubmitting(true);
-    
     try {
-      console.log('Procesando reserva con método:', metodo);
-      
-      // Calcular la duración de la estancia en días
-      const fechaInicio = new Date(formData.fechaEntrada);
-      const fechaFin = new Date(formData.fechaSalida);
-      const duracionEstancia = Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24));
+       const reservas = selectedRooms.map(room => {
+         const fechas = fechasPorHabitacion[room._id];
+         if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
+            throw new Error(`Fechas inválidas o faltantes para la habitación ${room.nombre}`);
+         }
+         const noches = Math.ceil((fechas.fechaSalida - fechas.fechaEntrada) / (1000 * 60 * 60 * 24));
+         const precioTotalHabitacion = (room.precio || 0) * noches;
 
-      // Calcular precios
-      const precioPorNoche = categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble;
-      const precioTotal = precioPorNoche * duracionEstancia;
-      
-      // Si hay múltiples habitaciones seleccionadas
-      if (selectedRooms && selectedRooms.length > 0) {
-        console.log('Procesando reserva con', selectedRooms.length, 'habitaciones');
-        const reservas = [];
-        
-        for (const room of selectedRooms) {
-          const precioPorNocheHab = room.precio || (room.categoriaHabitacion === 'sencilla' ? precioSencilla : precioDoble);
-          const precioTotalHab = precioPorNocheHab * duracionEstancia;
-          
-          const reservaIndividual = {
-            // Datos de contacto
+         return {
             nombreContacto: formData.nombre,
             apellidosContacto: formData.apellidos,
             emailContacto: formData.email,
             telefonoContacto: formData.telefono,
-            
-            // Datos de la habitación
-            habitacion: room.letra || 'A', // Usar letra en lugar de ID
-            tipoHabitacion: room.tipo || 'doble',
-            
-            // Fechas
-            fechaEntrada: formData.fechaEntrada,
-            fechaSalida: formData.fechaSalida,
-            
-            // Detalles de la reserva
-            numHuespedes: formData.huespedes || 1,
+            numHuespedes: formData.huespedes,
+            mensaje: formData.mensaje,
+            habitacion: room.letra,
+            precioPorNoche: room.precio,
+            fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
+            fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
+            precioTotal: precioTotalHabitacion,
             numeroHabitaciones: 1,
+            metodoPago: metodo,
             tipoReserva: 'hotel',
             estadoReserva: 'pendiente',
-            
-            // Detalles de pago
-            metodoPago: metodo,
-            estadoPago: 'pendiente',
-            
-            // Categoría y precios
-            categoriaHabitacion: room.categoriaHabitacion || categoriaHabitacion,
-            precioPorNoche: precioPorNocheHab,
-            precio: precioTotalHab,
-            
-            // Información adicional
-            mensaje: formData.mensaje || '',
-            esReservaIndependiente: true
-          };
-          reservas.push(reservaIndividual);
-        }
-        
-        console.log('Datos de reservas múltiples:', reservas);
+         };
+      });
+       
+       console.log(`Datos de reservas múltiples con ${metodo} (fechas individuales):`, reservas);
         const response = await createMultipleReservaciones(reservas);
         
-        if (response.success) {
+       if (response.success && Array.isArray(response.data)) {
           setMultipleReservationConfirmations(response.data);
           setShowReservationSuccess(true);
-          
-          if (response.errores && response.errores.length > 0) {
-            // Algunas reservas fallaron
-            toast.warning(`${response.message}. Revise los detalles para más información.`);
-          } else {
-            // Todas las reservas fueron exitosas
-            toast.success('Sus habitaciones han sido reservadas con éxito');
-          }
+         toast.success(`Reserva con ${metodo} registrada. Recibirá instrucciones por correo.`);
         } else {
           console.error('Error en la respuesta:', response);
-          setReservationError(response.message || 'Error al procesar su reserva');
-          toast.error(response.message || 'Error al procesar su reserva');
-        }
-      } else {
-        // Reserva individual
-        const reservaData = {
-          // Datos de contacto
-          nombreContacto: formData.nombre,
-          apellidosContacto: formData.apellidos,
-          emailContacto: formData.email,
-          telefonoContacto: formData.telefono,
-          
-          // Datos de la habitación
-          habitacion: selectedRoom?._id || 'Habitación estándar',
-          tipoHabitacion: selectedRoom?.tipo || 'doble',
-          
-          // Fechas
-          fechaEntrada: formData.fechaEntrada,
-          fechaSalida: formData.fechaSalida,
-          
-          // Detalles de la reserva
-          numHuespedes: formData.huespedes || 1,
-          numeroHabitaciones: 1,
-          tipoReserva: 'hotel',
-          estadoReserva: 'pendiente',
-          
-          // Detalles de pago
-          metodoPago: metodo,
-          estadoPago: 'pendiente',
-          
-          // Categoría y precios
-          categoriaHabitacion: categoriaHabitacion,
-          precioPorNoche: precioPorNoche,
-          precio: precioTotal,
-          
-          // Información adicional
-          mensaje: formData.mensaje || '',
-          esReservaIndependiente: true
-        };
-        
-        console.log('Datos de reserva individual:', reservaData);
-        const response = await createReservacion(reservaData);
-        
-        if (response.success) {
-          setReservationConfirmation(response.data);
-          setShowReservationSuccess(true);
-          toast.success('Su habitación ha sido reservada con éxito');
-        } else {
-          console.error('Error en la respuesta:', response);
-          setReservationError(response.message || 'Error al procesar su reserva');
-        }
+         setReservationError(response.message || 'Error al procesar su reserva múltiple');
+         toast.error(response.message || 'Error al procesar la reserva múltiple');
       }
     } catch (error) {
-      console.error('Error al crear la reserva:', error);
-      setReservationError(error.message || 'Error al procesar su reserva. Por favor, inténtelo de nuevo.');
+       console.error(`Error al preparar o procesar reserva múltiple con ${metodo}:`, error);
+       setReservationError(error.message || `Error al registrar la reserva con ${metodo}. Verifique las fechas.`);
+       toast.error(error.message || `Error de red o datos inválidos al registrar la reserva con ${metodo}`);
     } finally {
       setIsSubmitting(false);
+       setMostrarPago(false);
     }
   };
 
-  // Función para verificar si una fecha está disponible
-  const esDisponible = (date) => {
-    // No permitir fechas pasadas
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    if (date < hoy) return false;
-    
-    // Verificar contra fechas ocupadas
-    for (const reserva of fechasOcupadas) {
-      const entrada = new Date(reserva.fechaEntrada);
-      const salida = new Date(reserva.fechaSalida);
-      
-      // Normalizar fechas para comparación
-      entrada.setHours(0, 0, 0, 0);
-      salida.setHours(0, 0, 0, 0);
-      date.setHours(0, 0, 0, 0);
-      
-      // Si la fecha está dentro del rango de una reserva, no está disponible
-      if (date >= entrada && date <= salida) {
-        return false;
-      }
-    }
-    
-    return true;
+  if (showReservationSuccess) {
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        try {
+            return new Date(dateString + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch (e) {
+            return dateString;
+        }
   };
 
   return (
-    <section id="reserva-form" className="py-16 bg-[var(--color-cream-light)]">
-      <div className="container-custom">
-        <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-[var(--font-display)] text-center text-black mb-4">
-            {selectedRooms.length > 0 ? (
-              <>
-                Reservar Habitación{' '}
-                {selectedRooms.map((room, index) => (
-                  <React.Fragment key={room._id}>
-                    <span className={room.tipo === 'sencilla' ? 'text-[var(--color-primary)]' : 'text-[var(--color-accent)]'}>
-                      {room.letra}
-                    </span>
-                    {index < selectedRooms.length - 1 && ', '}
-                  </React.Fragment>
-                ))}
-              </>
-            ) : (
-              'Completar Reserva'
-            )}
-          </h2>
-          <div className="w-16 h-[1px] bg-[var(--color-primary)] mx-auto mb-8"></div>
-          
-          <div className="bg-white shadow-lg p-8 md:p-10 border border-gray-100">
-            {!selectedRoom ? (
-              <div className="text-center py-10">
-                <p className="text-gray-500">Seleccione una habitación para continuar con la reserva.</p>
-              </div>
-            ) : showReservationSuccess ? (
-              <div className="text-center py-10">
-                <div className="flex justify-center mb-4">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-500">
-                    <FaCheck size={24} />
-                  </div>
-                </div>
-                <h3 className="text-2xl font-semibold text-[var(--color-primary)] mb-3">¡Reserva Confirmada!</h3>
-                <p className="text-gray-700 mb-6">Su reserva ha sido realizada con éxito.</p>
-                
-                {multipleReservationConfirmations.length > 0 ? (
-                  <div className="mb-6">
-                    <h4 className="font-semibold mb-3 text-[var(--color-accent)]">Detalle de habitaciones reservadas</h4>
-                    <div className="space-y-4">
-                      {multipleReservationConfirmations.map((confirmacion, index) => (
-                        <div key={index} className="bg-gray-50 p-4 rounded-lg text-left">
-                          <p><span className="font-semibold">Habitación:</span> {selectedRooms[index]?.letra || 'N/A'} ({selectedRooms[index]?.tipo || 'N/A'})</p>
-                          <p><span className="font-semibold">Número de reserva:</span> {confirmacion._id || 'N/A'}</p>
-                          <p><span className="font-semibold">Fechas:</span> {new Date(formData.fechaEntrada).toLocaleDateString('es-ES')} - {new Date(formData.fechaSalida).toLocaleDateString('es-ES')}</p>
-                          <p><span className="font-semibold">Método de pago:</span> {metodoPago === 'tarjeta' ? 'Tarjeta de crédito/débito' : 'Efectivo al llegar'}</p>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-2xl mx-auto my-12 p-8 bg-green-50 rounded-lg shadow-lg text-center border border-green-200"
+      >
+        <h2 className="text-2xl font-semibold text-green-800 mb-4">¡Reserva Exitosa!</h2>
+        <p className="text-green-700 mb-6">Sus habitaciones han sido reservadas. Recibirá un correo de confirmación pronto.</p>
+        <h3 className="text-lg font-medium text-gray-700 mb-3">Detalles de la Reserva:</h3>
+        <div className="space-y-4 text-left bg-white p-4 rounded shadow-sm max-h-60 overflow-y-auto">
+          {multipleReservationConfirmations.map((conf, index) => (
+            <div key={conf._id || index} className="border-b pb-2 mb-2">
+              <p><strong>Habitación:</strong> {conf.habitacion || `Habitación ${index + 1}`}</p>
+              <p><strong>Fechas:</strong> {formatDate(conf.fechaEntrada)} - {formatDate(conf.fechaSalida)}</p>
+              <p><strong>Huéspedes:</strong> {conf.numHuespedes || formData.huespedes}</p>
+              <p><strong>Precio:</strong> ${conf.precioTotal ? conf.precioTotal.toFixed(2) : 'N/A'}</p>
+              <p><strong>Método Pago:</strong> {conf.metodoPago}</p>
+              <p className="text-xs text-gray-500">ID: {conf._id}</p>
                         </div>
                       ))}
-                      <div className="bg-[var(--color-primary)]/10 p-4 rounded-lg text-left">
-                        <p className="font-semibold">Total habitaciones: {multipleReservationConfirmations.length}</p>
-                        <p><span className="font-semibold">Método de pago:</span> {metodoPago === 'tarjeta' ? 'Tarjeta de crédito/débito' : 'Efectivo al llegar'}</p>
+                      </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.section 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      transition={{ duration: 0.5 }}
+      className="booking-form-section py-12 bg-gradient-to-b from-gray-50 to-white mt-[-1px]"
+    >
+      <div className="container-custom max-w-4xl mx-auto px-4">
+        <h2 className="text-3xl font-bold text-center mb-8 text-[var(--color-primary)]">Completa tu Reserva</h2>
+
+        <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
+          <h3 className="text-xl font-semibold text-blue-800 mb-4">Habitaciones Seleccionadas</h3>
+          {isLoadingDetails ? (
+            <div className="flex items-center justify-center text-blue-600">
+              <FaSpinner className="animate-spin mr-2" /> Cargando detalles...
+                  </div>
+          ) : selectedRooms.length > 0 ? (
+            <ul className="space-y-5">
+              {selectedRooms.map(room => {
+                const roomDates = fechasPorHabitacion[room._id] || { fechaEntrada: null, fechaSalida: null };
+                const hasValidDates = roomDates.fechaEntrada && roomDates.fechaSalida && roomDates.fechaSalida > roomDates.fechaEntrada;
+
+                return (
+                  <li key={room._id} className={`p-4 bg-white rounded shadow-sm border ${!hasValidDates && roomDates.fechaEntrada ? 'border-red-300' : 'border-gray-100'}`}>
+                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-3">
+                       <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden border border-gray-200">
+                          <Image 
+                            src={room.imagen || '/images/placeholder/room.jpg'} 
+                            alt={room.nombre}
+                            width={80}
+                            height={80}
+                            className="object-cover"
+                    />
+                  </div>
+                       <div className="flex-grow">
+                         <p className="font-semibold text-gray-800 text-lg">{room.nombre}</p>
+                         <p className="text-sm text-gray-600">Tipo: {room.tipo}</p>
+                         <p className="font-semibold text-[var(--color-primary)] mt-1">${room.precio || 0} / noche</p>
+                    </div>
+                       <div className="w-full md:w-auto md:min-w-[280px]">
+                          <label htmlFor={`fechas-${room._id}`} className="block text-xs font-medium text-gray-600 mb-1">Fechas para {room.nombre} *</label>
+                          <DatePicker
+                            selected={roomDates.fechaEntrada}
+                            onChange={(dates) => handleFechasHabitacionChange(room._id, dates)}
+                            startDate={roomDates.fechaEntrada}
+                            endDate={roomDates.fechaSalida}
+                            selectsRange
+                            monthsShown={1}
+                            locale="es"
+                            dateFormat="dd/MM/yyyy"
+                            minDate={new Date()}
+                            placeholderText="Entrada - Salida"
+                            className={`w-full p-2 border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm ${!hasValidDates && roomDates.fechaEntrada ? 'border-red-500' : 'border-gray-300'}`}
+                            wrapperClassName="w-full"
+                            calendarClassName="shadow-lg border rounded-lg bg-white text-xs"
+                            popperPlacement="bottom-end"
+                        required
+                      />
+                          {!hasValidDates && roomDates.fechaEntrada && (
+                              <p className="text-xs text-red-600 mt-1">La fecha de salida debe ser posterior a la de entrada.</p>
+                          )}
+                    </div>
+                  </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-center text-gray-500 italic">No has seleccionado ninguna habitación aún.</p>
+          )}
+           {selectedRooms.length > 0 && !isLoadingDetails && (
+             <div className="mt-5 pt-4 border-t border-blue-200 text-right">
+                <p className="text-lg font-semibold text-gray-800">Precio Total Estimado: 
+                   <span className={`ml-2 ${calcularPrecioTotal() > 0 ? 'text-[var(--color-primary)]' : 'text-gray-500'}`}>
+                      ${calcularPrecioTotal().toFixed(2)}
+                   </span>
+                </p>
+                <p className="text-xs text-gray-500">
+                    {calcularPrecioTotal() > 0 ? '(Suma de todas las habitaciones y noches)' : '(Selecciona fechas válidas para todas las habitaciones)'}
+                </p>
+                  </div>
+           )}
+                  </div>
+                  
+        <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow-lg border border-gray-200">
+           <h3 className="text-xl font-semibold text-gray-800 border-b pb-2 mb-5">Datos del Contacto Principal</h3>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                <input type="text" name="nombre" id="nombre" required value={formData.nombre} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+                  </div>
+              <div>
+                <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-1">Apellidos *</label>
+                <input type="text" name="apellidos" id="apellidos" required value={formData.apellidos} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+              <div>
+                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico *</label>
+                 <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FaEnvelope className="h-5 w-5 text-gray-400"/></div>
+                    <input type="email" name="email" id="email" required value={formData.email} onChange={handleInputChange} className="w-full p-3 pl-10 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+              </div>
+              <div>
+                 <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">Teléfono *</label>
+                 <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FaPhone className="h-5 w-5 text-gray-400"/></div>
+                    <input type="tel" name="telefono" id="telefono" required value={formData.telefono} onChange={handleInputChange} className="w-full p-3 pl-10 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
+                  </div>
+              </div>
+                  </div>
+                  
+                  <div>
+             <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700 mb-1">Número Total de Huéspedes *</label>
+                    <input
+               type="number" 
+               name="huespedes" 
+               id="huespedes" 
+               min="1" 
+               max={selectedRooms.reduce((acc, room) => {
+                   const capacity = typeof room.capacidad === 'object' 
+                                    ? (room.capacidad.adultos || 0) + (room.capacidad.ninos || 0)
+                                    : (typeof room.capacidad === 'number' ? room.capacidad : 2);
+                   return acc + capacity; 
+               }, 0) || 1}
+                      required
+               value={formData.huespedes}
+                      onChange={handleInputChange}
+               className="w-full md:w-1/2 p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
+               placeholder="Total de personas"
+                    />
+             <p className="text-xs text-gray-500 mt-1">Indica el número total de personas que se hospedarán en todas las habitaciones seleccionadas.</p>
+                  </div>
+                  
+                  <div>
+             <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700 mb-1">Mensaje Adicional (opcional)</label>
+             <textarea name="mensaje" id="mensaje" rows="4" value={formData.mensaje} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Alergias, preferencias, hora estimada de llegada..."></textarea>
+                  </div>
+
+           <div className="text-center pt-4">
+             <button 
+               type="submit" 
+               disabled={!isFormValid || isSubmitting || isLoadingDetails}
+               className="w-full md:w-auto px-10 py-3 bg-[var(--color-primary)] text-white text-lg font-semibold rounded-full shadow-lg hover:bg-[var(--color-primary-dark)] transition-colors duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
+             >
+               {isSubmitting ? <FaSpinner className="animate-spin"/> : (isLoadingDetails ? 'Cargando...' : 'Continuar al Pago')}
+             </button>
+             {!isFormValid && selectedRooms.length > 0 && !isLoadingDetails && (
+                 <p className="text-xs text-red-500 mt-2">Completa los datos y selecciona fechas válidas para continuar.</p>
+             )}
+                </div>
+                
+           {reservationError && !mostrarPago && (
+             <p className="text-red-600 text-center mt-4">Error: {reservationError}</p>
+           )}
+         </form>
+
+         <AnimatePresence>
+           {mostrarPago && (
+             <motion.div 
+               initial={{ opacity: 0, scale: 0.9 }} 
+               animate={{ opacity: 1, scale: 1 }} 
+               exit={{ opacity: 0, scale: 0.9 }} 
+               transition={{ duration: 0.3 }}
+               className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4"
+             >
+                <div className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-auto relative">
+                   <button onClick={() => {setMostrarPago(false); setMostrarFormularioTarjeta(false); setReservationError(null);}} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 z-10">
+                     &times;
+                   </button>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">Selecciona Método de Pago</h3>
+                  <p className="text-center text-lg font-semibold text-gray-700 mb-4">Total: ${calcularPrecioTotal().toFixed(2)}</p>
+                  
+                  {reservationError && (
+                     <p className="text-red-600 text-center mb-4">{reservationError}</p>
+                   )}
+                  
+                  <div className="space-y-4">
+                     <button 
+                        onClick={() => { setMostrarFormularioTarjeta(true); setReservationError(null); }}
+                        disabled={isSubmitting}
+                        className="w-full flex items-center justify-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                     >
+                        Pagar con Tarjeta
+                     </button>
+                     
+                     <AnimatePresence>
+                       {mostrarFormularioTarjeta && (
+                         <motion.div 
+                           initial={{ height: 0, opacity: 0 }} 
+                           animate={{ height: 'auto', opacity: 1 }} 
+                           exit={{ height: 0, opacity: 0 }} 
+                           transition={{ duration: 0.3 }}
+                           className="overflow-hidden"
+                         >
+                           <div className="space-y-4 border p-4 rounded-md bg-gray-50 mt-4">
+                             <h4 className="text-md font-medium text-gray-700">Datos de la Tarjeta</h4>
+                    <div>
+                                <label htmlFor="numeroTarjeta" className="block text-sm font-medium text-gray-700 mb-1">Número Tarjeta *</label>
+                                <input type="text" name="numeroTarjeta" id="numeroTarjeta" required value={datosTarjeta.numeroTarjeta} onChange={handleCardInputChange} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" />
+                              </div>
+                              <div>
+                                <label htmlFor="nombreTitular" className="block text-sm font-medium text-gray-700 mb-1">Nombre Titular *</label>
+                                <input type="text" name="nombreTitular" id="nombreTitular" required value={datosTarjeta.nombreTitular} onChange={handleCardInputChange} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" />
+                              </div>
+                             <div className="grid grid-cols-2 gap-4">
+                    <div>
+                                 <label htmlFor="fechaExpiracion" className="block text-sm font-medium text-gray-700 mb-1">Expiración (MM/AA) *</label>
+                                 <input type="text" name="fechaExpiracion" id="fechaExpiracion" placeholder="MM/AA" required value={datosTarjeta.fechaExpiracion} onChange={handleCardInputChange} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" />
+                    </div>
+                    <div>
+                                 <label htmlFor="cvv" className="block text-sm font-medium text-gray-700 mb-1">CVV *</label>
+                                 <input type="text" name="cvv" id="cvv" required value={datosTarjeta.cvv} onChange={handleCardInputChange} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" />
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 p-4 rounded-lg mb-4 text-left">
-                    <p><span className="font-semibold">Número de reserva:</span> {reservationConfirmation?._id || 'N/A'}</p>
-                    <p><span className="font-semibold">Habitación:</span> {selectedRoom?.nombre}</p>
-                    <p><span className="font-semibold">Fechas:</span> {new Date(formData.fechaEntrada).toLocaleDateString('es-ES')} - {new Date(formData.fechaSalida).toLocaleDateString('es-ES')}</p>
-                    <p><span className="font-semibold">Método de pago:</span> {metodoPago === 'tarjeta' ? 'Tarjeta de crédito/débito' : 'Efectivo al llegar'}</p>
-                  </div>
-                )}
-                
-                <p className="text-gray-600 text-sm">
-                  Hemos enviado un correo electrónico con los detalles de su reserva.
-                </p>
-              </div>
-            ) : mostrarFormularioTarjeta ? (
-              <div className="py-10">
-                <h3 className="text-2xl font-semibold text-[var(--color-primary)] mb-6 text-center">Pago con Tarjeta</h3>
-                
-                <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                  <div className="mb-4">
-                    <label htmlFor="numeroTarjeta" className="block text-sm font-medium text-gray-700 mb-1">Número de Tarjeta *</label>
-                    <input
-                      type="text"
-                      id="numeroTarjeta"
-                      name="numeroTarjeta"
-                      value={datosTarjeta.numeroTarjeta}
-                      onChange={(e) => {
-                        // Solo permitir números y limitar a 16 dígitos
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 16);
-                        setDatosTarjeta({...datosTarjeta, numeroTarjeta: value});
-                      }}
-                      placeholder="1234 5678 9012 3456"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="mb-4">
-                    <label htmlFor="nombreTitular" className="block text-sm font-medium text-gray-700 mb-1">Nombre del Titular *</label>
-                    <input
-                      type="text"
-                      id="nombreTitular"
-                      name="nombreTitular"
-                      value={datosTarjeta.nombreTitular}
-                      onChange={(e) => setDatosTarjeta({...datosTarjeta, nombreTitular: e.target.value})}
-                      placeholder="Como aparece en la tarjeta"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="flex space-x-4 mb-4">
-                    <div className="flex-1">
-                      <label htmlFor="fechaExpiracion" className="block text-sm font-medium text-gray-700 mb-1">Fecha de Expiración *</label>
-                      <input
-                        type="text"
-                        id="fechaExpiracion"
-                        name="fechaExpiracion"
-                        value={datosTarjeta.fechaExpiracion}
-                        onChange={(e) => {
-                          // Formato MM/AA y validación
-                          let value = e.target.value.replace(/\D/g, '');
-                          if (value.length > 2) {
-                            value = value.slice(0, 2) + '/' + value.slice(2, 4);
-                          }
-                          setDatosTarjeta({...datosTarjeta, fechaExpiracion: value});
-                        }}
-                        placeholder="MM/AA"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                        required
-                      />
+                              
+                             <button 
+                               onClick={procesarPagoTarjeta} 
+                               disabled={isSubmitting}
+                               className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                             >
+                               {isSubmitting ? <FaSpinner className="animate-spin" /> : 'Confirmar Pago'}
+                             </button>
                     </div>
-                    <div className="w-1/3">
-                      <label htmlFor="cvv" className="block text-sm font-medium text-gray-700 mb-1">CVV *</label>
-                      <input
-                        type="text"
-                        id="cvv"
-                        name="cvv"
-                        value={datosTarjeta.cvv}
-                        onChange={(e) => {
-                          // Solo permitir números y limitar a 3-4 dígitos
-                          const value = e.target.value.replace(/\D/g, '').slice(0, 4);
-                          setDatosTarjeta({...datosTarjeta, cvv: value});
-                        }}
-                        placeholder="123"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <label htmlFor="direccion" className="block text-sm font-medium text-gray-700 mb-1">Dirección de Facturación *</label>
-                    <input
-                      type="text"
-                      id="direccion"
-                      name="direccion"
-                      value={datosTarjeta.direccion}
-                      onChange={(e) => setDatosTarjeta({...datosTarjeta, direccion: e.target.value})}
-                      placeholder="Calle y número"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="flex space-x-4 mb-4">
-                    <div className="w-1/3">
-                      <label htmlFor="codigoPostal" className="block text-sm font-medium text-gray-700 mb-1">Código Postal *</label>
-                      <input
-                        type="text"
-                        id="codigoPostal"
-                        name="codigoPostal"
-                        value={datosTarjeta.codigoPostal}
-                        onChange={(e) => {
-                          // Solo permitir números y limitar a 5 dígitos (México)
-                          const value = e.target.value.replace(/\D/g, '').slice(0, 5);
-                          setDatosTarjeta({...datosTarjeta, codigoPostal: value});
-                        }}
-                        placeholder="12345"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                        required
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label htmlFor="ciudad" className="block text-sm font-medium text-gray-700 mb-1">Ciudad *</label>
-                      <input
-                        type="text"
-                        id="ciudad"
-                        name="ciudad"
-                        value={datosTarjeta.ciudad}
-                        onChange={(e) => setDatosTarjeta({...datosTarjeta, ciudad: e.target.value})}
-                        placeholder="Ciudad"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="mb-4">
-                    <label htmlFor="estado" className="block text-sm font-medium text-gray-700 mb-1">Estado *</label>
-                    <select
-                      id="estado"
-                      name="estado"
-                      value={datosTarjeta.estado}
-                      onChange={(e) => setDatosTarjeta({...datosTarjeta, estado: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      required
+                         </motion.div>
+                      )}
+                     </AnimatePresence>
+                    
+                    <button 
+                       onClick={() => procesarPago('transferencia')}
+                       disabled={isSubmitting || mostrarFormularioTarjeta}
+                       className="w-full flex items-center justify-center px-6 py-3 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                     >
-                      <option value="">Seleccione un estado</option>
-                      <option value="Aguascalientes">Aguascalientes</option>
-                      <option value="Baja California">Baja California</option>
-                      <option value="Baja California Sur">Baja California Sur</option>
-                      <option value="Campeche">Campeche</option>
-                      <option value="Chiapas">Chiapas</option>
-                      <option value="Chihuahua">Chihuahua</option>
-                      <option value="Ciudad de México">Ciudad de México</option>
-                      <option value="Coahuila">Coahuila</option>
-                      <option value="Colima">Colima</option>
-                      <option value="Durango">Durango</option>
-                      <option value="Estado de México">Estado de México</option>
-                      <option value="Guanajuato">Guanajuato</option>
-                      <option value="Guerrero">Guerrero</option>
-                      <option value="Hidalgo">Hidalgo</option>
-                      <option value="Jalisco">Jalisco</option>
-                      <option value="Michoacán">Michoacán</option>
-                      <option value="Morelos">Morelos</option>
-                      <option value="Nayarit">Nayarit</option>
-                      <option value="Nuevo León">Nuevo León</option>
-                      <option value="Oaxaca">Oaxaca</option>
-                      <option value="Puebla">Puebla</option>
-                      <option value="Querétaro">Querétaro</option>
-                      <option value="Quintana Roo">Quintana Roo</option>
-                      <option value="San Luis Potosí">San Luis Potosí</option>
-                      <option value="Sinaloa">Sinaloa</option>
-                      <option value="Sonora">Sonora</option>
-                      <option value="Tabasco">Tabasco</option>
-                      <option value="Tamaulipas">Tamaulipas</option>
-                      <option value="Tlaxcala">Tlaxcala</option>
-                      <option value="Veracruz">Veracruz</option>
-                      <option value="Yucatán">Yucatán</option>
-                      <option value="Zacatecas">Zacatecas</option>
-                    </select>
-                  </div>
-                  
-                  <div className="flex justify-between mt-6">
-                    <button
-                      onClick={() => {
-                        setMostrarFormularioTarjeta(false);
-                        setMostrarPago(true);
-                      }}
-                      className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-                    >
-                      Volver
+                       Pagar por Transferencia
                     </button>
                     
-                    <button
-                      onClick={procesarPagoTarjeta}
-                      disabled={isSubmitting}
-                      className="px-6 py-2 bg-[var(--color-brown-medium)] text-black font-bold rounded-lg hover:bg-[var(--color-brown-dark)] transition-colors"
+                  <button
+                       onClick={() => procesarPago('efectivo')}
+                       disabled={isSubmitting || mostrarFormularioTarjeta}
+                       className="w-full flex items-center justify-center px-6 py-3 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                     >
-                      Confirmar Pago
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="text-center text-sm text-gray-600">
-                  <p className="mb-2">Pago seguro con encriptación SSL</p>
-                  <div className="flex justify-center space-x-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    <span>Sus datos están protegidos</span>
-                  </div>
-                </div>
-              </div>
-            ) : mostrarPago ? (
-              <div className="py-10">
-                <h3 className="text-2xl font-semibold text-[var(--color-primary)] mb-6 text-center">Seleccione método de pago</h3>
-                
-                <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4 mb-6">
-                  <button
-                    onClick={() => procesarPago('tarjeta')}
-                    disabled={isSubmitting}
-                    className="flex-1 bg-white border border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-colors rounded-lg p-6 flex flex-col items-center"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="2" y="5" width="20" height="14" rx="2" />
-                      <line x1="2" y1="10" x2="22" y2="10" />
-                    </svg>
-                    <span className="font-semibold text-lg">Tarjeta de Crédito/Débito</span>
-                    <span className="text-sm mt-2">Pago seguro en línea</span>
+                       Pagar en Efectivo (en Hacienda)
                   </button>
-                  
-                  <button
-                    onClick={() => procesarPago('efectivo')}
-                    disabled={isSubmitting}
-                    className="flex-1 bg-white border border-[var(--color-primary)] text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-colors rounded-lg p-6 flex flex-col items-center"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="2" y="6" width="20" height="12" rx="2" />
-                      <circle cx="12" cy="12" r="4" />
-                    </svg>
-                    <span className="font-semibold text-lg">Pago en Efectivo</span>
-                    <span className="text-sm mt-2">Pago al llegar a la hacienda</span>
-                  </button>
+                 </div>
                 </div>
-                
-                {isSubmitting && (
-                  <div className="text-center py-4">
-                    <FaSpinner className="mx-auto animate-spin text-[var(--color-brown-medium)]" size={30} />
-                    <p className="mt-2 text-gray-600">Procesando su reserva...</p>
-                  </div>
-                )}
-                
-                {reservationError && (
-                  <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
-                    <p>{reservationError}</p>
-                  </div>
-                )}
-                
-                <button
-                  onClick={() => setMostrarPago(false)}
-                  className="text-gray-600 hover:text-[var(--color-primary)] text-center w-full mt-4"
-                >
-                  Volver al formulario
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                    <input
-                      type="text"
-                      id="nombre"
-                      name="nombre"
-                      value={formData.nombre}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
-                    <input
-                      type="text"
-                      id="apellidos"
-                      name="apellidos"
-                      value={formData.apellidos}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                    <input
-                      type="tel"
-                      id="telefono"
-                      name="telefono"
-                      value={formData.telefono}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Entrada</label>
-                    <div className="relative">
-                      <DatePicker
-                        selected={fechaEntrada}
-                        onChange={date => setFechaEntrada(date)}
-                        selectsStart
-                        startDate={fechaEntrada}
-                        endDate={fechaSalida}
-                        minDate={new Date()}
-                        filterDate={esDisponible}
-                        dateFormat="dd/MM/yyyy"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                        placeholderText="Seleccione fecha de entrada"
-                        required
-                      />
-                      <FaCalendarAlt className="absolute right-3 top-3 text-gray-400" />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Salida</label>
-                    <div className="relative">
-                      <DatePicker
-                        selected={fechaSalida}
-                        onChange={date => setFechaSalida(date)}
-                        selectsEnd
-                        startDate={fechaEntrada}
-                        endDate={fechaSalida}
-                        minDate={fechaEntrada || new Date()}
-                        filterDate={esDisponible}
-                        dateFormat="dd/MM/yyyy"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                        placeholderText="Seleccione fecha de salida"
-                        required
-                      />
-                      <FaCalendarAlt className="absolute right-3 top-3 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {selectedRooms.length > 0 ? (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Huéspedes por Habitación</label>
-                      <div className={selectedRooms.length > 4 ? 'space-y-3 max-h-40 overflow-y-auto pr-2' : 'space-y-3'}>
-                        {selectedRooms.map((room, index) => {
-                          // Determinar la capacidad máxima de la habitación
-                          const maxCapacidad = typeof room.capacidad === 'object' 
-                            ? (room.capacidad.adultos + room.capacidad.ninos) 
-                            : (room.capacidad || 4);
-                            
-                          // Obtener el valor actual de huéspedes para esta habitación o usar 1 como valor predeterminado
-                          const huespedesActuales = formData.huespedesPorHabitacion && 
-                            formData.huespedesPorHabitacion[room._id] ? 
-                            formData.huespedesPorHabitacion[room._id] : 1;
-                            
-                          return (
-                            <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded-md border border-gray-200">
-                              <div className="flex-1">
-                                <p className="font-medium text-gray-700">{room.nombre || room.tipo || `Habitación ${index + 1}`}</p>
-                                <p className="text-xs text-gray-500">Máx. {maxCapacidad} huéspedes</p>
-                              </div>
-                              <div className="w-24">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max={maxCapacidad}
-                                  value={huespedesActuales}
-                                  onChange={(e) => {
-                                    const value = parseInt(e.target.value) || 1;
-                                    const newHuespedesPorHabitacion = {
-                                      ...formData.huespedesPorHabitacion || {},
-                                      [room._id]: Math.min(Math.max(1, value), maxCapacidad)
-                                    };
-                                    
-                                    // Calcular el total de huéspedes
-                                    const totalHuespedes = Object.values(newHuespedesPorHabitacion).reduce((sum, val) => sum + val, 0);
-                                    
-                                    setFormData({
-                                      ...formData,
-                                      huespedesPorHabitacion: newHuespedesPorHabitacion,
-                                      huespedes: totalHuespedes
-                                    });
-                                  }}
-                                  className="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)] text-center"
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700 mb-1">Número de Huéspedes</label>
-                      <input
-                        type="number"
-                        id="huespedes"
-                        name="huespedes"
-                        min="1"
-                        max="8"
-                        value={formData.huespedes}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      />
-                    </div>
-                  )}
-                  
-                  {!ocultarOpcionesCategoriaHabitacion && selectedRooms.length === 0 ? (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Categoría de Habitación</label>
-                      <div className="flex space-x-4">
-                        <label className="inline-flex items-center">
-                          <input
-                            type="radio"
-                            className="form-radio text-[var(--color-brown-medium)]"
-                            name="categoriaHabitacion"
-                            value="sencilla"
-                            checked={categoriaHabitacion === 'sencilla'}
-                            onChange={() => setCategoriaHabitacion('sencilla')}
-                          />
-                          <span className="ml-2">Sencilla (${precioSencilla}/noche)</span>
-                        </label>
-                        <label className="inline-flex items-center">
-                          <input
-                            type="radio"
-                            className="form-radio text-[var(--color-brown-medium)]"
-                            name="categoriaHabitacion"
-                            value="doble"
-                            checked={categoriaHabitacion === 'doble'}
-                            onChange={() => setCategoriaHabitacion('doble')}
-                          />
-                          <span className="ml-2">Doble (${precioDoble}/noche)</span>
-                        </label>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Número de Habitaciones para Eventos (7-14)</label>
-                      <select
-                        id="totalHabitaciones"
-                        name="totalHabitaciones"
-                        value={totalHabitaciones}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                      >
-                        {[7, 8, 9, 10, 11, 12, 13, 14].map(num => (
-                          <option key={num} value={num}>{num}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-                
-                <div>
-                  <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700 mb-1">Solicitudes Especiales</label>
-                  <textarea
-                    id="mensaje"
-                    name="mensaje"
-                    rows="3"
-                    value={formData.mensaje}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-[var(--color-brown-medium)] focus:border-[var(--color-brown-medium)]"
-                    placeholder="Indique cualquier solicitud especial o comentario"
-                  ></textarea>
-                </div>
-                
-                <div className="mt-4">
-                  <button
-                    type="submit"
-                    disabled={!isFormValid || isSubmitting}
-                    className={`w-full py-3 px-6 rounded-lg text-black font-bold transition-colors ${
-                      isFormValid ? 'bg-[var(--color-brown-medium)] hover:bg-[var(--color-brown-dark)]' : 'bg-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    Continuar a Pago
-                  </button>
-                </div>
-                
-                {isSubmitting && (
-                  <div className="text-center py-4">
-                    <FaSpinner className="mx-auto animate-spin text-[var(--color-brown-medium)]" size={30} />
-                    <p className="mt-2 text-gray-600">Procesando su solicitud...</p>
-                  </div>
-                )}
-                
-                {reservationError && (
-                  <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-4">
-                    <p>{reservationError}</p>
-                  </div>
-                )}
-              </form>
-            )}
-          </div>
-        </div>
+               </motion.div>
+           )}
+         </AnimatePresence>
       </div>
-    </section>
+    </motion.section>
   );
 } 

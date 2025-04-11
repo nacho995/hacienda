@@ -242,7 +242,8 @@ const ReservaWizard = () => {
         }) || [],
         modo_gestion_habitaciones: formData.modoGestionHabitaciones,
         modo_gestion_servicios: formData.modoGestionServicios,
-        serviciosContratados: formData.serviciosSeleccionados
+        serviciosContratados: formData.serviciosSeleccionados,
+        _serviciosCompletosParaPrecio: formData.serviciosSeleccionados 
       };
 
       // Enviar datos al backend
@@ -679,7 +680,7 @@ const ReservaWizard = () => {
                   <div className="border-l-2 border-[#D1B59B]/30 pl-4">
                     <p className="text-[#8A6E52] text-sm font-medium">Tipo de evento</p>
                     <p className="font-semibold text-[#5D4B3A] capitalize">
-                      {typeof formData.tipoEvento === 'object' ? 
+                      {typeof formData.tipoEvento === 'object' && formData.tipoEvento ? 
                         (formData.tipoEvento.titulo || formData.tipoEvento.nombre || 'No especificado') : 
                         (formData.tipoEvento || 'No especificado')}
                     </p>

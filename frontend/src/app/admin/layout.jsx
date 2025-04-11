@@ -110,7 +110,7 @@ export default function AdminLayout({ children }) {
 
   // Enlaces del sidebar
   const sidebarLinks = [
-    { name: 'Dashboard', href: '/admin/dashboard', icon: <FaChartPie /> },
+    { name: 'Vista General', href: '/admin/dashboard', icon: <FaChartPie /> },
     { name: 'Reservaciones', href: '/admin/reservaciones', icon: <FaCalendarAlt /> },
     { name: 'Habitaciones eventos', href: '/admin/habitaciones', icon: <FaBed /> },
     { name: 'Reservas Hotel', href: '/admin/reservas-hotel', icon: <FaHotel /> },

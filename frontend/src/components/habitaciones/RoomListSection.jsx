@@ -3,13 +3,10 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { FaBed, FaUserFriends, FaRuler, FaCheck, FaChevronRight, FaHotel, FaCalendarAlt, FaUsers, FaCheckCircle, FaMapMarkedAlt } from 'react-icons/fa';
+import { FaBed, FaUserFriends, FaRuler, FaCheck, FaCheckCircle } from 'react-icons/fa';
 import { obtenerHabitaciones } from '@/services/habitaciones.service';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { toast } from 'sonner';
 
-export default function RoomListSection({ onSelectRoom }) {
-  const router = useRouter();
+export default function RoomListSection({ selectedRoomIds = [], onToggleRoom }) {
   const [habitaciones, setHabitaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,17 +15,32 @@ export default function RoomListSection({ onSelectRoom }) {
     // Cargar habitaciones desde la API
     const cargarHabitaciones = async () => {
       try {
-        const data = await obtenerHabitaciones();
-        console.log('Habitaciones cargadas:', data);
-        
-        // Verificar que todas las habitaciones tienen un tipo o un ID
-        data.forEach((habitacion, index) => {
-          if (!habitacion.tipo && !habitacion._id) {
-            console.warn(`Habitación #${index} sin tipo ni ID:`, habitacion);
+        const response = await obtenerHabitaciones();
+        console.log('Respuesta de obtenerHabitaciones:', response);
+
+        // Verificar que la respuesta y response.data existen y que response.data es un array
+        if (response && response.data && Array.isArray(response.data)) {
+          const habitacionesData = response.data;
+          // Verificar que todas las habitaciones tienen un tipo o un ID
+          habitacionesData.forEach((habitacion, index) => {
+            if (!habitacion.tipo && !habitacion._id) {
+              console.warn(`Habitación #${index} sin tipo ni ID:`, habitacion);
+            }
+          });
+          setHabitaciones(habitacionesData);
+        } else {
+          // Mejorar el mensaje de error basado en la respuesta real
+          let errorMsg = 'Formato de datos inesperado recibido del servidor.';
+          if (response && response.data && !Array.isArray(response.data)) {
+              errorMsg = 'La propiedad \'data\' de la respuesta no es un array.';
+          } else if (!response || !response.data) {
+              errorMsg = 'La respuesta del servidor no contiene la propiedad \'data\' esperada.';
           }
-        });
-        
-        setHabitaciones(data);
+          console.error('Error:', errorMsg, response);
+          setError(errorMsg);
+          setHabitaciones([]); // Establecer como array vacío para evitar errores posteriores
+        }
+
         setLoading(false);
       } catch (error) {
         console.error('Error al cargar habitaciones:', error);
@@ -40,15 +52,10 @@ export default function RoomListSection({ onSelectRoom }) {
     cargarHabitaciones();
   }, []);
 
-  const handleHabitacionSelect = (habitacion) => {
-    // Solo seleccionar la habitación para mostrar sus detalles
-    onSelectRoom(habitacion);
-  };
-
   return (
     <section className="space-y-8">
       <h2 className="text-3xl font-bold text-center mb-8 text-[var(--color-primary)]">
-        Nuestras Habitaciones
+        Selecciona tus Habitaciones
       </h2>
 
       {loading ? (
@@ -62,50 +69,64 @@ export default function RoomListSection({ onSelectRoom }) {
         </div>
       ) : (
         <>
-          {/* Lista de habitaciones */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {habitaciones.map((habitacion) => (
-              <motion.div
-                key={habitacion._id || habitacion.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
-                onClick={() => handleHabitacionSelect(habitacion)}
-              >
-                <div className="relative h-48">
-                  <Image
-                    src={habitacion.imagen || '/images/placeholder/room.jpg'}
-                    alt={habitacion.nombre || 'Habitación'}
-                    fill
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold mb-2 text-gray-800">
-                    {habitacion.nombre || 'Habitación'}
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    {habitacion.descripcion || 'Descripción de la habitación'}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-[var(--color-primary)]">
-                      ${habitacion.precio || 0} por noche
-                    </span>
-                    <button
-                      className="px-4 py-2 bg-[var(--color-primary)] text-white rounded hover:bg-[var(--color-primary-dark)]"
-                    >
-                      Ver Detalles
-                    </button>
+            {habitaciones.map((habitacion) => {
+              const isSelected = selectedRoomIds.includes(habitacion._id);
+              return (
+                <motion.div
+                  key={habitacion._id || habitacion.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className={`bg-white rounded-lg shadow-md overflow-hidden transition-all duration-200 cursor-pointer relative border-2 ${
+                    isSelected ? 'border-[var(--color-primary)] shadow-lg scale-[1.02]' : 'border-transparent hover:shadow-lg'
+                  }`}
+                  onClick={() => onToggleRoom(habitacion._id)}
+                >
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 bg-[var(--color-primary)] text-white rounded-full p-1 z-10">
+                      <FaCheckCircle size={20} />
+                    </div>
+                  )}
+                  <div className={`relative h-48 transition-opacity duration-200 ${isSelected ? 'opacity-90' : 'opacity-100'}`}>
+                    <Image
+                      src={habitacion.imagen || '/images/placeholder/room.jpg'}
+                      alt={habitacion.nombre || 'Habitación'}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      priority={habitaciones.indexOf(habitacion) < 3}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                  <div className="p-6">
+                    <h3 className="text-xl font-semibold mb-2 text-gray-800">
+                      {habitacion.nombre || 'Habitación'}
+                    </h3>
+                    <p className="text-gray-600 mb-4 text-sm">
+                      {habitacion.descripcion || 'Descripción de la habitación'}
+                    </p>
+                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100">
+                      <span className="text-lg font-bold text-[var(--color-primary)]">
+                        ${habitacion.precio || 0} / noche
+                      </span>
+                      <span
+                        className={`px-4 py-2 rounded text-sm font-medium ${
+                          isSelected
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-[var(--color-primary-light)] text-[var(--color-primary)]'
+                        }`}
+                      >
+                        {isSelected ? 'Seleccionada' : 'Seleccionar'}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
 
-          {/* Información sobre las habitaciones */}
-          <div className="bg-[var(--color-cream-light)] p-8 rounded-lg">
+          <div className="bg-[var(--color-cream-light)] p-8 rounded-lg mt-12">
             <h3 className="text-2xl font-bold text-center mb-6 text-[var(--color-primary)]">
               Tipos de Habitaciones
             </h3>

@@ -149,7 +149,42 @@ export default function AdminHotelReservations() {
 
   // Definir getLetraHabitacion aquí o importarlo
   const getLetraHabitacion = (reserva) => {
-      return reserva?.letraHabitacion || reserva?.habitacion?.letra || (typeof reserva?.habitacion === 'string' ? reserva.habitacion : '?');
+    // Prioridad 1: Campo directo en la reserva (ej. si se denormaliza al crear la reserva)
+    if (reserva?.letraHabitacion) return reserva.letraHabitacion.toUpperCase();
+  
+    // Prioridad 2: Objeto 'habitacion' populado
+    if (typeof reserva?.habitacion === 'object' && reserva.habitacion?.letra) {
+      return reserva.habitacion.letra.toUpperCase();
+    }
+  
+    // Prioridad 3: Objeto 'habitacionId' populado (nombre común para referencias)
+    if (typeof reserva?.habitacionId === 'object' && reserva.habitacionId?.letra) {
+      return reserva.habitacionId.letra.toUpperCase();
+    }
+    
+    // Prioridad 4: Objeto 'habitacion_id' populado (otra convención)
+    if (typeof reserva?.habitacion_id === 'object' && reserva.habitacion_id?.letra) {
+        return reserva.habitacion_id.letra.toUpperCase();
+    }
+  
+    // Fallback 1: Si 'habitacion' es una string, verificar si es una letra válida
+    if (typeof reserva?.habitacion === 'string') {
+        const habString = reserva.habitacion.trim().toUpperCase();
+        // Check if it's a single uppercase letter A-O (typical room letters)
+        if (habString.length === 1 && habString >= 'A' && habString <= 'O') { 
+            return habString;
+        }
+        // If not a letter, it might be an ID, return '?'
+    }
+    
+    // Fallback 2: Si 'habitacionId' es un string (probablemente ID)
+    if (typeof reserva?.habitacionId === 'string') {
+      // No podemos obtener la letra solo del ID aquí, devolvemos '?'
+    }
+    
+    // Fallback final si no se encontró nada
+    // console.warn(`getLetraHabitacion: No se pudo determinar la letra para la reserva ID: ${reserva?._id}`);
+    return '?'; 
   };
 
 
@@ -272,9 +307,15 @@ export default function AdminHotelReservations() {
     setOpenActionMenu(null);
     if (!reservaId) return;
     try {
-      console.log(`Confirmando reserva ${reservaId}...`);
-      // TODO: API call for hotel reservation confirmation
-      toast.info('Funcionalidad "Confirmar" (Hotel) pendiente de API.');
+      const response = await apiClient.patch(`/reservas/habitaciones/${reservaId}`, {
+        estadoReserva: 'confirmada'
+      });
+      if (response && response.data && response.data.success) {
+        toast.success('Reserva confirmada exitosamente.');
+        loadAllReservations(false); // Recargar datos
+      } else {
+        toast.error(response?.data?.message || 'Error al confirmar la reserva.');
+      }
     } catch (error) {
       toast.error('Error al confirmar la reserva de hotel');
       console.error('Error confirmando reserva hotel:', error);
@@ -286,9 +327,15 @@ export default function AdminHotelReservations() {
     if (!reservaId) return;
     if (window.confirm('¿Estás seguro de que quieres cancelar esta reserva de hotel?')) {
         try {
-            console.log(`Cancelando reserva ${reservaId}...`);
-            // TODO: API call for hotel reservation cancellation
-            toast.info('Funcionalidad "Cancelar" (Hotel) pendiente de API.');
+            const response = await apiClient.patch(`/reservas/habitaciones/${reservaId}`, {
+              estadoReserva: 'cancelada'
+            });
+            if (response && response.data && response.data.success) {
+              toast.success('Reserva cancelada exitosamente.');
+              loadAllReservations(false); // Recargar datos
+            } else {
+              toast.error(response?.data?.message || 'Error al cancelar la reserva.');
+            }
         } catch (error) {
             toast.error('Error al cancelar la reserva de hotel');
             console.error('Error cancelando reserva hotel:', error);
@@ -301,9 +348,13 @@ export default function AdminHotelReservations() {
     if (!reservaId) return;
     if (window.confirm('¡Acción irreversible! ¿Estás seguro de que quieres ELIMINAR esta reserva de hotel permanentemente?')) {
       try {
-        console.log(`Eliminando reserva ${reservaId}...`);
-        // TODO: API call for hotel reservation deletion
-         toast.info('Funcionalidad "Eliminar" (Hotel) pendiente de API.');
+        const response = await apiClient.delete(`/reservas/habitaciones/${reservaId}`);
+        if (response && response.data && response.data.success) {
+          toast.success('Reserva eliminada permanentemente.');
+          loadAllReservations(false); // Recargar datos
+        } else {
+          toast.error(response?.data?.message || 'Error al eliminar la reserva.');
+        }
       } catch (error) {
         toast.error('Error al eliminar la reserva de hotel');
         console.error('Error eliminando reserva hotel:', error);

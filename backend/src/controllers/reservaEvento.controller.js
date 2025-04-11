@@ -161,11 +161,11 @@ exports.crearReservaEvento = async (req, res) => {
           salida.setDate(entrada.getDate() + 1); // Asumimos 1 noche
 
           const reservaHabitacionData = {
-            tipoReserva: 'habitacion', // Marcamos como reserva de habitación
+            tipoReserva: 'evento', // Corregido: valor válido del enum
             reservaEvento: reserva._id, // Link al evento
-            habitacion: habInfo._id, // ID de la habitación física
+            habitacion: habInfo.letra || 'SinLetra', // Corregido: Asignar la letra, no el ID. Añadir fallback.
             letraHabitacion: habInfo.letra, 
-            tipoHabitacion: habInfo.tipo, 
+            tipoHabitacion: habInfo.tipo || 'Estándar', // Añadido valor por defecto
             categoriaHabitacion: (habInfo.capacidad <= 2) ? 'sencilla' : 'doble', // Asignar categoría
             precio: habInfo.precioPorNoche || 0, // Precio por noche de la habitación
             numHuespedes: habInfo.capacidad || 2, // Capacidad por defecto

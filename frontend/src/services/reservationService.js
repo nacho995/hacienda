@@ -293,8 +293,14 @@ export const assignHabitacionReservation = async (id, usuarioId) => {
       console.log(`La habitación ${id} está asociada al evento ${habitacion.reservaEvento}, asignando el evento primero`);
       
       try {
-        // Asignar el evento completo (esto asignará todas las habitaciones asociadas, incluida esta)
-        const eventoResponse = await assignEventoReservation(habitacion.reservaEvento, usuarioId);
+        // Asegurarse de que reservaEvento es un ID válido antes de llamar
+        const eventoId = habitacion.reservaEvento?._id || habitacion.reservaEvento; // Obtener el ID si es objeto o usar directamente si es string
+        if (!eventoId || typeof eventoId !== 'string') {
+          throw new Error(`ID de evento asociado inválido: ${eventoId}`);
+        }
+        
+        // Asignar el evento completo usando el ID extraído
+        const eventoResponse = await assignEventoReservation(eventoId, usuarioId);
         
         // No necesitamos asignar la habitación individualmente, ya se asignó con el evento
         return {
