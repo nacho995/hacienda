@@ -1,19 +1,32 @@
-const confirmacionAdminTemplate = (datos) => {
-  // Datos esperados: nombreCliente, emailCliente, telefonoCliente, tipoEvento, fechaEvento, numeroInvitados, estadoReserva, numeroConfirmacion, modoGestionHabitaciones, totalHabitaciones
-  const datosSeguro = datos || {};
+const confirmacionAdmin = ({
+  nombreCliente,
+  apellidosCliente,
+  emailCliente,
+  telefonoCliente,
+  tipoEvento,
+  fechaEvento,
+  numeroConfirmacion,
+  mensajeCliente,
+  urlGestionReserva // Opcional: Enlace al panel de admin
+}) => {
+  // Paleta de colores (consistente con confirmacionReserva)
+  const colors = {
+    bgPage: '#f8f8f8',
+    bgContainer: '#FFFFFF',
+    border: '#A5856A',
+    textPrimary: '#333333',
+    textSecondary: '#8A6E52',
+    textHeader: '#7B5C44',
+    accent: '#D1B59B',
+    accentLight: '#F0E8DC',
+    buttonText: '#FFFFFF'
+  };
 
-  const nombreCliente = datosSeguro.nombreCliente || 'No especificado';
-  const emailCliente = datosSeguro.emailCliente || 'No especificado';
-  const telefonoCliente = datosSeguro.telefonoCliente || 'No especificado';
-  const tipoEvento = datosSeguro.tipoEvento || 'Evento Especial';
-  const fechaFormateada = datosSeguro.fechaEvento ? new Date(datosSeguro.fechaEvento).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Fecha no especificada';
-  const numeroInvitados = datosSeguro.numeroInvitados || 'No especificado';
-  const estadoReserva = datosSeguro.estadoReserva || 'Pendiente';
-  const numeroConfirmacion = datosSeguro.numeroConfirmacion || 'N/A';
-  const modoGestionHab = datosSeguro.modoGestionHabitaciones || 'No especificado';
-  const totalHabitaciones = datosSeguro.totalHabitaciones || 0;
-  const logoUrl = process.env.LOGO_URL || 'https://via.placeholder.com/150x50?text=Hacienda+Logo'; // Reemplaza con la URL real de tu logo
-  const adminPanelUrl = process.env.ADMIN_PANEL_URL || '#'; // URL al panel de admin
+  // Fuentes
+  const fonts = {
+    body: "'Montserrat', Helvetica, Arial, sans-serif",
+    header: "'Cormorant Garamond', Georgia, 'Times New Roman', serif"
+  };
 
   return `
 <!DOCTYPE html>
@@ -21,67 +34,102 @@ const confirmacionAdminTemplate = (datos) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nueva Reserva de Evento Recibida - Hacienda San Carlos Borromeo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+  <title>Nueva Solicitud de Reserva de Evento - ${numeroConfirmacion || 'Pendiente'}</title>
   <style>
-    /* Estilos generales (iguales a la plantilla de cliente) */
-    body { margin: 0; padding: 0; background-color: #FAF3E0; font-family: Georgia, 'Times New Roman', Times, serif; }
-    .email-container { max-width: 600px; margin: 20px auto; background-color: #FFFFFF; border: 1px solid #E0D8CC; border-radius: 8px; overflow: hidden; }
-    .header { background-color: #4E3629; padding: 20px; text-align: center; }
-    .header img { max-width: 180px; height: auto; }
-    .content { padding: 30px; color: #4E3629; font-size: 16px; line-height: 1.6; }
-    .content h1 { color: #800020; font-family: Didot, Georgia, 'Times New Roman', serif; font-size: 24px; margin-top: 0; margin-bottom: 20px; font-weight: normal; text-align: center; }
-    .content p { margin-bottom: 15px; }
-    .details { background-color: #FDFBF5; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 3px solid #800020; }
-    .details strong { color: #800020; }
-    .alert { background-color: #FFF3CD; border-left: 4px solid #FFC107; padding: 10px 15px; margin: 15px 0; color: #664D03; }
-    .button-container { text-align: center; margin-top: 30px; margin-bottom: 20px; }
-    .button { background-color: #800020; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
-    .footer { background-color: #FAF3E0; padding: 20px; text-align: center; font-size: 12px; color: #918174; }
-    .footer a { color: #800020; text-decoration: none; }
-    table { border-collapse: collapse; width: 100%; }
-    td { padding: 0; vertical-align: top; }
+    body { font-family: ${fonts.body}; margin: 0; padding: 0; background-color: ${colors.bgPage}; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    a { color: ${colors.border}; text-decoration: underline; }
+    .email-wrapper { padding: 20px 0; }
+    .email-container { background-color: ${colors.bgContainer}; border: 1px solid #e0e0e0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 0 auto; max-width: 600px; text-align: center; border-top: 5px solid ${colors.border}; }
+    .header-cell { padding: 30px 30px 20px 30px; text-align: center; }
+    .header-title { font-family: ${fonts.header}; color: ${colors.textHeader}; font-size: 28px; font-weight: 600; margin: 0; }
+    .content-cell { color: ${colors.textPrimary}; font-size: 16px; line-height: 1.7; padding: 20px 40px; text-align: left; }
+    .content-cell p { margin: 0 0 18px 0; }
+    .section-title { font-size: 18px; font-weight: bold; color: ${colors.textHeader}; margin-bottom: 15px; border-bottom: 1px solid ${colors.accent}; padding-bottom: 8px; }
+    .details-section { background-color: ${colors.accentLight}; padding: 20px 30px; margin: 15px 0 25px 0; text-align: left; border-radius: 4px; }
+    .details-item { padding: 5px 0; color: ${colors.textSecondary}; font-size: 15px; }
+    .details-item strong { color: ${colors.textPrimary}; font-weight: 700; }
+    .mensaje-cliente { margin-top: 20px; padding: 15px; border: 1px dashed ${colors.accent}; background-color: #fffdf9; border-radius: 4px; }
+    .mensaje-cliente strong { display: block; margin-bottom: 8px; color: ${colors.textHeader}; }
+    .button-cell { padding: 15px 0 30px 0; text-align: center; }
+    .button-link { display: inline-block; background-color: ${colors.border}; color: ${colors.buttonText}; padding: 14px 35px; text-decoration: none; font-weight: bold; border-radius: 4px; font-family: ${fonts.body}; font-size: 16px; transition: background-color 0.3s ease; }
+    .footer-cell { font-size: 12px; color: ${colors.textSecondary}; padding: 25px 30px; border-top: 1px solid #e0e0e0; text-align: center; line-height: 1.5; }
+
+    @media screen and (max-width: 600px) {
+      .email-container { width: 100% !important; border-radius: 0 !important; border-left: none; border-right: none; }
+      .content-cell { padding: 20px; }
+      .header-cell { padding: 25px 20px 15px 20px; }
+      .details-section { padding: 15px 20px; }
+    }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #FAF3E0; font-family: Georgia, 'Times New Roman', Times, serif;">
-  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+<body style="font-family: ${fonts.body}; margin: 0; padding: 0; background-color: ${colors.bgPage};">
+  <table class="email-wrapper" width="100%" border="0" cellspacing="0" cellpadding="0" style="padding: 20px 0;">
     <tr>
-      <td style="padding: 20px 0;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border: 1px solid #E0D8CC; border-radius: 8px; overflow: hidden;" class="email-container">
+      <td align="center">
+        <table class="email-container" width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: ${colors.bgContainer}; border: 1px solid #e0e0e0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 0 auto; max-width: 600px; text-align: center; border-top: 5px solid ${colors.border};">
           <!-- Header -->
           <tr>
-            <td style="background-color: #4E3629; padding: 20px; text-align: center;" class="header">
-              <img src="${logoUrl}" alt="Hacienda San Carlos Borromeo Logo" style="max-width: 180px; height: auto;">
+            <td class="header-cell" style="padding: 30px 30px 20px 30px; text-align: center;">
+              <p class="header-title" style="font-family: ${fonts.header}; color: ${colors.textHeader}; font-size: 28px; font-weight: 600; margin: 0;">Nueva Solicitud de Reserva</p>
             </td>
           </tr>
           <!-- Content -->
           <tr>
-            <td style="padding: 30px; color: #4E3629; font-size: 16px; line-height: 1.6;" class="content">
-              <h1 style="color: #800020; font-family: Didot, Georgia, 'Times New Roman', serif; font-size: 24px; margin-top: 0; margin-bottom: 20px; font-weight: normal; text-align: center;">Nueva Reserva de Evento Recibida</h1>
-              <p>Se ha registrado una nueva solicitud de reserva de evento en el sistema:</p>
-              <div style="background-color: #FDFBF5; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 3px solid #800020;" class="details">
-                <p><strong style="color: #800020;">Número de Confirmación:</strong> ${numeroConfirmacion}</p>
-                <p><strong style="color: #800020;">Cliente:</strong> ${nombreCliente}</p>
-                <p><strong style="color: #800020;">Email:</strong> <a href="mailto:${emailCliente}" style="color: #800020; text-decoration: underline;">${emailCliente}</a></p>
-                <p><strong style="color: #800020;">Teléfono:</strong> ${telefonoCliente}</p>
-                <p><strong style="color: #800020;">Tipo de Evento:</strong> ${tipoEvento}</p>
-                <p><strong style="color: #800020;">Fecha:</strong> ${fechaFormateada}</p>
-                <p><strong style="color: #800020;">Invitados (Aprox):</strong> ${numeroInvitados}</p>
-                <p><strong style="color: #800020;">Estado Actual:</strong> ${estadoReserva}</p>
-                <p><strong style="color: #800020;">Gestión Habitaciones:</strong> ${modoGestionHab}</p>
-                <p><strong style="color: #800020;">Total Habitaciones:</strong> ${totalHabitaciones}</p>
+            <td class="content-cell" style="color: ${colors.textPrimary}; font-size: 16px; line-height: 1.7; padding: 20px 40px; text-align: left;">
+              <p style="margin: 0 0 18px 0;">Se ha recibido una nueva solicitud de reserva de evento a través del sitio web.</p>
+              
+              <p class="section-title" style="font-size: 18px; font-weight: bold; color: ${colors.textHeader}; margin-bottom: 15px; border-bottom: 1px solid ${colors.accent}; padding-bottom: 8px;">Detalles del Evento</p>
+              <table class="details-section" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: ${colors.accentLight}; padding: 20px 30px; margin: 15px 0 25px 0; text-align: left; border-radius: 4px;">
+                <tr>
+                  <td>
+                    <p class="details-item" style="padding: 5px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Confirmación #:</strong> ${numeroConfirmacion || 'N/A'}</p>
+                    <p class="details-item" style="padding: 5px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Tipo de Evento:</strong> ${tipoEvento || 'No especificado'}</p>
+                    <p class="details-item" style="padding: 5px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Fecha Solicitada:</strong> ${fechaEvento || 'No especificada'}</p>
+                     <!-- Aquí puedes añadir más detalles del evento si los tienes: hora, invitados, espacio, etc. -->
+                  </td>
+                </tr>
+              </table>
+
+              <p class="section-title" style="font-size: 18px; font-weight: bold; color: ${colors.textHeader}; margin-bottom: 15px; border-bottom: 1px solid ${colors.accent}; padding-bottom: 8px;">Datos del Cliente</p>
+               <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 20px;">
+                 <tr>
+                   <td style="padding-right: 10px; vertical-align: top; width: 50%;">
+                     <p class="details-item" style="padding: 5px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Nombre:</strong> ${nombreCliente || 'No especificado'}</p>
+                     <p class="details-item" style="padding: 5px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Apellidos:</strong> ${apellidosCliente || 'No especificado'}</p>
+                   </td>
+                   <td style="padding-left: 10px; vertical-align: top; width: 50%;">
+                      <p class="details-item" style="padding: 5px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Email:</strong> <a href="mailto:${emailCliente || '#'}" style="color: ${colors.border}; text-decoration: underline;">${emailCliente || 'No especificado'}</a></p>
+                      <p class="details-item" style="padding: 5px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Teléfono:</strong> ${telefonoCliente || 'No especificado'}</p>
+                   </td>
+                 </tr>
+               </table>
+
+              ${mensajeCliente ? `
+              <div class="mensaje-cliente" style="margin-top: 20px; padding: 15px; border: 1px dashed ${colors.accent}; background-color: #fffdf9; border-radius: 4px;">
+                <strong style="display: block; margin-bottom: 8px; color: ${colors.textHeader};">Mensaje del Cliente:</strong>
+                <p style="margin: 0; font-style: italic; color: ${colors.textSecondary};">${mensajeCliente}</p>
               </div>
-              <div style="background-color: #FFF3CD; border-left: 4px solid #FFC107; padding: 10px 15px; margin: 15px 0; color: #664D03;" class="alert">
-                <strong>Acción Requerida:</strong> Por favor, revise esta reserva en el panel de administración y contacte al cliente para confirmar detalles y próximos pasos.
-              </div>
-              <div style="text-align: center; margin-top: 30px; margin-bottom: 20px;" class="button-container">
-                <a href="${adminPanelUrl}" target="_blank" style="background-color: #800020; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-family: Arial, Helvetica, sans-serif; font-size: 16px;" class="button">Ir al Panel de Administración</a>
-              </div>
+              ` : ''}
+
             </td>
           </tr>
+          <!-- Button (Optional - if URL exists) -->
+          ${urlGestionReserva ? `
+          <tr>
+            <td class="button-cell" style="padding: 15px 0 30px 0; text-align: center;">
+              <a href="${urlGestionReserva}" target="_blank" class="button-link" style="display: inline-block; background-color: ${colors.border}; color: ${colors.buttonText}; padding: 14px 35px; text-decoration: none; font-weight: bold; border-radius: 4px; font-family: ${fonts.body}; font-size: 16px;">
+                Gestionar Reserva en Panel
+              </a>
+            </td>
+          </tr>
+          ` : ''}
           <!-- Footer -->
           <tr>
-            <td style="background-color: #FAF3E0; padding: 20px; text-align: center; font-size: 12px; color: #918174;" class="footer">
-              <p>&copy; ${new Date().getFullYear()} Hacienda San Carlos Borromeo</p>
+            <td class="footer-cell" style="font-size: 12px; color: ${colors.textSecondary}; padding: 25px 30px; border-top: 1px solid #e0e0e0; text-align: center; line-height: 1.5;">
+              <p style="margin: 0;">Este es un correo de notificación automático.</p>
             </td>
           </tr>
         </table>
@@ -93,4 +141,4 @@ const confirmacionAdminTemplate = (datos) => {
 `;
 };
 
-module.exports = confirmacionAdminTemplate; 
+module.exports = confirmacionAdmin; 

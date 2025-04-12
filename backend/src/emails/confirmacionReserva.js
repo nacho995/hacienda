@@ -1,180 +1,115 @@
-const emailConfirmacionReserva = (datos) => {
-  // Verificación de seguridad para evitar errores con propiedades undefined
-  const datosSeguro = datos || {};
-
-  // Determinar el tipo de reserva basado en los campos disponibles
-  let tipoReserva = 'desconocido';
-  if (datosSeguro.tipoHabitacion) tipoReserva = 'habitacion';
-  else if (datosSeguro.tipoEvento) tipoReserva = 'evento';
-  else if (datosSeguro.tipoMasaje) tipoReserva = 'masaje';
-  
-  const formatearPrecio = (precio) => {
-    return typeof precio === 'number' ? `€${precio.toFixed(2)}` : precio;
+const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroConfirmacion, urlConfirmacion }) => {
+  // Paleta de colores refinada (basada en globals.css)
+  const colors = {
+    bgPage: '#f8f8f8', // Fondo general gris muy claro, casi blanco
+    bgContainer: '#FFFFFF', // Contenedor blanco puro para elegancia
+    border: '#A5856A', // Marrón oscuro para el borde principal
+    textPrimary: '#333333', // Gris oscuro para texto principal (mejor legibilidad)
+    textSecondary: '#8A6E52', // Marrón texto para detalles y footer
+    textHeader: '#7B5C44', // Marrón oscuro para el título principal
+    accent: '#D1B59B', // Marrón medio para acentos (bordes sutiles, botón)
+    accentLight: '#F0E8DC', // Marrón muy claro para fondos de sección
+    buttonText: '#FFFFFF' // Texto blanco para el botón (contraste)
   };
 
-  const obtenerDetallesMasajes = () => {
-    if (!datosSeguro.serviciosAdicionales?.masajes?.length) return '';
-
-    const masajes = datosSeguro.serviciosAdicionales.masajes;
-    const totalMasajes = masajes.reduce((total, masaje) => total + (masaje.precio || 0), 0);
-
-    return `
-      <div class="masajes-section" style="margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
-        <h4 style="color: #2c5282; margin-bottom: 15px;">Servicios de Masaje Incluidos</h4>
-        <div style="margin-bottom: 15px;">
-          ${masajes.map(masaje => `
-            <div style="padding: 10px; background-color: white; margin-bottom: 10px; border-radius: 3px;">
-              <div style="display: flex; justify-content: space-between;">
-                <div>
-                  <p style="font-weight: 600; color: #2d3748;">${masaje.tipo}</p>
-                  <p style="color: #718096; font-size: 14px;">Duración: ${masaje.duracion}</p>
-                </div>
-                <p style="font-weight: 600;">${formatearPrecio(masaje.precio)}</p>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        <div style="border-top: 1px solid #e2e8f0; padding-top: 10px;">
-          <div style="display: flex; justify-content: space-between;">
-            <p style="font-weight: 500;">Total Servicios de Masaje:</p>
-            <p style="font-weight: 600; color: #2c5282;">${formatearPrecio(totalMasajes)}</p>
-          </div>
-        </div>
-      </div>
-    `;
+  // Fuentes (con fallbacks para emails)
+  const fonts = {
+    body: "'Montserrat', Helvetica, Arial, sans-serif",
+    header: "'Cormorant Garamond', Georgia, 'Times New Roman', serif"
   };
-  
-  const obtenerDetallesReserva = () => {
-    switch(tipoReserva) {
-      case 'habitacion':
-        return `
-          <div class="details">
-            <h3>Detalles de su Reserva de Habitación</h3>
-            <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
-            <p><strong>Tipo de Habitación:</strong> ${datosSeguro.tipoHabitacion || 'No especificado'}</p>
-            <p><strong>Número de Habitaciones:</strong> ${datosSeguro.numeroHabitaciones || '1'}</p>
-            <p><strong>Fecha de Entrada:</strong> ${datosSeguro.fechaEntrada ? new Date(datosSeguro.fechaEntrada).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
-            <p><strong>Fecha de Salida:</strong> ${datosSeguro.fechaSalida ? new Date(datosSeguro.fechaSalida).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
-            <p><strong>Adultos:</strong> ${datosSeguro.numeroAdultos || '0'}</p>
-            <p><strong>Niños:</strong> ${datosSeguro.numeroNinos || '0'}</p>
-            <p><strong>Precio Total:</strong> ${formatearPrecio(datosSeguro.precioTotal)}</p>
-            <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
-          </div>
-        `;
-      case 'evento':
-        return `
-          <div class="details">
-            <h3>Detalles de su Reserva de Evento</h3>
-            <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
-            <p><strong>Tipo de Evento:</strong> ${datosSeguro.tipoEvento || 'No especificado'}</p>
-            <p><strong>Nombre del Evento:</strong> ${datosSeguro.nombreEvento || 'No especificado'}</p>
-            <p><strong>Fecha:</strong> ${datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
-            <p><strong>Hora de Inicio:</strong> ${datosSeguro.horaInicio || 'No especificada'}</p>
-            <p><strong>Hora de Fin:</strong> ${datosSeguro.horaFin || 'No especificada'}</p>
-            <p><strong>Número de Invitados:</strong> ${datosSeguro.numeroInvitados || '0'}</p>
-            <p><strong>Espacio Seleccionado:</strong> ${datosSeguro.espacioSeleccionado || 'No especificado'}</p>
-            <p><strong>Presupuesto Estimado:</strong> ${formatearPrecio(datosSeguro.presupuestoEstimado)}</p>
-            <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
-          </div>
-          ${obtenerDetallesMasajes()}
-        `;
-      case 'masaje':
-        return `
-          <div class="details">
-            <h3>Detalles de su Reserva de Masaje</h3>
-            <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
-            <p><strong>Tipo de Masaje:</strong> ${datosSeguro.tipoMasaje || 'No especificado'}</p>
-            <p><strong>Fecha:</strong> ${datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'No especificada'}</p>
-            <p><strong>Hora:</strong> ${datosSeguro.hora || 'No especificada'}</p>
-            <p><strong>Duración:</strong> ${datosSeguro.duracion || '0'} minutos</p>
-            <p><strong>Precio:</strong> ${formatearPrecio(datosSeguro.precio)}</p>
-            <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
-          </div>
-        `;
-      default:
-        return `
-          <div class="details">
-            <h3>Detalles de su Reserva</h3>
-            <p><strong>Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'Pendiente'}</p>
-            <p><strong>Estado:</strong> ${datosSeguro.estado === 'confirmada' ? 'Confirmada' : 'Pendiente de confirmación'}</p>
-          </div>
-        `;
-    }
-  };
-  
-  // Obtener nombre y apellidos seguros
-  const nombreMostrar = datosSeguro.nombreContacto || datosSeguro.nombre || 'Estimado/a Cliente';
-  const apellidosMostrar = datosSeguro.apellidosContacto || datosSeguro.apellidos || '';
-  
+
   return `
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
   <title>Confirmación de Reserva - Hacienda San Carlos Borromeo</title>
   <style>
-    /* Estilos generales (con fallbacks) */
-    body { margin: 0; padding: 0; background-color: #FAF3E0; /* Crema claro */ font-family: Georgia, 'Times New Roman', Times, serif; }
-    .email-container { max-width: 600px; margin: 20px auto; background-color: #FFFFFF; border: 1px solid #E0D8CC; /* Borde suave */ border-radius: 8px; overflow: hidden; }
-    .header { background-color: #4E3629; /* Marrón oscuro */ padding: 20px; text-align: center; }
-    .header img { max-width: 180px; height: auto; }
-    .content { padding: 30px; color: #4E3629; /* Marrón oscuro */ font-size: 16px; line-height: 1.6; }
-    .content h1 { color: #800020; /* Guinda/Vino */ font-family: Didot, Georgia, 'Times New Roman', serif; font-size: 24px; margin-top: 0; margin-bottom: 20px; font-weight: normal; text-align: center; }
-    .content p { margin-bottom: 15px; }
-    .details { background-color: #FDFBF5; /* Crema muy claro */ padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 3px solid #800020; }
-    .details strong { color: #800020; }
-    .button-container { text-align: center; margin-top: 30px; margin-bottom: 20px; }
-    .button { background-color: #800020; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
-    .footer { background-color: #FAF3E0; padding: 20px; text-align: center; font-size: 12px; color: #918174; /* Marrón grisáceo */ }
-    .footer a { color: #800020; text-decoration: none; }
-    /* Estilos específicos para tabla (máxima compatibilidad) */
-    table { border-collapse: collapse; width: 100%; }
-    td { padding: 0; vertical-align: top; }
+    body { font-family: ${fonts.body}; margin: 0; padding: 0; background-color: ${colors.bgPage}; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    a { color: ${colors.border}; text-decoration: underline; }
+    .email-wrapper { padding: 20px 0; }
+    .email-container { background-color: ${colors.bgContainer}; border: 1px solid #e0e0e0; /* Borde más sutil */ box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 0 auto; max-width: 600px; text-align: center; border-top: 5px solid ${colors.border}; /* Borde superior grueso */ }
+    .header-cell { padding: 30px 30px 20px 30px; text-align: center; }
+    .header-title { font-family: ${fonts.header}; color: ${colors.textHeader}; font-size: 32px; font-weight: 600; margin: 0; }
+    .content-cell { color: ${colors.textPrimary}; font-size: 16px; line-height: 1.7; padding: 20px 40px; text-align: left; }
+    .content-cell p { margin: 0 0 18px 0; }
+    .confirmation-number { font-size: 22px; font-weight: bold; color: ${colors.textHeader}; margin: 10px 0 25px 0; display: block; text-align: center; }
+    .details-section { background-color: ${colors.accentLight}; padding: 20px 30px; margin: 15px 0 25px 0; text-align: left; }
+    .details-title { font-weight: bold; color: ${colors.textHeader}; margin-bottom: 15px; font-size: 17px; }
+    .details-item { padding: 4px 0; color: ${colors.textSecondary}; font-size: 15px; }
+    .details-item strong { color: ${colors.textPrimary}; font-weight: 700; }
+    .button-cell { padding: 15px 0 30px 0; text-align: center; }
+    .button-link { display: inline-block; background-color: ${colors.border}; /* Botón marrón oscuro */ color: ${colors.buttonText}; padding: 14px 35px; text-decoration: none; font-weight: bold; border-radius: 4px; font-family: ${fonts.body}; font-size: 16px; transition: background-color 0.3s ease; }
+    .footer-cell { font-size: 12px; color: ${colors.textSecondary}; padding: 25px 30px; border-top: 1px solid #e0e0e0; text-align: center; line-height: 1.5; }
+    .footer-cell p { margin: 0 0 8px 0; }
+    .footer-cell a { color: ${colors.border}; text-decoration: underline; }
+
+    @media screen and (max-width: 600px) {
+      .email-container { width: 100% !important; border-radius: 0 !important; border-left: none; border-right: none; }
+      .content-cell { padding: 20px; }
+      .header-cell { padding: 25px 20px 15px 20px; }
+      .details-section { padding: 15px 20px; }
+    }
   </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #FAF3E0; font-family: Georgia, 'Times New Roman', Times, serif;">
-  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+<body style="font-family: ${fonts.body}; margin: 0; padding: 0; background-color: ${colors.bgPage};">
+  <table class="email-wrapper" width="100%" border="0" cellspacing="0" cellpadding="0" style="padding: 20px 0;">
     <tr>
-      <td style="padding: 20px 0;">
-        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border: 1px solid #E0D8CC; border-radius: 8px; overflow: hidden;" class="email-container">
+      <td align="center">
+        <table class="email-container" width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: ${colors.bgContainer}; border: 1px solid #e0e0e0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin: 0 auto; max-width: 600px; text-align: center; border-top: 5px solid ${colors.border};">
           <!-- Header -->
           <tr>
-            <td style="background-color: #4E3629; padding: 20px; text-align: center;" class="header">
-              <img src="https://haciendabodas.com/logo.png" alt="Hacienda San Carlos Borromeo Logo" style="max-width: 180px; height: auto;">
+            <td class="header-cell" style="padding: 30px 30px 20px 30px; text-align: center;">
+              <p class="header-title" style="font-family: ${fonts.header}; color: ${colors.textHeader}; font-size: 32px; font-weight: 600; margin: 0;">Hacienda San Carlos Borromeo</p>
             </td>
           </tr>
           <!-- Content -->
           <tr>
-            <td style="padding: 30px; color: #4E3629; font-size: 16px; line-height: 1.6;" class="content">
-              <h1 style="color: #800020; font-family: Didot, Georgia, 'Times New Roman', serif; font-size: 24px; margin-top: 0; margin-bottom: 20px; font-weight: normal; text-align: center;">Confirmación de su Reserva</h1>
-              <p>Estimado/a ${nombreMostrar} ${apellidosMostrar},</p>
-              <p>Le agradecemos por elegir <strong>Hacienda San Carlos Borromeo</strong> para su ${
-                tipoReserva === 'habitacion' ? 'estancia' : 
-                tipoReserva === 'evento' ? 'evento' : 
-                'servicio de masaje'
-              }. Nos complace confirmar que hemos recibido su reserva correctamente.</p>
-              <div style="background-color: #FDFBF5; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 3px solid #800020;" class="details">
-                <p><strong style="color: #800020;">Tipo de Reserva:</strong> ${tipoReserva === 'habitacion' ? 'Habitación' : tipoReserva === 'evento' ? 'Evento' : 'Masaje'}</p>
-                <p><strong style="color: #800020;">Fecha:</strong> ${datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Fecha no especificada'}</p>
-                <p><strong style="color: #800020;">Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'N/A'}</p>
-              </div>
-              <p>Su reserva se encuentra actualmente en estado 'pendiente'. Nuestro equipo se pondrá en contacto con usted próximamente para finalizar todos los detalles y proceder con la confirmación final.</p>
-              <p>Si lo desea, puede ver un resumen de su solicitud haciendo clic en el siguiente botón:</p>
-              <div style="text-align: center; margin-top: 30px; margin-bottom: 20px;" class="button-container">
-                <a href="${datosSeguro.urlConfirmacion || '#'}" target="_blank" style="background-color: #800020; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-family: Arial, Helvetica, sans-serif; font-size: 16px;" class="button">Ver Detalles de la Reserva</a>
-              </div>
-              <p>Si tiene alguna pregunta inmediata, no dude en contactarnos.</p>
-              <p>Atentamente,</p>
-              <p><strong>El Equipo de Hacienda San Carlos Borromeo</strong></p>
+            <td class="content-cell" style="color: ${colors.textPrimary}; font-size: 16px; line-height: 1.7; padding: 20px 40px; text-align: left;">
+              <p style="margin: 0 0 18px 0;">Estimado/a ${nombreCliente || 'Cliente'},</p>
+              <p style="margin: 0 0 18px 0;">Es un placer confirmar la recepción de su solicitud de reserva en <strong>Hacienda San Carlos Borromeo</strong>.</p>
+              <p style="margin: 0 0 18px 0;">Hemos registrado su interés para un <strong>${tipoEvento || 'Evento Especial'}</strong> en la fecha <strong>${fechaEvento || 'indicada'}</strong>.</p>
+              <p style="margin: 0;">Su número de confirmación es:</p>
+              <span class="confirmation-number" style="font-size: 22px; font-weight: bold; color: ${colors.textHeader}; margin: 10px 0 25px 0; display: block; text-align: center;">${numeroConfirmacion || 'N/A'}</span>
+              <p style="margin: 0; text-align: center;">Guarde este número para futuras referencias.</p>
             </td>
           </tr>
+          <!-- Details Section -->
+          <tr>
+            <td style="padding: 0 40px;">
+              <table class="details-section" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: ${colors.accentLight}; padding: 20px 30px; margin: 15px 0 25px 0; text-align: left;">
+                <tr>
+                  <td>
+                    <p class="details-title" style="font-weight: bold; color: ${colors.textHeader}; margin-bottom: 15px; font-size: 17px;">Resumen de su Solicitud:</p>
+                    <p class="details-item" style="padding: 4px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Tipo de Evento:</strong> ${tipoEvento || 'No especificado'}</p>
+                    <p class="details-item" style="padding: 4px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Fecha Solicitada:</strong> ${fechaEvento || 'No especificada'}</p>
+                    <p class="details-item" style="padding: 4px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Número Confirmación:</strong> ${numeroConfirmacion || 'N/A'}</p>
+                    <p class="details-item" style="padding: 4px 0; color: ${colors.textSecondary}; font-size: 15px;"><strong style="color: ${colors.textPrimary}; font-weight: 700;">Estado Actual:</strong> Pendiente de Revisión</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Button (Optional - if URL exists) -->
+          ${urlConfirmacion ? `
+          <tr>
+            <td class="button-cell" style="padding: 15px 0 30px 0; text-align: center;">
+              <a href="${urlConfirmacion}" target="_blank" class="button-link" style="display: inline-block; background-color: ${colors.border}; color: ${colors.buttonText}; padding: 14px 35px; text-decoration: none; font-weight: bold; border-radius: 4px; font-family: ${fonts.body}; font-size: 16px;">
+                Ver Detalles en Línea
+              </a>
+            </td>
+          </tr>
+          ` : ''}
           <!-- Footer -->
           <tr>
-            <td style="background-color: #FAF3E0; padding: 20px; text-align: center; font-size: 12px; color: #918174;" class="footer">
-              <p>&copy; ${new Date().getFullYear()} Hacienda San Carlos Borromeo. Todos los derechos reservados.</p>
-              <p>Carretera Nacional Km 30, San Carlos, México</p>
-              <p><a href="https://haciendabodas.com" target="_blank" style="color: #800020; text-decoration: none;">Visite nuestro sitio web</a></p>
+            <td class="footer-cell" style="font-size: 12px; color: ${colors.textSecondary}; padding: 25px 30px; border-top: 1px solid #e0e0e0; text-align: center; line-height: 1.5;">
+              <p style="margin: 0 0 8px 0;">Este correo ha sido generado automáticamente. Para cualquier consulta, por favor, contacte con nosotros a través de los canales oficiales.</p>
+              <p style="margin: 0 0 8px 0;">Hacienda San Carlos Borromeo</p>
+              <p style="margin: 0;"><a href="${process.env.FRONTEND_URL || 'https://hacienda-bodas.com'}" target="_blank" style="color: ${colors.border}; text-decoration: underline;">hacienda-bodas.com</a> | Teléfono de contacto</p>
             </td>
           </tr>
         </table>
@@ -186,4 +121,4 @@ const emailConfirmacionReserva = (datos) => {
 `;
 };
 
-module.exports = emailConfirmacionReserva; 
+module.exports = confirmacionReserva; 
