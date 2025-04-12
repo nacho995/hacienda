@@ -11,6 +11,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { registerLocale, setDefaultLocale } from 'react-datepicker';
 import es from 'date-fns/locale/es';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReservationSuccessModal from '@/components/modals/ReservationSuccessModal';
 
 registerLocale('es', es);
 setDefaultLocale('es');
