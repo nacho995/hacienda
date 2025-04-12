@@ -4,6 +4,17 @@ const nodemailer = require('nodemailer');
  * Función de utilidad para enviar emails usando nodemailer
  */
 const sendEmail = async (options) => {
+  // --- TEMPORARY DEBUG LOGS ---
+  // Log the credentials being used by the Node.js process in Render
+  console.log('--- DEBUG EMAIL CREDENTIALS ---');
+  console.log('EMAIL_USER:', process.env.EMAIL_USER);
+  // !! SECURITY RISK: Log password ONLY for temporary debug. REMOVE THIS LINE LATER !!
+  console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? '********' : 'Not Set'); // Log password status
+  console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
+  console.log('EMAIL_PORT:', process.env.EMAIL_PORT);
+  console.log('--- END DEBUG ---');
+  // --- END TEMPORARY DEBUG LOGS ---
+
   // 1. Crear un transportador reutilizable usando la configuración SMTP
   const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
