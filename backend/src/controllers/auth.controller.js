@@ -44,30 +44,50 @@ exports.register = async (req, res) => {
     // Crear URL de confirmación
     const confirmUrl = `${process.env.CLIENT_URL}/confirmar-cuenta/${confirmToken}`;
 
-    // Nota: La plantilla adminApprovalRequestTemplate está pensada para aprobar cuentas admin.
-    // Para aprobación de usuario normal, quizá necesitemos otra plantilla o ajustar la existente.
-    // Por ahora, usaré una versión simple aquí.
-    const htmlAdminApproval = `
-        <h1>Nueva solicitud de registro de Usuario</h1>
-        <p>Un nuevo usuario desea registrarse:</p>
-        <p><strong>Nombre:</strong> ${nombre} ${apellidos}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Teléfono:</strong> ${telefono || 'No especificado'}</p>
-        <p>Para aprobar este registro, haga clic en el siguiente enlace:</p>
-        <a href="${confirmUrl}" style="padding: 10px 15px; background-color: #800020; color: white; text-decoration: none; border-radius: 4px;">Aprobar Registro de Usuario</a>
-        <p>Si no reconoces esta solicitud, por favor ignórala.</p>
-      `;
-    
-    await sendEmail({
-      to: process.env.ADMIN_EMAIL,
-      subject: 'Nueva solicitud de registro de Usuario - Hacienda San Carlos Borromeo',
-      html: htmlAdminApproval
-    });
+    // --- Actualizar envío de email al admin --- (Manejar múltiples destinatarios)
+    try {
+      const adminEmailString = process.env.ADMIN_EMAIL;
+      if (adminEmailString) {
+        const adminEmails = adminEmailString.split(',').map(email => email.trim()).filter(email => email); // Divide, limpia y filtra vacíos
+        
+        if (adminEmails.length > 0) {
+            const htmlAdminApproval = `
+                <h1>Nueva solicitud de registro de Usuario</h1>
+                <p>Un nuevo usuario desea registrarse:</p>
+                <p><strong>Nombre:</strong> ${nombre} ${apellidos}</p>
+                <p><strong>Email:</strong> ${email}</p>
+                <p><strong>Teléfono:</strong> ${telefono || 'No especificado'}</p>
+                <p>Para aprobar este registro, haga clic en el siguiente enlace:</p>
+                <a href="${confirmUrl}" style="padding: 10px 15px; background-color: #800020; color: white; text-decoration: none; border-radius: 4px;">Aprobar Registro de Usuario</a>
+                <p>Si no reconoces esta solicitud, por favor ignórala.</p>
+              `;
+            
+            await sendEmail({
+              to: adminEmails, // Pasa la matriz de correos
+              subject: 'Nueva solicitud de registro de Usuario - Hacienda San Carlos Borromeo',
+              html: htmlAdminApproval
+            });
+            console.log(`Correo de solicitud de registro de usuario enviado a: ${adminEmails.join(', ')}`);
+        } else {
+            console.warn("ADMIN_EMAIL (registro usuario) está configurado pero vacío o inválido.");
+        }
+      } else {
+          console.warn("ADMIN_EMAIL (registro usuario) no está configurado.");
+      }
 
-    res.status(201).json({
-      success: true,
-      message: 'Solicitud de registro enviada. Recibirás un correo cuando tu cuenta sea aprobada por un administrador.'
-    });
+      res.status(201).json({
+        success: true,
+        message: 'Solicitud de registro enviada. Recibirás un correo cuando tu cuenta sea aprobada por un administrador.'
+      });
+
+    } catch (error) {
+        console.error('Error durante envío de email de solicitud de registro al admin:', error);
+        res.status(201).json({
+          success: true, 
+          message: 'Solicitud de registro creada, pero hubo un error al notificar al administrador. Por favor, contacte soporte si no recibe aprobación.'
+        });
+    }
+    // --- Fin Actualizar envío de email al admin ---
   } catch (error) {
     console.error('Error al enviar email de solicitud de registro al admin:', error);
     // Informar al usuario que la solicitud se creó pero hubo un problema con la notificación
@@ -113,19 +133,31 @@ exports.registerAdmin = async (req, res) => {
     const confirmUrl = `${process.env.CLIENT_URL}/admin/confirmar/${confirmToken}`;
 
     try {
-      // --- Actualizar envío de email al admin principal --- (Usar nueva plantilla)
-      const htmlAdminApproval = adminApprovalRequestTemplate({
-        nuevoAdminNombre: `${nombre} ${apellidos}`,
-        nuevoAdminEmail: email,
-        nuevoAdminTelefono: telefono,
-        confirmUrl: confirmUrl
-      });
-      
-      await sendEmail({
-        to: process.env.ADMIN_EMAIL,
-        subject: 'Nueva solicitud de cuenta de administrador - Hacienda San Carlos Borromeo',
-        html: htmlAdminApproval
-      });
+      // --- Actualizar envío de email al admin principal --- (Manejar múltiples destinatarios)
+      const adminEmailString = process.env.ADMIN_EMAIL;
+      if (adminEmailString) {
+        const adminEmails = adminEmailString.split(',').map(email => email.trim()).filter(email => email);
+
+        if (adminEmails.length > 0) {
+            const htmlAdminApproval = adminApprovalRequestTemplate({
+              nuevoAdminNombre: `${nombre} ${apellidos}`,
+              nuevoAdminEmail: email,
+              nuevoAdminTelefono: telefono,
+              confirmUrl: confirmUrl
+            });
+            
+            await sendEmail({
+              to: adminEmails, // Pasa la matriz de correos
+              subject: 'Nueva solicitud de cuenta de administrador - Hacienda San Carlos Borromeo',
+              html: htmlAdminApproval
+            });
+            console.log(`Correo de solicitud de cuenta admin enviado a: ${adminEmails.join(', ')}`);
+        } else {
+            console.warn("ADMIN_EMAIL (registro admin) está configurado pero vacío o inválido.");
+        }
+      } else {
+          console.warn("ADMIN_EMAIL (registro admin) no está configurado.");
+      }
       // --- Fin Actualizar envío de email ---
 
       res.status(201).json({
@@ -133,7 +165,7 @@ exports.registerAdmin = async (req, res) => {
         message: 'Solicitud de cuenta de administrador enviada para aprobación.'
       });
     } catch (err) {
-      console.error('Error al enviar email:', err);
+      console.error('Error al enviar email de solicitud de cuenta admin:', err);
       
       // Si falla el envío, eliminar el token de confirmación
       user.tokenConfirmacion = undefined;

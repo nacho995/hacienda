@@ -240,37 +240,41 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
          console.warn(`No se pudo enviar correo de confirmación: la reserva ${reservaCreada._id} no tiene un email de contacto asociado.`);
         }
 
-        // Enviar correo de notificación a Hacienda
-        const adminEmail = process.env.ADMIN_EMAIL;
-        if (adminEmail) {
-          // Usar confirmacionAdminTemplate para la notificación general al admin
-          const htmlAdmin = confirmacionAdminTemplate({
-               // Usar los datos de contacto de la reserva
-               nombreCliente: nombreCliente || 'No especificado',
-               emailCliente: emailCliente || 'No especificado',
-               telefonoCliente: reservaCreada.telefonoContacto || 'No especificado',
-               // TODO: Obtener el nombre/titulo del tipo de evento para el email
-               tipoEvento: reservaCreada.nombreEvento || 'Evento Especial',
-               fechaEvento: new Date(reservaCreada.fecha).toLocaleDateString('es-ES'),
-               numeroInvitados: reservaCreada.numInvitados || 'No especificado',
-               estadoReserva: reservaCreada.estadoReserva,
-               numeroConfirmacion: reservaCreada.numeroConfirmacion,
-               modoGestionHabitaciones: reservaCreada.modoGestionHabitaciones,
-               totalHabitaciones: reservaCreada.totalHabitaciones,
-               // Puedes añadir más detalles si la plantilla los soporta
-           });
-
-           try {
-             await sendEmail({
-               to: adminEmail,
-               subject: `Nueva Reserva de Evento #${reservaCreada.numeroConfirmacion}`,
-               html: htmlAdmin,
+        // Enviar correo de notificación a Hacienda (potencialmente a múltiples admins)
+        const adminEmailString = process.env.ADMIN_EMAIL;
+        if (adminEmailString) {
+          const adminEmails = adminEmailString.split(',').map(email => email.trim()).filter(email => email); // Divide, limpia y filtra vacíos
+          
+          if (adminEmails.length > 0) {
+            // Usar confirmacionAdminTemplate para la notificación general al admin
+            const htmlAdmin = confirmacionAdminTemplate({
+                 // Usar los datos de contacto de la reserva
+                 nombreCliente: nombreCliente || 'No especificado',
+                 emailCliente: emailCliente || 'No especificado',
+                 telefonoCliente: reservaCreada.telefonoContacto || 'No especificado',
+                 tipoEvento: reservaCreada.nombreEvento || 'Evento Especial',
+                 fechaEvento: new Date(reservaCreada.fecha).toLocaleDateString('es-ES'),
+                 numeroInvitados: reservaCreada.numInvitados || 'No especificado',
+                 estadoReserva: reservaCreada.estadoReserva,
+                 numeroConfirmacion: reservaCreada.numeroConfirmacion,
+                 modoGestionHabitaciones: reservaCreada.modoGestionHabitaciones,
+                 totalHabitaciones: reservaCreada.totalHabitaciones,
              });
-             console.log(`Correo de notificación enviado a ${adminEmail}`);
-           } catch (error) {
-             console.error(`Error al enviar correo de notificación al admin ${adminEmail}:`, error);
-             // No lanzar error aquí. Solo registrar.
-           }
+  
+             try {
+               await sendEmail({
+                 to: adminEmails, // Pasa la matriz de correos
+                 subject: `Nueva Reserva de Evento #${reservaCreada.numeroConfirmacion}`,
+                 html: htmlAdmin,
+               });
+               console.log(`Correo de notificación de evento enviado a: ${adminEmails.join(', ')}`);
+             } catch (error) {
+               console.error(`Error al enviar correo de notificación de evento a los admins (${adminEmails.join(', ')}):`, error);
+               // No lanzar error aquí. Solo registrar.
+             }
+          } else {
+              console.warn("ADMIN_EMAIL está configurado pero no contiene direcciones válidas después de procesar.");
+          }
         } else {
             console.warn("ADMIN_EMAIL no está configurado. No se envió notificación a Hacienda.");
         }
