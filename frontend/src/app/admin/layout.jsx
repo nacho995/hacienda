@@ -15,7 +15,8 @@ import {
   FaChartPie,
   FaBoxOpen,
   FaHotel,
-  FaFileExcel
+  FaFileExcel,
+  FaStar
 } from 'react-icons/fa';
 import { UserGroupIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../context/AuthContext';
@@ -118,6 +119,7 @@ export default function AdminLayout({ children }) {
     { name: 'Reservas Hotel', href: '/admin/reservas-hotel', icon: <FaHotel /> },
     { name: 'Servicios Eventos', href: '/admin/servicios-eventos', icon: <FaBoxOpen /> },
     { name: 'Sube tu Excel', href: '/admin/sube-tu-excel', icon: <FaFileExcel /> },
+    { name: 'Reseñas', href: '/admin/reviews', icon: <FaStar /> },
     { name: 'Usuarios', href: '/admin/usuarios', icon: <UserGroupIcon className="h-6 w-6" /> },
     { name: 'Configuración', href: '/admin/configuracion', icon: <FaCog /> },
   ];

@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const [token, setToken] = useState(null);
 
   // Escuchar eventos de error de autenticación
   useEffect(() => {
@@ -34,6 +35,7 @@ export function AuthProvider({ children }) {
       
       // Actualizar estado
       setUser(null);
+      setToken(null);
       
       // Mostrar notificación
       toast.error(event.detail.message || 'Sesión expirada. Por favor inicie sesión nuevamente.');
@@ -55,13 +57,16 @@ export function AuthProvider({ children }) {
         setAuthError(null);
         
         // Obtener token del localStorage
-        const token = localStorage.getItem('authToken');
-        if (!token) {
+        const tokenFromStorage = localStorage.getItem('authToken');
+        if (!tokenFromStorage) {
           // console.log('No se encontró token en localStorage');
           setUser(null);
+          setToken(null);
           setLoading(false);
           return;
         }
+        
+        setToken(tokenFromStorage);
         
         // Intentar obtener el usuario actual del servicio
         const userData = await authService.getCurrentUser();
@@ -76,6 +81,7 @@ export function AuthProvider({ children }) {
           localStorage.removeItem('authToken');
           localStorage.removeItem('user');
           setUser(null);
+          setToken(null);
         }
       } catch (error) {
         setAuthError('Error al verificar la sesión: ' + error.message);
@@ -85,6 +91,7 @@ export function AuthProvider({ children }) {
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         setUser(null);
+        setToken(null);
       } finally {
         setLoading(false);
       }
@@ -102,6 +109,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       setUser(null);
+      setToken(null);
     }, 8000); // 8 segundos máximo para verificar la sesión
     
     checkSession().finally(() => {
@@ -126,6 +134,9 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       
+      setUser(null);
+      setToken(null);
+      
       const response = await authService.login(email, password);
       // console.log('Respuesta completa de login:', response);
       
@@ -134,10 +145,17 @@ export function AuthProvider({ children }) {
         setUser(response.data);
         setAuthError(null);
         
-        // Guardar el token en localStorage (si no lo hizo authService)
-        if (response.token) {
-          // console.log('Guardando token en localStorage desde AuthContext');
-          localStorage.setItem('authToken', response.token);
+        // Asegurar que el token se guarda y se pone en el estado
+        const receivedToken = response.token || localStorage.getItem('authToken'); 
+        if (receivedToken) {
+           setToken(receivedToken);
+           // Si authService no guardó el token, guardarlo aquí
+           if (!localStorage.getItem('authToken')) { 
+                localStorage.setItem('authToken', receivedToken);
+           }
+        } else {
+            console.warn('Login exitoso pero no se recibió/encontró token.');
+            setToken(null);
         }
         
         return { success: true };
@@ -148,6 +166,7 @@ export function AuthProvider({ children }) {
           status: 401,
           message: errorMsg
         });
+        setToken(null);
         return { success: false, message: errorMsg };
       }
     } catch (error) {
@@ -157,6 +176,7 @@ export function AuthProvider({ children }) {
         status: error?.status || 500,
         message: errorMsg
       });
+      setToken(null);
       return { success: false, message: errorMsg };
     } finally {
       setLoading(false);
@@ -188,6 +208,7 @@ export function AuthProvider({ children }) {
       // Limpiar estado
       setUser(null);
       setAuthError(null);
+      setToken(null);
       
       return { success: true };
     } catch (error) {
@@ -197,6 +218,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
       setUser(null);
+      setToken(null);
       
       return { success: false, message: 'Error al cerrar sesión' };
     } finally {
@@ -205,12 +227,13 @@ export function AuthProvider({ children }) {
   };
 
   // Propiedades calculadas
-  const isAuthenticated = !!user;
+  const isAuthenticated = !!user && !!token;
   const isAdmin = isAuthenticated && ['admin', 'admin_confirmado'].includes(user?.role);
 
   // Valor del contexto
   const value = {
     user,
+    token,
     loading,
     isAuthenticated,
     isAdmin,

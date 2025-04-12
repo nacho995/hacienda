@@ -321,7 +321,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
   };
 
   // Estado para filtros
-  const [filtroActivo, setFiltroActivo] = useState('todos');
+  const [filtroActivo, setFiltroActivo] = useState('paquete_evento');
   const [busqueda, setBusqueda] = useState('');
   
   // Función para filtrar servicios por categoría
@@ -356,11 +356,9 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
   
   // Obtener todas las categorías disponibles
   const categorias = [
-    { id: 'todos', nombre: 'Todos los servicios' },
     { id: 'paquete_evento', nombre: 'Paquetes completos' },
     { id: 'servicio_adicional', nombre: 'Servicios adicionales' },
     { id: 'coctel_brunch', nombre: 'Cóctel y brunch' },
-    { id: 'bebidas', nombre: 'Bebidas' },
     { id: 'montaje', nombre: 'Montaje' },
     { id: 'foto_video', nombre: 'Fotografía y video' },
     { id: 'coordinacion', nombre: 'Coordinación' }
@@ -368,12 +366,29 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
   
   // Filtrar categorías que tienen servicios
   const categoriasFiltradas = categorias.filter(cat => {
-    if (cat.id === 'todos') return true;
     return serviciosPorCategoria[cat.id] && serviciosPorCategoria[cat.id].length > 0;
   });
   
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Nueva sección de mensaje destacado */}
+      <div className="mb-8">
+        <div className="bg-[#E6DCC6] p-6 rounded-lg shadow-sm border border-[#D1B59B]">
+          <h2 className="text-2xl font-bold text-[#000000] mb-4">
+            Explora todos nuestros servicios
+          </h2>
+          <p className="text-lg font-bold text-[#000000] mb-6">
+            Descubre todos los detalles de nuestros servicios y encuentra las mejores opciones para tu evento.
+          </p>
+          <button
+            onClick={() => window.open('/servicios', '_blank')}
+            className="px-8 py-3 text-xl font-bold bg-[#D1B59B] text-[#000000] rounded-lg hover:bg-[#A5856A] transition-colors shadow-lg hover:shadow-xl transform hover:scale-105"
+          >
+            Ver en detalle todos nuestros servicios
+          </button>
+        </div>
+      </div>
+
       <h2 className="text-2xl font-semibold text-[#000000] mb-4">Seleccione los servicios para su evento</h2>
       
       <div className="bg-[#F9F5F0] border border-[#D1B59B] rounded-lg p-4 mb-6">
@@ -455,7 +470,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
       ) : (
         <div className="space-y-10">
           {/* Paquetes de Eventos */}
-          {serviciosPorCategoria.paquete_evento.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'paquete_evento') && (
+          {serviciosPorCategoria.paquete_evento.length > 0 && filtroActivo === 'paquete_evento' && (
             <div>
               <h3 className="text-xl font-bold text-[#000000] mb-4">Paquetes Completos</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -512,7 +527,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           )}
           
           {/* Servicios Adicionales */}
-          {serviciosPorCategoria.servicio_adicional.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'servicio_adicional') && (
+          {serviciosPorCategoria.servicio_adicional.length > 0 && filtroActivo === 'servicio_adicional' && (
             <div>
               <h3 className="text-xl font-bold text-[#000000] mb-4">Servicios Adicionales</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -569,7 +584,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           )}
           
           {/* Cóctel y Brunch */}
-          {serviciosPorCategoria.coctel_brunch.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'coctel_brunch') && (
+          {serviciosPorCategoria.coctel_brunch.length > 0 && filtroActivo === 'coctel_brunch' && (
             <div>
               <h3 className="text-xl font-bold text-[#000000] mb-4">Opciones de Cóctel y Brunch</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -683,7 +698,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           )}
           
           {/* Montaje */}
-          {serviciosPorCategoria.montaje.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'montaje') && (
+          {serviciosPorCategoria.montaje.length > 0 && filtroActivo === 'montaje' && (
             <div>
               <h3 className="text-xl font-bold text-[#000000] mb-4">Opciones de Montaje</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -740,7 +755,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           )}
           
           {/* Fotografía y Video */}
-          {serviciosPorCategoria.foto_video.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'foto_video') && (
+          {serviciosPorCategoria.foto_video.length > 0 && filtroActivo === 'foto_video' && (
             <div>
               <h3 className="text-xl font-bold text-[#000000] mb-4">Fotografía y Video</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -797,7 +812,7 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
           )}
           
           {/* Coordinación */}
-          {serviciosPorCategoria.coordinacion.length > 0 && (filtroActivo === 'todos' || filtroActivo === 'coordinacion') && (
+          {serviciosPorCategoria.coordinacion.length > 0 && filtroActivo === 'coordinacion' && (
             <div>
               <h3 className="text-xl font-bold text-[#000000] mb-4">Coordinación de Eventos</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
