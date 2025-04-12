@@ -1,62 +1,157 @@
 const nodemailer = require('nodemailer');
+const confirmacionReservaEvento = require('../emails/confirmacionReservaEvento');
+const confirmacionReservaHabitacion = require('../emails/confirmacionReservaHabitacion');
 
 /**
- * Función de utilidad para enviar emails usando nodemailer
+ * Configura el transporter de nodemailer
+ */
+const transporter = nodemailer.createTransport({
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: process.env.EMAIL_PORT || 587,
+  secure: process.env.EMAIL_SECURE === 'true', // true para 465, false para otros puertos
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD
+  },
+  tls: {
+    rejectUnauthorized: false // Permitir certificados autofirmados - solo para desarrollo
+  }
+});
+
+/**
+ * Envia un correo utilizando nodemailer
+ * @param {Object} options - Opciones del correo
+ * @param {string} options.email - Destinatario(s)
+ * @param {string} options.subject - Asunto del correo
+ * @param {string} options.html - Contenido HTML del correo
+ * @returns {Promise}
  */
 const sendEmail = async (options) => {
-  // --- TEMPORARY DEBUG LOGS ---
-  // Log the credentials being used by the Node.js process in Render
-  console.log('--- DEBUG EMAIL CREDENTIALS ---');
-  console.log('EMAIL_USER:', process.env.EMAIL_USER);
-  // !! REMOVED TEMPORARY PASSWORD LOG !!
-  console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? '********' : 'Not Set'); // Revert to safe logging
-  console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
-  console.log('EMAIL_PORT:', process.env.EMAIL_PORT);
-  console.log('--- END DEBUG ---');
-  // --- END TEMPORARY DEBUG LOGS ---
-
-  // 1. Crear un transportador reutilizable usando la configuración SMTP
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT || '587', 10),
-    secure: process.env.EMAIL_SECURE === 'true', // Should be false for port 587
-    auth: {
-      user: process.env.EMAIL_USER, // usuario de email
-      pass: process.env.EMAIL_PASSWORD || process.env.EMAIL_PASS, // contraseña de email
-    },
-    // Simplified TLS config for Gmail on port 587
-    ...(process.env.EMAIL_HOST === 'smtp.gmail.com' && parseInt(process.env.EMAIL_PORT || '587', 10) === 587 && {
-      requireTLS: true,
-    }),
-  });
-
-  // 2. Definir las opciones del correo
-  const mailOptions = {
-    from: `"${process.env.EMAIL_FROM_NAME || 'Hacienda San Carlos Borromeo'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`, // dirección del remitente
-    to: options.email, // lista de destinatarios
-    subject: options.subject, // Asunto
-    text: options.text, // cuerpo del texto plano
-    html: options.html, // cuerpo del html
-  };
-
   try {
-    // 3. Enviar el correo
+    const { email, subject, html } = options;
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject,
+      html
+    };
+    
+    // Registrar parámetros (sin mostrar contraseñas)
+    console.log('Enviando email con parámetros:', {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject,
+      htmlLength: html?.length || 0,
+      transporterConfig: {
+        host: transporter?.options?.host,
+        port: transporter?.options?.port,
+        secure: transporter?.options?.secure,
+        auth: { user: transporter?.options?.auth?.user || 'no-user' },
+        tls: transporter?.options?.tls
+      }
+    });
+    
     const info = await transporter.sendMail(mailOptions);
-    console.log('Correo enviado: %s', info.messageId);
-    return {
-      success: true,
-      message: `Correo enviado exitosamente a ${options.email}`,
-      messageId: info.messageId,
-    };
+    console.log('Email enviado con éxito:', info.messageId);
+    return info;
   } catch (error) {
-    console.error('Error al enviar el correo:', error);
-    // Considerar lanzar el error o devolver un objeto de error más detallado
-    return {
-      success: false,
-      message: `Error al enviar correo a ${options.email}: ${error.message}`,
-      error: error // Opcional: incluir el objeto de error completo para depuración interna
-    };
+    console.error('Error al enviar email:', error);
+    throw error;
   }
 };
 
-module.exports = sendEmail; 
+/**
+ * Envía un correo de confirmación al cliente para una reserva de evento
+ * @param {Object} datos - Datos del evento y cliente
+ * @returns {Promise}
+ */
+const enviarConfirmacionReservaEvento = async (datos) => {
+  const {
+    email,
+    nombreCliente,
+    tipoEvento,
+    numeroConfirmacion,
+    fechaEvento,
+    horaInicio,
+    horaFin,
+    numInvitados,
+    precioTotal,
+    porcentajePago,
+    metodoPago,
+    detallesEvento,
+    habitacionesReservadas
+  } = datos;
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: `Confirmación de reserva de ${tipoEvento} - Hacienda San Carlos Borromeo`,
+    html: confirmacionReservaEvento({
+      nombreCliente,
+      tipoEvento,
+      numeroConfirmacion,
+      fechaEvento,
+      horaInicio,
+      horaFin,
+      numInvitados,
+      precioTotal,
+      porcentajePago,
+      metodoPago,
+      detallesEvento,
+      habitacionesReservadas
+    })
+  };
+
+  return transporter.sendMail(mailOptions);
+};
+
+/**
+ * Envía un correo de confirmación al cliente para una reserva de habitación
+ * @param {Object} datos - Datos de la habitación y cliente
+ * @returns {Promise}
+ */
+const enviarConfirmacionReservaHabitacion = async (datos) => {
+  const {
+    email,
+    nombreCliente,
+    tipoHabitacion,
+    numeroConfirmacion,
+    fechaEntrada,
+    fechaSalida,
+    precio,
+    metodoPago,
+    detallesAdicionales = {}
+  } = datos;
+
+  // Calcular el número de noches
+  const entrada = new Date(fechaEntrada);
+  const salida = new Date(fechaSalida);
+  const diferenciaDias = Math.round((salida - entrada) / (1000 * 60 * 60 * 24));
+  const totalNoches = diferenciaDias > 0 ? diferenciaDias : 1;
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: `Confirmación de reserva de habitación - Hacienda San Carlos Borromeo`,
+    html: confirmacionReservaHabitacion({
+      nombreCliente,
+      tipoHabitacion,
+      numeroConfirmacion,
+      fechaEntrada,
+      fechaSalida,
+      totalNoches,
+      precio,
+      metodoPago,
+      detallesAdicionales
+    })
+  };
+
+  return transporter.sendMail(mailOptions);
+};
+
+module.exports = {
+  sendEmail,
+  enviarConfirmacionReservaEvento,
+  enviarConfirmacionReservaHabitacion
+}; 

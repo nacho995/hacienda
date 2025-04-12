@@ -13,6 +13,8 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import React from 'react';
+// Importar el modal
+import ConfirmationModal from '@/components/modals/ConfirmationModal';
 
 export default function HabitacionReservationDetail({ params }) {
   const router = useRouter();
@@ -31,6 +33,16 @@ export default function HabitacionReservationDetail({ params }) {
     nombres: [], // Ahora es un array
   });
   const [currentGuestName, setCurrentGuestName] = useState(''); // Estado para el input del nuevo huésped
+  
+  // Estado para el modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ 
+    title: '', 
+    message: '', 
+    onConfirm: () => {}, 
+    iconType: 'warning',
+    confirmText: 'Confirmar'
+  });
   
   const cargarReserva = useCallback(async () => {
     if (!id) return;
@@ -212,48 +224,69 @@ export default function HabitacionReservationDetail({ params }) {
     }
   };
 
-  const handleStatusChange = async (newStatus) => {
+  // Función refactorizada para ejecutar la actualización de estado
+  const executeStatusUpdate = async (statusToSend) => {
     setUpdating(true);
     try {
-      // Convertir estado a minúsculas antes de enviar
-      const statusToSend = newStatus.toLowerCase(); 
-      console.log(`[handleStatusChange] Intentando actualizar estado a: ${statusToSend}`); // Log para verificar
-      
       const response = await updateHabitacionReservation(id, { estadoReserva: statusToSend }); 
       if (response && response.success) {
-        toast.success(`Estado de la reserva cambiado a: ${newStatus}`);
-        await cargarReserva();
+        const displayStatus = statusToSend.charAt(0).toUpperCase() + statusToSend.slice(1);
+        toast.success(`Estado de la reserva cambiado a: ${displayStatus}`);
+        await cargarReserva(); // Recargar datos
       } else {
         toast.error('Error al actualizar el estado: ' + (response?.message || 'Error desconocido'));
       }
     } catch (err) {
-      console.error('Error updating reservation status:', err);
       toast.error('No se pudo actualizar el estado: ' + (err.message || 'Error desconocido'));
     } finally {
       setUpdating(false);
     }
   };
+
+  // Modificado para usar modal en cancelación
+  const handleStatusChange = async (newStatus) => {
+    const statusToSend = String(newStatus).toLowerCase();
+
+    if (statusToSend === 'cancelada') {
+      setModalConfig({
+        title: 'Cancelar Reserva',
+        message: '¿Estás seguro de que deseas cancelar esta reserva de habitación?',
+        onConfirm: () => executeStatusUpdate(statusToSend),
+        iconType: 'danger',
+        confirmText: 'Sí, Cancelar'
+      });
+      setIsModalOpen(true);
+    } else {
+      // Para otros estados (confirmada, pendiente), actualizar directamente
+      executeStatusUpdate(statusToSend);
+    }
+  };
   
+  // Modificado para usar modal
   const handleDeleteReservation = async () => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta reserva? Esta acción no se puede deshacer.')) {
-      return;
-    }
-    
-    setUpdating(true);
-    try {
-      const response = await deleteHabitacionReservation(id);
-      if (response && response.success) {
-        toast.success('Reserva eliminada exitosamente');
-        router.push('/admin/reservaciones');
-      } else {
-        toast.error('Error al eliminar la reserva: ' + (response?.message || 'Error desconocido'));
-      }
-    } catch (err) {
-      console.error('Error deleting reservation:', err);
-      toast.error('No se pudo eliminar la reserva: ' + (err.message || 'Error desconocido'));
-    } finally {
-      setUpdating(false);
-    }
+    setModalConfig({
+      title: 'Eliminar Reserva de Habitación',
+      message: '¿Estás seguro de que deseas eliminar permanentemente esta reserva de habitación? Esta acción no se puede deshacer.',
+      onConfirm: async () => {
+        setUpdating(true);
+        try {
+          const response = await deleteHabitacionReservation(id);
+          if (response && response.success) {
+            toast.success('Reserva de habitación eliminada exitosamente');
+            router.push('/admin/reservaciones'); // O a la lista de reservas de hotel
+          } else {
+            toast.error('Error al eliminar la reserva: ' + (response?.message || 'Error desconocido'));
+          }
+        } catch (err) {
+          toast.error('No se pudo eliminar la reserva: ' + (err.message || 'Error desconocido'));
+        } finally {
+          setUpdating(false);
+        }
+      },
+      iconType: 'delete',
+      confirmText: 'Sí, Eliminar'
+    });
+    setIsModalOpen(true);
   };
   
   // --- Lógica para Añadir Nueva Reserva (Redirige) ---
@@ -313,274 +346,233 @@ export default function HabitacionReservationDetail({ params }) {
   };
 
   return (
-    <div className="space-y-8 p-6 md:p-8">
-      <div className="flex flex-wrap items-center gap-4 justify-between">
-        <div className="flex items-center gap-4">
+    <div className="container mx-auto p-4 md:p-8 bg-gray-50 min-h-screen">
+      {/* Botón Volver */}
+      <div className="mb-6">
+        <Link href="/admin/reservaciones" className="inline-flex items-center text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors">
+          <FaArrowLeft className="mr-2" />
+          Volver a Reservaciones
+        </Link>
+      </div>
+
+      {/* Botón para añadir nueva reserva */}
+      <div className="mb-6 text-right">
           <button 
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-600 hover:text-[var(--color-primary)] transition-colors"
+            onClick={handleAddNewReservation} 
+            className="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow"
           >
-            <FaArrowLeft /> Volver
+              <FaPlus className="mr-2" /> Añadir Nueva Reserva de Habitación
           </button>
-          <h1 className="text-3xl font-[var(--font-display)] text-gray-800">
-            Detalles de la Reservación de Habitación
-          </h1>
+      </div>
+
+      {/* Contenedor principal de detalles */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+        {/* Cabecera */}
+        <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white p-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold mb-1">Detalle de Reserva de Habitación</h1>
+            <p className="text-sm opacity-90">Número de Confirmación: <span className="font-mono bg-white bg-opacity-20 px-2 py-1 rounded">{reservation?.numeroConfirmacion || 'N/A'}</span></p>
+          </div>
+          <button 
+            onClick={handleEditToggle}
+            disabled={updating}
+            className={`px-4 py-2 rounded-md flex items-center transition-colors ${isEditing ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white disabled:opacity-50`}
+          >
+            {isEditing ? <><FaTimes className="mr-2" /> Cancelar Edición</> : <><FaEdit className="mr-2" /> Editar Reserva</>}
+          </button>
         </div>
-        
-        <div className="flex items-center gap-2 md:gap-3">
-          {updating && <FaSpinner className="animate-spin text-[var(--color-primary)] text-xl" />}
-          
-          {/* Botones de Edición */} 
-          {isEditing ? (
-            <>
-              {/* Guardar y Cancelar aparecen cuando isEditing es true */}
-              <button 
-                onClick={handleSaveChanges}
-                disabled={updating}
-                className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                 <FaSave /> Guardar
-              </button>
-              <button 
-                onClick={handleEditToggle} // Botón para cancelar/salir de edición
-                disabled={updating}
-                className="bg-gray-500 text-white px-3 py-2 rounded-lg hover:bg-gray-600 transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <FaTimes /> Cancelar
-              </button>
-            </>
-          ) : (
-            <>
-              {/* Editar aparece cuando isEditing es false */}
-              <button 
-                onClick={handleEditToggle} // Botón para entrar en modo edición
-                disabled={updating}
-                className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <FaEdit /> Editar
-              </button>
+
+        {/* Cuerpo con Grid */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Columna 1: Detalles Habitación y Fechas */}
+            <div className="md:col-span-1 space-y-4 border-r pr-6 border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Habitación y Estancia</h2>
+              <DetailItem icon={FaBed} label="Habitación" value={`${reservation?.habitacion} (${reservation?.tipoHabitacion || 'Estándar'})`} />
+              <DetailItem icon={FaRuler} label="Categoría" value={reservation?.categoriaHabitacion || 'N/A'} />
+              <DetailItem icon={FaMoneyBillWave} label="Precio" value={reservation?.precio ? `${reservation.precio.toFixed(2)} €` : 'N/A'} />
               
-              {/* Botones de Acción (solo si no se está editando) */} 
-              {!isEditing && (
-                <>
-                  {/* Usar estadoActual para las condiciones */}
-                  {estadoActual !== 'confirmada' && (
-                     <button 
-                      onClick={() => handleStatusChange('confirmada')}
-                      disabled={updating}
-                      className="bg-teal-600 text-white px-3 py-2 rounded-lg hover:bg-teal-700 transition disabled:opacity-50"
-                    >
-                      Confirmar
-                    </button>
-                  )}
-                  {estadoActual !== 'cancelada' && (
-                     <button 
-                      onClick={() => handleStatusChange('cancelada')}
-                      disabled={updating}
-                      className="bg-orange-500 text-white px-3 py-2 rounded-lg hover:bg-orange-600 transition disabled:opacity-50"
-                    >
-                      Cancelar
-                    </button>
-                  )}
-                   {estadoActual !== 'pendiente' && (
-                     <button
-                       onClick={() => handleStatusChange('pendiente')}
-                       disabled={updating}
-                       className="bg-yellow-500 text-white px-3 py-2 rounded-lg hover:bg-yellow-600 transition disabled:opacity-50"
-                     >
-                       Pendiente
-                     </button>
-                   )}
-                  {/* ... (Botón Eliminar) ... */}
-                  <button 
-                    onClick={handleDeleteReservation}
-                    disabled={updating}
-                    className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition flex items-center gap-1.5 disabled:opacity-50"
-                  >
-                     Eliminar
-                  </button>
-                  {/* ... (Botón Nueva) ... */} 
-                  <button 
-                    onClick={handleAddNewReservation}
-                    disabled={updating}
-                    className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-1.5 disabled:opacity-50"
-                    title="Crear una nueva reserva de habitación"
-                  >
-                    <FaPlus /> Nueva
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-      
-      {/* Detalles de la reserva */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Reserva #{reservation._id ? reservation._id.substring(0, 8) : 'Sin ID'}
-              </h2>
-              <p className="text-gray-600 mt-1">Creada el {formatDate(reservation.createdAt)}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-gray-700 font-medium">Estado:</span>
-              {/* Usar estadoActual y su lógica de colores para el badge */}
-              <span
-                className={`px-3 py-1 inline-flex text-xs font-semibold rounded-full ${
-                  estadoActual === 'confirmada' ? 'bg-green-100 text-green-800' :
-                  estadoActual === 'cancelada' ? 'bg-red-100 text-red-800' :
-                  estadoActual === 'pagada' ? 'bg-blue-100 text-blue-800' :
-                  estadoActual === 'completada' ? 'bg-purple-100 text-purple-800' :
-                  'bg-yellow-100 text-yellow-800' // Pendiente por defecto
-                }`}
-              >
-                {/* Mostrar estadoActual capitalizado */}
-                {estadoActual.charAt(0).toUpperCase() + estadoActual.slice(1)}
-              </span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Cuerpo */} 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 p-4 md:p-6">
-          {/* Columna 1: Habitación y Estancia */} 
-          <div className="space-y-5 lg:col-span-1">
-            <h3 className="text-lg font-medium text-gray-700 border-b pb-2">Habitación y Estancia</h3>
-            {/* --- INICIO: Información del Tipo de Reserva --- */}
-            <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-md border border-blue-200">
-              <FaInfoCircle className="text-blue-500 mt-1 flex-shrink-0" /> 
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Contexto de la Reserva</p>
-                <p className="font-medium text-gray-800">
-                  {reservation.tipoReserva === 'evento' && reservation.reservaEvento ? (
-                    <>Habitación asociada al evento: <span className="font-semibold">{reservation.reservaEvento.nombreEvento || 'Evento sin nombre'}</span> ({reservation.reservaEvento.tipoEvento?.titulo || reservation.reservaEvento.tipoEvento?.nombre || 'Tipo no especificado'})</>
+              <div className="mt-4">
+                  <p className="text-sm text-gray-500 mb-1">Fecha de Entrada</p>
+                  {isEditing ? (
+                      <input 
+                          type="date"
+                          name="fechaEntrada"
+                          value={editedData.fechaEntrada}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] sm:text-sm"
+                      />
                   ) : (
-                    'Reserva de hotel individual'
+                      <p className="text-lg font-medium text-gray-900 flex items-center"><FaCalendarAlt className="mr-2 text-[var(--color-accent)]" /> {formatDate(reservation?.fechaEntrada)}</p>
                   )}
-                </p>
+              </div>
+              <div className="mt-4">
+                  <p className="text-sm text-gray-500 mb-1">Fecha de Salida</p>
+                   {isEditing ? (
+                      <input 
+                          type="date"
+                          name="fechaSalida"
+                          value={editedData.fechaSalida}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] sm:text-sm"
+                      />
+                  ) : (
+                    <p className="text-lg font-medium text-gray-900 flex items-center"><FaCalendarAlt className="mr-2 text-[var(--color-accent)]" /> {formatDate(reservation?.fechaSalida)}</p>
+                  )}
               </div>
             </div>
-            {/* --- FIN: Información del Tipo de Reserva --- */}
-            <div className="flex items-start gap-3">
-              <FaBed className="text-gray-400 mt-1 flex-shrink-0" />
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Habitación</p>
-                <p className="font-medium text-gray-800">
-                  {reservation.habitacion?.nombre || reservation.letraHabitacion || 'N/A'}
-                  {reservation.tipoHabitacion ? ` (${typeof reservation.tipoHabitacion === 'object' ? reservation.tipoHabitacion.nombre : reservation.tipoHabitacion})` : ''}
-                </p>
-              </div>
-            </div>
-             {/* --- Nombres Huéspedes (Editable) --- */} 
-            <div className="flex items-start gap-3">
-              <FaUserFriends className="text-gray-400 mt-1 flex-shrink-0" />
-              <div className="w-full">
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Huéspedes ({editedData.nombres.length})</p> 
-                {isEditing ? (
-                  <div className="mt-1 space-y-2">
-                    {/* Input para nuevo huésped */}
-                    <div className="flex items-center gap-2">
-                        <input 
-                            type="text"
-                            value={currentGuestName}
-                            onChange={handleCurrentGuestNameChange}
-                            className="flex-grow px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                            placeholder="Nombre Apellido"
-                        />
-                        <button 
-                            type="button"
-                            onClick={handleAddGuest}
-                            className="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-                            title="Aceptar Huésped"
-                        >
-                            <FaUserPlus />
-                        </button>
-                    </div>
-                    {/* Lista de huéspedes añadidos */}
-                    {editedData.nombres.length > 0 && (
-                        <ul className="list-disc list-inside pl-1 text-sm space-y-1 max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
-                            {editedData.nombres.map((name, index) => (
-                                <li key={index} className="flex justify-between items-center text-gray-700">
-                                    <span>{name}</span>
-                                    <button 
-                                        type="button"
-                                        onClick={() => handleRemoveGuest(index)}
-                                        className="p-1 text-red-500 hover:text-red-700"
-                                        title="Eliminar Huésped"
-                                    >
-                                        <FaTrashAlt size={12}/>
-                                    </button>
+
+            {/* Columna 2: Detalles Cliente y Huéspedes */}
+            <div className="md:col-span-1 space-y-4 border-r pr-6 border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Cliente y Huéspedes</h2>
+              <DetailItem icon={FaUserFriends} label="Cliente" value={`${reservation?.nombreContacto || 'N/A'} ${reservation?.apellidosContacto || ''}`} />
+              <DetailItem icon={FaEnvelope} label="Email" value={reservation?.emailContacto || 'N/A'} />
+              <DetailItem icon={FaPhone} label="Teléfono" value={reservation?.telefonoContacto || 'N/A'} />
+              
+              <div className="mt-4">
+                  <p className="text-sm text-gray-500 mb-1">Huéspedes ({editedData.nombres?.length || 0})</p>
+                  {isEditing ? (
+                      <div className="space-y-2">
+                          <ul className="list-disc list-inside mb-2 text-sm text-gray-600 max-h-32 overflow-y-auto border rounded p-2 bg-gray-50">
+                             {editedData.nombres?.length > 0 ? editedData.nombres.map((nombre, index) => (
+                                <li key={index} className="flex justify-between items-center mb-1">
+                                    <span>{nombre}</span>
+                                    <button onClick={() => handleRemoveGuest(index)} className="text-red-500 hover:text-red-700 text-xs p-1"><FaTrashAlt /></button>
                                 </li>
-                            ))}
-                        </ul>
-                    )}
-                    {editedData.nombres.length === 0 && (
-                        <p className="text-xs text-gray-400 italic">No hay huéspedes añadidos.</p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="font-medium text-gray-800 whitespace-pre-wrap">
-                    {/* Mostrar nombres guardados (vista) */}
-                    {reservation.infoHuespedes?.nombres?.length > 0 
-                        ? reservation.infoHuespedes.nombres.map((name, i) => <div key={i}>{name}</div>)
-                        : 'N/A'
-                    }
-                  </div>
-                )}
+                             )) : <li className="text-gray-400 italic">No hay huéspedes registrados</li>}
+                          </ul>
+                          <div className="flex gap-2">
+                              <input 
+                                  type="text"
+                                  placeholder="Añadir nombre huésped..."
+                                  value={currentGuestName}
+                                  onChange={handleCurrentGuestNameChange}
+                                  className="flex-grow px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)] sm:text-sm"
+                              />
+                              <button 
+                                  onClick={handleAddGuest}
+                                  className="bg-blue-500 text-white px-3 py-1.5 rounded-md hover:bg-blue-600 transition text-sm flex items-center"
+                              >
+                                  <FaUserPlus className="mr-1"/> Añadir
+                              </button>
+                          </div>
+                          <p className="text-xs text-gray-500 flex items-center mt-1"><FaInfoCircle className="mr-1" /> El número de huéspedes se actualiza automáticamente.</p>
+                      </div>
+                  ) : (
+                      <ul className="list-disc list-inside text-gray-800">
+                           {reservation?.infoHuespedes?.nombres?.length > 0 ? reservation.infoHuespedes.nombres.map((nombre, index) => (
+                                <li key={index}>{nombre}</li>
+                             )) : <li className="text-gray-500 italic">No hay huéspedes registrados</li>}
+                      </ul>
+                  )}
               </div>
+
             </div>
-            {/* --- Fechas (Editable) --- */} 
-            <div className="flex items-start gap-3">
-              <FaCalendarAlt className="text-gray-400 mt-1 flex-shrink-0" />
-              <div className="w-full">
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Fechas</p>
-                {isEditing ? (
-                  <div className="flex flex-col sm:flex-row gap-2 mt-1">
-                    <input 
-                      type="date"
-                      name="fechaEntrada"
-                      value={editedData.fechaEntrada || ''}
-                      onChange={handleInputChange} // Reutilizamos handleInputChange
-                      className="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    />
-                    <input 
-                      type="date"
-                      name="fechaSalida"
-                      value={editedData.fechaSalida || ''}
-                      onChange={handleInputChange} // Reutilizamos handleInputChange
-                      className="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    />
-                  </div>
-                ) : (
-                  <p className="font-medium text-gray-800">
-                    {formatDate(reservation.fechaEntrada)} - {formatDate(reservation.fechaSalida)}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-6 lg:col-span-2">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Información Financiera</h3>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-start gap-3">
-                  <FaMoneyBillWave className="text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Precio</p>
-                    <p className="font-medium">
-                      ${reservation.precio ? reservation.precio.toLocaleString('es-MX') : 'No especificado'}
-                    </p>
-                  </div>
+
+            {/* Columna 3: Estado y Acciones */}
+            <div className="md:col-span-1 space-y-6">
+                 <h2 className="text-xl font-semibold text-gray-800 border-b pb-2 mb-4">Estado y Acciones</h2>
+                
+                <div>
+                  <p className="text-sm text-gray-500 mb-2">Estado Actual</p>
+                  <span className={`inline-block px-3 py-1.5 text-sm font-semibold rounded-full ${getStatusStyles(reservation?.estadoReserva)}`}>
+                    {reservation?.estadoReserva ? reservation.estadoReserva.charAt(0).toUpperCase() + reservation.estadoReserva.slice(1) : 'Pendiente'}
+                  </span>
                 </div>
-              </div>
+
+                {!isEditing && (
+                  <div>
+                    <p className="text-sm text-gray-500 mb-2">Cambiar Estado</p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                       <ActionButton status="confirmada" currentStatus={reservation?.estadoReserva} onClick={handleStatusChange} updating={updating} />
+                       <ActionButton status="pendiente" currentStatus={reservation?.estadoReserva} onClick={handleStatusChange} updating={updating} />
+                       <ActionButton status="cancelada" currentStatus={reservation?.estadoReserva} onClick={handleStatusChange} updating={updating} />
+                    </div>
+                  </div>
+                )}
+
+                {isEditing && (
+                  <div>
+                      <p className="text-sm text-gray-500 mb-2">Guardar Cambios</p>
+                       <button
+                          onClick={handleSaveChanges}
+                          disabled={updating}
+                          className="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition disabled:opacity-50 flex items-center justify-center"
+                        >
+                           {updating ? <FaSpinner className="animate-spin mr-2" /> : <FaSave className="mr-2" />} Guardar Cambios
+                        </button>
+                  </div>
+                )}
+
+                 <div>
+                  <p className="text-sm text-gray-500 mb-2">Eliminar Reserva</p>
+                  <button
+                    onClick={handleDeleteReservation}
+                    disabled={updating || isEditing} // Deshabilitar si está editando también
+                    className="w-full bg-gray-700 text-white px-4 py-2 rounded-md hover:bg-gray-800 transition disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {updating ? <FaSpinner className="animate-spin mr-2" /> : <FaTrashAlt className="mr-2" />} 
+                    Eliminar Permanentemente
+                  </button>
+                </div>
+
             </div>
-          </div>
         </div>
       </div>
+
+      {/* Modal de Confirmación */}
+       <ConfirmationModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        {...modalConfig} 
+      />
     </div>
   );
-} 
+}
+
+// Componente auxiliar para botones de estado
+const ActionButton = ({ status, currentStatus, onClick, updating }) => {
+  const texts = { confirmada: 'Confirmar', pendiente: 'Pendiente', cancelada: 'Cancelar' };
+  const colors = {
+    confirmada: 'bg-green-500 hover:bg-green-600',
+    pendiente: 'bg-yellow-500 hover:bg-yellow-600',
+    cancelada: 'bg-red-500 hover:bg-red-600'
+  };
+  const text = texts[status];
+  const color = colors[status];
+  const isDisabled = updating || currentStatus === status;
+
+  return (
+    <button
+      onClick={() => onClick(status)}
+      disabled={isDisabled}
+      className={`flex-1 ${color} text-white px-4 py-2 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed`}
+    >
+      {updating ? <FaSpinner className="animate-spin mx-auto" /> : text}
+    </button>
+  );
+};
+
+// Componente auxiliar para mostrar detalles
+const DetailItem = ({ icon: Icon, label, value }) => (
+  <div>
+    <p className="text-sm text-gray-500">{label}</p>
+    <p className="text-lg font-medium text-gray-900 flex items-center">
+      {Icon && <Icon className="mr-2 text-[var(--color-accent)]" />} 
+      {value || 'N/A'}
+    </p>
+  </div>
+);
+
+// Función auxiliar para estilos de estado (igual que en evento)
+const getStatusStyles = (status) => {
+  switch (status?.toLowerCase()) {
+    case 'confirmada':
+      return 'bg-green-100 text-green-800';
+    case 'pendiente':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'cancelada':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+}; 

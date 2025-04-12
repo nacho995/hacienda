@@ -127,20 +127,28 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
         // --- EMAIL AL CLIENTE ---
         const clienteEmail = reserva.emailContacto || (reserva.usuario?.email); // Usar optional chaining
         if (clienteEmail) {
-           await sendEmail({
-             email: clienteEmail,
-             subject: 'Confirmación de reserva - Hacienda San Carlos Borromeo',
-             html: ` 
-               <h1>Reserva confirmada</h1>
-               <p>Su reserva para la habitación ${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'}) ha sido confirmada.</p>
-               <p>Fechas: ${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}</p>
-               <p>Número de confirmación: <strong>${reserva.numeroConfirmacion}</strong></p>
-               <p>Precio Total: ${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}</p>
-               <p>Método de pago: ${metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1)}</p>
-               ${mensajeAdicionalCliente}
-               <p>Gracias por elegir Hacienda San Carlos Borromeo.</p>
-             `
-           });
+          // Importar la plantilla de confirmación de reserva
+          const confirmacionReserva = require('../emails/confirmacionReserva');
+          
+          // Adaptar la plantilla para una reserva de habitación
+          const htmlCliente = confirmacionReserva({
+            nombreCliente: `${reserva.nombreContacto || 'Cliente'} ${reserva.apellidosContacto || ''}`,
+            tipoEvento: `Habitación ${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'})`,
+            fechaEvento: `${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}`,
+            numeroConfirmacion: reserva.numeroConfirmacion,
+            detallesAdicionales: {
+              precio: `${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}`,
+              metodoPago: metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1),
+              notaAdicional: mensajeAdicionalCliente.replace(/<\/?p>/g, '')
+            },
+            urlConfirmacion: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/perfil/reservas/${reserva.numeroConfirmacion}`
+          });
+          
+          await sendEmail({
+            email: clienteEmail,
+            subject: 'Confirmación de reserva - Hacienda San Carlos Borromeo',
+            html: htmlCliente
+          });
         } else {
           console.warn(`[Email Send] No se pudo determinar el email del cliente para la reserva ${reserva._id}`);
         }
@@ -152,26 +160,32 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
             const adminEmailArray = adminEmailsString.split(',').map(email => email.trim());
 
             if (adminEmailArray.length > 0) {
+                // Importar la plantilla de notificación para administradores
+                const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
+                
+                // Crear la plantilla para admin con la notificación de nueva reserva
+                const htmlAdmin = notificacionGestionAdmin({
+                  accion: "Nueva Reserva",
+                  tipoReserva: `Habitación (${reserva.tipoReserva})`,
+                  numeroConfirmacion: reserva.numeroConfirmacion,
+                  nombreCliente: `${reserva.nombreContacto || 'No especificado'} ${reserva.apellidosContacto || ''}`,
+                  emailCliente: clienteEmail || 'No disponible',
+                  detallesAdicionales: {
+                    telefono: reserva.telefonoContacto || 'No disponible',
+                    habitacion: `${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'})`,
+                    fechas: `${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}`,
+                    precio: `${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}`,
+                    metodoPago: metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1),
+                    estado: reserva.estadoReserva || 'pendiente',
+                    notas: reserva.infoHuespedes?.detalles || 'Ninguna'
+                  },
+                  urlGestionReserva: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reservas/habitaciones/${reserva._id}`
+                });
+                
                 await sendEmail({
                   email: adminEmailArray, // <-- Pasar el array de emails
                   subject: `Nueva Reserva Habitación #${reserva.numeroConfirmacion} (${reserva.tipoReserva})`,
-                  html: `
-                    <h1>Nueva Reserva de Habitación Registrada</h1>
-                    <p>Se ha creado una nueva reserva de habitación (${reserva.tipoReserva}).</p>
-                    <ul>
-                      <li><strong>Cliente:</strong> ${reserva.nombreContacto || 'No especificado'} ${reserva.apellidosContacto || ''}</li>
-                      <li><strong>Email Cliente:</strong> ${clienteEmail || 'No disponible'}</li>
-                      <li><strong>Teléfono Cliente:</strong> ${reserva.telefonoContacto || 'No disponible'}</li>
-                      <li><strong>Habitación:</strong> ${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'})</li>
-                      <li><strong>Fechas:</strong> ${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}</li>
-                      <li><strong>Confirmación #:</strong> ${reserva.numeroConfirmacion}</li>
-                      <li><strong>Precio:</strong> ${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}</li>
-                      <li><strong>Método Pago:</strong> ${metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1)}</li>
-                      <li><strong>Estado Reserva:</strong> ${reserva.estadoReserva || 'pendiente'}</li>
-                      <li><strong>Notas/Huéspedes:</strong> ${reserva.infoHuespedes?.detalles || 'Ninguna'}</li>
-                    </ul>
-                    <p>Por favor, verifique esta reserva en el panel de administración.</p>
-                  `
+                  html: htmlAdmin
                 });
             } else {
                  console.warn('[Email Send] ADMIN_EMAIL está configurado pero no contiene direcciones válidas después de dividir.');

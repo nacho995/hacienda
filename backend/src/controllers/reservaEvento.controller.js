@@ -4,7 +4,7 @@ const TipoEvento = require('../models/TipoEvento');
 const ReservaHabitacion = require('../models/ReservaHabitacion');
 const Habitacion = require('../models/Habitacion');
 const mongoose = require('mongoose');
-const sendEmail = require('../utils/email');
+const { sendEmail, enviarConfirmacionReservaEvento } = require('../utils/email');
 const confirmacionTemplate = require('../emails/confirmacionReserva');
 const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
 const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
@@ -214,84 +214,92 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
        const nombreCliente = reservaCreada.nombreContacto;
 
        if (emailCliente) {
-          // Enviar correo de confirmación al cliente
-          const htmlCliente = confirmacionTemplate({
-           nombreCliente: nombreCliente,
-           // TODO: Obtener el nombre/titulo del tipo de evento para el email
-           tipoEvento: reservaCreada.nombreEvento || 'Evento Especial', // Usar nombreEvento si está disponible
-            fechaEvento: new Date(reservaCreada.fecha).toLocaleDateString('es-ES'),
-            numeroConfirmacion: reservaCreada.numeroConfirmacion,
-            // Asegúrate de que FRONTEND_URL esté definido en tus variables de entorno
-            urlConfirmacion: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/confirmar-reserva/${reservaCreada.numeroConfirmacion}`
-          });
- 
+          // Enviar correo de confirmación al cliente usando la nueva plantilla
           try {
-            await sendEmail({
-             to: emailCliente,
-              subject: 'Confirmación de tu reserva de evento',
-              html: htmlCliente,
+            await enviarConfirmacionReservaEvento({
+              email: emailCliente,
+              nombreCliente: nombreCliente || 'Cliente',
+              tipoEvento: reservaCreada.nombreEvento || 'Evento Especial',
+              numeroConfirmacion: reservaCreada.numeroConfirmacion,
+              fechaEvento: reservaCreada.fecha,
+              horaInicio: reservaCreada.horaInicio || '12:00',
+              horaFin: reservaCreada.horaFin || '00:00',
+              numInvitados: reservaCreada.numeroInvitados || 0,
+              precioTotal: reservaCreada.precio || 0,
+              porcentajePago: 30, // Porcentaje de pago inicial - ajustar según política
+              metodoPago: reservaCreada.metodoPago || 'No especificado',
+              detallesEvento: {
+                tipoComida: reservaCreada.tipoComida || 'No especificado',
+                serviciosAdicionales: reservaCreada.serviciosContratados?.join(', ') || 'Ninguno',
+                estado: reservaCreada.estadoReserva || 'Pendiente de confirmación'
+              },
+              habitacionesReservadas: habitacionesCreadas.map(hab => ({
+                tipoHabitacion: hab.tipoHabitacion || 'Estándar',
+                fechaEntrada: hab.fechaEntrada,
+                fechaSalida: hab.fechaSalida,
+                precio: hab.precio || 0
+              }))
             });
             console.log(`Correo de confirmación enviado a ${emailCliente}`);
           } catch (error) {
             console.error(`Error al enviar correo de confirmación al cliente ${emailCliente}:`, error);
             // No lanzar error aquí, la reserva ya se creó. Solo registrar el fallo.
           }
-        } else {
-         console.warn(`No se pudo enviar correo de confirmación: la reserva ${reservaCreada._id} no tiene un email de contacto asociado.`);
-        }
+       }
 
-        // Enviar correo de notificación a Hacienda (potencialmente a múltiples admins)
-        const adminEmailString = process.env.ADMIN_EMAIL;
-        if (adminEmailString) {
-          const adminEmails = adminEmailString.split(',').map(email => email.trim()).filter(email => email); // Divide, limpia y filtra vacíos
-          
-          if (adminEmails.length > 0) {
-            // Usar confirmacionAdminTemplate para la notificación general al admin
-            const htmlAdmin = confirmacionAdminTemplate({
-                 // Usar los datos de contacto de la reserva
-                 nombreCliente: nombreCliente || 'No especificado',
-                 emailCliente: emailCliente || 'No especificado',
-                 telefonoCliente: reservaCreada.telefonoContacto || 'No especificado',
-                 tipoEvento: reservaCreada.nombreEvento || 'Evento Especial',
-                 fechaEvento: new Date(reservaCreada.fecha).toLocaleDateString('es-ES'),
-                 numeroInvitados: reservaCreada.numInvitados || 'No especificado',
-                 estadoReserva: reservaCreada.estadoReserva,
-                 numeroConfirmacion: reservaCreada.numeroConfirmacion,
-                 modoGestionHabitaciones: reservaCreada.modoGestionHabitaciones,
-                 totalHabitaciones: reservaCreada.totalHabitaciones,
-             });
-  
-             try {
-               await sendEmail({
-                 to: adminEmails, // Pasa la matriz de correos
-                 subject: `Nueva Reserva de Evento #${reservaCreada.numeroConfirmacion}`,
-                 html: htmlAdmin,
-               });
-               console.log(`Correo de notificación de evento enviado a: ${adminEmails.join(', ')}`);
-             } catch (error) {
-               console.error(`Error al enviar correo de notificación de evento a los admins (${adminEmails.join(', ')}):`, error);
-               // No lanzar error aquí. Solo registrar.
-             }
-          } else {
-              console.warn("ADMIN_EMAIL está configurado pero no contiene direcciones válidas después de procesar.");
+       // Notificar a los administradores
+       const adminEmailsString = process.env.ADMIN_EMAIL;
+       if (adminEmailsString) {
+          try {
+              // Dividir por comas y eliminar espacios en blanco
+              const adminEmails = adminEmailsString.split(',').map(email => email.trim());
+              
+              // Usar el template de notificación para admin
+              await sendEmail({
+                email: adminEmails,
+                subject: `Nueva Reserva de Evento #${reservaCreada.numeroConfirmacion}`,
+                html: notificacionGestionAdmin({
+                  accion: "Nueva Reserva",
+                  tipoReserva: reservaCreada.nombreEvento || "Evento",
+                  numeroConfirmacion: reservaCreada.numeroConfirmacion,
+                  nombreCliente: `${nombreCliente || 'Cliente'} ${reservaCreada.apellidosContacto || ''}`,
+                  emailCliente: emailCliente || 'No disponible',
+                  detallesAdicionales: {
+                    fecha: new Date(reservaCreada.fecha).toLocaleDateString('es-ES'),
+                    telefono: reservaCreada.telefonoContacto || 'No disponible',
+                    invitados: reservaCreada.numInvitados || 'No especificado',
+                    precio: `${reservaCreada.precio || 0} MXN`,
+                    habitaciones: `${habitacionesCreadas.length} asignadas`,
+                    estado: reservaCreada.estadoReserva || 'pendiente',
+                    notas: reservaCreada.peticionesEspeciales || 'Ninguna',
+                    servicios: reservaCreada.modoGestionServicios === 'hacienda' ? 
+                      'Gestión por hacienda' : 
+                      (reservaCreada.serviciosContratados?.length > 0 ? 
+                        `${reservaCreada.serviciosContratados.length} seleccionados` : 'Ninguno')
+                  },
+                  urlGestionReserva: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reservas/${reservaCreada._id}`
+                })
+              });
+          } catch (error) {
+              console.error(`Error al enviar email de notificación a los administradores:`, error);
+              // No lanzar error, la reserva ya se creó
           }
-        } else {
-            console.warn("ADMIN_EMAIL no está configurado. No se envió notificación a Hacienda.");
-        }
+       }
 
-        // --- Respuesta Final ---
-        // Poblar detalles antes de responder si es necesario (opcional)
-        const reservaConDetalles = await ReservaEvento.findById(reservaCreada._id)
-            .populate('tipoEvento', 'titulo') // Ejemplo: Poblar el título del tipo de evento
-            // .populate('serviciosContratados') // Si necesitas detalles de servicios
-            // .populate('usuario', 'nombre email'); // Si necesitas detalles del usuario (si existe)
+       // --- Respuesta Final ---
+       // Poblar detalles antes de responder si es necesario (opcional)
+       const reservaConDetalles = await ReservaEvento.findById(reservaCreada._id)
+           .populate('tipoEvento', 'titulo'); // Ejemplo: Poblar el título del tipo de evento
+           // .populate('serviciosContratados') // Si necesitas detalles de servicios
+           // .populate('usuario', 'nombre email'); // Si necesitas detalles del usuario (si existe)
 
-        res.status(201).json({
-          success: true,
-          message: 'Reserva de evento creada con éxito. Se ha enviado un correo de confirmación.',
-          data: reservaConDetalles || reservaCreada, // Devolver la reserva poblada si se pudo, si no, la original
-          habitacionesCreadas: habitacionesCreadas // Incluir habitaciones si se crearon
-        });
+       res.status(201).json({
+         success: true,
+         message: 'Reserva de evento creada con éxito. Se ha enviado un correo de confirmación.',
+         data: reservaConDetalles || reservaCreada
+       });
+        
+       return; // Terminar aquí para evitar la duplicación de respuesta
 
     } else {
       // Esto no debería ocurrir si la transacción tuvo éxito y reservaCreada se asignó
