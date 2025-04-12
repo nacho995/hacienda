@@ -8,9 +8,8 @@ const sendEmail = async (options) => {
   // Log the credentials being used by the Node.js process in Render
   console.log('--- DEBUG EMAIL CREDENTIALS ---');
   console.log('EMAIL_USER:', process.env.EMAIL_USER);
-  // !! TEMPORARY: Log the actual password string for debugging !!
-  // !! REMOVE THIS LINE IMMEDIATELY AFTER TESTING !!
-  console.log('EMAIL_PASSWORD_VALUE:', process.env.EMAIL_PASSWORD);
+  // !! REMOVED TEMPORARY PASSWORD LOG !!
+  console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? '********' : 'Not Set'); // Revert to safe logging
   console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
   console.log('EMAIL_PORT:', process.env.EMAIL_PORT);
   console.log('--- END DEBUG ---');
@@ -20,17 +19,14 @@ const sendEmail = async (options) => {
   const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST,
     port: parseInt(process.env.EMAIL_PORT || '587', 10),
-    secure: process.env.EMAIL_SECURE === 'true', // true for 465, false for other ports (like 587 with TLS)
+    secure: process.env.EMAIL_SECURE === 'true', // Should be false for port 587
     auth: {
       user: process.env.EMAIL_USER, // usuario de email
       pass: process.env.EMAIL_PASSWORD || process.env.EMAIL_PASS, // contraseña de email
     },
-    // Para Gmail con puerto 587, a menudo se necesita esto:
+    // Simplified TLS config for Gmail on port 587
     ...(process.env.EMAIL_HOST === 'smtp.gmail.com' && parseInt(process.env.EMAIL_PORT || '587', 10) === 587 && {
       requireTLS: true,
-      tls: {
-        ciphers: 'SSLv3',
-      },
     }),
   });
 
