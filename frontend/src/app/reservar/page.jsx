@@ -160,6 +160,15 @@ const ReservaWizard = () => {
     resetForm();
   }, [resetForm]); // Dependencia para evitar warnings de lint, asumiendo que resetForm es estable
 
+  // *** NUEVO: Efecto para establecer default de habitaciones en Paso 2 ***
+  useEffect(() => {
+    if (currentStep === 2 && (!formData.numeroHabitaciones || formData.numeroHabitaciones < 7)) {
+      console.log("[ReservaWizard Step 2 Effect] Estableciendo numeroHabitaciones default a 7");
+      updateFormSection('numeroHabitaciones', 7);
+    }
+    // Ejecutar solo cuando el paso cambie a 2 o si el valor cambia mientras estamos en el paso 2
+  }, [currentStep, formData.numeroHabitaciones, updateFormSection]);
+
   // Estilos para el contenedor principal del wizard
   const wizardContainerStyle = {
     background: 'linear-gradient(145deg, rgba(230,220,198,0.95), rgba(209,181,155,0.95))',

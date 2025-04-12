@@ -9,20 +9,20 @@ import './EventoMapaHabitaciones.css';
 import { debounce } from 'lodash';
 
 const areasSeleccionables = {
-  'A': { coords: '332,143,392,204', shape: 'rect', direction: 'bottom' },
-  'B': { coords: '400,143,460,204', shape: 'rect', direction: 'bottom' },
-  'C': { coords: '453,205,534,266', shape: 'rect', direction: 'left' },
-  'D': { coords: '453,263,534,324', shape: 'rect', direction: 'left' },
-  'E': { coords: '453,321,534,382', shape: 'rect', direction: 'left' },
-  'F': { coords: '453,379,534,440', shape: 'rect', direction: 'left' },
-  'G': { coords: '467,492,528,573', shape: 'rect', direction: 'top' },
-  'H': { coords: '523,492,584,573', shape: 'rect', direction: 'top' },
-  'I': { coords: '579,492,640,573', shape: 'rect', direction: 'top' },
-  'J': { coords: '635,492,696,573', shape: 'rect', direction: 'top' },
-  'K': { coords: '399,568,460,629', shape: 'rect', direction: 'right' },
-  'L': { coords: '399,492,460,553', shape: 'rect', direction: 'right' },
-  'M': { coords: '759,353,820,414', shape: 'rect', direction: 'left' },
-  'O': { coords: '759,443,820,504', shape: 'rect', direction: 'left' }
+  'A': { coords: '597,260,698,358', shape: 'rect', direction: 'bottom' },
+  'B': { coords: '723,257,824,355', shape: 'rect', direction: 'bottom' },
+  'C': { coords: '830,379,960,461', shape: 'rect', direction: 'left' },
+  'D': { coords: '830,485,958,565', shape: 'rect', direction: 'left' },
+  'E': { coords: '825,585,959,671', shape: 'rect', direction: 'left' },
+  'F': { coords: '825,693,958,775', shape: 'rect', direction: 'left' },
+  'G': { coords: '842,886,931,1034', shape: 'rect', direction: 'top' },
+  'H': { coords: '949,888,1036,1032', shape: 'rect', direction: 'top' },
+  'I': { coords: '1054,890,1143,1033', shape: 'rect', direction: 'top' },
+  'J': { coords: '1160,886,1250,1035', shape: 'rect', direction: 'top' },
+  'K': { coords: '724,890,819,985', shape: 'rect', direction: 'right' },
+  'L': { coords: '727,1025,820,1121', shape: 'rect', direction: 'right' },
+  'M': { coords: '1366,632,1458,731', shape: 'rect', direction: 'left' },
+  'O': { coords: '1365,793,1461,892', shape: 'rect', direction: 'left' }
 };
 
 const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesLoad }) => {
@@ -117,7 +117,7 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
     }
     
     toast.success(`Habitación ${habitacion.letra} seleccionada (${updatedRooms.length} de ${maxHabitaciones})`);
-  }, [rooms, maxHabitaciones, onRoomsChange]);
+  }, [rooms, maxHabitaciones, onRoomsChange, isSelected]);
 
   const removeRoom = useCallback((letra) => {
     const updatedRooms = rooms.filter(room => room.letra !== letra);
@@ -246,8 +246,8 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
     const y1 = coords[1];
     const x2 = coords[2];
     const y2 = coords[3];
-    const width = x2 - x1;
-    const height = y2 - y1;
+    const width = Math.abs(x2 - x1);
+    const height = Math.abs(y2 - y1);
 
     const selectedColor = '#E57373';
     const selectedBorderColor = '#D32F2F';
