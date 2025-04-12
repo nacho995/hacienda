@@ -30,7 +30,7 @@ const getHabitacionImage = (letra) => {
   return `/Habitacion${imageNumber}.jpeg`; 
 };
 
-export default function BookingFormSection({ 
+function BookingFormSection({ 
   selectedRooms = [], 
   isLoadingDetails,
   formData, 
@@ -59,6 +59,8 @@ export default function BookingFormSection({
   });
   
   const [multipleReservationConfirmations, setMultipleReservationConfirmations] = useState([]);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictMessage, setConflictMessage] = useState('');
   
   const fetchOccupiedDates = useCallback(async (roomLetra, fechaInicioVisible, fechaFinVisible) => {
     if (!roomLetra) { 
@@ -186,8 +188,8 @@ export default function BookingFormSection({
 
       let currentDate = new Date(start);
       const endDate = new Date(end);
-      currentDate.setHours(0, 0, 0, 0); 
-      endDate.setHours(0, 0, 0, 0); 
+      currentDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
 
       while (currentDate <= endDate) {
         const year = currentDate.getFullYear();
@@ -196,7 +198,8 @@ export default function BookingFormSection({
         const dateString = `${year}-${month}-${day}`;
 
         if (occupiedSet.has(dateString)) {
-          toast.error(`La habitación ${roomLetra} no está disponible en el rango seleccionado.`);
+          setConflictMessage(`La habitación ${roomLetra} no está disponible en el rango de fechas seleccionado.`);
+          setShowConflictModal(true);
           setFechasPorHabitacion(prev => ({
             ...prev,
             [roomLetra]: { fechaEntrada: null, fechaSalida: null },
@@ -311,11 +314,80 @@ export default function BookingFormSection({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm(formData, fechasPorHabitacion)) {
-      toast.warning('Por favor, complete todos los campos requeridos y seleccione fechas válidas (salida posterior a entrada) para todas las habitaciones.');
+    if (!validateForm(formData, fechasPorHabitacion) || isSubmitting) {
+      toast.warning('Por favor, complete todos los campos requeridos y seleccione fechas válidas para todas las habitaciones.');
       return;
     }
-    setMostrarPago(true);
+
+    setIsSubmitting(true);
+    setReservationError(null);
+    setShowReservationSuccess(false);
+    setMultipleReservationConfirmations([]);
+    
+    try {
+      const reservacionesParaEnviar = selectedRooms.map(room => {
+        const fechas = fechasPorHabitacion[room.letra];
+        if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida) {
+          throw new Error(`Fechas inválidas para la habitación ${room.letra}`);
+        }
+        
+        return {
+          nombreContacto: formData.nombre,
+          apellidosContacto: formData.apellidos,
+          emailContacto: formData.email,
+          telefonoContacto: formData.telefono,
+          numHuespedes: formData.huespedes,
+          mensaje: formData.mensaje,
+          habitacion: room.letra,
+          tipoHabitacion: room.tipoHabitacion,
+          categoriaHabitacion: room.categoriaHabitacion,
+          precioPorNoche: room.precioPorNoche,
+          fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
+          fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
+          numeroHabitaciones: 1,
+          metodoPago: metodoPago || 'efectivo',
+          tipoReserva: 'hotel',
+          estadoReserva: 'pendiente' 
+        };
+      });
+      
+      console.log("Enviando reservas múltiples:", reservacionesParaEnviar);
+
+      const response = await createMultipleReservaciones(reservacionesParaEnviar);
+      
+      console.log("Respuesta de createMultipleReservaciones:", response);
+
+      if (response.success) {
+        setShowReservationSuccess(true);
+        setMultipleReservationConfirmations(response.data || []);
+        toast.success(response.message || '¡Reservas creadas con éxito!');
+      } else {
+        if (response.errores && response.errores.length > 0) {
+            const errorMessages = response.errores.map(err => err.message || `Error al reservar habitación ${err.habitacion || 'desconocida'}`).join('\n');
+            setConflictMessage(errorMessages || response.message || 'Algunas habitaciones no pudieron ser reservadas.');
+            setShowConflictModal(true);
+            setMultipleReservationConfirmations(response.data || []);
+        } else if (response.status === 409) {
+             setConflictMessage(response.message || 'Conflicto de disponibilidad detectado. Verifique las fechas.');
+             setShowConflictModal(true);
+        } else {
+            setReservationError(response.message || 'Ocurrió un error al procesar la reserva.');
+            toast.error(response.message || 'Error al crear las reservas.');
+        }
+      }
+
+    } catch (error) {
+      console.error('Error en handleSubmit:', error);
+      if (error.response && error.response.status === 409) {
+           setConflictMessage(error.response.data?.message || 'Una o más habitaciones no están disponibles para las fechas seleccionadas.');
+           setShowConflictModal(true);
+       } else {
+           setReservationError(error.message || 'Error de conexión o desconocido.');
+           toast.error('Error inesperado al conectar con el servidor.');
+       }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const procesarPago = async (metodo) => {
@@ -372,50 +444,6 @@ export default function BookingFormSection({
        setMostrarPago(false);
     }
   };
-
-  if (showReservationSuccess) {
-    const formatDate = (dateInput) => {
-        if (!dateInput) return 'N/A';
-        try {
-            // Intenta crear la fecha directamente desde la entrada
-            const date = new Date(dateInput);
-            // Comprueba si la fecha es válida
-            if (isNaN(date.getTime())) {
-                console.warn("Formato de fecha inválido recibido para la vista de éxito:", dateInput);
-                // Devolver el string original si no se puede parsear, podría ser útil para debug
-                return dateInput.toString(); 
-            }
-            return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-        } catch (e) {
-            console.error("Error formateando fecha en vista de éxito:", e);
-            return 'Error fecha'; 
-        }
-  };
-
-  return (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-2xl mx-auto my-12 p-8 bg-green-50 rounded-lg shadow-lg text-center border border-green-200"
-      >
-        <h2 className="text-2xl font-semibold text-green-800 mb-4">¡Reserva Exitosa!</h2>
-        <p className="text-green-700 mb-6">Sus habitaciones han sido reservadas. Recibirá un correo de confirmación pronto.</p>
-        <h3 className="text-lg font-medium text-gray-700 mb-3">Detalles de la Reserva:</h3>
-        <div className="space-y-4 text-left bg-white p-4 rounded shadow-sm max-h-60 overflow-y-auto">
-          {multipleReservationConfirmations.map((conf, index) => (
-            <div key={conf._id || index} className="border-b pb-2 mb-2">
-              <p><strong>Habitación:</strong> {conf.habitacion || `Habitación ${index + 1}`}</p>
-              <p><strong>Fechas:</strong> {formatDate(conf.fechaEntrada)} - {formatDate(conf.fechaSalida)}</p>
-              <p><strong>Huéspedes:</strong> {conf.numHuespedes || formData.huespedes}</p>
-              <p><strong>Precio:</strong> ${typeof conf.precio === 'number' ? conf.precio.toFixed(2) : 'N/A'}</p>
-              <p><strong>Método Pago:</strong> {conf.metodoPago}</p>
-              <p className="text-xs text-gray-500">ID: {conf._id}</p>
-            </div>
-          ))}
-        </div>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.section 
@@ -690,7 +718,62 @@ export default function BookingFormSection({
                </motion.div>
            )}
          </AnimatePresence>
+
+        <AnimatePresence>
+          {showConflictModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+              onClick={() => setShowConflictModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: -20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: -20 }}
+                className="bg-white rounded-xl shadow-2xl p-6 md:p-8 max-w-md w-full text-center relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                 <button 
+                   onClick={() => setShowConflictModal(false)}
+                   className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
+                   aria-label="Cerrar modal"
+                 >
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-5">
+                  <svg className="h-10 w-10 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.008v.008H12v-.008Z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-3">Fechas No Disponibles</h3>
+                <p className="text-gray-600 whitespace-pre-line">{conflictMessage}</p>
+                <button
+                  onClick={() => setShowConflictModal(false)}
+                  className="mt-6 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm transition-colors"
+                >
+                  Entendido
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Success Modal */}
+        <AnimatePresence>
+           {showSuccessModal && multipleReservationConfirmations.length > 0 && (
+            <ReservationSuccessModal
+              isOpen={showSuccessModal}
+              onClose={() => setShowSuccessModal(false)}
+              reservationDetails={multipleReservationConfirmations}
+            />
+           )}
+         </AnimatePresence>
+
       </div>
     </motion.section>
   );
-} 
+}
+
+export default BookingFormSection;
