@@ -4,7 +4,7 @@ const ReservaHabitacion = require('../models/ReservaHabitacion');
 const { StatusCodes } = require('http-status-codes');
 
 // Función auxiliar para actualizar el estado de una reserva
-const actualizarEstadoReserva = async (tipoReserva, id, nuevoEstado) => {
+const actualizarEstadoReserva = async (tipoReserva, id, nuevoEstado, usuarioActualId) => {
   let modelo;
   
   switch (tipoReserva) {
@@ -33,22 +33,38 @@ const actualizarEstadoReserva = async (tipoReserva, id, nuevoEstado) => {
   }
 
   try {
-    // Buscar la reserva y actualizar el estado en una operación atómica
-    const reservaActualizada = await modelo.findByIdAndUpdate(
-      id,
-      { estadoReserva: nuevoEstado, updatedAt: new Date() },
-      { new: true, runValidators: true }
-    );
-
-    if (!reservaActualizada) {
+    // --- Obtener la reserva PRIMERO para verificar permiso ---
+    const reserva = await modelo.findById(id);
+    if (!reserva) {
       throw new Error('Reserva no encontrada');
     }
+
+    // --- INICIO: Verificación de Permiso de Asignación --- 
+    if (!usuarioActualId) {
+       console.error("Error: usuarioActualId no fue proporcionado a actualizarEstadoReserva.");
+       throw new Error('Error interno del servidor (Autenticación)');
+    }
+    const asignadoAId = reserva.asignadoA ? reserva.asignadoA.toString() : null;
+    const userId = usuarioActualId.toString(); 
+
+    // Si está asignada Y NO está asignada al usuario actual Y el nuevo estado NO es 'cancelada'
+    if (asignadoAId && asignadoAId !== userId && nuevoEstado !== 'cancelada') {
+      const error = new Error('No tienes permiso para actualizar el estado de esta reserva porque está asignada a otro administrador.');
+      error.statusCode = 403; // Añadir código de estado para el catch
+      throw error;
+    }
+    // --- FIN: Verificación de Permiso de Asignación ---
+
+    // Si la verificación pasa, ahora sí actualizar
+    reserva.estadoReserva = nuevoEstado;
+    reserva.updatedAt = new Date();
+    const reservaActualizada = await reserva.save({ validateBeforeSave: true });
 
     console.log(`Estado de reserva actualizado: ${tipoReserva} ${id} -> ${nuevoEstado}`);
     return reservaActualizada;
   } catch (error) {
     console.error('Error al actualizar estado de reserva:', error);
-    throw error;
+    throw error; // Re-lanzar el error para que lo maneje el controlador
   }
 };
 
@@ -57,6 +73,16 @@ const actualizarEstado = async (req, res) => {
   try {
     const { tipoReserva, id, estadoReserva } = req.body;
 
+    // --- Asegurarse de que req.user.id existe --- 
+    if (!req.user || !req.user.id) {
+       console.error("Error: req.user no está definido en el controlador actualizarEstado.");
+       return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+         success: false, 
+         message: 'Error interno del servidor (Autenticación)' 
+       });
+    }
+    // -------------------------------------------
+
     if (!tipoReserva || !id || !estadoReserva) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
@@ -64,7 +90,8 @@ const actualizarEstado = async (req, res) => {
       });
     }
 
-    const reservaActualizada = await actualizarEstadoReserva(tipoReserva, id, estadoReserva);
+    // Pasar el ID del usuario actual a la función auxiliar
+    const reservaActualizada = await actualizarEstadoReserva(tipoReserva, id, estadoReserva, req.user.id);
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -72,8 +99,10 @@ const actualizarEstado = async (req, res) => {
       message: `Estado de reserva actualizado a ${estadoReserva}`
     });
   } catch (error) {
-    console.error('Error al actualizar estado de reserva:', error);
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+    console.error('Error en controlador actualizarEstado:', error);
+    // Usar el statusCode del error si existe (para el 403 Forbidden)
+    const statusCode = error.statusCode || StatusCodes.INTERNAL_SERVER_ERROR;
+    res.status(statusCode).json({
       success: false,
       message: error.message || 'Error al actualizar el estado de la reserva'
     });

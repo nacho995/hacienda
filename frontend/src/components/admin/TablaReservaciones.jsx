@@ -163,6 +163,14 @@ const TablaReservaciones = ({
             const reservationType = reservation.tipo;
             const currentStatus = reservation.estadoReserva || reservation.estado;
             
+            // Datos para el log
+            const reservationIdForLog = reservation._id || reservation.id || 'ID_DESCONOCIDO';
+            // console.log(`[Render TablaReservaciones] Reserva ${reservationIdForLog}: asignadoA =`, reservation.asignadoA);
+
+            const isAssigned = !!reservation.asignadoA; // Check if it's assigned to anyone
+            
+            const canPerformCriticalActions = reservation.asignadoA === user?.id || reservation.asignadoA?._id === user?.id;
+            
             return (
               <tr key={reservation.uniqueId || `${reservation.tipo}_${reservationId}`} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -250,7 +258,7 @@ const TablaReservaciones = ({
                             </MenuButton>
                           )}
                           
-                          {onUnassign && reservation.asignadoA && (reservation.asignadoA === user?.id || reservation.asignadoA?._id === user?.id) && (
+                          {onUnassign && reservation.asignadoA && (
                             <MenuButton onClick={() => { onUnassign(reservationType, reservationId); setOpenMenuId(null); }}>
                               <FaUndo className="inline mr-2"/> Desasignar de mi cuenta
                             </MenuButton>

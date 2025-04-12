@@ -46,7 +46,7 @@ export default function AdminHotelReservations() {
       if (response && response.data && Array.isArray(response.data)) {
         setUsuarios(response.data);
       } else {
-        console.log('No se recibieron datos válidos de usuarios');
+        // console.log('No se recibieron datos válidos de usuarios');
         setUsuarios([]);
       }
     } catch (error) {
@@ -304,18 +304,15 @@ export default function AdminHotelReservations() {
 
   // --- Handlers de Reserva (Adaptar y añadir nuevos) ---
   const handleConfirmarReserva = async (reservaId) => {
-    console.log(`[AdminHotelReservations] INICIO handleConfirmarReserva (ID: ${reservaId})`);
-    if (!reservaId) {
-      toast.error('ID de reserva inválido.');
-      return;
-    }
+    if (!reservaId) return;
+    // console.log(`[AdminHotelReservations] INICIO handleConfirmarReserva (ID: ${reservaId})`);
+    
     setIsLoading(true);
     try {
-      const payload = { estadoReserva: 'confirmada' };
-      const url = `/reservas/habitaciones/${reservaId}`;
-      console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, payload);
-      console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+      const url = `/reservas/hotel/${reservaId}/estado`;
+      // console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, { estado: 'confirmada' });
+      // console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
       
       if (response && response.success === true) {
         toast.success('Reserva confirmada correctamente');
@@ -334,18 +331,15 @@ export default function AdminHotelReservations() {
   };
 
   const handleCancelarReserva = async (reservaId) => {
-    console.log(`[AdminHotelReservations] INICIO handleCancelarReserva (ID: ${reservaId})`);
-    if (!reservaId) {
-      toast.error('ID de reserva inválido.');
-      return;
-    }
+    if (!reservaId) return;
+    // console.log(`[AdminHotelReservations] INICIO handleCancelarReserva (ID: ${reservaId})`);
+    
     setIsLoading(true);
     try {
-      const payload = { estadoReserva: 'cancelada' };
-      const url = `/reservas/habitaciones/${reservaId}`;
-      console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, payload);
-      console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+      const url = `/reservas/hotel/${reservaId}/estado`;
+      // console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, { estado: 'cancelada' });
+      // console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
 
       if (response && response.success === true) {
         toast.success('Reserva cancelada correctamente');
@@ -391,18 +385,15 @@ export default function AdminHotelReservations() {
   };
 
   const handleMarcarPendiente = async (reservaId) => {
-    console.log(`[AdminHotelReservations] INICIO handleMarcarPendiente (ID: ${reservaId})`);
-    if (!reservaId) {
-      toast.error('ID de reserva inválido.');
-      return;
-    }
+    if (!reservaId) return;
+    // console.log(`[AdminHotelReservations] INICIO handleMarcarPendiente (ID: ${reservaId})`);
+    
     setIsLoading(true);
     try {
-      const payload = { estadoReserva: 'pendiente' };
-      const url = `/reservas/habitaciones/${reservaId}`;
-      console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, payload);
-      console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+      const url = `/reservas/hotel/${reservaId}/estado`;
+      // console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, { estado: 'pendiente' });
+      // console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
 
       if (response && response.success === true) {
         toast.success('Reserva marcada como pendiente');
@@ -663,6 +654,11 @@ function RoomTableView({
               const canDelete = true; 
               const canAssign = reserva.estadoReserva !== 'cancelada';
               const canMarkPending = reserva.estadoReserva !== 'pendiente' && reserva.estadoReserva !== 'completada';
+
+              const canPerformCriticalActions = asignadaAlUsuarioActual || !estaAsignada;
+
+              // <<< LOG 7: Renderizando fila >>>
+              // console.log(`[Render Hotel] Reserva ${reserva._id}: asignadoA =`, reserva.asignadoA);
 
               return (
                 <Fragment key={reservaId}>

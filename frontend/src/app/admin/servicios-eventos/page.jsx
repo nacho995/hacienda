@@ -25,7 +25,7 @@ const formatDate = (dateString) => {
 
 export default function ServiciosPorEventoAdminPage() {
   const router = useRouter();
-  const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
+  const { isAuthenticated, isAdmin, loading: authLoading, user } = useAuth();
 
   const [eventos, setEventos] = useState([]);
   const [selectedEventoId, setSelectedEventoId] = useState('');
@@ -264,15 +264,22 @@ export default function ServiciosPorEventoAdminPage() {
               {eventosOrdenados.map(evento => {
                 // Usar serviciosContratados.length
                 const numServicios = Array.isArray(evento.serviciosContratados) ? evento.serviciosContratados.length : 0;
-                const colorClass = getColorClassForServiceCount(numServicios);
+                // const colorClass = getColorClassForServiceCount(numServicios); // <-- Ya no usamos esto para el fondo principal
                 const isSelected = evento._id === selectedEventoId;
                 const tituloEvento = evento.nombreEvento || evento.tipoEvento?.titulo || 'Evento sin título';
                 const fechaEvento = evento.fechaEvento || evento.fecha;
+                
+                // Nueva lógica de color basada en asignación
+                const isAssignedToMe = user && evento.asignadoA && evento.asignadoA._id === user.id;
+                const assignmentBgClass = isAssignedToMe 
+                  ? 'bg-green-100 hover:bg-green-200 border-green-300' 
+                  : 'bg-gray-100 hover:bg-gray-200 border-gray-300';
+
                 return (
                   <button 
                     key={evento._id}
                     onClick={() => handleEventoSelect(evento._id)}
-                    className={`w-full text-left p-3 border rounded-md transition-colors duration-150 ${colorClass} ${isSelected ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                    className={`w-full text-left p-3 border rounded-md transition-colors duration-150 ${assignmentBgClass} ${isSelected ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
                   >
                     <div className="font-semibold text-sm text-gray-800">{tituloEvento}</div>
                     <div className="text-xs text-gray-600 flex items-center">

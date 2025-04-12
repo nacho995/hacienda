@@ -572,14 +572,31 @@ exports.actualizarReservaEvento = async (req, res) => {
       });
     }
     
-    // Temporalmente desactivada la verificación de permisos para debugging
-    // if (reserva.usuario && reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: 'No tienes permiso para actualizar esta reserva'
-    //   });
-    // }
-    
+    // --- INICIO: Verificación de Permiso de Asignación ---
+    if (!req.user || !req.user.id) {
+       console.error("Error: req.user no está definido en actualizarReservaEvento.");
+       return res.status(500).json({ success: false, message: 'Error interno del servidor (Autenticación)' });
+    }
+    const asignadoAId = reserva.asignadoA ? reserva.asignadoA.toString() : null;
+    const userId = req.user.id.toString(); 
+    if (asignadoAId && asignadoAId !== userId) {
+      // Permitir actualizar solo si el único cambio es el estado a 'cancelada' por si acaso
+      // O si se está asignando/desasignando (esto se maneja en otros endpoints)
+      // Comprobamos si solo se actualiza el estado y si es a 'cancelada'
+      const updateKeys = Object.keys(req.body);
+      const isOnlyStatusUpdateToCancelled = updateKeys.length === 1 && updateKeys[0] === 'estadoReserva' && req.body.estadoReserva === 'cancelada';
+      // Podríamos añadir más excepciones si son necesarias
+      
+      // Si NO es una excepción permitida, denegar
+      if (!isOnlyStatusUpdateToCancelled) { 
+         return res.status(403).json({
+           success: false,
+           message: 'No tienes permiso para actualizar esta reserva porque está asignada a otro administrador.'
+         });
+      }
+    }
+    // --- FIN: Verificación de Permiso de Asignación ---
+
     // Detectar si es una operación de eliminación de habitación por la bandera especial
     const esOperacionEliminacionHabitacion = req.body._operacion_eliminacion_habitacion === true;
     
@@ -700,14 +717,21 @@ exports.eliminarReservaEvento = async (req, res) => {
       });
     }
     
-    // Temporalmente desactivada la verificación de permisos para debugging
-    // if (reserva.usuario && reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') {
-    //   return res.status(403).json({
-    //     success: false,
-    //     message: 'No tienes permiso para eliminar esta reserva'
-    //   });
-    // }
-    
+    // --- INICIO: Verificación de Permiso de Asignación ---
+    if (!req.user || !req.user.id) {
+       console.error("Error: req.user no está definido en eliminarReservaEvento.");
+       return res.status(500).json({ success: false, message: 'Error interno del servidor (Autenticación)' });
+    }
+    const asignadoAId = reserva.asignadoA ? reserva.asignadoA.toString() : null;
+    const userId = req.user.id.toString(); 
+    if (asignadoAId && asignadoAId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para eliminar esta reserva porque está asignada a otro administrador.'
+      });
+    }
+    // --- FIN: Verificación de Permiso de Asignación ---
+
     // --- Añadido: Eliminar habitaciones asociadas ANTES de eliminar el evento --- 
     const ReservaHabitacion = require('../models/ReservaHabitacion'); // Asegurarse de importar el modelo
     const deleteResult = await ReservaHabitacion.deleteMany({ reservaEvento: reserva._id });

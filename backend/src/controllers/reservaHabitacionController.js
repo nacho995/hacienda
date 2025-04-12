@@ -305,6 +305,30 @@ exports.updateReservaHabitacion = asyncHandler(async (req, res, next) => {
       });
     }
     
+    // --- INICIO: Verificación de Permiso de Asignación ---
+    if (!req.user || !req.user.id) {
+       console.error("Error: req.user no está definido en updateReservaHabitacion.");
+       return res.status(500).json({ success: false, message: 'Error interno del servidor (Autenticación)' });
+    }
+    const asignadoAId = reserva.asignadoA ? reserva.asignadoA.toString() : null;
+    const userId = req.user.id.toString(); 
+    if (asignadoAId && asignadoAId !== userId) {
+      // Excepción: Permitir actualizar solo si el único cambio es el estado a 'cancelada'
+      const updateKeys = Object.keys(req.body);
+      const isOnlyStatusUpdateToCancelled = updateKeys.length === 1 && updateKeys[0] === 'estadoReserva' && req.body.estadoReserva === 'cancelada';
+      
+      if (!isOnlyStatusUpdateToCancelled) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permiso para actualizar esta reserva porque está asignada a otro administrador.'
+        });
+      }
+    }
+    // --- FIN: Verificación de Permiso de Asignación ---
+    
+    // (Añadir verificación de permisos de usuario normal si es necesario)
+    // if (reserva.usuario && reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') { ... }
+
     // Definir campos que requieren verificación de disponibilidad
     const requiresAvailabilityCheck = 
         req.body.hasOwnProperty('tipoHabitacion') || 
@@ -413,7 +437,25 @@ exports.deleteReservaHabitacion = asyncHandler(async (req, res, next) => {
         message: 'No se encontró la reserva con ese ID'
       });
     }
+
+    // --- INICIO: Verificación de Permiso de Asignación ---
+    if (!req.user || !req.user.id) {
+       console.error("Error: req.user no está definido en deleteReservaHabitacion.");
+       return res.status(500).json({ success: false, message: 'Error interno del servidor (Autenticación)' });
+    }
+    const asignadoAId = reserva.asignadoA ? reserva.asignadoA.toString() : null;
+    const userId = req.user.id.toString(); 
+    if (asignadoAId && asignadoAId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para eliminar esta reserva porque está asignada a otro administrador.'
+      });
+    }
+    // --- FIN: Verificación de Permiso de Asignación ---
     
+    // (Añadir verificación de permisos de usuario normal si es necesario)
+    // if (reserva.usuario && reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') { ... }
+
     await reserva.deleteOne();
     console.log('Reserva eliminada exitosamente');
     

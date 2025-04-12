@@ -43,7 +43,7 @@ export default function AdminEventRooms() {
       if (response && response.data && Array.isArray(response.data)) {
         setUsuarios(response.data);
       } else {
-        console.log('No se recibieron datos válidos de usuarios o la API no está disponible');
+        // console.log('No se recibieron datos válidos de usuarios o la API no está disponible');
         setUsuarios([]);
       }
     } catch (error) {
@@ -118,17 +118,20 @@ export default function AdminEventRooms() {
   };
 
   const handleDesasignarHabitacion = async (reservaId) => {
+    // console.log(`[handleDesasignar HabitaciónEvento] Intentando desasignar ID: ${reservaId}`);
     try {
       setIsAsignando(true);
       const response = await unassignHabitacionReservation(reservaId);
+      // console.log(`[handleDesasignar HabitaciónEvento] Respuesta API para ${reservaId}:`, response);
       if (response.success) {
         toast.success('Reserva de evento desasignada correctamente');
+        // console.log(`[handleDesasignar HabitaciónEvento] Llamando a loadAllReservations tras éxito para ${reservaId}`);
         loadAllReservations(false);
       } else {
         toast.error(response.message || 'Error al desasignar la reserva del evento');
       }
     } catch (error) {
-      console.error('Error desasignando reserva de evento:', error);
+      console.error('[handleDesasignar HabitaciónEvento] Error en catch:', error);
       toast.error('No se pudo desasignar la reserva del evento');
     } finally {
       setIsAsignando(false);
@@ -312,18 +315,14 @@ export default function AdminEventRooms() {
   };
 
   const handleConfirmarReserva = async (reservaId) => {
-    console.log(`[AdminEventRooms] INICIO handleConfirmarReserva (ID: ${reservaId})`);
-    if (!reservaId) {
-      toast.error('ID de reserva inválido.');
-      return;
-    }
+    if (!reservaId) return;
+    // console.log(`[AdminEventRooms] INICIO handleConfirmarReserva (ID: ${reservaId})`);
     setIsLoading(true);
     try {
-      const payload = { estadoReserva: 'confirmada' };
-      const url = `/reservas/habitaciones/${reservaId}`; // Asume que actualiza ReservaHabitacion
-      console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, payload);
-      console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+      const url = `/reservas/habitaciones/${reservaId}/estado`;
+      // console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, { estado: 'confirmada' });
+      // console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
       
       if (response && response.success === true) {
         toast.success('Reserva confirmada correctamente');
@@ -342,18 +341,14 @@ export default function AdminEventRooms() {
   };
 
   const handleCancelarReserva = async (reservaId) => {
-    console.log(`[AdminEventRooms] INICIO handleCancelarReserva (ID: ${reservaId})`);
-    if (!reservaId) {
-      toast.error('ID de reserva inválido.');
-      return;
-    }
+    if (!reservaId) return;
+    // console.log(`[AdminEventRooms] INICIO handleCancelarReserva (ID: ${reservaId})`);
     setIsLoading(true);
     try {
-      const payload = { estadoReserva: 'cancelada' };
-      const url = `/reservas/habitaciones/${reservaId}`; // Asume que actualiza ReservaHabitacion
-      console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, payload);
-      console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+      const url = `/reservas/habitaciones/${reservaId}/estado`;
+      // console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, { estado: 'cancelada' });
+      // console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
 
       if (response && response.success === true) {
         toast.success('Reserva cancelada correctamente');
@@ -372,18 +367,14 @@ export default function AdminEventRooms() {
   };
   
   const handleMarcarPendiente = async (reservaId) => {
-    console.log(`[AdminEventRooms] INICIO handleMarcarPendiente (ID: ${reservaId})`);
-    if (!reservaId) {
-      toast.error('ID de reserva inválido.');
-      return;
-    }
+    if (!reservaId) return;
+    // console.log(`[AdminEventRooms] INICIO handleMarcarPendiente (ID: ${reservaId})`);
     setIsLoading(true);
     try {
-      const payload = { estadoReserva: 'pendiente' };
-      const url = `/reservas/habitaciones/${reservaId}`; // Asume que actualiza ReservaHabitacion
-      console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, payload);
-      console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+      const url = `/reservas/habitaciones/${reservaId}/estado`;
+      // console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
+      const response = await apiClient.patch(url, { estado: 'pendiente' });
+      // console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
 
       if (response && response.success === true) {
         toast.success('Reserva marcada como pendiente');
@@ -412,9 +403,9 @@ export default function AdminEventRooms() {
       try {
         // Podríamos llamar a apiClient.delete directamente o usar servicio si existe
         const url = `/reservas/habitaciones/${reservaId}`;
-        console.log(`[AdminEventRooms] Llamando apiClient.delete directamente a ${url}...`);
+        // console.log(`[AdminEventRooms] Llamando apiClient.delete directamente a ${url}...`);
         const response = await apiClient.delete(url);
-        console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
+        // console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
 
         if (response && response.success) { // Asumiendo que delete devuelve { success: true }
           toast.success('Reserva eliminada con éxito');
@@ -817,6 +808,11 @@ function RoomTableView({
                   (typeof reserva.asignadoA === 'string' && reserva.asignadoA === user?.id)
               );
               const isMenuOpen = openActionMenu === reservaId;
+              const canPerformCriticalActions = asignadaAlUsuarioActual || !estaAsignada;
+
+              // Datos para el log
+              const reservaIdForLog = reserva._id || reserva.id || 'ID_DESCONOCIDO';
+              // console.log(`[Render HabitaciónEvento] Reserva ${reservaIdForLog}: asignadoA =`, reserva.asignadoA);
 
               const eventoId = reserva.eventoId?._id || reserva.eventoId || (typeof reserva.reservaEvento === 'object' ? reserva.reservaEvento?._id : reserva.reservaEvento);
               const detalleUrl = eventoId ? `/admin/reservaciones/evento/${eventoId}` : '#';

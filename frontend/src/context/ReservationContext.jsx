@@ -63,7 +63,7 @@ export const ReservationProvider = ({ children }) => {
   }, []);
 
   const resetForm = useCallback(() => {
-    console.log("[ReservationContext] Reseteando formData");
+    // console.log("[ReservationContext] Reseteando formData");
     setFormData({
       tipoEvento: null,
       fechaInicio: null,
@@ -92,11 +92,16 @@ export const ReservationProvider = ({ children }) => {
 
   // Cargar todas las reservaciones
   const loadAllReservations = useCallback(async (showToast = false) => {
+    // <<< LOG 4: Inicio de la carga >>>
+    // console.log('[ReservationContext] Iniciando loadAllReservations...');
     try {
       setLoading(true);
       setError(null);
       
       const allReservations = await getAllReservationsForDashboard();
+      // <<< LOG 5: Datos recibidos del backend >>>
+      // console.log('[ReservationContext] Datos recibidos de getAllReservationsForDashboard:', JSON.stringify(allReservations)); // Stringify para ver todo
+
       const normalizedReservations = allReservations.map(normalizeId);
       
       const habitaciones = normalizedReservations.filter(r => r.tipo === 'habitacion');
@@ -113,16 +118,28 @@ export const ReservationProvider = ({ children }) => {
       
       // Procesar habitaciones
       const habitacionesProcesadas = habitaciones.map(habitacion => {
+        // Primero, normalizar el asignadoA propio de la habitación si existe
+        if (habitacion.asignadoA && typeof habitacion.asignadoA === 'string' && user) {
+           habitacion.asignadoAMi = habitacion.asignadoA === user.id;
+        } else if (habitacion.asignadoA && typeof habitacion.asignadoA === 'object' && user) {
+           habitacion.asignadoAMi = habitacion.asignadoA._id === user.id;
+        } else {
+           habitacion.asignadoAMi = false;
+        }
+
+        // Si está vinculada a un evento, añadir info del evento SIN sobrescribir asignadoA
         if (habitacion.eventoId || habitacion.reservaEvento) {
           const eventoId = habitacion.eventoId || habitacion.reservaEvento;
           const eventoAsociado = eventosMap.get(eventoId);
           
           if (eventoAsociado) {
-            habitacion.asignadoA = eventoAsociado.asignadoA;
-            habitacion.asignadoAMi = eventoAsociado.asignadoA === user?.id;
+            // --- NO SOBRESCRIBIR asignadoA --- 
+            // habitacion.asignadoA = eventoAsociado.asignadoA; <<-- ELIMINAR/COMENTAR ESTA LÍNEA
+            // habitacion.asignadoAMi = eventoAsociado.asignadoA === user?.id; <<-- MOVIDO ARRIBA
             
-            if (eventoAsociado.estado) {
-              habitacion.estado = eventoAsociado.estado;
+            // Copiar otras propiedades útiles del evento si es necesario
+            if (eventoAsociado.estado && !habitacion.estadoReserva) { // Solo si la habitación no tiene estado propio
+              habitacion.estadoReserva = eventoAsociado.estado;
             }
             
             habitacion.eventoAsociado = {
@@ -130,12 +147,16 @@ export const ReservationProvider = ({ children }) => {
               _id: eventoAsociado._id,
               nombre: eventoAsociado.datosCompletos?.nombreEvento || 'Evento sin nombre'
             };
+          } else {
+              // console.warn(`[ReservationContext] Evento asociado ${eventoId} no encontrado para habitación ${habitacion.id}`);
           }
         }
         
-        if (habitacion.asignadoA && user) {
-          habitacion.asignadoAMi = habitacion.asignadoA === user.id;
-        }
+        // Asegurar que asignadoAMi se calcula incluso si no hay evento asociado
+        // (Ya se hizo al principio del map)
+        // if (habitacion.asignadoA && user && !habitacion.eventoAsociado) {
+        //  habitacion.asignadoAMi = habitacion.asignadoA === user.id || habitacion.asignadoA?._id === user.id;
+        // }
         
         return habitacion;
       });
@@ -162,6 +183,9 @@ export const ReservationProvider = ({ children }) => {
       setEventoReservations(eventosProcesados);
       setLastUpdate(new Date());
       
+      // <<< LOG 6: Fin >>>
+      // console.log('[ReservationContext] loadAllReservations completado.'); 
+
       if (showToast) {
         toast.success('Reservaciones actualizadas correctamente');
       }
@@ -192,7 +216,7 @@ export const ReservationProvider = ({ children }) => {
         const parsedData = JSON.parse(savedFormData);
         setFormData(parsedData);
       } catch (error) {
-        console.error('Error al parsear los datos guardados:', error);
+        // console.error('Error al parsear los datos guardados:', error);
       }
     }
   }, []);
