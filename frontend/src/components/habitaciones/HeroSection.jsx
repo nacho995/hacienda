@@ -89,7 +89,7 @@ export default function HeroSection({ scrollY, title = "Habitaciones de Ensueño
               }} 
               className="px-6 sm:px-8 py-2 sm:py-3 text-sm sm:text-base bg-[var(--color-brown-medium)] text-black hover:bg-[var(--color-brown-dark)] rounded shadow-lg inline-block transform hover:scale-105 transition-all duration-300"
             >
-              Ver Habitaciones
+              Reserva tu Habitación
             </button>
           </div>
         </div>

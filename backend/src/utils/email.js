@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const confirmacionReservaEvento = require('../emails/confirmacionReservaEvento');
 const confirmacionReservaHabitacion = require('../emails/confirmacionReservaHabitacion');
+const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
 
 /**
  * Configura el transporter de nodemailer
@@ -150,8 +151,44 @@ const enviarConfirmacionReservaHabitacion = async (datos) => {
   return transporter.sendMail(mailOptions);
 };
 
+/**
+ * Envía una notificación de gestión administrativa
+ * @param {Object} datos - Datos de la notificación
+ * @returns {Promise}
+ */
+const enviarNotificacionGestionAdmin = async (datos) => {
+  const {
+    destinatarios,
+    tipo = 'info',
+    asunto,
+    mensaje,
+    enlaceAccion,
+    textoEnlace
+  } = datos;
+
+  if (!destinatarios || !asunto || !mensaje) {
+    throw new Error('Se requieren destinatarios, asunto y mensaje para enviar la notificación');
+  }
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: Array.isArray(destinatarios) ? destinatarios.join(',') : destinatarios,
+    subject: `[${tipo.toUpperCase()}] ${asunto} - Hacienda San Carlos Borromeo`,
+    html: notificacionGestionAdmin({
+      tipo,
+      asunto,
+      mensaje,
+      enlaceAccion,
+      textoEnlace
+    })
+  };
+
+  return transporter.sendMail(mailOptions);
+};
+
 module.exports = {
   sendEmail,
   enviarConfirmacionReservaEvento,
-  enviarConfirmacionReservaHabitacion
+  enviarConfirmacionReservaHabitacion,
+  enviarNotificacionGestionAdmin
 }; 

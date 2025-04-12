@@ -18,6 +18,7 @@ export default function ContactForm() {
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState(null);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -26,6 +27,11 @@ export default function ContactForm() {
     // Limpiar errores al editar
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
+    }
+    
+    // Limpiar error de servidor cuando se edita cualquier campo
+    if (serverError) {
+      setServerError(null);
     }
   };
   
@@ -54,26 +60,49 @@ export default function ContactForm() {
     }
     
     setIsSubmitting(true);
+    setServerError(null);
     
-    // Simular envío de formulario
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsSubmitting(false);
-    setSubmitted(true);
-    
-    // Reiniciar estado después de 5 segundos
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormState({
-        nombre: '',
-        email: '',
-        telefono: '',
-        fecha: '',
-        tipoEvento: '',
-        invitados: '',
-        mensaje: '',
+    try {
+      // Obtener la URL base del backend desde una variable de entorno o usar un valor por defecto
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${API_URL}/api/contacto`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formState),
       });
-    }, 5000);
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Hubo un problema al enviar el formulario');
+      }
+      
+      // Éxito
+      setIsSubmitting(false);
+      setSubmitted(true);
+      
+      // Reiniciar estado después de 5 segundos
+      setTimeout(() => {
+        setSubmitted(false);
+        setFormState({
+          nombre: '',
+          email: '',
+          telefono: '',
+          fecha: '',
+          tipoEvento: '',
+          invitados: '',
+          mensaje: '',
+        });
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error al enviar formulario:', error);
+      setIsSubmitting(false);
+      setServerError(error.message || 'Hubo un problema al enviar el formulario. Intente nuevamente más tarde.');
+    }
   };
   
   const formAnimation = {
@@ -240,6 +269,12 @@ export default function ContactForm() {
                 </motion.div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {serverError && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 mb-4">
+                      {serverError}
+                    </div>
+                  )}
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label htmlFor="nombre" className="block text-gray-700 mb-2">Nombre Completo *</label>

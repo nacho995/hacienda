@@ -1,9 +1,16 @@
 /**
- * Plantilla de email para solicitud de restablecimiento de contraseña
+ * Plantilla de email para confirmación de recepción del formulario de contacto
  * Diseño premium y elegante
  */
 
-const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
+module.exports = function({
+  nombreCompleto,
+  email,
+  telefono,
+  asunto,
+  mensaje,
+  fechaContacto = new Date()
+}) {
   // Paleta de colores sofisticada
   const colors = {
     gold: '#D4AF37',           // Dorado elegante
@@ -52,20 +59,20 @@ const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
     </svg>
   `;
 
-  // Sello de recuperación
-  const lockSeal = `
-    <div style="position: absolute; top: 20px; right: 20px; transform: rotate(12deg);">
+  // Sello de recepción
+  const contactSeal = `
+    <div style="position: absolute; top: 20px; right: 20px; transform: rotate(10deg);">
       <svg xmlns="http://www.w3.org/2000/svg" width="90" height="90" viewBox="0 0 100 100">
         <circle cx="50" cy="50" r="45" fill="none" stroke="${colors.gold}" stroke-width="2"/>
         <circle cx="50" cy="50" r="40" fill="none" stroke="${colors.gold}" stroke-width="1"/>
-        
-        <!-- Icono de candado -->
-        <rect x="35" y="45" width="30" height="25" rx="2" fill="${colors.gold}" opacity="0.7"/>
-        <rect x="40" y="30" width="20" height="15" rx="10" fill="none" stroke="${colors.gold}" stroke-width="3"/>
-        <circle cx="50" cy="55" r="3" fill="${colors.textLight}"/>
-        <line x1="50" y1="55" x2="50" y2="60" stroke="${colors.textLight}" stroke-width="2"/>
-        
-        <text x="50" y="80" font-family="'Playfair Display', serif" font-size="8" text-anchor="middle" fill="${colors.gold}">RECUPERACIÓN</text>
+        <path d="M50,5 
+                L52.5,15 L63,15 L55,25 L60,35 L50,27.5 L40,35 L45,25 L37,15 L47.5,15 Z" 
+              fill="${colors.gold}" opacity="0.7"/>
+        <path d="M50,95 
+                L52.5,85 L63,85 L55,75 L60,65 L50,72.5 L40,65 L45,75 L37,85 L47.5,85 Z" 
+              fill="${colors.gold}" opacity="0.7"/>
+        <text x="50" y="45" font-family="'Playfair Display', serif" font-size="10" text-anchor="middle" fill="${colors.gold}">RECIBIDO</text>
+        <text x="50" y="60" font-family="'Playfair Display', serif" font-size="8" text-anchor="middle" fill="${colors.gold}">CONTACTO</text>
       </svg>
     </div>
   `;
@@ -84,13 +91,27 @@ const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
     </div>
   `;
 
+  // Formatear fecha para mostrar
+  const formatearFecha = (fecha) => {
+    if (!fecha) return 'No especificada';
+    const options = { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    };
+    return new Date(fecha).toLocaleDateString('es-ES', options);
+  };
+
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Restablecimiento de Contraseña - Hacienda San Carlos Borromeo</title>
+      <title>Confirmación de Contacto - Hacienda San Carlos Borromeo</title>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
         
@@ -180,7 +201,7 @@ const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
           letter-spacing: 1px;
         }
         
-        .reset-badge {
+        .contact-badge {
           position: relative;
           background: linear-gradient(135deg, ${colors.gold} 0%, ${colors.goldDark} 100%);
           color: ${colors.textLight};
@@ -219,39 +240,86 @@ const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
           color: ${colors.textDark};
         }
         
-        .expiry-notice {
+        .message-box {
           font-family: 'Lato', Arial, sans-serif;
           background-color: ${colors.creamLight};
           border: 1px dashed ${colors.gold};
-          padding: 15px 20px;
-          color: ${colors.darkBrown};
-          font-size: 16px;
+          padding: 20px;
           margin: 25px 0;
-          text-align: center;
-          letter-spacing: 0.5px;
+          color: ${colors.textDark};
+          line-height: 1.6;
           border-radius: 2px;
         }
         
-        .cta-button {
-          display: inline-block;
-          background: linear-gradient(135deg, ${colors.gold} 0%, ${colors.goldDark} 100%);
-          color: white;
-          text-decoration: none;
-          padding: 15px 40px;
-          margin: 30px 0;
-          border-radius: 2px;
-          font-family: 'Lato', Arial, sans-serif;
+        .message-title {
+          font-family: 'Cormorant Garamond', Georgia, serif;
+          font-size: 20px;
+          font-weight: 600;
+          color: ${colors.darkBrown};
+          margin-top: 0;
+          margin-bottom: 15px;
+          border-bottom: 1px solid ${colors.goldLight};
+          padding-bottom: 10px;
+        }
+        
+        .contact-section {
+          margin: 40px 0;
+          padding: 0;
+          position: relative;
+        }
+        
+        .section-title {
+          font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+          font-size: 24px;
+          color: ${colors.darkBrown};
+          margin-bottom: 20px;
           font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 1px;
           text-align: center;
-          transition: all 0.3s;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+          position: relative;
         }
         
-        .cta-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        .section-title:before, .section-title:after {
+          content: '';
+          display: inline-block;
+          width: 30px;
+          height: 1px;
+          background: ${colors.gold};
+          margin: 0 15px;
+          vertical-align: middle;
+        }
+        
+        .details-table {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          margin: 20px 0;
+          border: 1px solid ${colors.goldLight};
+        }
+        
+        .details-table th {
+          font-family: 'Lato', Arial, sans-serif;
+          text-align: left;
+          padding: 15px 20px;
+          background-color: rgba(212, 175, 55, 0.1);
+          color: ${colors.darkBrown};
+          font-weight: 600;
+          width: 40%;
+          border-bottom: 1px solid ${colors.goldLight};
+        }
+        
+        .details-table td {
+          padding: 15px 20px;
+          color: ${colors.textDark};
+          border-bottom: 1px solid ${colors.goldLight};
+          transition: background-color 0.3s ease;
+        }
+        
+        .details-table tr:last-child th, .details-table tr:last-child td {
+          border-bottom: none;
+        }
+        
+        .details-table tr:hover td {
+          background-color: rgba(212, 175, 55, 0.05);
         }
         
         .additional-info {
@@ -345,6 +413,23 @@ const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
           margin-top: 25px;
         }
         
+        .cta-button {
+          display: inline-block;
+          background: linear-gradient(135deg, ${colors.gold} 0%, ${colors.goldDark} 100%);
+          color: white;
+          text-decoration: none;
+          padding: 15px 40px;
+          margin: 30px 0;
+          border-radius: 2px;
+          font-family: 'Lato', Arial, sans-serif;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          text-align: center;
+          transition: all 0.3s;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        
         @media only screen and (max-width: 600px) {
           .content {
             padding: 50px 20px 30px;
@@ -358,13 +443,22 @@ const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
             font-size: 16px;
           }
           
-          .reset-badge {
+          .contact-badge {
             padding: 12px 30px;
             font-size: 16px;
           }
           
           .greeting {
             font-size: 22px;
+          }
+          
+          .section-title:before, .section-title:after {
+            width: 20px;
+            margin: 0 10px;
+          }
+          
+          .details-table th, .details-table td {
+            padding: 12px 15px;
           }
           
           .footer {
@@ -385,44 +479,66 @@ const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
           <header class="header">
             <div class="header-bg"></div>
             <h1 class="header-title">Hacienda San Carlos Borromeo</h1>
-            <p class="header-subtitle">Gestión de Cuenta de Usuario</p>
+            <p class="header-subtitle">Elegancia y tradición para momentos únicos</p>
           </header>
           
-          ${lockSeal}
+          ${contactSeal}
           
           <div style="text-align: center;">
-            <div class="reset-badge">Restablecer Contraseña</div>
+            <div class="contact-badge">Mensaje Recibido</div>
           </div>
           
           <div class="content">
-            <p class="greeting">Hola <strong>${nombreUsuario || 'Usuario'}</strong>,</p>
+            <p class="greeting">Estimado/a <strong>${nombreCompleto}</strong>,</p>
             
-            <p class="intro-text">Recibimos una solicitud para restablecer la contraseña de su cuenta en Hacienda San Carlos Borromeo. Si usted no ha solicitado este cambio, puede ignorar este correo electrónico de forma segura.</p>
+            <p class="intro-text">Gracias por contactar con Hacienda San Carlos Borromeo. Hemos recibido su mensaje y uno de nuestros representantes se pondrá en contacto con usted a la mayor brevedad posible.</p>
             
             ${decorativeDivider}
             
-            <div class="expiry-notice">
-              Este enlace es válido por 10 minutos a partir de ahora.
-            </div>
-            
-            <p class="intro-text">Para crear una nueva contraseña, haga clic en el siguiente botón:</p>
-            
-            <div style="text-align: center;">
-              <a href="${resetUrl || '#'}" class="cta-button">Restablecer Contraseña</a>
+            <div class="contact-section">
+              <h3 class="section-title">Detalles de su Mensaje</h3>
+              
+              <table class="details-table">
+                <tr>
+                  <th>Fecha:</th>
+                  <td>${formatearFecha(fechaContacto)}</td>
+                </tr>
+                <tr>
+                  <th>Asunto:</th>
+                  <td>${asunto}</td>
+                </tr>
+                <tr>
+                  <th>Email:</th>
+                  <td>${email}</td>
+                </tr>
+                <tr>
+                  <th>Teléfono:</th>
+                  <td>${telefono || 'No proporcionado'}</td>
+                </tr>
+              </table>
+              
+              <div class="message-box">
+                <h4 class="message-title">Su mensaje:</h4>
+                <p>${mensaje.replace(/\n/g, '<br>')}</p>
+              </div>
             </div>
             
             <div class="additional-info">
               <p><strong>Información importante:</strong></p>
-              <p>• Si usted no solicitó restablecer su contraseña, su cuenta sigue siendo segura.</p>
-              <p>• Para mayor seguridad, considere cambiar su contraseña regularmente.</p>
-              <p>• Nunca comparta su contraseña con terceros.</p>
+              <p>• Nuestro equipo revisa todas las consultas en un plazo de 24-48 horas laborables.</p>
+              <p>• Si su consulta es urgente, puede contactarnos directamente al teléfono +34 91 875 43 21.</p>
+              <p>• Este email es generado automáticamente, por favor no responda a este mensaje.</p>
+            </div>
+            
+            <div style="text-align: center;">
+              <a href="https://hacienda-bodas.com/servicios" class="cta-button">Explorar Servicios</a>
             </div>
             
             ${decorativeDivider}
             
             <div class="signature-section">
-              <p>Atentamente,</p>
-              <p class="signature-name">El Equipo de Hacienda San Carlos Borromeo</p>
+              <p>Esperamos poder atenderle pronto,</p>
+              <p class="signature-name">Equipo de Hacienda San Carlos Borromeo</p>
             </div>
           </div>
           
@@ -447,6 +563,4 @@ const passwordResetRequestTemplate = ({ nombreUsuario, resetUrl }) => {
     </body>
     </html>
   `;
-};
-
-module.exports = passwordResetRequestTemplate; 
+}; 

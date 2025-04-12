@@ -14,6 +14,7 @@ const configRoutes = require('./routes/config.routes');
 const servicioRoutes = require('./routes/servicio.routes');
 const adminRoutes = require('./routes/admin.routes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const contactoRoutes = require('./routes/contacto.routes');
 
 const app = express();
 
@@ -60,6 +61,7 @@ app.use('/api/tipos-habitacion', tipoHabitacionRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/servicios', servicioRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/contacto', contactoRoutes);
 
 // Log para verificar si se monta la ruta de reseñas
 console.log('>>> Montando rutas en /api/reviews'); 
