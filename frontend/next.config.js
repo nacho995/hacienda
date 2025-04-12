@@ -14,9 +14,6 @@ const nextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     domains: ['localhost', 'localhost:5000', 'localhost:3000', 'localhost:3001']
   },
-  env: {
-    NEXT_PUBLIC_API_URL: 'http://localhost:3001/api',
-  },
   webpack: (config) => {
     config.resolve.alias['@'] = path.join(__dirname, 'src');
     return config;

@@ -1,10 +1,16 @@
 import axios from 'axios';
+import Cookies from 'js-cookie';
 
-// Determinar la URL base según el entorno
-console.log('Valor de la variable de entorno NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+// const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
-console.log('API Base URL configurada:', BASE_URL);
+if (!BASE_URL) {
+  console.error("Error Fatal: La variable de entorno NEXT_PUBLIC_API_URL no está definida.");
+  // Opcional: Lanza un error para detener la ejecución si la URL no está configurada
+  // throw new Error("La variable de entorno NEXT_PUBLIC_API_URL es obligatoria y no está definida.");
+}
+
+console.log('API Base URL configurada:', BASE_URL); // Log para verificar
 
 // Crear instancia de axios con configuración base
 const apiClient = axios.create({
