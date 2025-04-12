@@ -461,10 +461,10 @@ const ReservaWizard = () => {
                 onChange={(e) => updateFormSection('numeroHabitaciones', parseInt(e.target.value, 10))} 
                 className="w-full p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300"
               >
-                {[...Array(14 - 7 + 1)].map((_, i) => {
-                  const value = 7 + i;
-                  return <option key={value} value={value}>{value}</option>;
-                })}
+                {/* Generar opciones de 7 a 14 */}
+                {Array.from({ length: 14 - 7 + 1 }, (_, i) => 7 + i).map(num => (
+                  <option key={num} value={num}>{num}</option>
+                ))}
               </select>
             </div>
           </div>

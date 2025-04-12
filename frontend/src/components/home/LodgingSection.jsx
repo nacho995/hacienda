@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { FaBed, FaBath, FaUsers, FaWifi, FaMountain, FaCocktail, FaCoffee, FaConciergeBell, FaAngleRight, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import apiClient from '@/services/apiClient';
+import Link from 'next/link';
 
 // Componente de Carga
 const LoadingSpinner = () => (
@@ -458,13 +459,16 @@ export default function LodgingSection() {
                    </div>
                  </div>
 
-                <motion.button 
-                  whileHover={{ scale: 1.03, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
-                  whileTap={{ scale: 0.98 }}
-                  className="mt-auto bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-primary)] text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 self-start flex items-center text-sm"
-                >
-                  Reservar esta habitación <FaAngleRight className="ml-1.5" />
-                </motion.button>
+                {/* Botón de reserva (ahora como Link sin legacyBehavior) */}
+                <Link href="/habitaciones">
+                  <motion.a // `motion.a` es ahora el hijo directo
+                    whileHover={{ scale: 1.03, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
+                    whileTap={{ scale: 0.98 }}
+                    className="mt-auto bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-primary)] text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 self-start flex items-center text-sm cursor-pointer" // Añadido cursor-pointer para claridad visual
+                  >
+                    Ver disponibilidad <FaAngleRight className="ml-1.5" />
+                  </motion.a>
+                </Link>
               </motion.div>
             </div>
             

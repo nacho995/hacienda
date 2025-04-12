@@ -4,13 +4,14 @@ const {
   getHabitacionOccupiedDates,
   createReservaHabitacion,
   getReservasHabitacion,
-  getReservaHabitacion,
+  getReservaHabitacionById,
   updateReservaHabitacion,
   deleteReservaHabitacion,
-  assignReservaHabitacion,
-  unassignReservaHabitacion,
+  asignarReservaHabitacion,
+  desasignarReservaHabitacion,
   updateReservaHabitacionHuespedes,
-  getAllHabitacionOccupiedDates
+  getAllHabitacionOccupiedDates,
+  actualizarEstadoReservaHabitacion
 } = require('../controllers/reservaHabitacionController');
 
 // Importar controladores para eventos
@@ -51,13 +52,13 @@ router.post('/habitaciones', createReservaHabitacion);
 
 // Rutas protegidas para habitaciones
 router.get('/habitaciones', protectRoute, getReservasHabitacion);
-router.get('/habitaciones/:id', protectRoute, getReservaHabitacion);
+router.get('/habitaciones/:id', protectRoute, getReservaHabitacionById);
 router.patch('/habitaciones/:id', protectRoute, updateReservaHabitacion);
 router.delete('/habitaciones/:id', protectRoute, deleteReservaHabitacion);
 
 // Asignar/desasignar reserva a un usuario
-router.put('/habitaciones/:id/asignar', protectRoute, authorize('admin'), assignReservaHabitacion);
-router.put('/habitaciones/:id/desasignar', protectRoute, unassignReservaHabitacion);
+router.put('/habitaciones/:id/asignar', protectRoute, authorize('admin'), asignarReservaHabitacion);
+router.put('/habitaciones/:id/desasignar', protectRoute, desasignarReservaHabitacion);
 
 // Nueva ruta para actualizar información de huéspedes (solo Admin)
 router.put('/habitaciones/:id/huespedes', protectRoute, authorize('admin'), updateReservaHabitacionHuespedes);

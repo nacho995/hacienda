@@ -4,169 +4,162 @@ const ReservaHabitacion = require('../models/ReservaHabitacion');
 const ReservaEvento = require('../models/ReservaEvento');
 const User = require('../models/User');
 const sendEmail = require('../utils/email');
+const mongoose = require('mongoose'); // Importar mongoose
 
 // @desc    Crear una nueva reserva de habitación
 // @route   POST /api/reservas/habitaciones
 // @access  Public
 exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
+  // Iniciar sesión de MongoDB
+  const session = await mongoose.startSession();
+
   try {
-    // Si hay un usuario autenticado, usar su ID
-    if (req.user) {
-      req.body.usuario = req.user.id;
-    }
-    
-    // Extraer datos de la solicitud
-    const { 
-      tipoHabitacion, 
-      habitacion, 
-      fechaEntrada, 
-      fechaSalida, 
-      numeroHabitaciones,
-      tipoReserva = 'hotel',
-      categoriaHabitacion = 'doble',
-      precioPorNoche,
-      infoHuespedes,
-      letraHabitacion,
-      reservaEvento,
-      metodoPago = 'efectivo',
-      estadoPago = 'pendiente'
-    } = req.body;
-    
-    // Comprobar disponibilidad
-    const disponibilidad = await ReservaHabitacion.comprobarDisponibilidad(
-      tipoHabitacion,
-      fechaEntrada,
-      fechaSalida
-    );
-    
-    if (!disponibilidad.disponible) {
-      return res.status(400).json({
-        success: false,
-        message: 'La habitación no está disponible para las fechas seleccionadas'
-      });
-    }
-
-    // Calcular la duración de la estancia en días
-    const fechaInicioObj = new Date(fechaEntrada);
-    const fechaFinObj = new Date(fechaSalida);
-    const duracionEstancia = Math.ceil((fechaFinObj - fechaInicioObj) / (1000 * 60 * 60 * 24));
-
-    // Calcular el precio según el tipo de reserva
-    let precioTotal = 0;
-    let precioFinal = 0;
-
-    if (tipoReserva === 'hotel') {
-      // Si es reservación individual (por noche como hotel)
-      let precioPorNocheCalculado = 0;
-      
-      if (categoriaHabitacion === 'sencilla') {
-        precioPorNocheCalculado = precioPorNoche || 2400; // Precio por defecto para habitación sencilla
-      } else { // doble
-        precioPorNocheCalculado = precioPorNoche || 2600; // Precio por defecto para habitación doble
+    // Iniciar transacción
+    await session.withTransaction(async () => {
+      // Si hay un usuario autenticado, usar su ID
+      if (req.user) {
+        req.body.usuario = req.user.id;
       }
       
-      precioTotal = precioPorNocheCalculado * duracionEstancia * numeroHabitaciones;
-      precioFinal = precioPorNocheCalculado;
-    } else {
-      // Si es parte de un evento, el precio se podría manejar diferente
-      precioTotal = precioPorNoche || 0;
-      precioFinal = precioPorNoche || 0;
-    }
+      // Extraer datos de la solicitud
+      const { 
+        tipoHabitacion, 
+        habitacion, // Este es el ID/Letra de la habitación específica
+        fechaEntrada, 
+        fechaSalida, 
+        numeroHabitaciones = 1, // Asegurar default si no viene
+        tipoReserva = 'hotel',
+        categoriaHabitacion = 'doble',
+        precioPorNoche,
+        infoHuespedes,
+        letraHabitacion, // Puede ser redundante si 'habitacion' ya es la letra/ID
+        reservaEvento,
+        metodoPago = 'pendiente', // Default más seguro
+        estadoPago = 'pendiente'
+      } = req.body;
 
-    // Generar un número de confirmación único para esta reserva
-    const prefix = 'H'; // H para Habitación
-    const timestamp = Date.now().toString().slice(-6);
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    const numeroConfirmacion = `${prefix}${timestamp}${random}`;
+      const fechaEntradaObj = new Date(fechaEntrada);
+      const fechaSalidaObj = new Date(fechaSalida);
 
-    // Crear la reserva con todos los datos
-    const reservaData = {
-      ...req.body,
-      precio: precioTotal,
-      precioPorNoche: precioFinal,
-      tipoReserva,
-      categoriaHabitacion,
-      infoHuespedes: infoHuespedes || { nombres: [], detalles: '' },
-      letraHabitacion: letraHabitacion || '',
-      metodoPago,
-      estadoPago,
-      numeroConfirmacion
-    };
-    
-    // Verificar que el objeto tiene todos los campos necesarios antes de crear la reserva
-    if (!reservaData.tipoHabitacion) {
-      return res.status(400).json({
-        success: false,
-        message: 'Falta el tipo de habitación'
-      });
-    }
-    
-    if (!reservaData.habitacion) {
-      return res.status(400).json({
-        success: false,
-        message: 'Falta el nombre de la habitación'
-      });
-    }
-    
-    if (!reservaData.fechaEntrada || !reservaData.fechaSalida) {
-      return res.status(400).json({
-        success: false,
-        message: 'Faltan fechas de entrada o salida'
-      });
-    }
-    
-    // Verificar que el numeroConfirmacion esté definido
-    if (!reservaData.numeroConfirmacion) {
-      return res.status(400).json({
-        success: false,
-        message: 'Error al generar número de confirmación'
-      });
-    }
-    
-    console.log('Creando reserva de habitación con datos:', reservaData);
-    
-    const reserva = await ReservaHabitacion.create(reservaData);
-    
-    // Enviar email de confirmación si hay una función sendEmail configurada
-    if (typeof sendEmail === 'function') {
+      // Validaciones básicas de fechas
+      if (isNaN(fechaEntradaObj.getTime()) || isNaN(fechaSalidaObj.getTime())) {
+        throw new ErrorResponse('Fechas inválidas proporcionadas.', 400);
+      }
+      if (fechaEntradaObj >= fechaSalidaObj) {
+        throw new ErrorResponse('La fecha de entrada debe ser anterior a la fecha de salida.', 400);
+      }
+      
+      // --- Verificación de disponibilidad DENTRO de la transacción ---
+      const reservaSolapada = await ReservaHabitacion.findOne({
+        habitacion: habitacion, 
+        estadoReserva: { $in: ['pendiente', 'confirmada', 'completada'] }, 
+        fechaEntrada: { $lt: fechaSalidaObj }, 
+        fechaSalida: { $gt: fechaEntradaObj }
+      }).session(session); 
+
+      if (reservaSolapada) {
+        throw new ErrorResponse(`La habitación ${habitacion} no está disponible para las fechas seleccionadas. Ya existe una reserva (${reservaSolapada.estadoReserva}) que se solapa.`, 409); 
+      }
+
+      // --- Si no hay solapamiento, continuamos con la creación ---
+
+      const duracionEstancia = Math.ceil((fechaSalidaObj - fechaEntradaObj) / (1000 * 60 * 60 * 24));
+      let precioTotal = 0;
+      let precioNocheFinal = 0;
+
+      if (tipoReserva === 'hotel') {
+        let precioPorNocheCalculado = 0;
+        if (categoriaHabitacion === 'sencilla') {
+          precioPorNocheCalculado = precioPorNoche !== undefined ? precioPorNoche : 2400;
+        } else { 
+          precioPorNocheCalculado = precioPorNoche !== undefined ? precioPorNoche : 2600;
+        }
+        precioTotal = precioPorNocheCalculado * duracionEstancia * numeroHabitaciones;
+        precioNocheFinal = precioPorNocheCalculado;
+      } else { 
+        precioTotal = precioPorNoche !== undefined ? precioPorNoche : 0;
+        precioNocheFinal = precioPorNoche !== undefined ? precioPorNoche : 0;
+      }
+
+      const reservaData = {
+        ...req.body,
+        fechaEntrada: fechaEntradaObj,
+        fechaSalida: fechaSalidaObj,
+        precio: precioTotal,
+        precioPorNoche: precioNocheFinal,
+        tipoReserva,
+        categoriaHabitacion,
+        infoHuespedes: infoHuespedes || { nombres: [], detalles: '' },
+        letraHabitacion: letraHabitacion || habitacion, 
+        metodoPago,
+        estadoPago,
+      };
+      
+      if (!reservaData.tipoHabitacion || !reservaData.habitacion || reservaData.precio === undefined) { // Corrección: comparar con undefined
+         throw new ErrorResponse('Faltan datos esenciales para la reserva (tipo, habitación, precio).', 400);
+      }
+
+      const [reservaCreada] = await ReservaHabitacion.create([reservaData], { session }); 
+
+      if (!reservaCreada) {
+         throw new ErrorResponse('No se pudo crear la reserva en la base de datos.', 500);
+      }
+      
+      req.reservaCreada = reservaCreada; 
+      req.metodoPago = metodoPago;
+
+    }); // Fin de session.withTransaction
+
+    const reserva = req.reservaCreada;
+    const metodoPagoSeleccionado = req.metodoPago;
+
+    if (reserva && typeof sendEmail === 'function') {
       try {
-        // Preparar el contenido del email según el método de pago seleccionado
         let mensajeAdicional = '';
-        if (metodoPago === 'tarjeta') {
+        if (metodoPagoSeleccionado === 'tarjeta') {
           mensajeAdicional = '<p>Su pago con tarjeta está siendo procesado. Recibirá una confirmación adicional cuando se complete.</p>';
-        } else {
+        } else if (metodoPagoSeleccionado === 'transferencia') {
+            mensajeAdicional = '<p>Usted ha elegido pagar mediante transferencia. Recibirá instrucciones por separado.</p>';
+        } else { 
           mensajeAdicional = '<p>Usted ha elegido pagar en efectivo al llegar. Por favor presente su número de confirmación en la recepción.</p>';
         }
         
+        // Corregir la plantilla del email eliminando las barras invertidas innecesarias
         await sendEmail({
-          email: reserva.emailContacto || reserva.email,
+          email: reserva.emailContacto || (reserva.usuario ? reserva.usuario.email : null), 
           subject: 'Confirmación de reserva - Hacienda San Carlos Borromeo',
-          html: `
+          html: ` 
             <h1>Reserva confirmada</h1>
-            <p>Su reserva para ${reserva.tipoHabitacion} ha sido confirmada para las fechas: ${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}</p>
-            <p>Número de confirmación: ${reserva.numeroConfirmacion}</p>
-            <p>Método de pago: ${metodoPago === 'tarjeta' ? 'Tarjeta de crédito/débito' : 'Efectivo al llegar'}</p>
+            <p>Su reserva para la habitación ${reserva.habitacion} (${reserva.tipoHabitacion}) ha sido confirmada.</p>
+            <p>Fechas: ${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}</p>
+            <p>Número de confirmación: <strong>${reserva.numeroConfirmacion}</strong></p>
+            <p>Precio Total: ${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}</p>
+            <p>Método de pago: ${metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1)}</p>
             ${mensajeAdicional}
             <p>Gracias por elegir Hacienda San Carlos Borromeo.</p>
           `
         });
       } catch (err) {
-        console.error('Error al enviar email de confirmación:', err);
-        // No impedimos que se complete la reserva si el email falla
+        console.error('Error al enviar email de confirmación (la reserva FUE creada):', err);
       }
     }
-    
+
     res.status(201).json({
       success: true,
-      data: reserva
+      data: reserva 
     });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
+    console.error('Error durante la transacción de creación de reserva:', error);
+    const statusCode = error.statusCode || 500;
+    const message = error.message || 'Error al crear la reserva de habitación';
+    // Evitar enviar el objeto error completo en producción si contiene detalles sensibles
+    res.status(statusCode).json({
       success: false,
-      message: 'Error al crear la reserva de habitación',
-      error: error.message
+      message: message
     });
+  } finally {
+    await session.endSession();
   }
 });
 
@@ -175,60 +168,49 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
 // @access  Private
 exports.getReservasHabitacion = asyncHandler(async (req, res, next) => {
   try {
-    // Filtros básicos
     let query = {};
-    
-    // Si el usuario está autenticado y es admin, puede ver reservas según filtros
-    if (req.user && req.user.role === 'admin') {
-      // Filtros para administradores
-      if (req.query.misReservas === 'true') {
-        // Ver solo las reservas asignadas al admin actual
-        query.asignadoA = req.user.id;
-      } else if (req.query.disponibles === 'true' || req.query.sinAsignar === 'true') {
-        // Ver solo las reservas no asignadas (disponibles)
-        query.asignadoA = null;
-      } else {
-        // Sin filtros específicos, mostrar tanto las asignadas a este admin como las sin asignar
-        query = {
-          $or: [
-            { asignadoA: req.user.id },
-            { asignadoA: null }
-          ]
-        };
+    const { from_admin, misReservas, disponibles, sinAsignar, fechaInicio, fechaFin, estado, habitacionId } = req.query;
+
+    // Lógica de filtrado para admin/usuario normal (simplificada para claridad)
+    if (req.user && from_admin === 'true') { 
+      if (misReservas === 'true') query.asignadoA = req.user.id;
+      else if (disponibles === 'true' || sinAsignar === 'true') query.asignadoA = null;
+    } else if (req.user) { 
+      query.$or = [ { usuario: req.user.id }, { asignadoA: req.user.id } ];
+    } else {
+       query._id = null; // No autenticado, devuelve vacío por defecto
+    }
+
+    // Filtros Adicionales
+    if (fechaInicio && fechaFin) {
+      const inicio = new Date(fechaInicio);
+      const fin = new Date(fechaFin);
+      if (!isNaN(inicio) && !isNaN(fin) && inicio <= fin) {
+        // Añadir condición de solapamiento al query existente
+        const dateCondition = { fechaEntrada: { $lt: fin }, fechaSalida: { $gt: inicio } };
+        if (query.$or) {
+            // Si ya hay un $or (del filtro de usuario), añadirlo a una condición $and
+            query.$and = [ { $or: query.$or }, dateCondition ];
+            delete query.$or; // Quitar el $or original
+        } else {
+            // Si no hay $or, añadir directamente la condición de fecha
+             Object.assign(query, dateCondition);
+        }
       }
-    } else if (req.user) {
-      // Usuario autenticado normal: ver sus propias reservas
-      query = {
-        $or: [
-          { usuario: req.user.id },
-          { asignadoA: req.user.id }
-        ]
-      };
+    } // Podrían añadirse casos para solo fechaInicio o fechaFin si es necesario
+    
+    if (estado && ['pendiente', 'confirmada', 'cancelada', 'completada'].includes(estado)) {
+      query.estadoReserva = estado;
+    }
+    if (habitacionId) {
+      query.habitacion = habitacionId; 
     }
     
-    // Ejecutar query con opción strictPopulate para evitar errores
     const reservas = await ReservaHabitacion.find(query)
-      .populate({
-        path: 'usuario',
-        select: 'nombre apellidos email telefono',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'asignadoA',
-        select: 'nombre apellidos email',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'habitacion',
-        select: 'nombre letra',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'tipoHabitacion',
-        select: 'nombre',
-        strictPopulate: false
-      })
-      .sort('-createdAt');
+      .populate({ path: 'usuario', select: 'nombre apellidos email', strictPopulate: false })
+      .populate({ path: 'asignadoA', select: 'nombre apellidos email', strictPopulate: false })
+      .populate({ path: 'reservaEvento', select: 'nombreEvento fecha', strictPopulate: false }) 
+      .sort('-fechaEntrada'); 
     
     res.status(200).json({
       success: true,
@@ -237,323 +219,110 @@ exports.getReservasHabitacion = asyncHandler(async (req, res, next) => {
     });
   } catch (error) {
     console.error('Error al obtener las reservas de habitación:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener las reservas de habitación',
-      error: error.message
-    });
+    next(error); 
   }
 });
 
 // @desc    Obtener una reserva de habitación por ID
 // @route   GET /api/reservas/habitaciones/:id
 // @access  Private
-exports.getReservaHabitacion = asyncHandler(async (req, res, next) => {
-  try {
-    const reserva = await ReservaHabitacion.findById(req.params.id)
-      .populate({
-        path: 'usuario',
-        select: 'nombre apellidos email telefono',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'asignadoA',
-        select: 'nombre apellidos email',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'reservaEvento',
-        select: 'nombreEvento tipoEvento',
-        strictPopulate: false,
-        populate: {
-           path: 'tipoEvento',
-           select: 'titulo nombre'
-        }
-      });
-    
-    if (!reserva) {
-      return res.status(404).json({
-        success: false,
-        message: 'No se encontró la reserva con ese ID'
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      data: reserva
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener la reserva de habitación'
-    });
+exports.getReservaHabitacionById = asyncHandler(async (req, res, next) => {
+  const reserva = await ReservaHabitacion.findById(req.params.id)
+    .populate('usuario', 'nombre apellidos email')
+    .populate('asignadoA', 'nombre apellidos email')
+    .populate('reservaEvento', 'nombreEvento fecha');
+
+  if (!reserva) {
+    return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
   }
+  res.status(200).json({ success: true, data: reserva });
 });
 
 // @desc    Actualizar una reserva de habitación
 // @route   PUT /api/reservas/habitaciones/:id
-// @access  Private
+// @access  Private (Admin)
 exports.updateReservaHabitacion = asyncHandler(async (req, res, next) => {
-  try {
-    let reserva = await ReservaHabitacion.findById(req.params.id);
-    
+    const { numeroConfirmacion, ...updateData } = req.body;
+    // TODO: Añadir re-validación de disponibilidad si se cambian fechas/habitación.
+    const reserva = await ReservaHabitacion.findByIdAndUpdate(req.params.id, updateData, {
+        new: true, 
+        runValidators: true 
+    });
     if (!reserva) {
-      return res.status(404).json({
-        success: false,
-        message: 'No se encontró la reserva con ese ID'
-      });
+        return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
     }
-    
-    // --- INICIO: Verificación de Permiso de Asignación ---
-    if (!req.user || !req.user.id) {
-       console.error("Error: req.user no está definido en updateReservaHabitacion.");
-       return res.status(500).json({ success: false, message: 'Error interno del servidor (Autenticación)' });
-    }
-    const asignadoAId = reserva.asignadoA ? reserva.asignadoA.toString() : null;
-    const userId = req.user.id.toString(); 
-    if (asignadoAId && asignadoAId !== userId) {
-      // Excepción: Permitir actualizar solo si el único cambio es el estado a 'cancelada'
-      const updateKeys = Object.keys(req.body);
-      const isOnlyStatusUpdateToCancelled = updateKeys.length === 1 && updateKeys[0] === 'estadoReserva' && req.body.estadoReserva === 'cancelada';
-      
-      if (!isOnlyStatusUpdateToCancelled) {
-        return res.status(403).json({
-          success: false,
-          message: 'No tienes permiso para actualizar esta reserva porque está asignada a otro administrador.'
-        });
-      }
-    }
-    // --- FIN: Verificación de Permiso de Asignación ---
-    
-    // (Añadir verificación de permisos de usuario normal si es necesario)
-    // if (reserva.usuario && reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') { ... }
-
-    // Definir campos que requieren verificación de disponibilidad
-    const requiresAvailabilityCheck = 
-        req.body.hasOwnProperty('tipoHabitacion') || 
-        req.body.hasOwnProperty('fechaEntrada') || 
-        req.body.hasOwnProperty('fechaSalida') || 
-        req.body.hasOwnProperty('numeroHabitaciones');
-
-    // Si se está cambiando algún campo que afecta la disponibilidad
-    if (requiresAvailabilityCheck) {
-      console.log('Realizando chequeo de disponibilidad para la actualización...');
-      // Usar valores del body si existen, si no, los de la reserva original
-      const tipoHabitacion = req.body.tipoHabitacion !== undefined ? req.body.tipoHabitacion : reserva.tipoHabitacion;
-      const fechaEntrada = req.body.fechaEntrada !== undefined ? req.body.fechaEntrada : reserva.fechaEntrada;
-      const fechaSalida = req.body.fechaSalida !== undefined ? req.body.fechaSalida : reserva.fechaSalida;
-      // numeroHabitaciones no afecta directamente comprobarDisponibilidad por ahora
-      
-      // Validar fechas antes de comprobar
-      if (new Date(fechaSalida) <= new Date(fechaEntrada)) {
-           return res.status(400).json({
-               success: false,
-               message: 'La fecha de salida debe ser posterior a la fecha de entrada.'
-           });
-      }
-
-      const disponibilidad = await ReservaHabitacion.comprobarDisponibilidad(
-        tipoHabitacion, 
-        fechaEntrada, 
-        fechaSalida
-      );
-      
-      // Importante: Excluir la reserva actual de la comprobación de solapamiento
-      const reservaActualId = req.params.id;
-      const haySolapamientoReal = disponibilidad.reservasExistentes.some(
-          reservaExistente => reservaExistente._id.toString() !== reservaActualId
-      );
-
-      if (haySolapamientoReal) {
-           console.warn('Conflicto de disponibilidad detectado al actualizar.');
-           return res.status(400).json({
-               success: false,
-               message: 'Conflicto de disponibilidad para las nuevas fechas o tipo de habitación.'
-           });
-      }
-      console.log('Disponibilidad confirmada para la actualización.');
-    }
-    
-    // Log ANTES de la actualización
-    console.log(`[updateReservaHabitacion] Intentando actualizar ${req.params.id} con body:`, req.body);
-    console.log(`[updateReservaHabitacion] Estado ANTES: ${reserva.estadoReserva}`);
-
-    const reservaActualizada = await ReservaHabitacion.findByIdAndUpdate(req.params.id, req.body, {
-      new: true, // Devolver el documento modificado
-      runValidators: true // Ejecutar validaciones del Schema
-    });
-    
-    // Log DESPUÉS de la actualización
-    console.log(`[updateReservaHabitacion] Resultado de findByIdAndUpdate:`, reservaActualizada);
-    console.log(`[updateReservaHabitacion] Estado DESPUÉS (en reservaActualizada): ${reservaActualizada?.estadoReserva}`);
-
-     if (!reservaActualizada) {
-         return res.status(404).json({ success: false, message: 'No se pudo actualizar la reserva.' });
-     }
-
-    console.log('Reserva actualizada exitosamente:', reservaActualizada._id);
-    res.status(200).json({
-      success: true,
-      data: reservaActualizada
-    });
-
-  } catch (error) {
-    console.error('Error detallado al actualizar reserva:', error);
-    // Devolver un mensaje de error más específico si es un error de validación
-    if (error.name === 'ValidationError') {
-        return res.status(400).json({ success: false, message: error.message });
-    }
-    // Error genérico para otros casos
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Error al actualizar la reserva de habitación'
-    });
-  }
+    res.status(200).json({ success: true, data: reserva });
 });
 
 // @desc    Eliminar una reserva de habitación
 // @route   DELETE /api/reservas/habitaciones/:id
-// @access  Private
+// @access  Private (Admin)
 exports.deleteReservaHabitacion = asyncHandler(async (req, res, next) => {
-  try {
-    console.log('Intentando eliminar reserva de habitación con ID:', req.params.id);
-    
-    // Validar que el ID sea válido para MongoDB
-    if (!req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
-      console.log('ID de reserva no válido:', req.params.id);
-      return res.status(400).json({
-        success: false,
-        message: 'ID de reserva no válido'
-      });
-    }
-    
     const reserva = await ReservaHabitacion.findById(req.params.id);
-    
     if (!reserva) {
-      console.log('Reserva no encontrada con ID:', req.params.id);
-      return res.status(404).json({
-        success: false,
-        message: 'No se encontró la reserva con ese ID'
-      });
+        return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
     }
-
-    // --- INICIO: Verificación de Permiso de Asignación ---
-    if (!req.user || !req.user.id) {
-       console.error("Error: req.user no está definido en deleteReservaHabitacion.");
-       return res.status(500).json({ success: false, message: 'Error interno del servidor (Autenticación)' });
-    }
-    const asignadoAId = reserva.asignadoA ? reserva.asignadoA.toString() : null;
-    const userId = req.user.id.toString(); 
-    if (asignadoAId && asignadoAId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permiso para eliminar esta reserva porque está asignada a otro administrador.'
-      });
-    }
-    // --- FIN: Verificación de Permiso de Asignación ---
-    
-    // (Añadir verificación de permisos de usuario normal si es necesario)
-    // if (reserva.usuario && reserva.usuario.toString() !== req.user.id && req.user.role !== 'admin') { ... }
-
-    await reserva.deleteOne();
-    console.log('Reserva eliminada exitosamente');
-    
-    res.status(200).json({
-      success: true,
-      data: {}
-    });
-  } catch (error) {
-    console.error('Error al eliminar reserva de habitación:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al eliminar la reserva de habitación'
-    });
-  }
+    await reserva.deleteOne(); 
+    res.status(200).json({ success: true, data: {} }); 
 });
 
-// @desc    Asignar reserva de habitación a un usuario
+// @desc    Asignar una reserva de habitación a un usuario (Admin)
 // @route   PUT /api/reservas/habitaciones/:id/asignar
-// @access  Private
-exports.assignReservaHabitacion = asyncHandler(async (req, res, next) => {
-  try {
-    const { usuarioId } = req.body;
-    
-    // Si no se proporciona un ID de usuario, asignar al usuario actual
-    const idUsuarioAsignar = usuarioId || req.user.id;
-    
-    // Verificar que el usuario existe (solo si se proporcionó un ID específico)
-    if (usuarioId) {
-      const usuario = await User.findById(usuarioId);
-      if (!usuario) {
-        return res.status(404).json({
-          success: false,
-          message: 'Usuario no encontrado'
-        });
-      }
-    }
-    
-    // Buscar la reserva y actualizarla
-    const reserva = await ReservaHabitacion.findById(req.params.id);
-    
-    if (!reserva) {
-      return res.status(404).json({
-        success: false,
-        message: 'No se encontró la reserva con ese ID'
-      });
-    }
-    
-    // Actualizar asignación
-    reserva.asignadoA = idUsuarioAsignar;
-    await reserva.save();
-    
-    res.status(200).json({
-      success: true,
-      data: reserva,
-      message: 'Reserva asignada exitosamente'
-    });
-  } catch (error) {
-    console.error('Error al asignar la reserva de habitación:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al asignar la reserva de habitación',
-      error: error.message
-    });
+// @access  Private (Admin)
+exports.asignarReservaHabitacion = asyncHandler(async (req, res, next) => {
+  const { usuarioId } = req.body;
+  if (!usuarioId) {
+    return next(new ErrorResponse('Por favor, proporcione el ID del usuario a asignar.', 400));
   }
+  const userExists = await User.findById(usuarioId);
+  if (!userExists) {
+      return next(new ErrorResponse(`Usuario no encontrado con ID ${usuarioId}`, 404));
+  }
+  const reserva = await ReservaHabitacion.findByIdAndUpdate(
+    req.params.id,
+    { asignadoA: usuarioId },
+    { new: true, runValidators: true }
+  ).populate('asignadoA', 'nombre apellidos email'); 
+  if (!reserva) {
+    return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
+  }
+  res.status(200).json({ success: true, data: reserva });
 });
 
-// @desc    Desasignar una reserva de habitación
+// @desc    Desasignar una reserva de habitación (Admin)
 // @route   PUT /api/reservas/habitaciones/:id/desasignar
-// @access  Private
-exports.unassignReservaHabitacion = asyncHandler(async (req, res, next) => {
-  try {
-    // Buscar la reserva
-    const reserva = await ReservaHabitacion.findById(req.params.id);
-    
-    if (!reserva) {
-      return res.status(404).json({
-        success: false,
-        message: 'No se encontró la reserva con ese ID'
-      });
-    }
-    
-    // Desasignar reserva
-    reserva.asignadoA = null;
-    await reserva.save();
-    
-    res.status(200).json({
-      success: true,
-      data: reserva,
-      message: 'Reserva de habitación desasignada exitosamente'
-    });
-  } catch (error) {
-    console.error('Error al desasignar la reserva de habitación:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al desasignar la reserva de habitación',
-      error: error.message
-    });
+// @access  Private (Admin)
+exports.desasignarReservaHabitacion = asyncHandler(async (req, res, next) => {
+  const reserva = await ReservaHabitacion.findByIdAndUpdate(
+    req.params.id,
+    { asignadoA: null }, 
+    { new: true, runValidators: true }
+  );
+  if (!reserva) {
+    return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
   }
+  res.status(200).json({ success: true, data: reserva, message: 'Reserva de habitación desasignada exitosamente' });
+});
+
+
+// @desc    Actualizar estado de una reserva de habitación (Admin)
+// @route   PATCH /api/reservas/habitaciones/:id/estado
+// @access  Private (Admin)
+exports.actualizarEstadoReservaHabitacion = asyncHandler(async (req, res, next) => {
+  const { estado } = req.body;
+  const validStates = ['pendiente', 'confirmada', 'cancelada', 'completada'];
+  if (!estado || !validStates.includes(estado)) {
+    return next(new ErrorResponse(`Estado inválido. Los estados permitidos son: ${validStates.join(', ')}.`, 400));
+  }
+  const reserva = await ReservaHabitacion.findByIdAndUpdate(
+    req.params.id,
+    { estadoReserva: estado },
+    { new: true, runValidators: true }
+  );
+  if (!reserva) {
+    return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
+  }
+  res.status(200).json({ success: true, data: reserva });
 });
 
 // @desc    Comprobar disponibilidad de habitaciones
