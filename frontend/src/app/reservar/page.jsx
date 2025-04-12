@@ -358,66 +358,72 @@ const ReservaWizard = () => {
   };
 
   const handleSubmit = async () => {
-    // --- Inicio: Añadir validación y log ---
-    if (!formData.fechaInicio || isNaN(new Date(formData.fechaInicio).getTime())) {
-      toast.error('La fecha seleccionada no es válida. Por favor, selecciónela de nuevo.');
-      setCurrentStep(2); // Volver al paso de fecha
-      return;
-    }
-    console.log('Datos de habitaciones seleccionadas antes de mapear:', JSON.stringify(formData.habitacionesSeleccionadas, null, 2));
-    // --- Fin: Añadir validación y log ---
-    
-    // --- Reactivar lógica de envío --- 
+    // Prevalidación final (opcional, ya se validó por pasos)
+    // ...
+
+    setLoading(true);
     try {
-      // ---- NUEVO LOG ----
-      console.log("Valor de formData.tipoEvento antes de construir reservaData:", JSON.stringify(formData.tipoEvento, null, 2));
-      // ---- FIN NUEVO LOG ----
-      
-      // Construir el objeto de datos para la reserva (AJUSTADO A EXPECTATIVAS DEL BACKEND)
-      const reservaData = {
-        tipo_evento: formData.tipoEvento?.titulo || formData.tipoEvento, // Campo backend: tipo_evento (Enviar título)
-        fecha: formData.fechaInicio, // Campo backend: fecha (usamos fechaInicio como principal)
-        // Campos de contacto mapeados:
-        nombre_contacto: formData.datosContacto?.nombre,
-        apellidos_contacto: formData.datosContacto?.apellidos,
-        email_contacto: formData.datosContacto?.email,
-        telefono_contacto: formData.datosContacto?.telefono,
-        mensaje: formData.datosContacto?.mensaje, // Campo backend: mensaje
-        // Modos de gestión mapeados:
+      // Preparar datos para la API
+      const apiData = {
+        tipo_evento: formData.tipoEvento?.titulo || formData.tipoEvento, // Enviar el título o el string
+        fecha: formData.fechaInicio ? formData.fechaInicio.toISOString().split('T')[0] : null,
+        // Incluir fechas inicio/fin si es necesario por el backend, aunque el modelo de evento solo usa una fecha?
+        // fechaInicio: formData.fechaInicio?.toISOString(),
+        // fechaFin: formData.fechaFin?.toISOString(),
+        nombre_contacto: formData.datosContacto.nombre,
+        apellidos_contacto: formData.datosContacto.apellidos,
+        email_contacto: formData.datosContacto.email,
+        telefono_contacto: formData.datosContacto.telefono,
+        mensaje: formData.datosContacto.mensaje,
         modo_gestion_habitaciones: formData.modoGestionHabitaciones,
+        // Solo enviar habitaciones si el modo es 'usuario'
+        habitaciones: formData.modoGestionHabitaciones === 'usuario' ? formData.habitacionesSeleccionadas : undefined,
         modo_gestion_servicios: formData.modoGestionServicios,
-        // Habitaciones y servicios (asegurarse de que el backend espera este formato)
-        habitaciones: formData.habitacionesSeleccionadas, // Campo backend: habitaciones
-        serviciosContratados: formData.serviciosSeleccionados.map(s => s._id || s), // Campo backend: serviciosContratados
-        // Incluir _serviciosCompletosParaPrecio si el modo es usuario para cálculo de precio en backend
-        ...(formData.modoGestionServicios === 'usuario' && { 
-             _serviciosCompletosParaPrecio: formData.serviciosSeleccionados 
-        })
+        // Solo enviar servicios si el modo es 'usuario'
+        serviciosContratados: formData.modoGestionServicios === 'usuario' ? formData.serviciosSeleccionados.map(s => s._id) : undefined,
+        // Pasar servicios completos para cálculo de precio si modo es 'usuario'
+        _serviciosCompletosParaPrecio: formData.modoGestionServicios === 'usuario' ? formData.serviciosSeleccionados : undefined,
+        // Otros campos necesarios por el backend...
+        numInvitados: formData.numeroInvitados || 50, // Añadir numInvitados si se pide en algún paso
       };
 
-      console.log("Enviando datos de reserva:", reservaData);
+      console.log("Enviando datos de reserva a la API:", apiData);
 
-      // Llamar al servicio de creación de reserva de evento
-      // Asegúrate de que la función createEventoReservation esté importada correctamente
-      const response = await createEventoReservation(reservaData);
+      // Llamar a la API
+      const response = await createEventoReservation(apiData);
 
-      console.log("Respuesta del servidor:", response);
+      console.log("Respuesta de la API:", response);
 
-      if (response && (response.success || response.data)) { // Verificar éxito (la estructura de respuesta puede variar)
-        toast.success('¡Reserva creada exitosamente!');
-        resetForm(); // Limpiar el formulario
-        // Opcional: Redirigir a página de confirmación o dashboard
-        // router.push('/reservar/confirmacion'); 
-        setCurrentStep(steps.length + 1); // Avanzar a un paso de "éxito" (si existe)
+      if (response.success) {
+        toast.success(response.message || '¡Reserva creada con éxito! Nos pondremos en contacto pronto.');
+        // Avanzar al paso de confirmación (si existe) o resetear/redirigir
+        setCurrentStep(steps.length + 1); // Ir a un paso final de confirmación
+        // resetForm(); // O resetear aquí
+        // router.push('/gracias-reserva'); // O redirigir
       } else {
-        // Manejar error devuelto por el backend
-        toast.error(response?.message || 'Error al crear la reserva. Intente de nuevo.');
-        // Podrías querer volver a un paso anterior si el error lo justifica
-        // setCurrentStep(5); 
+        // --- MANEJO DE ERROR 409 y OTROS --- 
+        if (response.status === 409) {
+          setValidationErrorMessage(response.message || 'La habitación o fecha seleccionada ya no está disponible.');
+          setShowValidationModal(true);
+          setValidationRedirectStep(2); // Ofrecer volver al paso de fechas
+        } else {
+          toast.error(response.message || 'Error al crear la reserva.');
+        }
+        // --- FIN MANEJO ERROR --- 
       }
     } catch (error) {
       console.error('Error al enviar la reserva:', error);
-      toast.error(error.response?.data?.message || error.message || 'Error de conexión al crear la reserva.');
+      // --- MANEJO DE ERROR 409 y OTROS (Bloque Catch) --- 
+      if (error.response && error.response.status === 409) {
+        setValidationErrorMessage(error.response.data?.message || 'La habitación o fecha seleccionada ya no está disponible.');
+        setShowValidationModal(true);
+        setValidationRedirectStep(2); // Ofrecer volver al paso de fechas
+      } else {
+        toast.error(error.message || 'Ocurrió un error inesperado al intentar crear la reserva.');
+      }
+      // --- FIN MANEJO ERROR --- 
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -447,34 +453,73 @@ const ReservaWizard = () => {
       
       case 2:
         return (
-          <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-center text-[#4A3728]">Seleccione la Fecha y Número de Habitaciones</h3>
-            <div>
-              <label className="block text-sm font-medium text-[#6B4F3A] mb-2">Fechas del Evento</label>
-              <CalendarioReserva 
-                // MODIFICADO: Pasar props para rango
-                startDate={formData.fechaInicio instanceof Date && !isNaN(formData.fechaInicio) ? formData.fechaInicio : null}
-                endDate={formData.fechaFin instanceof Date && !isNaN(formData.fechaFin) ? formData.fechaFin : null}
-                onChange={handleDateRangeChange} 
-                occupiedDates={occupiedDates}
-                loadingOccupiedDates={loadingOccupiedDates}
-                placeholderText="Seleccione el rango de fechas"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            {/* Columna Izquierda: Calendario */}
+            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-[#D1B59B]">
+              <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Seleccione las fechas</h3>
+              <p className="text-[#8A6E52] mb-6 italic">Elija la fecha de inicio y fin de su evento.</p>
+              <DatePicker
+                selected={formData.fechaInicio}
+                onChange={handleDateRangeChange}
+                startDate={formData.fechaInicio}
+                endDate={formData.fechaFin}
+                excludeDates={occupiedDates.map(date => new Date(date))} // <-- Asegurar que pasamos objetos Date
+                selectsRange
+                inline
+                locale={es} 
+                minDate={new Date()} // No permitir fechas pasadas
+                monthsShown={2}
+                dateFormat="dd/MM/yyyy"
+                calendarClassName="reserva-datepicker"
+                dayClassName={(date) => {
+                  // Lógica para clases de días (opcional)
+                  return undefined; 
+                }}
+                filterDate={(date) => {
+                  // Opcional: deshabilitar fines de semana si es necesario
+                  // const day = date.getDay();
+                  // return day !== 0 && day !== 6; 
+                  return true; // Permitir todos los días por defecto
+                }}
+                isLoading={loadingOccupiedDates} // Mostrar indicador de carga
               />
+              {loadingOccupiedDates && <p className="text-sm text-gray-500 mt-2">Cargando disponibilidad...</p>}
+              {!loadingOccupiedDates && occupiedDates.length > 0 && 
+                <p className="text-sm text-gray-500 mt-2 italic">Los días marcados pueden no estar disponibles.</p>
+              }
             </div>
-            <div>
-              <label htmlFor="numeroHabitaciones" className="block text-sm font-medium text-[#6B4F3A] mb-2">Número de Habitaciones Requeridas</label>
-              <select 
-                id="numeroHabitaciones" 
-                name="numeroHabitaciones" 
-                value={formData.numeroHabitaciones || 7}
-                onChange={(e) => updateFormSection('numeroHabitaciones', parseInt(e.target.value, 10))} 
-                className="w-full p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300"
-              >
-                {/* Generar opciones de 7 a 14 */}
-                {Array.from({ length: 14 - 7 + 1 }, (_, i) => 7 + i).map(num => (
-                  <option key={num} value={num}>{num}</option>
-                ))}
-              </select>
+            
+            {/* Columna Derecha: Input Número de Habitaciones */}
+            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-[#D1B59B]">
+               <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Número de Habitaciones</h3>
+               <p className="text-[#8A6E52] mb-6 italic">Indique cuántas habitaciones estima necesitar (7-14).</p>
+               <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <FaBed className="text-[#A5856A]" />
+                  </div>
+                  <input 
+                    type="number"
+                    min="7"
+                    max="14" // Límite máximo según la descripción
+                    value={formData.numeroHabitaciones || ''} 
+                    onChange={(e) => {
+                       const value = parseInt(e.target.value, 10);
+                       if (!isNaN(value) && value >= 1 && value <= 14) { // Validar rango aquí también
+                         updateFormSection('numeroHabitaciones', value);
+                       } else if (e.target.value === '') { // Permitir borrar
+                         updateFormSection('numeroHabitaciones', '');
+                       }
+                    }}
+                    className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
+                    placeholder="Ej. 10"
+                    required
+                  />
+               </div>
+               <p className="text-xs text-gray-500 mt-2">Se reservarán hasta 14 habitaciones estándar si selecciona la gestión por la Hacienda.</p>
+               {/* Mensaje de error si el número está fuera de rango */}
+               {(formData.numeroHabitaciones !== '' && (formData.numeroHabitaciones < 7 || formData.numeroHabitaciones > 14)) && (
+                 <p className="text-red-500 text-sm mt-2">Por favor, introduzca un número entre 7 y 14.</p>
+               )}
             </div>
           </div>
         );
