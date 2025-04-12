@@ -762,10 +762,10 @@ function BookingFormSection({
 
         {/* Success Modal */}
         <AnimatePresence>
-           {showSuccessModal && multipleReservationConfirmations.length > 0 && (
+           {showReservationSuccess && multipleReservationConfirmations.length > 0 && (
             <ReservationSuccessModal
-              isOpen={showSuccessModal}
-              onClose={() => setShowSuccessModal(false)}
+              isOpen={showReservationSuccess}
+              onClose={() => setShowReservationSuccess(false)}
               reservationDetails={multipleReservationConfirmations}
             />
            )}
