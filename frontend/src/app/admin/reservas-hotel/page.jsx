@@ -309,7 +309,7 @@ export default function AdminHotelReservations() {
     
     setIsLoading(true);
     try {
-      const url = `/reservas/hotel/${reservaId}/estado`;
+      const url = `/reservas/habitaciones/${reservaId}/estado`;
       // console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
       const response = await apiClient.patch(url, { estado: 'confirmada' });
       // console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
@@ -336,7 +336,7 @@ export default function AdminHotelReservations() {
     
     setIsLoading(true);
     try {
-      const url = `/reservas/hotel/${reservaId}/estado`;
+      const url = `/reservas/habitaciones/${reservaId}/estado`;
       // console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
       const response = await apiClient.patch(url, { estado: 'cancelada' });
       // console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
@@ -390,7 +390,7 @@ export default function AdminHotelReservations() {
     
     setIsLoading(true);
     try {
-      const url = `/reservas/hotel/${reservaId}/estado`;
+      const url = `/reservas/habitaciones/${reservaId}/estado`;
       // console.log(`[AdminHotelReservations] Llamando apiClient.patch directamente a ${url}...`);
       const response = await apiClient.patch(url, { estado: 'pendiente' });
       // console.log('[AdminHotelReservations] Respuesta DIRECTA de API recibida:', JSON.stringify(response));

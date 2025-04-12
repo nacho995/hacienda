@@ -269,15 +269,34 @@ exports.getReservasHabitacion = asyncHandler(async (req, res, next) => {
 // @route   GET /api/reservas/habitaciones/:id
 // @access  Private
 exports.getReservaHabitacionById = asyncHandler(async (req, res, next) => {
-  const reserva = await ReservaHabitacion.findById(req.params.id)
-    .populate('usuario', 'nombre apellidos email')
-    .populate('asignadoA', 'nombre apellidos email')
-    .populate('reservaEvento', 'nombreEvento fecha');
+  try {
+    let reserva = await ReservaHabitacion.findById(req.params.id)
+      .populate('asignadoA', 'nombre apellidos email') // Populamos los otros primero
+      .populate('reservaEvento', 'nombreEvento fecha');
 
-  if (!reserva) {
-    return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
+    if (!reserva) {
+      return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
+    }
+
+    // Intentar popular 'usuario' por separado y manejar el error si falla
+    try {
+      // Necesitamos re-ejecutar el populate en el documento encontrado
+      await reserva.populate({ path: 'usuario', select: 'nombre apellidos email' });
+    } catch (populateError) {
+      // Si falla el populate de 'usuario', simplemente lo dejamos como null o undefined
+      // y continuamos, en lugar de lanzar un error 500.
+      console.warn(`[Populate Warn] No se pudo popular 'usuario' para ReservaHabitacion ${req.params.id}: ${populateError.message}`);
+      // El campo reserva.usuario podría quedar como el ObjectId original o null/undefined,
+      // el frontend debería manejar esto.
+    }
+
+    res.status(200).json({ success: true, data: reserva });
+
+  } catch (error) {
+    // Capturar otros errores inesperados
+    console.error(`Error en getReservaHabitacionById para ID ${req.params.id}:`, error);
+    next(error); // Pasar a middleware de errores
   }
-  res.status(200).json({ success: true, data: reserva });
 });
 
 // @desc    Actualizar una reserva de habitación
