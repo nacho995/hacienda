@@ -146,29 +146,36 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
         }
 
         // --- EMAIL A LA HACIENDA (ADMIN) ---
-        const adminEmail = process.env.ADMIN_EMAIL;
-        if (adminEmail) {
-            await sendEmail({
-              email: adminEmail, // Directamente la cadena del .env
-              subject: `Nueva Reserva Habitación #${reserva.numeroConfirmacion} (${reserva.tipoReserva})`, 
-              html: `
-                <h1>Nueva Reserva de Habitación Registrada</h1>
-                <p>Se ha creado una nueva reserva de habitación (${reserva.tipoReserva}).</p>
-                <ul>
-                  <li><strong>Cliente:</strong> ${reserva.nombreContacto || 'No especificado'} ${reserva.apellidosContacto || ''}</li>
-                  <li><strong>Email Cliente:</strong> ${clienteEmail || 'No disponible'}</li>
-                  <li><strong>Teléfono Cliente:</strong> ${reserva.telefonoContacto || 'No disponible'}</li>
-                  <li><strong>Habitación:</strong> ${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'})</li>
-                  <li><strong>Fechas:</strong> ${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}</li>
-                  <li><strong>Confirmación #:</strong> ${reserva.numeroConfirmacion}</li>
-                  <li><strong>Precio:</strong> ${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}</li>
-                  <li><strong>Método Pago:</strong> ${metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1)}</li>
-                  <li><strong>Estado Reserva:</strong> ${reserva.estadoReserva || 'pendiente'}</li>
-                  <li><strong>Notas/Huéspedes:</strong> ${reserva.infoHuespedes?.detalles || 'Ninguna'}</li> 
-                </ul>
-                <p>Por favor, verifique esta reserva en el panel de administración.</p>
-              `
-            });
+        const adminEmailsString = process.env.ADMIN_EMAIL;
+        if (adminEmailsString) {
+            // Dividir la cadena de emails por comas y quitar espacios en blanco
+            const adminEmailArray = adminEmailsString.split(',').map(email => email.trim());
+
+            if (adminEmailArray.length > 0) {
+                await sendEmail({
+                  email: adminEmailArray, // <-- Pasar el array de emails
+                  subject: `Nueva Reserva Habitación #${reserva.numeroConfirmacion} (${reserva.tipoReserva})`,
+                  html: `
+                    <h1>Nueva Reserva de Habitación Registrada</h1>
+                    <p>Se ha creado una nueva reserva de habitación (${reserva.tipoReserva}).</p>
+                    <ul>
+                      <li><strong>Cliente:</strong> ${reserva.nombreContacto || 'No especificado'} ${reserva.apellidosContacto || ''}</li>
+                      <li><strong>Email Cliente:</strong> ${clienteEmail || 'No disponible'}</li>
+                      <li><strong>Teléfono Cliente:</strong> ${reserva.telefonoContacto || 'No disponible'}</li>
+                      <li><strong>Habitación:</strong> ${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'})</li>
+                      <li><strong>Fechas:</strong> ${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}</li>
+                      <li><strong>Confirmación #:</strong> ${reserva.numeroConfirmacion}</li>
+                      <li><strong>Precio:</strong> ${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}</li>
+                      <li><strong>Método Pago:</strong> ${metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1)}</li>
+                      <li><strong>Estado Reserva:</strong> ${reserva.estadoReserva || 'pendiente'}</li>
+                      <li><strong>Notas/Huéspedes:</strong> ${reserva.infoHuespedes?.detalles || 'Ninguna'}</li>
+                    </ul>
+                    <p>Por favor, verifique esta reserva en el panel de administración.</p>
+                  `
+                });
+            } else {
+                 console.warn('[Email Send] ADMIN_EMAIL está configurado pero no contiene direcciones válidas después de dividir.');
+            }
         } else {
             console.warn('[Email Send] La variable de entorno ADMIN_EMAIL no está configurada. No se envió notificación a la hacienda.');
         }
