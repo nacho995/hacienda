@@ -196,19 +196,17 @@ export default function Navbar() {
               ))}
             </div>
 
-            {/* Botón de menú móvil (visible solo en móvil) */}
-            <div className="lg:hidden">
-              <button
-                className="text-3xl relative z-50 p-2 rounded-full bg-[var(--color-primary)]/80 backdrop-blur-sm"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              >
-                {isMobileMenuOpen ? (
-                  <FaTimes className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
-                ) : (
-                  <FaBars className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
-                )}
-              </button>
+            {/* Botón de menú móvil (visible solo en móvil Y cuando el menú está cerrado) */}
+            <div className="lg:hidden flex-shrink-0">
+              { !isMobileMenuOpen && (
+                  <button
+                    className="text-3xl relative z-50 p-2 rounded-full bg-[var(--color-primary)]/80 backdrop-blur-sm"
+                    onClick={() => setIsMobileMenuOpen(true)} // Solo abre
+                    aria-label="Abrir menú"
+                  >
+                      <FaBars className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
+                  </button>
+              )}
             </div>
 
             {/* Logo y sello (centrado) */}
@@ -536,9 +534,18 @@ export default function Navbar() {
       </div>
 
       {/* Menú móvil */}
-      <div className={`fixed inset-0 z-40 overflow-y-auto transition-transform duration-500 transform ${
+      <div className={`fixed inset-0 z-[60] overflow-y-auto transition-transform duration-500 transform lg:hidden ${ // Aumentar z-index (ej: z-60)
         isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
       }`}>
+         {/* Botón de cierre DENTRO del menú móvil */}
+        <button
+          className="absolute top-6 right-6 text-4xl text-white z-[70] p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors" // z-index más alto
+          onClick={() => setIsMobileMenuOpen(false)} // Solo cierra
+          aria-label="Cerrar menú"
+        >
+          <FaTimes />
+        </button>
+
         {/* Fondo con gradiente elegante */}
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-brown-light)] via-[var(--color-brown-medium)] to-[var(--color-brown-dark)] opacity-95 backdrop-blur-md"></div>
         

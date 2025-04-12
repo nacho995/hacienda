@@ -156,19 +156,17 @@ export default function Navbar() {
               ))}
             </div>
 
-            {/* Botón de menú móvil (visible solo en móvil) */}
-            <div className="lg:hidden">
-              <button
-                className="text-3xl relative z-50 p-2 rounded-full bg-[var(--color-primary)]/80 backdrop-blur-sm"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                aria-label={isMobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              >
-                {isMobileMenuOpen ? (
-                  <FaTimes className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
-                ) : (
+            {/* Botón de menú móvil (visible solo en móvil Y cuando el menú está cerrado) */}
+            <div className="lg:hidden flex-shrink-0">
+              { !isMobileMenuOpen && (
+                <button
+                  className="text-3xl relative z-50 p-2 rounded-full bg-[var(--color-primary)]/80 backdrop-blur-sm"
+                  onClick={() => setIsMobileMenuOpen(true)} // Solo abre
+                  aria-label="Abrir menú"
+                >
                   <FaBars className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />
-                )}
-              </button>
+                </button>
+              )}
             </div>
 
             {/* Logo y sello (centrado) */}
@@ -485,20 +483,22 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Menú móvil */}
-      <div className={`fixed inset-0 z-40 overflow-y-auto transition-transform duration-500 transform ${
-        isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}>
-        {/* Fondo con gradiente elegante */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-brown-light)] via-[var(--color-brown-medium)] to-[var(--color-brown-dark)] opacity-95 backdrop-blur-md"></div>
-        
-        {/* Elementos decorativos */}
-        <div className="absolute top-0 left-0 w-64 h-64 border-l-2 border-t-2 border-white/10 opacity-30"></div>
-        <div className="absolute bottom-0 right-0 w-64 h-64 border-r-2 border-b-2 border-white/10 opacity-30"></div>
-        <div className="absolute top-1/4 right-10 w-32 h-32 rounded-full bg-[var(--color-primary-light)]/10 blur-xl"></div>
-        <div className="absolute bottom-1/4 left-10 w-40 h-40 rounded-full bg-white/5 blur-xl"></div>
-        
-        <div className="container mx-auto p-6 pt-24 md:pt-32 lg:pt-24 relative z-10">
+      {/* Menú móvil desplegable */}
+      <div
+        className={`lg:hidden absolute top-0 left-0 right-0 bg-black/95 backdrop-blur-md shadow-xl transition-all duration-300 ease-in-out overflow-y-auto z-50 ${ // Asegurar z-index alto y top-0
+          isMobileMenuOpen ? 'h-screen opacity-100' : 'h-0 opacity-0 pointer-events-none' // Usar h-screen y pointer-events
+        }`}
+      >
+        {/* Botón de cierre DENTRO del menú móvil */}
+        <button
+          className="absolute top-6 right-6 text-4xl text-white z-50 p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+          onClick={() => setIsMobileMenuOpen(false)} // Solo cierra
+          aria-label="Cerrar menú"
+        >
+          <FaTimes />
+        </button>
+
+        <div className="container mx-auto p-6 pt-24 md:pt-32 relative z-10"> {/* Ajustar padding top si es necesario */}
           <div className="mt-8 md:mt-12">
             <ul className="space-y-6 text-center font-[var(--font-display)]">
               {navLinks.map((link) => (
