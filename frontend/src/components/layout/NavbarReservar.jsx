@@ -71,8 +71,8 @@ export default function Navbar() {
       <nav className="w-full z-50 py-3 bg-black/95 md:pt-5 lg:mt-0 relative shadow-sm">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between">
-            {/* Logo con diseño de castillo */}
-            <div className="hidden lg:flex items-center mr-8">
+            {/* Logo con diseño de castillo - Ahora responsivo */}
+            <div className="flex items-center origin-left scale-50 md:scale-75 lg:scale-100 mr-2 md:mr-4 lg:mr-8">
               <div className="relative w-48 h-32">
                 <div className="absolute inset-0 flex items-center justify-center">
                   {/* Puerta principal */}
