@@ -1,11 +1,29 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { FaPlus, FaTrash, FaUserFriends, FaBed, FaList, FaMapMarkedAlt, FaCheckCircle, FaCalendarAlt } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { obtenerHabitaciones } from '../../services/habitaciones.service';
 import { useReservation } from '@/context/ReservationContext';
 import './EventoMapaHabitaciones.css';
+import { debounce } from 'lodash';
+
+const areasSeleccionables = {
+  'A': { coords: '332,143,392,204', shape: 'rect', direction: 'bottom' },
+  'B': { coords: '400,143,460,204', shape: 'rect', direction: 'bottom' },
+  'C': { coords: '453,205,534,266', shape: 'rect', direction: 'left' },
+  'D': { coords: '453,263,534,324', shape: 'rect', direction: 'left' },
+  'E': { coords: '453,321,534,382', shape: 'rect', direction: 'left' },
+  'F': { coords: '453,379,534,440', shape: 'rect', direction: 'left' },
+  'G': { coords: '467,492,528,573', shape: 'rect', direction: 'top' },
+  'H': { coords: '523,492,584,573', shape: 'rect', direction: 'top' },
+  'I': { coords: '579,492,640,573', shape: 'rect', direction: 'top' },
+  'J': { coords: '635,492,696,573', shape: 'rect', direction: 'top' },
+  'K': { coords: '399,568,460,629', shape: 'rect', direction: 'right' },
+  'L': { coords: '399,492,460,553', shape: 'rect', direction: 'right' },
+  'M': { coords: '759,353,820,414', shape: 'rect', direction: 'left' },
+  'O': { coords: '759,443,820,504', shape: 'rect', direction: 'left' }
+};
 
 const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesLoad }) => {
   const { formData, updateFormSection } = useReservation();
@@ -14,44 +32,23 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
   const [habitaciones, setHabitaciones] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const mapRef = useRef(null);
+  const imgRef = useRef(null);
+  const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
+  const [scaledCoords, setScaledCoords] = useState({});
 
-  // Obtener el número máximo de habitaciones del contexto
   const maxHabitaciones = formData.numeroHabitaciones || 7;
 
-  // Áreas seleccionables para cada habitación basadas en la imagen del plano
-  const areasSeleccionables = {
-    'A': { coords: '332,143,392,204', shape: 'rect', direction: 'bottom' },
-    'B': { coords: '400,143,460,204', shape: 'rect', direction: 'bottom' },
-    'C': { coords: '453,205,534,266', shape: 'rect', direction: 'left' },
-    'D': { coords: '453,263,534,324', shape: 'rect', direction: 'left' },
-    'E': { coords: '453,321,534,382', shape: 'rect', direction: 'left' },
-    'F': { coords: '453,379,534,440', shape: 'rect', direction: 'left' },
-    'G': { coords: '467,492,528,573', shape: 'rect', direction: 'top' },
-    'H': { coords: '523,492,584,573', shape: 'rect', direction: 'top' },
-    'I': { coords: '579,492,640,573', shape: 'rect', direction: 'top' },
-    'J': { coords: '635,492,696,573', shape: 'rect', direction: 'top' },
-    'K': { coords: '399,568,460,629', shape: 'rect', direction: 'right' },
-    'L': { coords: '399,492,460,553', shape: 'rect', direction: 'right' },
-    'M': { coords: '759,353,820,414', shape: 'rect', direction: 'left' },
-    'O': { coords: '759,443,820,504', shape: 'rect', direction: 'left' }
-  };
-
-  // No usamos habitaciones predefinidas, solo las de la base de datos
-
-  // Cargar habitaciones desde la API
   useEffect(() => {
     const cargarHabitaciones = async () => {
       try {
         setIsLoading(true);
-        // Obtener habitaciones exclusivamente de la base de datos
         const response = await obtenerHabitaciones();
         console.log('Habitaciones obtenidas de la BD:', response);
-        
-        // Check if response is successful and data is an array
+
         let habitacionesData = [];
         if (response && response.success && Array.isArray(response.data)) {
            habitacionesData = response.data;
-        } else if (Array.isArray(response)) { // Handle cases where API returns array directly
+        } else if (Array.isArray(response)) {
             console.warn('API devolvió un array directamente, usando ese array.');
             habitacionesData = response;
         } else {
@@ -61,8 +58,7 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
           toast.error('No se encontraron habitaciones disponibles');
           return;
         }
-        
-        // Procesar habitaciones recibidas usando habitacionesData
+
         const habitacionesProcesadas = habitacionesData.map(hab => {
           const letra = hab.letra || hab.id;
           return {
@@ -76,11 +72,9 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
             area: areasSeleccionables[letra] || { coords: '0,0,0,0', shape: 'rect', direction: 'bottom' }
           };
         });
-        
-        // Establecer las habitaciones procesadas
+
         setHabitaciones(habitacionesProcesadas);
-        
-        // Pasar las habitaciones al componente padre (solo una vez después de cargar)
+
         if (typeof onHabitacionesLoad === 'function') {
           onHabitacionesLoad(habitacionesProcesadas);
         }
@@ -92,34 +86,28 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
         setIsLoading(false);
       }
     };
-    
+
     cargarHabitaciones();
-  }, []); // Eliminamos la dependencia para evitar el bucle infinito
+  }, [onHabitacionesLoad]);
 
-  // Verificar si una habitación está seleccionada
-  const isSelected = (letra) => {
+  const isSelected = useCallback((letra) => {
     return rooms.some(room => room.letra === letra);
-  };
+  }, [rooms]);
 
-  // Seleccionar habitación
-  const handleSelectHabitacion = (habitacion) => {
-    // Verificar si la habitación ya está seleccionada
+  const handleSelectHabitacion = useCallback((habitacion) => {
     if (isSelected(habitacion.letra)) {
       toast.info(`La habitación ${habitacion.letra} ya está seleccionada`);
       return;
     }
 
-    // Verificar si ya se alcanzó el límite de habitaciones
     if (rooms.length >= maxHabitaciones) {
       toast.error(`No puede seleccionar más de ${maxHabitaciones} habitaciones`);
       return;
     }
     
-    // Agregar la habitación a las seleccionadas localmente
     const updatedRooms = [...rooms, habitacion];
     setRooms(updatedRooms);
     
-    // Notificar al componente padre de la habitación seleccionada
     if (onRoomsChange) {
       onRoomsChange({
         action: 'add',
@@ -129,21 +117,15 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
     }
     
     toast.success(`Habitación ${habitacion.letra} seleccionada (${updatedRooms.length} de ${maxHabitaciones})`);
-  };
+  }, [rooms, maxHabitaciones, onRoomsChange]);
 
-  // Eliminar habitación
-  const removeRoom = (letra) => {
-    // Eliminar localmente
+  const removeRoom = useCallback((letra) => {
     const updatedRooms = rooms.filter(room => room.letra !== letra);
     setRooms(updatedRooms);
     
-    // Actualizar el contexto de reserva
     updateFormSection('habitacionesSeleccionadas', updatedRooms);
     
-    // Notificar al componente padre de la eliminación
-    // Aquí sí enviamos el array completo actualizado para sincronizar
     if (onRoomsChange) {
-      // Enviamos un objeto especial para indicar que es una eliminación
       onRoomsChange({
         action: 'remove',
         letra: letra,
@@ -152,94 +134,142 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
     }
     
     toast.info(`Habitación ${letra} eliminada`);
-  };
+  }, [rooms, onRoomsChange, updateFormSection]);
 
-  // Renderizar el área seleccionable para cada habitación
-  const renderAreaSeleccionable = (habitacion) => {
-    const area = habitacion.area || areasSeleccionables[habitacion.letra];
-    if (!area) return null;
-    
+  const handleRoomClick = useCallback((habitacion) => {
+    if (isSelected(habitacion.letra)) {
+      removeRoom(habitacion.letra);
+    } else {
+      handleSelectHabitacion(habitacion);
+    }
+  }, [isSelected, removeRoom, handleSelectHabitacion]);
+
+  const handleImageLoad = useCallback(() => {
+    if (imgRef.current) {
+      setOriginalImageSize({
+        width: imgRef.current.naturalWidth,
+        height: imgRef.current.naturalHeight,
+      });
+      console.log(`[EventoMapa handleImageLoad] Natural dimensions set: ${imgRef.current.naturalWidth}x${imgRef.current.naturalHeight}`);
+    }
+  }, []);
+
+  const calculateCoords = useCallback((currentImg, originalSize) => {
+    if (!currentImg || !originalSize.width || !originalSize.height) {
+      console.log("[EventoMapa calculateCoords] Skipping: Missing refs or original size.");
+      return null;
+    }
+    const currentWidth = currentImg.offsetWidth;
+    const currentHeight = currentImg.offsetHeight;
+    const naturalWidth = originalSize.width;
+    const naturalHeight = originalSize.height;
+
+    if (naturalWidth === 0 || naturalHeight === 0 || currentWidth === 0 || currentHeight === 0) {
+       console.log("[EventoMapa calculateCoords] Skipping: Zero dimension detected.");
+       return null;
+    }
+
+    const scaleX = currentWidth / naturalWidth;
+    const scaleY = currentHeight / naturalHeight;
+
+    const newCoords = {};
+    for (const letra in areasSeleccionables) {
+      const area = areasSeleccionables[letra];
+      const originalCoords = area.coords.split(',').map(Number);
+      const scaled = [
+        Math.round(originalCoords[0] * scaleX),
+        Math.round(originalCoords[1] * scaleY),
+        Math.round(originalCoords[2] * scaleX),
+        Math.round(originalCoords[3] * scaleY)
+      ].join(',');
+      newCoords[letra] = { ...area, coords: scaled };
+    }
+    return newCoords;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (originalImageSize.width > 0 && originalImageSize.height > 0 && imgRef.current) {
+      console.log("[EventoMapa useLayoutEffect] Calculating initial coords...");
+      const initialCoords = calculateCoords(imgRef.current, originalImageSize);
+      if (initialCoords) {
+        setScaledCoords(initialCoords);
+      }
+
+      const handleResize = () => {
+        const newCoords = calculateCoords(imgRef.current, originalImageSize);
+        if (newCoords) {
+          setScaledCoords(newCoords);
+        }
+      };
+
+      const debouncedResizeHandler = debounce(handleResize, 150);
+      window.addEventListener('resize', debouncedResizeHandler);
+      console.log("[EventoMapa useLayoutEffect] Resize listener added.");
+
+      return () => {
+        window.removeEventListener('resize', debouncedResizeHandler);
+        debouncedResizeHandler.cancel();
+        console.log("[EventoMapa useLayoutEffect] Resize listener removed.");
+      };
+    }
+  }, [originalImageSize, calculateCoords]);
+
+  const renderAreaSeleccionable = useCallback((habitacion) => {
+    const areaOriginal = areasSeleccionables[habitacion.letra] || { coords: '0,0,0,0', shape: 'rect' };
+    const areaToUse = scaledCoords[habitacion.letra] || areaOriginal;
+
+    if (!areaToUse || areaToUse.coords === '0,0,0,0') return null;
+
     return (
-      <area 
+      <area
         key={`area-${habitacion.id || habitacion._id || habitacion.letra}`}
-        shape={area.shape || 'rect'} 
-        coords={area.coords} 
+        shape={areaToUse.shape || 'rect'}
+        coords={areaToUse.coords}
         alt={`Habitación ${habitacion.letra}`}
         title={`Habitación ${habitacion.letra} - ${habitacion.tipo} (${habitacion.capacidad} personas)`}
         onClick={() => handleRoomClick(habitacion)}
         style={{ cursor: 'pointer' }}
       />
     );
-  };
+  }, [handleRoomClick, scaledCoords]);
 
-  // Manejar clic en una habitación
-  const handleRoomClick = (habitacion) => {
-    if (isSelected(habitacion.letra)) {
-      removeRoom(habitacion.letra);
-    } else {
-      handleSelectHabitacion(habitacion);
-    }
-  };
+  const renderHabitacionMarcador = useCallback((habitacion) => {
+    const areaOriginal = areasSeleccionables[habitacion.letra] || { coords: '0,0,0,0', shape: 'rect' };
+    const areaToUse = scaledCoords[habitacion.letra] || areaOriginal;
 
-  // Renderizar un marcador visual para cada habitación
-  const renderHabitacionMarcador = (habitacion) => {
-    const area = habitacion.area || areasSeleccionables[habitacion.letra];
-    if (!area) return null;
-    
-    const coords = area.coords.split(',').map(Number);
+    if (!areaToUse || areaToUse.coords === '0,0,0,0') return null;
+
+    const coords = areaToUse.coords.split(',').map(Number);
     const selected = isSelected(habitacion.letra);
-    
-    // Calcular posición y tamaño
+
     const x1 = coords[0];
     const y1 = coords[1];
     const x2 = coords[2];
     const y2 = coords[3];
     const width = x2 - x1;
     const height = y2 - y1;
-    
-    // --- NEW COLOR LOGIC ---
-    // Unified color for selected rooms
-    const selectedColor = '#E57373'; // Reddish-coral
-    const selectedBorderColor = '#D32F2F'; // Darker red border for selected
 
-    // Base color per floor (when not selected)
+    const selectedColor = '#E57373';
+    const selectedBorderColor = '#D32F2F';
     let floorBaseColor;
-    if (['A', 'B'].includes(habitacion.letra)) {
-      floorBaseColor = '#A5D6A7'; // Soft Green (Floor 1)
-    } else if (['C', 'D', 'E', 'F'].includes(habitacion.letra)) {
-      floorBaseColor = '#90CAF9'; // Soft Blue (Floor 2)
-    } else {
-      floorBaseColor = '#FFCC80'; // Soft Orange/Peach (Floor 3)
-    }
-
-    // Determine final colors based on selection status
+    if (['A', 'B'].includes(habitacion.letra)) floorBaseColor = '#A5D6A7';
+    else if (['C', 'D', 'E', 'F'].includes(habitacion.letra)) floorBaseColor = '#90CAF9';
+    else floorBaseColor = '#FFCC80';
     const finalBackgroundColor = selected ? selectedColor : floorBaseColor;
-    const finalBorderColor = selected ? selectedBorderColor : floorBaseColor; // Border matches base color when not selected
-    // --- END NEW COLOR LOGIC ---
+    const finalBorderColor = selected ? selectedBorderColor : floorBaseColor;
 
-    // Determinar el gradiente según la dirección de la puerta (ahora color -> transparente -> transparente)
-    const getGradientByDirection = (direction, isSelected) => {
+    const getGradientByDirection = (direction, isSelectedParam) => {
       const color = finalBackgroundColor;
-      const baseOpacity = selected ? 'E6' : 'CC'; // 90% or 80% opacity hex
-      const transparent = `${color}00`; // Fully transparent version of the color
-      const semiTransparent = `${color}${baseOpacity}`; // Semi-transparent version
-
-      // Define the gradient stops: Color -> Transparent (early) -> Transparent
+      const baseOpacity = isSelectedParam ? 'E6' : 'CC';
+      const transparent = `${color}00`;
+      const semiTransparent = `${color}${baseOpacity}`;
       const gradientStops = `${semiTransparent} 0%, ${transparent} 40%, ${transparent} 100%`;
-
-      // Apply the gradient based on direction
       switch (direction) {
-        case 'top':
-          return `linear-gradient(to top, ${gradientStops})`;
-        case 'bottom':
-          return `linear-gradient(to bottom, ${gradientStops})`;
-        case 'left':
-          return `linear-gradient(to left, ${gradientStops})`;
-        case 'right':
-          return `linear-gradient(to right, ${gradientStops})`;
-        default:
-          // Default to bottom if direction is not specified
-          return `linear-gradient(to bottom, ${gradientStops})`;
+        case 'top': return `linear-gradient(to top, ${gradientStops})`;
+        case 'bottom': return `linear-gradient(to bottom, ${gradientStops})`;
+        case 'left': return `linear-gradient(to left, ${gradientStops})`;
+        case 'right': return `linear-gradient(to right, ${gradientStops})`;
+        default: return `linear-gradient(to bottom, ${gradientStops})`;
       }
     };
 
@@ -253,9 +283,7 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
           top: `${y1}px`,
           width: `${width}px`,
           height: `${height}px`,
-          // Use the determined background gradient
-          background: getGradientByDirection(area.direction, selected),
-           // Use the determined border color
+          background: getGradientByDirection(areaToUse.direction, selected),
           border: `2px solid ${finalBorderColor}`,
           zIndex: 1,
           pointerEvents: 'none',
@@ -263,9 +291,8 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
         }}
       />
     );
-  };
+  }, [isSelected, scaledCoords]);
 
-  // Renderizar componente de carga
   const renderLoading = () => (
     <div className="loading-overlay">
       <div className="loading-content">
@@ -310,7 +337,6 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
               renderLoading()
             ) : (
               <>
-                {/* Imagen del mapa con áreas seleccionables */}
                 <div className="relative" ref={mapRef} style={{ position: 'relative' }}>
                   <img
                     src="/plano-Hotel.jpeg"
@@ -318,22 +344,20 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
                     className="w-full h-auto rounded-lg shadow-sm"
                     useMap="#mapa-habitaciones"
                     style={{ maxWidth: '100%' }}
+                    ref={imgRef}
+                    onLoad={handleImageLoad}
                   />
                   
-                  {/* Marcadores visuales para todas las habitaciones */}
-                  {habitaciones.map(renderHabitacionMarcador)}
+                  {Object.keys(scaledCoords).length > 0 && habitaciones.map(renderHabitacionMarcador)}
                   
-                  {/* Mapa de imagen con áreas seleccionables */}
                   <map name="mapa-habitaciones">
-                    {habitaciones.map(renderAreaSeleccionable)}
+                    {Object.keys(scaledCoords).length > 0 && habitaciones.map(renderAreaSeleccionable)}
                   </map>
                 </div>
                 
-                {/* Leyenda Actualizada */}
                 <div className="mt-6 space-y-3">
                   <h4 className="text-lg font-semibold text-[var(--color-primary)] mb-3">Leyenda del Mapa</h4>
                   
-                  {/* Color de Selección Unificado */}
                   <div className="bg-white/80 p-3 rounded-lg shadow-sm">
                     <div className="flex items-center gap-3">
                        <div className="flex items-center">
@@ -343,24 +367,20 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
                     </div>
                   </div>
                   
-                  {/* Colores Disponibles por Planta */}
                   <div className="bg-white/80 p-3 rounded-lg shadow-sm space-y-2">
                     <h5 className="font-medium text-gray-700 mb-2">Disponibles por Planta:</h5>
-                    {/* Primera Planta */}
                     <div className="flex items-center gap-3">
                        <div className="flex items-center">
                         <div className="w-6 h-6 rounded bg-[#A5D6A7CC] mr-2 border border-[#A5D6A7]"></div>
                         <span className="text-sm">Primera Planta (A, B)</span>
                       </div>
                     </div>
-                    {/* Segunda Planta */}
                     <div className="flex items-center gap-3">
                        <div className="flex items-center">
                         <div className="w-6 h-6 rounded bg-[#90CAF9CC] mr-2 border border-[#90CAF9]"></div>
                         <span className="text-sm">Segunda Planta (C, D, E, F)</span>
                       </div>
                     </div>
-                    {/* Tercera Planta */}
                     <div className="flex items-center gap-3">
                        <div className="flex items-center">
                         <div className="w-6 h-6 rounded bg-[#FFCC80CC] mr-2 border border-[#FFCC80]"></div>
@@ -378,28 +398,25 @@ const EventoMapaHabitacionesNuevo = ({ onRoomsChange, eventDate, onHabitacionesL
           {habitaciones.map((habitacion) => {
             const isRoomSelected = isSelected(habitacion.letra);
             
-            // --- Inferir Planta y Tipo --- 
             let planta = 'Desconocida';
-            let tipoHab = 'Estándar'; // Tipo general por defecto
-            let categoria = 'Doble'; // Sencilla o Doble
+            let tipoHab = 'Estándar';
+            let categoria = 'Doble';
             
             if (['A', 'B'].includes(habitacion.letra)) {
               planta = 'Primera Planta';
-              categoria = 'Sencilla'; // Asumiendo A, B son sencillas
+              categoria = 'Sencilla';
             } else if (['C', 'D', 'E', 'F'].includes(habitacion.letra)) {
               planta = 'Segunda Planta';
-              categoria = 'Doble'; // Asumiendo C-F son dobles
+              categoria = 'Doble';
             } else if (['G', 'H', 'I', 'J'].includes(habitacion.letra)) {
               planta = 'Tercera Planta';
-              categoria = 'Doble'; // Asumiendo G-J son dobles
+              categoria = 'Doble';
             } else if (['K', 'L', 'M', 'O'].includes(habitacion.letra)) {
-              planta = 'Primera/Tercera Planta'; // K,L (1a), M,O (3a) - ajustar si es necesario
-              // Asignar planta más específicamente si es posible
+              planta = 'Primera/Tercera Planta';
               if (['K', 'L'].includes(habitacion.letra)) planta = 'Primera Planta';
               if (['M', 'O'].includes(habitacion.letra)) planta = 'Tercera Planta';
-              categoria = 'Sencilla'; // Asumiendo K, L, M, O son sencillas
+              categoria = 'Sencilla';
             }
-            // ------------------------------
             
             return (
               <div 
