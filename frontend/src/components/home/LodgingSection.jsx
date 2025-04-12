@@ -459,16 +459,20 @@ export default function LodgingSection() {
                    </div>
                  </div>
 
-                {/* Botón de reserva (ahora como Link sin legacyBehavior) */}
-                <Link href="/habitaciones">
-                  <motion.a // `motion.a` es ahora el hijo directo
-                    whileHover={{ scale: 1.03, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
-                    whileTap={{ scale: 0.98 }}
-                    className="mt-auto bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-primary)] text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 self-start flex items-center text-sm cursor-pointer" // Añadido cursor-pointer para claridad visual
+                {/* Botón de reserva: Link envuelto en motion.div */}
+                <motion.div
+                  whileHover={{ scale: 1.03, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)' }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-block mt-auto self-start" // Contenedor para la animación, ajusta según necesites
+                >
+                  <Link
+                    href="/habitaciones"
+                    className="bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-primary)] text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 flex items-center text-sm cursor-pointer display: inline-flex" // Clases originales del `motion.a`, ajustado a inline-flex
                   >
                     Ver disponibilidad <FaAngleRight className="ml-1.5" />
-                  </motion.a>
-                </Link>
+                  </Link>
+                </motion.div>
+
               </motion.div>
             </div>
             

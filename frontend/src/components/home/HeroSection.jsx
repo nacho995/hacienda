@@ -232,7 +232,7 @@ export default function HeroSection() {
   const current = carouselData[currentSlide];
 
   return (
-    <section className="relative w-full h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] overflow-hidden">
+    <section className="relative w-full h-[calc(100vh-64px)] md:h-screen overflow-hidden">
       {/* Fondo con degradado */}
       <div className="absolute inset-0 bg-gradient-to-b from-[var(--gradient-primary)] to-[var(--gradient-secondary)] opacity-90 z-0" />
       
@@ -263,19 +263,10 @@ export default function HeroSection() {
               </div>
 
               {/* Contenido del slide */}
-              <div className="absolute inset-0 flex flex-col justify-center items-center text-center px-4">
+              <div className="absolute inset-0 flex flex-col justify-center items-center text-center px-4 md:pt-80">
                 {/* Medallón y texto */}
                 <div className="relative z-10 transform -translate-y-20">
-                  {/* Medallón */}
-                  <div className="relative w-48 h-48 mx-auto mb-8">
-                    <Image
-                      src="/logo.png"
-                      alt="Hacienda San Carlos"
-                      fill
-                      className="object-contain"
-                      priority
-                    />
-                  </div>
+                  
 
                   {/* Título principal */}
                   {slide.heading && (
@@ -336,7 +327,7 @@ export default function HeroSection() {
       </div>
       
       {/* Controles del carrusel */}
-      <div className="absolute bottom-8 md:bottom-10 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 md:space-x-6 z-30">
+      <div className="absolute bottom-8 md:bottom-20 left-1/2 transform -translate-x-1/2 flex items-center space-x-4 md:space-x-6 z-30 mt-64">
         <button
           onClick={handlePrevSlide}
           className="w-10 h-10 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-[var(--color-brown-medium)]/20 transition-all duration-300"
@@ -369,18 +360,7 @@ export default function HeroSection() {
         </button>
       </div>
 
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.8 }} 
-        animate={{ opacity: 1, scale: 1 }} 
-        transition={{ duration: 1, delay: 0.8 }}
-        className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-32 h-32 md:w-40 md:h-40 z-20"
-      >
-        <Image 
-          src="/logo.png" 
-          alt="Hacienda San Carlos Logo" 
-          layout="fill"
-        />
-      </motion.div>
+      
     </section>
   );
 } 
