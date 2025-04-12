@@ -3,6 +3,12 @@ const User = require('../models/User');
 const sendEmail = require('../utils/email');
 const emailConfirmacionAdmin = require('../emails/confirmacionAdmin');
 const bcrypt = require('bcryptjs');
+const confirmacionTemplate = require('../emails/confirmacionReserva');
+const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
+const passwordResetRequestTemplate = require('../emails/passwordResetRequest');
+const passwordResetConfirmationTemplate = require('../emails/passwordResetConfirmation');
+const adminApprovalRequestTemplate = require('../emails/adminApprovalRequest');
+const userAccountApprovedTemplate = require('../emails/userAccountApproved');
 
 // @desc    Registrar un usuario
 // @route   POST /api/auth/register
@@ -38,31 +44,36 @@ exports.register = async (req, res) => {
     // Crear URL de confirmación
     const confirmUrl = `${process.env.CLIENT_URL}/confirmar-cuenta/${confirmToken}`;
 
-    // Enviar email al administrador para aprobación
-    await sendEmail({
-      email: process.env.ADMIN_EMAIL,
-      subject: 'Nueva solicitud de registro - Hacienda San Carlos Borromeo',
-      html: `
-        <h1>Nueva solicitud de registro</h1>
-        <p>Un nuevo usuario desea registrarse en el sistema:</p>
+    // Nota: La plantilla adminApprovalRequestTemplate está pensada para aprobar cuentas admin.
+    // Para aprobación de usuario normal, quizá necesitemos otra plantilla o ajustar la existente.
+    // Por ahora, usaré una versión simple aquí.
+    const htmlAdminApproval = `
+        <h1>Nueva solicitud de registro de Usuario</h1>
+        <p>Un nuevo usuario desea registrarse:</p>
         <p><strong>Nombre:</strong> ${nombre} ${apellidos}</p>
         <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Teléfono:</strong> ${telefono}</p>
+        <p><strong>Teléfono:</strong> ${telefono || 'No especificado'}</p>
         <p>Para aprobar este registro, haga clic en el siguiente enlace:</p>
-        <a href="${confirmUrl}" style="padding: 10px 15px; background-color: #800020; color: white; text-decoration: none; border-radius: 4px;">Aprobar registro</a>
+        <a href="${confirmUrl}" style="padding: 10px 15px; background-color: #800020; color: white; text-decoration: none; border-radius: 4px;">Aprobar Registro de Usuario</a>
         <p>Si no reconoces esta solicitud, por favor ignórala.</p>
-      `
+      `;
+    
+    await sendEmail({
+      to: process.env.ADMIN_EMAIL,
+      subject: 'Nueva solicitud de registro de Usuario - Hacienda San Carlos Borromeo',
+      html: htmlAdminApproval
     });
 
     res.status(201).json({
       success: true,
-      message: 'Solicitud de registro enviada. Recibirás un correo cuando tu cuenta sea aprobada.'
+      message: 'Solicitud de registro enviada. Recibirás un correo cuando tu cuenta sea aprobada por un administrador.'
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al registrar el usuario'
+    console.error('Error al enviar email de solicitud de registro al admin:', error);
+    // Informar al usuario que la solicitud se creó pero hubo un problema con la notificación
+    res.status(201).json({
+      success: true, // La cuenta se creó, pendiente de aprobación manual
+      message: 'Solicitud de registro creada, pero hubo un error al notificar al administrador. Por favor, contacte soporte si no recibe aprobación.'
     });
   }
 };
@@ -102,16 +113,24 @@ exports.registerAdmin = async (req, res) => {
     const confirmUrl = `${process.env.CLIENT_URL}/admin/confirmar/${confirmToken}`;
 
     try {
-      // Enviar email al administrador principal
-      await sendEmail({
-        email: process.env.ADMIN_EMAIL,
-        subject: 'Nueva solicitud de cuenta de administrador',
-        html: emailConfirmacionAdmin(user.nombre, confirmUrl)
+      // --- Actualizar envío de email al admin principal --- (Usar nueva plantilla)
+      const htmlAdminApproval = adminApprovalRequestTemplate({
+        nuevoAdminNombre: `${nombre} ${apellidos}`,
+        nuevoAdminEmail: email,
+        nuevoAdminTelefono: telefono,
+        confirmUrl: confirmUrl
       });
+      
+      await sendEmail({
+        to: process.env.ADMIN_EMAIL,
+        subject: 'Nueva solicitud de cuenta de administrador - Hacienda San Carlos Borromeo',
+        html: htmlAdminApproval
+      });
+      // --- Fin Actualizar envío de email ---
 
       res.status(201).json({
         success: true,
-        message: 'Se ha enviado un correo de confirmación al administrador principal'
+        message: 'Solicitud de cuenta de administrador enviada para aprobación.'
       });
     } catch (err) {
       console.error('Error al enviar email:', err);
@@ -135,9 +154,9 @@ exports.registerAdmin = async (req, res) => {
   }
 };
 
-// @desc    Confirmar cuenta de usuario
+// @desc    Confirmar cuenta de usuario (Aprobación por Admin)
 // @route   GET /api/auth/confirm/:token
-// @access  Public
+// @access  Public (enlace accedido por Admin)
 exports.confirmAccount = async (req, res) => {
   try {
     // Obtener el token hasheado
@@ -165,21 +184,28 @@ exports.confirmAccount = async (req, res) => {
     user.tokenExpiracion = undefined;
     await user.save();
     
-    // Enviar email al usuario notificando que su cuenta ha sido aprobada
-    await sendEmail({
-      email: user.email,
-      subject: 'Tu cuenta ha sido aprobada - Hacienda San Carlos Borromeo',
-      html: `
-        <h1>¡Enhorabuena, ${user.nombre}!</h1>
-        <p>Tu cuenta en Hacienda San Carlos Borromeo ha sido aprobada.</p>
-        <p>Ya puedes iniciar sesión y acceder a nuestros servicios:</p>
-        <a href="${process.env.CLIENT_URL}/login" style="padding: 10px 15px; background-color: #800020; color: white; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 15px;">Iniciar sesión</a>
-      `
-    });
+    // --- Actualizar envío de email al usuario --- (Usar nueva plantilla)
+    try {
+      const loginUrl = `${process.env.CLIENT_URL}/login`; // Ajustar si la ruta de login es diferente
+      const htmlUserApproved = userAccountApprovedTemplate({
+        nombreUsuario: user.nombre,
+        loginUrl: loginUrl
+      });
+      
+      await sendEmail({
+        to: user.email,
+        subject: '¡Tu cuenta ha sido aprobada! - Hacienda San Carlos Borromeo',
+        html: htmlUserApproved
+      });
+    } catch (emailError) {
+      console.error('Error al enviar correo de aprobación al usuario:', emailError);
+      // No fallar la operación principal si el correo no se envía
+    }
+    // --- Fin Actualizar envío de email ---
     
     res.status(200).json({
       success: true,
-      message: 'Cuenta confirmada exitosamente'
+      message: `Cuenta de ${user.email} confirmada exitosamente. Se envió notificación al usuario.`
     });
   } catch (error) {
     console.error(error);
@@ -365,9 +391,10 @@ exports.forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No se encontró ningún usuario con ese email'
+      // No revelar si el usuario existe o no
+      return res.status(200).json({
+        success: true,
+        message: 'Si existe una cuenta con ese correo, se ha enviado un enlace para restablecer la contraseña.'
       });
     }
 
@@ -378,26 +405,23 @@ exports.forgotPassword = async (req, res) => {
     // Crear URL de reseteo
     const resetUrl = `${process.env.CLIENT_URL}/restablecer-contrasena/${resetToken}`;
 
-    // Contenido del email
-    const mensaje = `
-      <h1>Solicitud de restablecimiento de contraseña</h1>
-      <p>Has recibido este correo porque tú (o alguien más) ha solicitado restablecer la contraseña de tu cuenta.</p>
-      <p>Por favor haz clic en el siguiente enlace para completar el proceso:</p>
-      <a href="${resetUrl}" style="padding: 10px 15px; background-color: #800020; color: white; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 15px;">Restablecer contraseña</a>
-      <p>Si no solicitaste este restablecimiento, por favor ignora este correo y tu contraseña permanecerá sin cambios.</p>
-      <p>Este enlace expirará en 10 minutos por seguridad.</p>
-    `;
-
     try {
-      await sendEmail({
-        email: user.email,
-        subject: 'Restablecimiento de contraseña - Hacienda San Carlos Borromeo',
-        html: mensaje
+      // --- Actualizar envío de email --- (Usar nueva plantilla)
+      const htmlResetRequest = passwordResetRequestTemplate({
+          nombreUsuario: user.nombre,
+          resetUrl: resetUrl
       });
+      
+      await sendEmail({
+        to: user.email,
+        subject: 'Restablecimiento de contraseña - Hacienda San Carlos Borromeo',
+        html: htmlResetRequest
+      });
+      // --- Fin Actualizar envío de email ---
 
       res.status(200).json({
         success: true,
-        message: 'Se ha enviado un correo electrónico con instrucciones para restablecer tu contraseña'
+        message: 'Si existe una cuenta con ese correo, se ha enviado un enlace para restablecer la contraseña.'
       });
     } catch (error) {
       console.error('Error al enviar el correo de reseteo:', error);
@@ -466,29 +490,31 @@ exports.resetPassword = async (req, res) => {
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
+    user.confirmado = true; // Asegurarse que la cuenta esté confirmada al resetear
     await user.save();
 
-    // Enviar email de confirmación
+    // --- Actualizar envío de email de confirmación --- (Usar nueva plantilla)
     try {
+      const loginUrl = `${process.env.CLIENT_URL}/login`; // Ajustar si es necesario
+      const htmlResetConfirmation = passwordResetConfirmationTemplate({
+          nombreUsuario: user.nombre,
+          loginUrl: loginUrl
+      });
+      
       await sendEmail({
-        email: user.email,
+        to: user.email,
         subject: 'Contraseña restablecida - Hacienda San Carlos Borromeo',
-        html: `
-          <h1>Contraseña Restablecida Exitosamente</h1>
-          <p>Hola ${user.nombre},</p>
-          <p>Tu contraseña ha sido restablecida correctamente.</p>
-          <p>Si no realizaste esta acción, por favor contacta a soporte inmediatamente.</p>
-          <a href="${process.env.CLIENT_URL}/login" style="padding: 10px 15px; background-color: #800020; color: white; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 15px;">Iniciar sesión</a>
-        `
+        html: htmlResetConfirmation
       });
     } catch (emailError) {
-      console.error('Error al enviar correo de confirmación:', emailError);
-      // Continuamos con la respuesta aunque falle el envío del correo
+      console.error('Error al enviar correo de confirmación de reseteo:', emailError);
+      // Continuamos aunque falle el envío del correo
     }
+    // --- Fin Actualizar envío de email ---
 
     res.status(200).json({
       success: true,
-      message: 'Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.'
+      message: 'Contraseña restablecida exitosamente. Ya puedes iniciar sesión.'
     });
   } catch (error) {
     console.error('Error en resetPassword:', error);

@@ -107,160 +107,83 @@ const emailConfirmacionReserva = (datos) => {
   const apellidosMostrar = datosSeguro.apellidosContacto || datosSeguro.apellidos || '';
   
   return `
-  <!DOCTYPE html>
-  <html lang="es">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirmación de Reserva - Hacienda San Carlos Borromeo</title>
-    <style>
-      body {
-        font-family: 'Didot', 'Times New Roman', serif;
-        line-height: 1.6;
-        color: #333;
-        margin: 0;
-        padding: 0;
-        background-color: #f9f5f0;
-      }
-      .container {
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 20px;
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      }
-      .header {
-        text-align: center;
-        padding: 20px 0;
-        border-bottom: 2px solid #800020;
-      }
-      .header img {
-        max-width: 150px;
-        height: auto;
-      }
-      .content {
-        padding: 30px 20px;
-      }
-      h1 {
-        color: #800020;
-        font-size: 24px;
-        margin-bottom: 20px;
-        font-weight: normal;
-        text-align: center;
-      }
-      h3 {
-        color: #800020;
-        font-size: 18px;
-        margin-top: 25px;
-        margin-bottom: 15px;
-        font-weight: normal;
-      }
-      p {
-        margin-bottom: 15px;
-        font-size: 16px;
-      }
-      .btn {
-        display: inline-block;
-        padding: 12px 24px;
-        background-color: #800020;
-        color: #fff;
-        text-decoration: none;
-        border-radius: 4px;
-        font-size: 16px;
-        margin: 20px 0;
-        transition: background-color 0.3s;
-      }
-      .btn:hover {
-        background-color: #600018;
-      }
-      .footer {
-        text-align: center;
-        padding: 20px;
-        font-size: 12px;
-        color: #666;
-        border-top: 1px solid #eee;
-      }
-      .address {
-        margin-top: 15px;
-        font-style: italic;
-      }
-      .quote {
-        font-style: italic;
-        padding: 15px;
-        background-color: #f9f5f0;
-        border-left: 3px solid #800020;
-        margin: 20px 0;
-        text-align: center;
-      }
-      .divider {
-        height: 1px;
-        background: linear-gradient(to right, transparent, #800020, transparent);
-        margin: 20px 0;
-      }
-      .details {
-        background-color: #f9f5f0;
-        padding: 20px;
-        border-radius: 6px;
-        margin: 25px 0;
-      }
-      .details p {
-        margin: 10px 0;
-      }
-      .contact {
-        text-align: center;
-        margin-top: 30px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="header">
-        <img src="https://haciendabodas.com/logo.png" alt="Hacienda San Carlos Borromeo">
-      </div>
-      
-      <div class="content">
-        <h1>¡Su Reserva ha sido Recibida!</h1>
-        
-        <p>Estimado/a <strong>${nombreMostrar} ${apellidosMostrar}</strong>,</p>
-        
-        <p>Gracias por elegir <strong>Hacienda San Carlos Borromeo</strong> para su ${
-          tipoReserva === 'habitacion' ? 'estancia' : 
-          tipoReserva === 'evento' ? 'evento' : 
-          'servicio de masaje'
-        }. Nos complace confirmar que hemos recibido su reserva correctamente.</p>
-        
-        <div class="quote">
-          "Cada piedra de esta hacienda cuenta una historia, cada rincón guarda un recuerdo, y ahora, usted será parte de este legado centenario de elegancia y tradición."
-        </div>
-        
-        ${obtenerDetallesReserva()}
-        
-        <p>
-          ${
-            (datosSeguro.estado === 'confirmada' || datosSeguro.estadoReserva === 'confirmada')
-              ? 'Su reserva ha sido confirmada. ¡Le esperamos con gran ilusión!' 
-              : 'Estamos procesando su reserva y le enviaremos una confirmación definitiva en breve.'
-          }
-        </p>
-        
-        <div class="divider"></div>
-        
-        <div class="contact">
-          <p>Si tiene alguna pregunta o necesita hacer cambios en su reserva, no dude en contactarnos:</p>
-          <p><strong>Email:</strong> hdasancarlos@gmail.com</p>
-          <p><strong>Teléfono:</strong> +52 (123) 456-7890</p>
-        </div>
-      </div>
-      
-      <div class="footer">
-        <p>&copy; ${new Date().getFullYear()} Hacienda San Carlos Borromeo. Todos los derechos reservados.</p>
-        <p class="address">Carretera Nacional Km 30, San Carlos, México</p>
-      </div>
-    </div>
-  </body>
-  </html>
-  `;
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmación de Reserva - Hacienda San Carlos Borromeo</title>
+  <style>
+    /* Estilos generales (con fallbacks) */
+    body { margin: 0; padding: 0; background-color: #FAF3E0; /* Crema claro */ font-family: Georgia, 'Times New Roman', Times, serif; }
+    .email-container { max-width: 600px; margin: 20px auto; background-color: #FFFFFF; border: 1px solid #E0D8CC; /* Borde suave */ border-radius: 8px; overflow: hidden; }
+    .header { background-color: #4E3629; /* Marrón oscuro */ padding: 20px; text-align: center; }
+    .header img { max-width: 180px; height: auto; }
+    .content { padding: 30px; color: #4E3629; /* Marrón oscuro */ font-size: 16px; line-height: 1.6; }
+    .content h1 { color: #800020; /* Guinda/Vino */ font-family: Didot, Georgia, 'Times New Roman', serif; font-size: 24px; margin-top: 0; margin-bottom: 20px; font-weight: normal; text-align: center; }
+    .content p { margin-bottom: 15px; }
+    .details { background-color: #FDFBF5; /* Crema muy claro */ padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 3px solid #800020; }
+    .details strong { color: #800020; }
+    .button-container { text-align: center; margin-top: 30px; margin-bottom: 20px; }
+    .button { background-color: #800020; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-family: Arial, Helvetica, sans-serif; font-size: 16px; }
+    .footer { background-color: #FAF3E0; padding: 20px; text-align: center; font-size: 12px; color: #918174; /* Marrón grisáceo */ }
+    .footer a { color: #800020; text-decoration: none; }
+    /* Estilos específicos para tabla (máxima compatibilidad) */
+    table { border-collapse: collapse; width: 100%; }
+    td { padding: 0; vertical-align: top; }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #FAF3E0; font-family: Georgia, 'Times New Roman', Times, serif;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td style="padding: 20px 0;">
+        <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; margin: 0 auto; background-color: #FFFFFF; border: 1px solid #E0D8CC; border-radius: 8px; overflow: hidden;" class="email-container">
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #4E3629; padding: 20px; text-align: center;" class="header">
+              <img src="https://haciendabodas.com/logo.png" alt="Hacienda San Carlos Borromeo Logo" style="max-width: 180px; height: auto;">
+            </td>
+          </tr>
+          <!-- Content -->
+          <tr>
+            <td style="padding: 30px; color: #4E3629; font-size: 16px; line-height: 1.6;" class="content">
+              <h1 style="color: #800020; font-family: Didot, Georgia, 'Times New Roman', serif; font-size: 24px; margin-top: 0; margin-bottom: 20px; font-weight: normal; text-align: center;">Confirmación de su Reserva</h1>
+              <p>Estimado/a ${nombreMostrar} ${apellidosMostrar},</p>
+              <p>Le agradecemos por elegir <strong>Hacienda San Carlos Borromeo</strong> para su ${
+                tipoReserva === 'habitacion' ? 'estancia' : 
+                tipoReserva === 'evento' ? 'evento' : 
+                'servicio de masaje'
+              }. Nos complace confirmar que hemos recibido su reserva correctamente.</p>
+              <div style="background-color: #FDFBF5; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 3px solid #800020;" class="details">
+                <p><strong style="color: #800020;">Tipo de Reserva:</strong> ${tipoReserva === 'habitacion' ? 'Habitación' : tipoReserva === 'evento' ? 'Evento' : 'Masaje'}</p>
+                <p><strong style="color: #800020;">Fecha:</strong> ${datosSeguro.fecha ? new Date(datosSeguro.fecha).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : 'Fecha no especificada'}</p>
+                <p><strong style="color: #800020;">Número de Confirmación:</strong> ${datosSeguro.numeroConfirmacion || 'N/A'}</p>
+              </div>
+              <p>Su reserva se encuentra actualmente en estado 'pendiente'. Nuestro equipo se pondrá en contacto con usted próximamente para finalizar todos los detalles y proceder con la confirmación final.</p>
+              <p>Si lo desea, puede ver un resumen de su solicitud haciendo clic en el siguiente botón:</p>
+              <div style="text-align: center; margin-top: 30px; margin-bottom: 20px;" class="button-container">
+                <a href="${datosSeguro.urlConfirmacion || '#'}" target="_blank" style="background-color: #800020; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; font-family: Arial, Helvetica, sans-serif; font-size: 16px;" class="button">Ver Detalles de la Reserva</a>
+              </div>
+              <p>Si tiene alguna pregunta inmediata, no dude en contactarnos.</p>
+              <p>Atentamente,</p>
+              <p><strong>El Equipo de Hacienda San Carlos Borromeo</strong></p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #FAF3E0; padding: 20px; text-align: center; font-size: 12px; color: #918174;" class="footer">
+              <p>&copy; ${new Date().getFullYear()} Hacienda San Carlos Borromeo. Todos los derechos reservados.</p>
+              <p>Carretera Nacional Km 30, San Carlos, México</p>
+              <p><a href="https://haciendabodas.com" target="_blank" style="color: #800020; text-decoration: none;">Visite nuestro sitio web</a></p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
 };
 
 module.exports = emailConfirmacionReserva; 

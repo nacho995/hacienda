@@ -18,7 +18,7 @@ const {
 const {
   checkEventoAvailability,
   getEventoOccupiedDates,
-  crearReservaEvento,
+  createReservaEvento,
   obtenerReservasEvento,
   obtenerReservaEvento,
   actualizarReservaEvento,
@@ -70,7 +70,7 @@ router.put('/habitaciones/:id/huespedes', protectRoute, authorize('admin'), upda
 // Rutas públicas para eventos
 router.post('/eventos/disponibilidad', checkEventoAvailability);
 router.get('/eventos/fechas-ocupadas', getEventoOccupiedDates);
-router.post('/eventos', crearReservaEvento);
+router.post('/eventos', createReservaEvento);
 
 // Rutas protegidas para eventos
 router.get('/eventos', protectRoute, obtenerReservasEvento);

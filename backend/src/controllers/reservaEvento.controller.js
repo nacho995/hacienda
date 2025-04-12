@@ -9,19 +9,22 @@ const confirmacionTemplate = require('../emails/confirmacionReserva');
 const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
 const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
 const Servicio = require('../models/Servicio');
+const asyncHandler = require('../middleware/async.js');
+const ErrorResponse = require('../utils/errorResponse');
+const generarNumeroConfirmacion = require('../utils/confirmNumGen');
 
 /**
  * @desc    Crear una reserva de evento
  * @route   POST /api/reservas/eventos
  * @access  Public
  */
-exports.crearReservaEvento = async (req, res) => {
+const createReservaEvento = asyncHandler(async (req, res, next) => {
   const session = await mongoose.startSession(); // Iniciar sesión
-  let reservaCreada; // Para acceso fuera de la transacción
-  const habitacionesCreadas = []; // Para almacenar temporalmente
+  let reservaCreada;
+  const habitacionesCreadas = [];
 
   try {
-    await session.withTransaction(async () => { // Iniciar transacción
+    await session.withTransaction(async () => {
       const {
         tipo_evento,
         fecha,
@@ -103,8 +106,9 @@ exports.crearReservaEvento = async (req, res) => {
         modoGestionHabitaciones: modo_gestion_habitaciones || 'usuario',
         modoGestionServicios: modo_gestion_servicios || 'usuario',
         totalHabitaciones,
-        serviciosContratados: Array.isArray(serviciosContratados) ? serviciosContratados : []
-        // numeroConfirmacion se genera en pre-save
+        serviciosContratados: Array.isArray(serviciosContratados) ? serviciosContratados : [],
+        numeroConfirmacion: generarNumeroConfirmacion(),
+        fechaHoraCreacion: new Date(),
       };
 
       const [reservaEventoCreada] = await ReservaEvento.create([reservaData], { session }); // <-- Incluir sesión
@@ -203,22 +207,93 @@ exports.crearReservaEvento = async (req, res) => {
 
     }); // Fin de session.withTransaction
 
-    // --- Operaciones Post-Transacción (Email) ---
+    // --- Operaciones Post-Transacción (Email y Respuesta) ---
     if (reservaCreada) {
-       // TODO: Implementar lógica de envío de email similar a la de reservaHabitacionController
-       console.log(`[Post-Transacción] Reserva de Evento ${reservaCreada._id} y ${habitacionesCreadas.length} habitaciones creadas exitosamente.`);
-       // try { await sendEmail(...); } catch (emailError) { ... }
-    }
+       // Usar directamente el email de contacto guardado en la reserva
+       const emailCliente = reservaCreada.emailContacto;
+       const nombreCliente = reservaCreada.nombreContacto;
 
-    // Enviar respuesta exitosa
-    res.status(201).json({
-      success: true,
-      message: 'Reserva de evento creada exitosamente',
-      data: {
-          evento: reservaCreada, // Enviar el evento creado
-          habitaciones: habitacionesCreadas // Enviar las habitaciones creadas
-      }
-    });
+       if (emailCliente) {
+          // Enviar correo de confirmación al cliente
+          const htmlCliente = confirmacionTemplate({
+           nombreCliente: nombreCliente,
+           // TODO: Obtener el nombre/titulo del tipo de evento para el email
+           tipoEvento: reservaCreada.nombreEvento || 'Evento Especial', // Usar nombreEvento si está disponible
+            fechaEvento: new Date(reservaCreada.fecha).toLocaleDateString('es-ES'),
+            numeroConfirmacion: reservaCreada.numeroConfirmacion,
+            // Asegúrate de que FRONTEND_URL esté definido en tus variables de entorno
+            urlConfirmacion: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/confirmar-reserva/${reservaCreada.numeroConfirmacion}`
+          });
+ 
+          try {
+            await sendEmail({
+             to: emailCliente,
+              subject: 'Confirmación de tu reserva de evento',
+              html: htmlCliente,
+            });
+            console.log(`Correo de confirmación enviado a ${emailCliente}`);
+          } catch (error) {
+            console.error(`Error al enviar correo de confirmación al cliente ${emailCliente}:`, error);
+            // No lanzar error aquí, la reserva ya se creó. Solo registrar el fallo.
+          }
+        } else {
+         console.warn(`No se pudo enviar correo de confirmación: la reserva ${reservaCreada._id} no tiene un email de contacto asociado.`);
+        }
+
+        // Enviar correo de notificación a Hacienda
+        const adminEmail = process.env.ADMIN_EMAIL;
+        if (adminEmail) {
+          // Usar confirmacionAdminTemplate para la notificación general al admin
+          const htmlAdmin = confirmacionAdminTemplate({
+               // Usar los datos de contacto de la reserva
+               nombreCliente: nombreCliente || 'No especificado',
+               emailCliente: emailCliente || 'No especificado',
+               telefonoCliente: reservaCreada.telefonoContacto || 'No especificado',
+               // TODO: Obtener el nombre/titulo del tipo de evento para el email
+               tipoEvento: reservaCreada.nombreEvento || 'Evento Especial',
+               fechaEvento: new Date(reservaCreada.fecha).toLocaleDateString('es-ES'),
+               numeroInvitados: reservaCreada.numInvitados || 'No especificado',
+               estadoReserva: reservaCreada.estadoReserva,
+               numeroConfirmacion: reservaCreada.numeroConfirmacion,
+               modoGestionHabitaciones: reservaCreada.modoGestionHabitaciones,
+               totalHabitaciones: reservaCreada.totalHabitaciones,
+               // Puedes añadir más detalles si la plantilla los soporta
+           });
+
+           try {
+             await sendEmail({
+               to: adminEmail,
+               subject: `Nueva Reserva de Evento #${reservaCreada.numeroConfirmacion}`,
+               html: htmlAdmin,
+             });
+             console.log(`Correo de notificación enviado a ${adminEmail}`);
+           } catch (error) {
+             console.error(`Error al enviar correo de notificación al admin ${adminEmail}:`, error);
+             // No lanzar error aquí. Solo registrar.
+           }
+        } else {
+            console.warn("ADMIN_EMAIL no está configurado. No se envió notificación a Hacienda.");
+        }
+
+        // --- Respuesta Final ---
+        // Poblar detalles antes de responder si es necesario (opcional)
+        const reservaConDetalles = await ReservaEvento.findById(reservaCreada._id)
+            .populate('tipoEvento', 'titulo') // Ejemplo: Poblar el título del tipo de evento
+            // .populate('serviciosContratados') // Si necesitas detalles de servicios
+            // .populate('usuario', 'nombre email'); // Si necesitas detalles del usuario (si existe)
+
+        res.status(201).json({
+          success: true,
+          message: 'Reserva de evento creada con éxito. Se ha enviado un correo de confirmación.',
+          data: reservaConDetalles || reservaCreada, // Devolver la reserva poblada si se pudo, si no, la original
+          habitacionesCreadas: habitacionesCreadas // Incluir habitaciones si se crearon
+        });
+
+    } else {
+      // Esto no debería ocurrir si la transacción tuvo éxito y reservaCreada se asignó
+      console.error("Error crítico: La transacción pareció tener éxito pero reservaCreada está vacía.");
+      next(new ErrorResponse('Error al procesar la reserva después de la creación', 500));
+    }
 
   } catch (error) {
     // El error puede venir de las validaciones o de la transacción
@@ -231,7 +306,7 @@ exports.crearReservaEvento = async (req, res) => {
     // Siempre terminar la sesión
     await session.endSession();
   }
-};
+});
 
 /**
  * @desc    Obtener todas las reservas de eventos
@@ -1312,7 +1387,6 @@ exports.removeHabitacionDeEvento = async (req, res) => {
   }
 };
 
-// --- NUEVA FUNCIÓN --- 
 /**
  * @desc    Asignar una reserva de evento a un administrador
  * @route   PUT /api/reservas/eventos/:id/asignar
@@ -1352,4 +1426,24 @@ exports.asignarEventoAdmin = async (req, res) => {
     console.error('Error asignando evento y habitaciones a admin:', error);
     res.status(500).json({ success: false, message: 'Error interno del servidor.', error: error.message });
   }
+};
+
+module.exports = {
+    createReservaEvento,
+    obtenerReservasEvento: exports.obtenerReservasEvento,
+    obtenerReservaEvento: exports.obtenerReservaEvento,
+    actualizarReservaEvento: exports.actualizarReservaEvento,
+    eliminarReservaEvento: exports.eliminarReservaEvento,
+    checkEventoAvailability: exports.checkEventoAvailability,
+    getEventoOccupiedDates: exports.getEventoOccupiedDates,
+    assignReservaEvento: exports.assignReservaEvento,
+    unassignReservaEvento: exports.unassignReservaEvento,
+    obtenerHabitacionesEvento: exports.obtenerHabitacionesEvento,
+    actualizarHabitacionEvento: exports.actualizarHabitacionEvento,
+    getEventoServicios: exports.getEventoServicios,
+    addEventoServicio: exports.addEventoServicio,
+    removeEventoServicio: exports.removeEventoServicio,
+    addHabitacionAEvento: exports.addHabitacionAEvento,
+    removeHabitacionDeEvento: exports.removeHabitacionDeEvento,
+    asignarEventoAdmin: exports.asignarEventoAdmin
 };
