@@ -8,8 +8,9 @@ const sendEmail = async (options) => {
   // Log the credentials being used by the Node.js process in Render
   console.log('--- DEBUG EMAIL CREDENTIALS ---');
   console.log('EMAIL_USER:', process.env.EMAIL_USER);
-  // !! SECURITY RISK: Log password ONLY for temporary debug. REMOVE THIS LINE LATER !!
-  console.log('EMAIL_PASSWORD:', process.env.EMAIL_PASSWORD ? '********' : 'Not Set'); // Log password status
+  // !! TEMPORARY: Log the actual password string for debugging !!
+  // !! REMOVE THIS LINE IMMEDIATELY AFTER TESTING !!
+  console.log('EMAIL_PASSWORD_VALUE:', process.env.EMAIL_PASSWORD);
   console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
   console.log('EMAIL_PORT:', process.env.EMAIL_PORT);
   console.log('--- END DEBUG ---');
