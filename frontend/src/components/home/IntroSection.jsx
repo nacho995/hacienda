@@ -400,33 +400,30 @@ export default function IntroSection() {
     }
   };
   
-  // Renderizado de la barra de progreso
+  // Renderizado de la barra de progreso (más pequeña en móvil)
   const renderProgressBar = () => {
     const progressPercentage = videoDuration > 0 ? (videoProgress / videoDuration) * 100 : 0;
-    
+
     return (
-      <div 
+      <div
         ref={progressBarRef}
-        className="w-full h-3 bg-white/30 rounded-full mb-4 relative overflow-visible cursor-pointer group py-4"
+        // Más delgado y menos padding vertical en móvil
+        className="w-full h-1 sm:h-2 bg-white/30 rounded-full mb-2 relative overflow-visible cursor-pointer group py-2 sm:py-3"
         onClick={handleProgressBarClick}
         onMouseDown={startDrag}
         onTouchStart={startDrag}
       >
-        <div 
-          className="absolute left-0 top-1/2 transform -translate-y-1/2 h-3 bg-[var(--color-primary)] rounded-full" 
+        <div
+          // Más delgado en móvil
+          className="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 sm:h-2 bg-[var(--color-primary)] rounded-full"
           style={{ width: `${progressPercentage}%` }}
         ></div>
-        <div 
-          className={`absolute top-1/2 transform -translate-y-1/2 h-6 w-6 bg-[var(--color-primary)] rounded-full shadow-md border-2 border-white transition-transform ${isDragging ? 'scale-125' : 'group-hover:scale-110'}`}
-          style={{ left: `calc(${progressPercentage}% - 12px)` }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            startDrag(e);
-          }}
-          onTouchStart={(e) => {
-            e.stopPropagation();
-            startDrag(e);
-          }}
+        <div
+          // Manija más pequeña en móvil
+          className={`absolute top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 bg-[var(--color-primary)] rounded-full shadow-md border border-white transition-transform ${isDragging ? 'scale-110' : 'group-hover:scale-105'}`} // Menos escalado
+          style={{ left: `calc(${progressPercentage}% - 6px)` }} // Ajustar offset según tamaño pequeño
+          onMouseDown={(e) => { e.stopPropagation(); startDrag(e); }}
+          onTouchStart={(e) => { e.stopPropagation(); startDrag(e); }}
         ></div>
       </div>
     );
@@ -518,17 +515,17 @@ export default function IntroSection() {
       {/* Contenedor principal - Ajustar padding top con breakpoint 1520px */}
       <div className="container-custom pt-8 pb-24 min-[1520px]:pt-16">
         <div className="text-center mb-20">
-          <h2 className="elegant-title centered fade-in text-5xl md:text-6xl font-[var(--font-display)] text-[var(--color-accent)] mb-12">
+          <h2 className="elegant-title centered fade-in text-4xl sm:text-5xl md:text-6xl font-[var(--font-display)] text-[var(--color-accent)] mb-12">
             Un <span className="text-[var(--color-primary)] font-semibold">Legado</span> de Distinción
           </h2>
-          <div className="gold-divider fade-in animate-delay-100"></div>
-          <p className="text-xl md:text-2xl font-light fade-in animate-delay-200 mt-10 max-w-4xl mx-auto leading-relaxed">
+          <div className="gold-divider fade-in animate-delay-100 mx-auto h-0.5 w-24 sm:w-32 md:w-40"></div>
+          <p className="text-lg sm:text-xl md:text-2xl font-light fade-in animate-delay-200 mt-8 sm:mt-10 max-w-4xl mx-auto leading-relaxed">
             Hacienda San Carlos Borromeo no es solo un lugar, es la <span className="italic text-[#8B7355]">manifestación de la elegancia clásica mexicana</span> donde los momentos especiales cobran vida en un entorno de incomparable belleza.
           </p>
         </div>
         
         {/* Video de YouTube con controles personalizados */}
-        <div className="my-20 fade-in animate-delay-200">
+        <div className="my-16 sm:my-20 fade-in animate-delay-200">
           <div 
             className="relative overflow-hidden rounded-lg shadow-2xl aspect-video cursor-pointer"
             ref={playerContainerRef}
@@ -573,8 +570,9 @@ export default function IntroSection() {
             
             {/* Controles personalizados */}
             {showYouTubePlayer && (
-              <div 
-                className={`absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 flex flex-col justify-end p-4 transition-opacity duration-300 z-20 ${
+              <div
+                // Padding más pequeño en móvil
+                className={`absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20 flex flex-col justify-end p-1.5 sm:p-3 transition-opacity duration-300 z-20 ${
                   showControls ? 'opacity-100' : 'opacity-0'
                 }`}
                 onClick={(e) => e.stopPropagation()}
@@ -584,81 +582,80 @@ export default function IntroSection() {
                 
                 {/* Controles de reproducción */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <button 
+                  {/* Controles Izquierda (Play, Seek) */}
+                  {/* Espaciado y tamaño de iconos más pequeños en móvil */}
+                  <div className="flex items-center space-x-0.5 sm:space-x-1">
+                    <button
                       onClick={seekBackward}
-                      className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                      className="text-white hover:text-[var(--color-primary)] transition-colors p-1 sm:p-1.5"
                       aria-label="Retroceder 10 segundos"
                     >
-                      <MdReplay10 className="w-6 h-6" />
+                      <MdReplay10 className="w-4 h-4 sm:w-5 sm:w-5" />
                     </button>
                     
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        togglePlay();
-                      }}
-                      className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] w-10 h-10 rounded-full flex items-center justify-center text-white transition-all transform hover:scale-110"
+                    <button
+                      onClick={togglePlay}
+                      className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-white transition-all transform hover:scale-105"
                       aria-label={isVideoPlaying ? "Pausar" : "Reproducir"}
                     >
-                      {isVideoPlaying ? <FaPause className="w-4 h-4" /> : <FaPlayCircle className="w-5 h-5" />}
+                      {isVideoPlaying ? <FaPause className="w-2.5 h-2.5 sm:w-3 sm:w-3" /> : <FaPlayCircle className="w-3 h-3 sm:w-4 sm:w-4" />}
                     </button>
                     
-                    <button 
+                    <button
                       onClick={seekForward}
-                      className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                      className="text-white hover:text-[var(--color-primary)] transition-colors p-1 sm:p-1.5"
                       aria-label="Avanzar 10 segundos"
                     >
-                      <MdForward10 className="w-6 h-6" />
+                      <MdForward10 className="w-4 h-4 sm:w-5 sm:w-5" />
                     </button>
                   </div>
                   
-                  <div className="flex items-center space-x-4">
+                  {/* Controles Derecha (Subtítulos, Volumen, Tiempo, Fullscreen) */}
+                  {/* Espaciado y tamaño de iconos más pequeños en móvil */}
+                  <div className="flex items-center space-x-0.5 sm:space-x-2">
                     <button
                       onClick={toggleSubtitles}
-                      className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                      className="text-white hover:text-[var(--color-primary)] transition-colors p-1 sm:p-1.5"
                       aria-label={subtitlesEnabled ? "Desactivar subtítulos" : "Activar subtítulos"}
                       title={subtitlesEnabled ? "Desactivar subtítulos" : "Activar subtítulos"}
                     >
-                      {subtitlesEnabled ? <MdSubtitles className="w-5 h-5" /> : <MdSubtitlesOff className="w-5 h-5" />}
+                      {subtitlesEnabled ? <MdSubtitles className="w-3.5 h-3.5 sm:w-4 sm:w-4" /> : <MdSubtitlesOff className="w-3.5 h-3.5 sm:w-4 sm:w-4" />}
                     </button>
                     
                     <div className="relative flex items-center">
-                      <button 
+                      <button
                         onClick={toggleVolumeSlider}
-                        className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                        className="text-white hover:text-[var(--color-primary)] transition-colors p-1 sm:p-1.5"
                         aria-label={isMuted ? "Activar sonido" : "Silenciar"}
                       >
-                        {isMuted ? <FaVolumeMute className="w-5 h-5" /> : <FaVolumeUp className="w-5 h-5" />}
+                        {isMuted ? <FaVolumeMute className="w-3.5 h-3.5 sm:w-4 sm:w-4" /> : <FaVolumeUp className="w-3.5 h-3.5 sm:w-4 sm:w-4" />}
                       </button>
                       
+                      {/* Slider de volumen */}
                       {showVolumeSlider && (
-                        <div className="absolute bottom-full left-0 mb-2 bg-black/80 p-2 rounded-lg w-32">
-                          <input 
-                            type="range" 
-                            min="0" 
-                            max="100" 
-                            value={volume} 
-                            onChange={handleVolumeChange}
-                            className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer"
-                            style={{
-                              accentColor: 'var(--color-primary)'
-                            }}
+                        <div
+                          className="absolute bottom-full right-0 sm:left-0 mb-2 bg-black/80 p-2 rounded-lg w-20 sm:w-28"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="range" min="0" max="100" value={volume} onChange={handleVolumeChange}
+                            className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
                           />
                         </div>
                       )}
                     </div>
                     
-                    <span className="text-white text-sm hidden sm:inline-block">
+                    {/* Tiempo - Oculto en pantallas aún más pequeñas si es necesario */}
+                    <span className="text-white text-xs hidden xs:inline-block sm:text-sm">
                       {formatTime(videoProgress)} / {formatTime(videoDuration)}
                     </span>
                     
-                    <button 
+                    <button
                       onClick={toggleFullScreen}
-                      className="text-white hover:text-[var(--color-primary)] transition-colors p-2"
+                      className="text-white hover:text-[var(--color-primary)] transition-colors p-1 sm:p-1.5"
                       aria-label="Pantalla completa"
                     >
-                      <FaExpand className="w-4 h-4" />
+                      <FaExpand className="w-3 h-3 sm:w-4 sm:w-4" />
                     </button>
                   </div>
                 </div>
@@ -678,14 +675,14 @@ export default function IntroSection() {
         </div>
         
         {/* Historia de la Hacienda - Formato renovado */}
-        <div className="my-20 fade-in animate-delay-300">
+        <div className="my-16 sm:my-20 fade-in animate-delay-300">
           <div className="text-center mb-12">
-            <h3 className="text-4xl font-[var(--font-display)] text-[var(--color-accent-dark)] mb-6">
+            <h3 className="text-3xl sm:text-4xl font-[var(--font-display)] text-[var(--color-accent-dark)] mb-6">
               <span style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#8B7355"}}>
                 Historia y Tradición
               </span>
             </h3>
-            <div className="w-32 h-1 bg-[var(--color-primary)] mx-auto mb-6"></div>
+            <div className="w-24 h-0.5 sm:w-32 sm:h-1 bg-[var(--color-primary)] mx-auto mb-6"></div>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
@@ -757,15 +754,15 @@ export default function IntroSection() {
         </div>
         
         {/* Legado Actual */}
-        <div className="my-20 fade-in animate-delay-400 bg-gradient-to-r from-[var(--color-cream)] to-[var(--color-cream-light)] p-8 rounded-lg shadow-inner">
+        <div className="my-16 sm:my-20 fade-in animate-delay-400 bg-gradient-to-r from-[var(--color-cream)] to-[var(--color-cream-light)] p-6 sm:p-8 rounded-lg shadow-inner">
           <div className="text-center mb-8">
-            <h3 className="text-3xl font-[var(--font-display)] text-[var(--color-accent-dark)] mb-4">
+            <h3 className="text-2xl sm:text-3xl font-[var(--font-display)] text-[var(--color-accent-dark)] mb-4">
               Legado Actual
             </h3>
-            <div className="w-24 h-1 bg-[var(--color-primary)] mx-auto mb-6"></div>
+            <div className="w-16 h-0.5 sm:w-24 sm:h-1 bg-[var(--color-primary)] mx-auto mb-6"></div>
           </div>
           
-          <div className="space-y-4 text-lg leading-relaxed max-w-4xl mx-auto">
+          <div className="space-y-4 text-base sm:text-lg leading-relaxed max-w-4xl mx-auto">
             <p>
               Hoy, la <span className="font-semibold" style={{fontFamily: "'Trajan Pro', 'Cinzel', 'Didot', serif", color: "#8B7355"}}>Hacienda San Carlos Borromeo</span> se alza como un símbolo de elegancia atemporal y preservación cultural. Sus jardines centenarios, con árboles que han sido testigos silenciosos de la historia, crean un ambiente de serenidad mágica inigualable.
             </p>
