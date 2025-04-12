@@ -596,7 +596,7 @@ const ReservaWizard = () => {
             ) : formData.modoGestionServicios === 'usuario' ? (
               // Mostrar componente de gestión si se eligió 'usuario'
               <ModoGestionServicios 
-                tipoEvento={typeof formData.tipoEvento === 'object' ? formData.tipoEvento.titulo : formData.tipoEvento}
+                tipoEvento={formData.tipoEvento && typeof formData.tipoEvento === 'object' ? formData.tipoEvento.titulo : formData.tipoEvento}
                 onServicesSelect={handleServicesSelect}
                 modoGestion={formData.modoGestionServicios}
                 serviciosSeleccionados={formData.serviciosSeleccionados}
