@@ -263,7 +263,7 @@ export default function HeroSection() {
               </div>
 
               {/* Contenido del slide */}
-              <div className="absolute inset-0 flex flex-col justify-center items-center text-center px-4 md:pt-80">
+              <div className="absolute inset-0 flex flex-col justify-center items-center text-center px-4 pt-80">
                 {/* Medallón y texto */}
                 <div className="relative z-10 transform -translate-y-20">
                   
