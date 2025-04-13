@@ -57,6 +57,7 @@ export default function ContactForm() {
   };
   
   const handleSubmit = async (e) => {
+    console.log('>>> handleSubmit INICIADO');
     e.preventDefault();
     
     const formErrors = validateForm();
