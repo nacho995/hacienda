@@ -113,13 +113,18 @@ export default function ContactForm() {
       }, 5000);
       
     } catch (error) {
+      console.error('>>> ERROR en handleSubmit:', error);
+      console.error('>>> Tipo de error:', error.name);
+      console.error('>>> Mensaje de error:', error.message);
       console.error('Error al enviar formulario:', error);
       setIsSubmitting(false);
       
       if (error.name === 'AbortError' || error.name === 'TypeError' || error.message.includes('Failed to fetch')) {
+        console.log('>>> Detectado como Error de Red o Timeout');
         // Error de red o timeout
         setNetworkError(true);
       } else {
+        console.log('>>> Detectado como Otro Error (Server Error)');
         // Otro tipo de error
         setServerError(error.message || 'Hubo un problema al enviar el formulario. Intente nuevamente más tarde.');
       }
