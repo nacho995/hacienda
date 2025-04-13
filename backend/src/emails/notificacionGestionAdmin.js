@@ -125,21 +125,21 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
       </svg>
     </div>
   `;
-
+  
   return `
-    <!DOCTYPE html>
+  <!DOCTYPE html>
     <html>
-    <head>
+  <head>
       <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${asunto || 'Notificación Administrativa'} - Hacienda San Carlos Borromeo</title>
-      <style>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
         
-        body {
+      body {
           font-family: 'Lato', Arial, sans-serif; 
-          margin: 0; 
-          padding: 0; 
+        margin: 0;
+        padding: 0;
           background-color: ${colors.ivory};
           color: ${colors.textDark};
           -webkit-font-smoothing: antialiased; 
@@ -171,10 +171,10 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
           z-index: 2;
         }
         
-        .header {
+      .header {
           background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.darkBrown} 100%);
           padding: 40px 20px;
-          text-align: center;
+        text-align: center;
           position: relative;
           overflow: hidden;
         }
@@ -238,15 +238,15 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
           letter-spacing: 2px;
         }
         
-        .content {
+      .content {
           padding: 60px 40px 40px;
           position: relative;
         }
         
         .notification-icon {
           margin: 0 auto 30px;
-          text-align: center;
-        }
+        text-align: center;
+      }
         
         .notification-subject {
           font-family: 'Cormorant Garamond', Georgia, serif;
@@ -306,7 +306,7 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
           text-align: center;
           color: ${colors.darkBrown};
           font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
-          font-size: 18px;
+        font-size: 18px;
         }
         
         .signature-name {
@@ -335,7 +335,7 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
         }
         
         .footer-logo {
-          margin-bottom: 15px;
+        margin-bottom: 15px;
           font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
           font-size: 20px;
           letter-spacing: 3px;
@@ -347,7 +347,7 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
         .footer-address {
           font-size: 14px;
           opacity: 0.9;
-          margin-bottom: 15px;
+        margin-bottom: 15px;
         }
         
         .footer-contact {
@@ -378,7 +378,7 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
         }
         
         .fine-print {
-          font-size: 12px;
+        font-size: 12px;
           opacity: 0.7;
           margin-top: 25px;
         }
@@ -408,10 +408,10 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
           .footer {
             padding: 25px 20px;
           }
-        }
-      </style>
-    </head>
-    <body>
+      }
+    </style>
+  </head>
+  <body>
       <div class="main-wrapper">
         <div class="main-container">
           <div class="inner-border"></div>
@@ -428,27 +428,27 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
           
           <div style="text-align: center;">
             <div class="notification-badge">${tipo || 'Notificación'}</div>
-          </div>
-          
-          <div class="content">
+      </div>
+      
+      <div class="content">
             <div class="notification-icon">
               ${getNotificationIcon()}
-            </div>
-            
+        </div>
+        
             <div class="notification-subject">${asunto || 'Notificación Administrativa'}</div>
             
             <div class="notification-message">
               ${mensaje || 'No hay información adicional para esta notificación.'}
-            </div>
-            
+        </div>
+        
             ${decorativeDivider}
             
             ${enlaceAccion ? `
             <div style="text-align: center;">
               <a href="${enlaceAccion}" target="_blank" class="cta-button">${textoEnlace || 'Ver Detalles'}</a>
-            </div>
-            ` : ''}
-            
+        </div>
+        ` : ''}
+        
             <div class="additional-info">
               <p><strong>Información importante:</strong></p>
               <p>• Esta es una notificación automática del sistema de administración.</p>
@@ -463,8 +463,8 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
               <p class="signature-name">Sistema de Administración</p>
               <p>Hacienda San Carlos Borromeo</p>
             </div>
-          </div>
-          
+      </div>
+      
           <footer class="footer">
             <div class="footer-border"></div>
             <div class="footer-logo">Hacienda San Carlos Borromeo</div>
@@ -482,9 +482,9 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
             </div>
           </footer>
         </div>
-      </div>
-    </body>
-    </html>
+    </div>
+  </body>
+  </html>
   `;
 };
 

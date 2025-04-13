@@ -1,26 +1,13 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const confirmacionReservaEvento = require('../emails/confirmacionReservaEvento');
 const confirmacionReservaHabitacion = require('../emails/confirmacionReservaHabitacion');
 const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
 
-/**
- * Configura el transporter de nodemailer
- */
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: process.env.EMAIL_PORT || 587,
-  secure: process.env.EMAIL_SECURE === 'true', // true para 465, false para otros puertos
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false // Permitir certificados autofirmados - solo para desarrollo
-  }
-});
+// Configurar SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 /**
- * Envia un correo utilizando nodemailer
+ * Envia un correo utilizando SendGrid
  * @param {Object} options - Opciones del correo
  * @param {string} options.email - Destinatario(s)
  * @param {string} options.subject - Asunto del correo
@@ -31,33 +18,29 @@ const sendEmail = async (options) => {
   try {
     const { email, subject, html } = options;
     
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject,
-      html
+    const msg = {
+      to: email, // Change to your recipient
+      from: process.env.EMAIL_FROM, // Change to your verified sender
+      subject: subject,
+      html: html,
     };
     
-    // Registrar parámetros (sin mostrar contraseñas)
-    console.log('Enviando email con parámetros:', {
-      from: process.env.EMAIL_USER,
+    // Registrar parámetros (sin mostrar contraseñas ni API Key)
+    console.log('Enviando email con SendGrid:', {
       to: email,
+      from: msg.from,
       subject,
       htmlLength: html?.length || 0,
-      transporterConfig: {
-        host: transporter?.options?.host,
-        port: transporter?.options?.port,
-        secure: transporter?.options?.secure,
-        auth: { user: transporter?.options?.auth?.user || 'no-user' },
-        tls: transporter?.options?.tls
-      }
     });
     
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email enviado con éxito:', info.messageId);
+    const info = await sgMail.send(msg);
+    console.log('Email enviado con éxito a través de SendGrid. Message ID:', info[0]?.headers?.['x-message-id']);
     return info;
   } catch (error) {
-    console.error('Error al enviar email:', error);
+    console.error('Error al enviar email con SendGrid:', error);
+    if (error.response) {
+      console.error('Detalles del error de SendGrid:', error.response.body)
+    }
     throw error;
   }
 };
@@ -84,27 +67,26 @@ const enviarConfirmacionReservaEvento = async (datos) => {
     habitacionesReservadas
   } = datos;
 
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: `Confirmación de reserva de ${tipoEvento} - Hacienda San Carlos Borromeo`,
-    html: confirmacionReservaEvento({
-      nombreCliente,
-      tipoEvento,
-      numeroConfirmacion,
-      fechaEvento,
-      horaInicio,
-      horaFin,
-      numInvitados,
-      precioTotal,
-      porcentajePago,
-      metodoPago,
-      detallesEvento,
-      habitacionesReservadas
-    })
-  };
+  const htmlContent = confirmacionReservaEvento({
+    nombreCliente,
+    tipoEvento,
+    numeroConfirmacion,
+    fechaEvento,
+    horaInicio,
+    horaFin,
+    numInvitados,
+    precioTotal,
+    porcentajePago,
+    metodoPago,
+    detallesEvento,
+    habitacionesReservadas
+  });
 
-  return transporter.sendMail(mailOptions);
+  return sendEmail({
+    email,
+    subject: `Confirmación de reserva de ${tipoEvento} - Hacienda San Carlos Borromeo`,
+    html: htmlContent
+  });
 };
 
 /**
@@ -131,24 +113,23 @@ const enviarConfirmacionReservaHabitacion = async (datos) => {
   const diferenciaDias = Math.round((salida - entrada) / (1000 * 60 * 60 * 24));
   const totalNoches = diferenciaDias > 0 ? diferenciaDias : 1;
 
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: `Confirmación de reserva de habitación - Hacienda San Carlos Borromeo`,
-    html: confirmacionReservaHabitacion({
-      nombreCliente,
-      tipoHabitacion,
-      numeroConfirmacion,
-      fechaEntrada,
-      fechaSalida,
-      totalNoches,
-      precio,
-      metodoPago,
-      detallesAdicionales
-    })
-  };
+  const htmlContent = confirmacionReservaHabitacion({
+    nombreCliente,
+    tipoHabitacion,
+    numeroConfirmacion,
+    fechaEntrada,
+    fechaSalida,
+    totalNoches,
+    precio,
+    metodoPago,
+    detallesAdicionales
+  });
 
-  return transporter.sendMail(mailOptions);
+  return sendEmail({
+    email,
+    subject: `Confirmación de reserva de habitación - Hacienda San Carlos Borromeo`,
+    html: htmlContent
+  });
 };
 
 /**
@@ -170,20 +151,19 @@ const enviarNotificacionGestionAdmin = async (datos) => {
     throw new Error('Se requieren destinatarios, asunto y mensaje para enviar la notificación');
   }
 
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: Array.isArray(destinatarios) ? destinatarios.join(',') : destinatarios,
-    subject: `[${tipo.toUpperCase()}] ${asunto} - Hacienda San Carlos Borromeo`,
-    html: notificacionGestionAdmin({
-      tipo,
-      asunto,
-      mensaje,
-      enlaceAccion,
-      textoEnlace
-    })
-  };
+  const htmlContent = notificacionGestionAdmin({
+    tipo,
+    asunto,
+    mensaje,
+    enlaceAccion,
+    textoEnlace
+  });
 
-  return transporter.sendMail(mailOptions);
+  return sendEmail({
+    email: destinatarios,
+    subject: `[${tipo.toUpperCase()}] ${asunto} - Hacienda San Carlos Borromeo`,
+    html: htmlContent
+  });
 };
 
 module.exports = {

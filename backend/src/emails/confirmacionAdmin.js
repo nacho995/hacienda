@@ -85,21 +85,21 @@ const confirmacionAdmin = ({
       </svg>
     </div>
   `;
-
+  
   return `
-    <!DOCTYPE html>
+  <!DOCTYPE html>
     <html>
-    <head>
+  <head>
       <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Nueva Solicitud de Reserva - Hacienda San Carlos Borromeo</title>
-      <style>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
         
-        body { 
+      body {
           font-family: 'Lato', Arial, sans-serif; 
-          margin: 0; 
-          padding: 0; 
+        margin: 0;
+        padding: 0;
           background-color: ${colors.ivory};
           color: ${colors.textDark};
           -webkit-font-smoothing: antialiased; 
@@ -131,10 +131,10 @@ const confirmacionAdmin = ({
           z-index: 2;
         }
         
-        .header {
+      .header {
           background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.darkBrown} 100%);
           padding: 40px 20px;
-          text-align: center;
+        text-align: center;
           position: relative;
           overflow: hidden;
         }
@@ -198,7 +198,7 @@ const confirmacionAdmin = ({
           letter-spacing: 2px;
         }
         
-        .content {
+      .content {
           padding: 60px 40px 40px;
           position: relative;
         }
@@ -211,11 +211,11 @@ const confirmacionAdmin = ({
         
         .section-title {
           font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
-          font-size: 24px;
+        font-size: 24px;
           color: ${colors.darkBrown};
-          margin-bottom: 20px;
+        margin-bottom: 20px;
           font-weight: 700;
-          text-align: center;
+        text-align: center;
           position: relative;
           border-bottom: 1px solid ${colors.goldLight};
           padding-bottom: 10px;
@@ -255,13 +255,13 @@ const confirmacionAdmin = ({
           font-family: 'Lato', Arial, sans-serif;
           background-color: ${colors.creamLight};
           border: 1px dashed ${colors.gold};
-          padding: 20px;
+        padding: 20px;
           margin: 25px 0;
           color: ${colors.textDark};
           line-height: 1.6;
           border-radius: 2px;
-          font-style: italic;
-        }
+        font-style: italic;
+      }
         
         .client-message-title {
           font-family: 'Cormorant Garamond', Georgia, serif;
@@ -287,7 +287,7 @@ const confirmacionAdmin = ({
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 1px;
-          text-align: center;
+        text-align: center;
           transition: all 0.3s;
           box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         }
@@ -301,8 +301,8 @@ const confirmacionAdmin = ({
           display: table;
           width: 100%;
           table-layout: fixed;
-          margin: 20px 0;
-        }
+        margin: 20px 0;
+      }
         
         .column {
           display: table-cell;
@@ -372,10 +372,10 @@ const confirmacionAdmin = ({
           .footer {
             padding: 25px 20px;
           }
-        }
-      </style>
-    </head>
-    <body>
+      }
+    </style>
+  </head>
+  <body>
       <div class="main-wrapper">
         <div class="main-container">
           <div class="inner-border"></div>
@@ -394,9 +394,9 @@ const confirmacionAdmin = ({
           
           <div style="text-align: center;">
             <div class="admin-badge">Nueva Solicitud de Reserva</div>
-          </div>
-          
-          <div class="content">
+      </div>
+      
+      <div class="content">
             <p class="intro-text">Se ha recibido una nueva solicitud de reserva de evento a través del sitio web. A continuación, se presentan los detalles:</p>
             
             ${decorativeDivider}
@@ -415,8 +415,8 @@ const confirmacionAdmin = ({
                 <span class="details-label">Fecha Solicitada:</span>
                 <span class="details-value">${fechaEvento || 'No especificada'}</span>
               </div>
-            </div>
-            
+        </div>
+        
             <h3 class="section-title">Información del Cliente</h3>
             <div class="columns-container">
               <div class="column">
@@ -443,8 +443,8 @@ const confirmacionAdmin = ({
                   </div>
                 </div>
               </div>
-            </div>
-            
+        </div>
+        
             ${mensajeCliente ? `
             <div class="client-message">
               <h4 class="client-message-title">Mensaje del Cliente:</h4>
@@ -460,17 +460,17 @@ const confirmacionAdmin = ({
             </div>
             ` : ''}
             
-          </div>
-          
+      </div>
+      
           <footer class="footer">
             <div class="footer-border"></div>
             <div class="footer-logo">Hacienda San Carlos Borromeo</div>
             <p class="footer-note">Esta es una notificación automática. No es necesario responder a este correo.</p>
           </footer>
         </div>
-      </div>
-    </body>
-    </html>
+    </div>
+  </body>
+  </html>
   `;
 };
 

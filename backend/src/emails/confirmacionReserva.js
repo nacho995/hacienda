@@ -59,8 +59,8 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
         
         <text x="50" y="75" font-family="'Playfair Display', serif" font-size="8" text-anchor="middle" fill="${colors.gold}">CONFIRMADO</text>
       </svg>
-    </div>
-  `;
+          </div>
+        `;
 
   // Divider decorativo
   const decorativeDivider = `
@@ -73,23 +73,23 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
         <circle cx="80" cy="10" r="3" fill="${colors.gold}" opacity="0.6"/>
         <circle cx="120" cy="10" r="3" fill="${colors.gold}" opacity="0.6"/>
       </svg>
-    </div>
-  `;
-
+          </div>
+        `;
+  
   return `
-    <!DOCTYPE html>
+  <!DOCTYPE html>
     <html>
-    <head>
+  <head>
       <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Confirmación de Reserva - Hacienda San Carlos Borromeo</title>
-      <style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmación de Reserva - Hacienda San Carlos Borromeo</title>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Cormorant+Garamond:wght@400;600;700&family=Lato:wght@300;400;700&display=swap');
         
-        body { 
+      body {
           font-family: 'Lato', Arial, sans-serif; 
-          margin: 0; 
-          padding: 0; 
+        margin: 0;
+        padding: 0;
           background-color: ${colors.ivory};
           color: ${colors.textDark};
           -webkit-font-smoothing: antialiased; 
@@ -121,10 +121,10 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           z-index: 2;
         }
         
-        .header {
+      .header {
           background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.darkBrown} 100%);
           padding: 40px 20px;
-          text-align: center;
+        text-align: center;
           position: relative;
           overflow: hidden;
         }
@@ -188,14 +188,14 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           letter-spacing: 2px;
         }
         
-        .content {
+      .content {
           padding: 60px 40px 40px;
           position: relative;
-        }
+      }
         
         .greeting {
           font-family: 'Cormorant Garamond', Georgia, serif;
-          font-size: 24px;
+        font-size: 24px;
           color: ${colors.darkBrown};
           margin-bottom: 30px;
         }
@@ -238,7 +238,7 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           font-size: 22px;
           color: ${colors.darkBrown};
           margin-top: 0;
-          margin-bottom: 20px;
+        margin-bottom: 20px;
           padding-bottom: 10px;
           border-bottom: 1px solid ${colors.goldLight};
           font-weight: 700;
@@ -282,7 +282,7 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 1px;
-          text-align: center;
+        text-align: center;
           transition: all 0.3s;
           box-shadow: 0 4px 10px rgba(0,0,0,0.15);
         }
@@ -310,7 +310,7 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           text-align: center;
           color: ${colors.darkBrown};
           font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
-          font-size: 18px;
+        font-size: 18px;
         }
         
         .signature-name {
@@ -339,7 +339,7 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
         }
         
         .footer-logo {
-          margin-bottom: 15px;
+        margin-bottom: 15px;
           font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
           font-size: 20px;
           letter-spacing: 3px;
@@ -351,7 +351,7 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
         .footer-address {
           font-size: 14px;
           opacity: 0.9;
-          margin-bottom: 15px;
+        margin-bottom: 15px;
         }
         
         .footer-contact {
@@ -369,10 +369,10 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
         }
         
         .social-link {
-          display: inline-block;
+        display: inline-block;
           margin: 0 10px;
           color: ${colors.textLight};
-          text-decoration: none;
+        text-decoration: none;
           opacity: 0.8;
           transition: opacity 0.3s;
         }
@@ -382,7 +382,7 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
         }
         
         .fine-print {
-          font-size: 12px;
+        font-size: 12px;
           opacity: 0.7;
           margin-top: 25px;
         }
@@ -411,7 +411,7 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           
           .confirmation-number {
             font-size: 24px;
-            padding: 15px;
+        padding: 15px;
           }
           
           .details-label, .details-value {
@@ -426,10 +426,10 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           .footer {
             padding: 25px 20px;
           }
-        }
-      </style>
-    </head>
-    <body>
+      }
+    </style>
+  </head>
+  <body>
       <div class="main-wrapper">
         <div class="main-container">
           <div class="inner-border"></div>
@@ -448,9 +448,9 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           
           <div style="text-align: center;">
             <div class="reservation-badge">Confirmación de Reserva</div>
-          </div>
-          
-          <div class="content">
+      </div>
+      
+      <div class="content">
             <p class="greeting">Estimado/a <strong>${nombreCliente || 'Cliente'}</strong>,</p>
             
             <p class="intro-text">Es un placer confirmar la recepción de su solicitud de reserva en <strong>Hacienda San Carlos Borromeo</strong>. Le agradecemos haber elegido nuestras instalaciones para su evento especial.</p>
@@ -486,8 +486,8 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
                 <div class="details-label">Estado Actual:</div>
                 <div class="details-value">Pendiente de Revisión</div>
               </div>
-            </div>
-            
+        </div>
+        
             <div class="additional-info">
               <p><strong>Información importante:</strong></p>
               <p>• Uno de nuestros coordinadores de eventos se pondrá en contacto con usted en las próximas 48 horas para confirmar los detalles y responder cualquier pregunta que tenga.</p>
@@ -506,9 +506,9 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
             <div class="signature-section">
               <p>Esperamos tener el honor de servirle pronto,</p>
               <p class="signature-name">Equipo de Hacienda San Carlos Borromeo</p>
-            </div>
-          </div>
-          
+        </div>
+      </div>
+      
           <footer class="footer">
             <div class="footer-border"></div>
             <div class="footer-logo">Hacienda San Carlos Borromeo</div>
@@ -526,9 +526,9 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
             </div>
           </footer>
         </div>
-      </div>
-    </body>
-    </html>
+    </div>
+  </body>
+  </html>
   `;
 };
 

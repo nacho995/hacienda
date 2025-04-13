@@ -42,9 +42,16 @@ exports.enviarFormularioContacto = asyncHandler(async (req, res) => {
     // Enviar notificación a los administradores
     const adminEmailsString = process.env.ADMIN_EMAIL;
     if (adminEmailsString) {
-      const adminEmails = adminEmailsString.split(',').map(email => email.trim()).filter(email => email);
+      // Dividir por comas, quitar espacios y filtrar vacíos. Puede ser un array o un string si solo hay uno.
+      let adminEmails = adminEmailsString.split(',').map(email => email.trim()).filter(email => email);
+      // Si después de filtrar solo queda un email, lo pasamos como string, si no, como array
+      if (adminEmails.length === 1) {
+        adminEmails = adminEmails[0];
+      } else if (adminEmails.length === 0) {
+        adminEmails = null; // No hay correos de admin válidos
+      }
       
-      if (adminEmails.length > 0) {
+      if (adminEmails) { // Comprobamos si hay emails válidos (string o array no vacío)
         const htmlAdmin = `
           <h1>Nuevo mensaje de contacto</h1>
           <p>Se ha recibido un nuevo mensaje de contacto con los siguientes detalles:</p>
@@ -61,7 +68,7 @@ exports.enviarFormularioContacto = asyncHandler(async (req, res) => {
         `;
         
         await sendEmail({
-          email: adminEmails,
+          email: adminEmails, // Pasamos el string o el array
           subject: `Nuevo contacto: ${nombreCompleto} - ${tipoEvento}`,
           html: htmlAdmin
         });

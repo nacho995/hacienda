@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaPhoneAlt, FaRegEnvelope, FaMapMarkerAlt, FaClock, FaInstagram, FaFacebookF, FaPinterestP, FaCheck } from 'react-icons/fa';
+import { FaPhoneAlt, FaRegEnvelope, FaMapMarkerAlt, FaClock, FaInstagram, FaFacebookF, FaPinterestP, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
 
 export default function ContactForm() {
   const [formState, setFormState] = useState({
@@ -19,6 +19,7 @@ export default function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState(null);
+  const [networkError, setNetworkError] = useState(false);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,6 +33,11 @@ export default function ContactForm() {
     // Limpiar error de servidor cuando se edita cualquier campo
     if (serverError) {
       setServerError(null);
+    }
+    
+    // Limpiar error de red
+    if (networkError) {
+      setNetworkError(false);
     }
   };
   
@@ -61,10 +67,14 @@ export default function ContactForm() {
     
     setIsSubmitting(true);
     setServerError(null);
+    setNetworkError(false);
     
     try {
       // Obtener la URL base del backend desde una variable de entorno o usar un valor por defecto
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
       
       const response = await fetch(`${API_URL}/api/contacto`, {
         method: 'POST',
@@ -72,7 +82,10 @@ export default function ContactForm() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formState),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       const data = await response.json();
       
@@ -101,7 +114,14 @@ export default function ContactForm() {
     } catch (error) {
       console.error('Error al enviar formulario:', error);
       setIsSubmitting(false);
-      setServerError(error.message || 'Hubo un problema al enviar el formulario. Intente nuevamente más tarde.');
+      
+      if (error.name === 'AbortError' || error.name === 'TypeError' || error.message.includes('Failed to fetch')) {
+        // Error de red o timeout
+        setNetworkError(true);
+      } else {
+        // Otro tipo de error
+        setServerError(error.message || 'Hubo un problema al enviar el formulario. Intente nuevamente más tarde.');
+      }
     }
   };
   
@@ -266,6 +286,35 @@ export default function ContactForm() {
                   <p className="text-green-700">
                     Gracias por contactarnos. Uno de nuestros organizadores se comunicará contigo pronto.
                   </p>
+                </motion.div>
+              ) : networkError ? (
+                <motion.div
+                  variants={fadeIn}
+                  initial="hidden"
+                  animate="visible"
+                  className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center mb-6"
+                >
+                  <div className="mx-auto w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                    <FaExclamationTriangle className="text-amber-600 text-xl" />
+                  </div>
+                  <h3 className="text-xl font-medium text-amber-800 mb-2">Problema de conexión</h3>
+                  <p className="text-amber-700 mb-4">
+                    Parece que hay un problema para conectar con nuestro servidor. Esto puede deberse a:
+                  </p>
+                  <ul className="text-amber-700 text-left list-disc pl-8 mb-4">
+                    <li>Problemas temporales con nuestra plataforma</li>
+                    <li>Problemas de conexión a internet</li>
+                    <li>El servidor puede estar en mantenimiento</li>
+                  </ul>
+                  <p className="text-amber-700 mb-4">
+                    Por favor, intente nuevamente más tarde o contáctenos directamente por teléfono.
+                  </p>
+                  <button
+                    onClick={() => setNetworkError(false)}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded transition-colors"
+                  >
+                    Intentar nuevamente
+                  </button>
                 </motion.div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-6">
