@@ -92,7 +92,7 @@ export default function ContactForm() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
       
-      const response = await fetch(`${API_URL}/api/contacto`, {
+      const response = await fetch(`${API_URL}/contacto`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

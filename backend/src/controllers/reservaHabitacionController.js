@@ -1009,10 +1009,18 @@ const seleccionarMetodoPagoHabitacion = asyncHandler(async (req, res, next) => {
   });
 });
 
-// --- CONTROLADOR PARA CREACIÓN MÚLTIPLE (CON EMAILS) --- 
+// --- CONTROLADOR PARA CREACIÓN MÚLTIPLE --- 
 const createMultipleReservacionesHabitacion = async (req, res) => {
   const { reservas } = req.body; 
-  const userId = req.user.id; 
+  // ¡Importante! Necesitamos obtener los datos de contacto del *body* de la petición,
+  // ya que req.user podría no existir si la ruta es pública.
+  // Asumimos que vienen en la raíz o dentro de cada objeto `reservaData`.
+  // Si vienen en la raíz:
+  // const { nombreContacto, apellidosContacto, emailContacto, telefonoContacto } = req.body;
+  // Si vienen en CADA reserva, se extraerán dentro del bucle.
+
+  // Si la ruta puede ser llamada por un usuario logueado, obtener su ID opcionalmente
+  const userId = req.user ? req.user.id : null;
 
   if (!Array.isArray(reservas) || reservas.length === 0) {
     return res.status(400).json({
@@ -1023,168 +1031,233 @@ const createMultipleReservacionesHabitacion = async (req, res) => {
 
   const resultados = [];
   const errores = [];
+  let primeraReservaCreada = null; // Para enviar un único email con datos representativos
 
-  for (const reservaData of reservas) {
-    let reservaCreada = null; // Definir fuera del try para usarla en el bloque de email
-    try {
-      // Validar datos básicos
-      if (!reservaData.habitacionLetra || !reservaData.fechaEntrada || !reservaData.fechaSalida || reservaData.precioPorNoche === undefined) {
-        throw new Error('Faltan datos requeridos (habitacionLetra, fechaEntrada, fechaSalida, precioPorNoche).');
-      }
+  const session = await mongoose.startSession(); // Iniciar sesión para transacción
 
-      // 1. Buscar la Habitación por letra
-      const habitacionDoc = await Habitacion.findOne({ letra: reservaData.habitacionLetra });
-      if (!habitacionDoc) {
-        throw new Error(`No se encontró una habitación con la letra ${reservaData.habitacionLetra}.`);
-      }
-      if (!habitacionDoc.tipoHabitacion) {
-        throw new Error(`La habitación ${reservaData.habitacionLetra} encontrada no tiene un tipoHabitacion ObjectId asociado.`);
-      }
-
-      // 2. Buscar el TipoHabitacion usando el ObjectId
-      const tipoHabDoc = await TipoHabitacion.findById(habitacionDoc.tipoHabitacion);
-      if (!tipoHabDoc || !tipoHabDoc.nombre) {
-         throw new Error(`No se pudo encontrar el nombre del TipoHabitacion asociado a la habitación ${reservaData.habitacionLetra}.`);
-      }
-      const tipoHabitacionNombre = tipoHabDoc.nombre; // <-- Nombre del tipo (String)
-      
-      // 3. Calcular precio total
-      const fechaEntradaObj = new Date(reservaData.fechaEntrada + 'T00:00:00Z');
-      const fechaSalidaObj = new Date(reservaData.fechaSalida + 'T00:00:00Z');
-      if (isNaN(fechaEntradaObj.getTime()) || isNaN(fechaSalidaObj.getTime()) || fechaEntradaObj >= fechaSalidaObj) {
-        throw new Error('Fechas inválidas o fecha de entrada posterior/igual a fecha de salida.');
-      }
-      const duracionEstancia = Math.ceil((fechaSalidaObj - fechaEntradaObj) / (1000 * 60 * 60 * 24));
-      const precioTotal = Number(reservaData.precioPorNoche) * duracionEstancia;
-      
-      // 4. Construir datos para ReservaHabitacion
-      const nuevaReservaData = {
-        habitacion: habitacionDoc.letra,          // <-- Usar la letra (String)
-        tipoHabitacion: tipoHabitacionNombre,    // <-- Usar el nombre del tipo (String)
-        fechaEntrada: fechaEntradaObj, 
-        fechaSalida: fechaSalidaObj,   
-        numHuespedes: reservaData.numHuespedes,
-        precio: precioTotal,
-        precioPorNoche: Number(reservaData.precioPorNoche),
-        nombreContacto: reservaData.nombreContacto,
-        apellidosContacto: reservaData.apellidosContacto,
-        emailContacto: reservaData.emailContacto,
-        telefonoContacto: reservaData.telefonoContacto,
-        metodoPago: reservaData.metodoPago || 'pendiente',
-        estadoReserva: 'pendiente', 
-        estadoPago: 'pendiente',
-        tipoReserva: reservaData.tipoReserva || 'hotel',
-        creadoPor: userId, // Usar creadoPor en lugar de usuario si ese es el campo
-        // Añadir campos con defaults si no vienen
-        numeroHabitaciones: reservaData.numeroHabitaciones || 1,
-        letraHabitacion: habitacionDoc.letra, // Puede ser redundante si ya está en 'habitacion'
-        infoHuespedes: reservaData.infoHuespedes || { nombres: [], detalles: '' },
-        // Omitir campos que ReservaHabitacion no espera directamente (como tipoHabitacion ObjectId)
-      };
-
-      // 5. Crear la ReservaHabitacion
-      reservaCreada = await ReservaHabitacion.create(nuevaReservaData);
-      resultados.push(reservaCreada);
-
-      // --- 6. ENVÍO DE EMAILS DESPUÉS DE CREAR (AÑADIDO) ---
-      if (reservaCreada) {
+  try {
+    await session.withTransaction(async () => {
+      for (const reservaData of reservas) {
         try {
-          const clienteEmail = reservaCreada.emailContacto;
-          const nombreCliente = `${reservaCreada.nombreContacto || 'Cliente'} ${reservaCreada.apellidosContacto || ''}`.trim();
-          const adminEmailsString = process.env.ADMIN_EMAIL;
-          const adminEmailArray = adminEmailsString ? adminEmailsString.split(',').map(email => email.trim()).filter(email => email) : [];
+          // Validar datos básicos
+          if (!reservaData.habitacionLetra || !reservaData.fechaEntrada || !reservaData.fechaSalida || reservaData.precioPorNoche === undefined || !reservaData.emailContacto) { // Asegurar emailContacto
+            throw new Error('Faltan datos requeridos (habitacionLetra, fechas, precioPorNoche, emailContacto).');
+          }
 
-          // 6a. Email al Cliente
-          if (clienteEmail) {
-            if (reservaCreada.metodoPago === 'transferencia') {
-              console.log(`>>> [ReservaHabitación ${reservaCreada._id}] Enviando instrucciones de transferencia a: ${clienteEmail}`);
-              await sendBankTransferInstructions({
+          // 1. Buscar la Habitación por letra
+          const habitacionDoc = await Habitacion.findOne({ letra: reservaData.habitacionLetra }).session(session);
+          if (!habitacionDoc) {
+            throw new Error(`No se encontró una habitación con la letra ${reservaData.habitacionLetra}.`);
+          }
+          if (!habitacionDoc.tipoHabitacion) {
+            throw new Error(`La habitación ${reservaData.habitacionLetra} no tiene un tipoHabitacion asociado.`);
+          }
+
+          // 2. Buscar el TipoHabitacion
+          const tipoHabDoc = await TipoHabitacion.findById(habitacionDoc.tipoHabitacion).session(session);
+          if (!tipoHabDoc || !tipoHabDoc.nombre) {
+            throw new Error(`No se pudo encontrar el nombre del TipoHabitacion para ${reservaData.habitacionLetra}.`);
+          }
+          const tipoHabitacionNombre = tipoHabDoc.nombre;
+
+          // 3. Calcular precio total
+          const fechaEntradaObj = new Date(reservaData.fechaEntrada + 'T00:00:00Z');
+          const fechaSalidaObj = new Date(reservaData.fechaSalida + 'T00:00:00Z');
+          if (isNaN(fechaEntradaObj.getTime()) || isNaN(fechaSalidaObj.getTime()) || fechaEntradaObj >= fechaSalidaObj) {
+            throw new Error('Fechas inválidas.');
+          }
+          const duracionEstancia = Math.ceil((fechaSalidaObj - fechaEntradaObj) / (1000 * 60 * 60 * 24));
+          const precioTotal = Number(reservaData.precioPorNoche) * duracionEstancia;
+
+          // --- Verificación de disponibilidad DENTRO de la transacción ---
+          const reservaSolapada = await ReservaHabitacion.findOne({
+            habitacion: habitacionDoc.letra, 
+            estadoReserva: { $in: ['pendiente', 'confirmada', 'completada'] }, 
+            fechaEntrada: { $lt: fechaSalidaObj }, 
+            fechaSalida: { $gt: fechaEntradaObj }
+          }).session(session); 
+
+          if (reservaSolapada) {
+            throw new Error(`La habitación ${habitacionDoc.letra} no está disponible para las fechas seleccionadas. Ya existe una reserva.`); 
+          }
+          // --- Fin Verificación ---
+          
+          // 4. Construir datos para ReservaHabitacion
+          const nuevaReservaData = {
+            habitacion: habitacionDoc.letra, 
+            tipoHabitacion: tipoHabitacionNombre,
+            fechaEntrada: fechaEntradaObj, 
+            fechaSalida: fechaSalidaObj,   
+            numHuespedes: reservaData.numHuespedes,
+            precio: precioTotal,
+            precioPorNoche: Number(reservaData.precioPorNoche),
+            nombreContacto: reservaData.nombreContacto,
+            apellidosContacto: reservaData.apellidosContacto,
+            emailContacto: reservaData.emailContacto, // Tomado de reservaData
+            telefonoContacto: reservaData.telefonoContacto,
+            metodoPago: reservaData.metodoPago || 'pendiente',
+            estadoReserva: reservaData.metodoPago === 'transferencia' ? 'pendiente_pago' : 'pendiente', // Estado inicial correcto
+            estadoPago: 'pendiente',
+            tipoReserva: reservaData.tipoReserva || 'hotel',
+            // Asociar al usuario logueado si existe, si no, null
+            usuario: userId, // Usar 'usuario' si ese es el campo en el modelo
+            creadoPor: userId, // O 'creadoPor' si se usa ese campo
+            numeroHabitaciones: reservaData.numeroHabitaciones || 1,
+            letraHabitacion: habitacionDoc.letra, 
+            infoHuespedes: reservaData.infoHuespedes || { nombres: [], detalles: '' },
+          };
+
+          // 5. Crear la ReservaHabitacion
+          const [reservaCreada] = await ReservaHabitacion.create([nuevaReservaData], { session });
+          
+          if (!reservaCreada) {
+            throw new Error('Error al guardar la reserva en la BD.');
+          }
+
+          resultados.push(reservaCreada);
+          if (!primeraReservaCreada) {
+            primeraReservaCreada = reservaCreada; // Guardar la primera para datos de email
+          }
+
+        } catch (error) {
+          console.error(`Error al crear reserva para habitación ${reservaData.habitacionLetra || 'desconocida'} dentro de la transacción:`, error.message);
+          // Guardar el error específico de esta reserva
+          errores.push({
+            habitacionLetra: reservaData.habitacionLetra || 'desconocida',
+            message: error.message,
+          });
+          // IMPORTANTE: No relanzar el error aquí para permitir que otras reservas del lote continúen
+        }
+      } // Fin del bucle for
+
+      // Si no se pudo crear ninguna reserva, abortar transacción
+      if (resultados.length === 0 && errores.length > 0) {
+          // Lanzar un error general para que la transacción haga rollback
+          throw new ErrorResponse('No se pudo crear ninguna de las reservas solicitadas.', 400); 
+      }
+      // Si se creó al menos una, la transacción será commit
+
+    }); // Fin de session.withTransaction
+
+    // --- 6. ENVÍO DE EMAILS DESPUÉS DE LA TRANSACCIÓN (si fue exitosa) ---
+    if (primeraReservaCreada) {
+      try {
+        const clienteEmail = primeraReservaCreada.emailContacto; // Email de la primera reserva
+        const nombreCliente = `${primeraReservaCreada.nombreContacto || 'Cliente'} ${primeraReservaCreada.apellidosContacto || ''}`.trim();
+        const adminEmailsString = process.env.ADMIN_EMAIL;
+        const adminEmailArray = adminEmailsString ? adminEmailsString.split(',').map(email => email.trim()).filter(email => email) : [];
+        const metodoPagoSeleccionado = primeraReservaCreada.metodoPago;
+
+        // 6a. Email al Cliente (Solo uno para todo el lote)
+        if (clienteEmail) {
+          if (metodoPagoSeleccionado === 'transferencia') {
+            console.log(`>>> [ReservaHabitación /batch] Enviando instrucciones de transferencia a: ${clienteEmail} para ${resultados.length} reservas.`);
+            // Podríamos necesitar adaptar el email para reflejar múltiples habitaciones/confirmaciones
+            // Por ahora, usamos la info de la primera como representativa.
+            await sendBankTransferInstructions({
+              email: clienteEmail,
+              nombreCliente: nombreCliente,
+              // Podríamos generar un número de confirmación de "lote" o usar el de la primera
+              numeroConfirmacion: primeraReservaCreada.numeroConfirmacion, 
+              montoTotal: resultados.reduce((sum, r) => sum + (r.precio || 0), 0) // Sumar precios de todas las reservas creadas
+            });
+          } else if (metodoPagoSeleccionado === 'efectivo') {
+            console.log(`>>> [ReservaHabitación /batch] Enviando confirmación (efectivo) a: ${clienteEmail} para ${resultados.length} reservas.`);
+            // Adaptar la confirmación para indicar que es pago en efectivo
+             await enviarConfirmacionReservaHabitacion({
                 email: clienteEmail,
                 nombreCliente: nombreCliente,
-                numeroConfirmacion: reservaCreada.numeroConfirmacion,
-                montoTotal: reservaCreada.precio
-              });
-            } else {
-              // Enviar confirmación simple para otros métodos (ej. efectivo)
-              console.log(`>>> [ReservaHabitación ${reservaCreada._id}] Enviando confirmación (${reservaCreada.metodoPago}) a: ${clienteEmail}`);
-              // Asumiendo que enviarConfirmacionReservaHabitacion existe y acepta estos parámetros
-              await enviarConfirmacionReservaHabitacion({
-                  email: clienteEmail,
-                  nombreCliente: nombreCliente,
-                  tipoHabitacion: reservaCreada.tipoHabitacion || 'Estándar',
-                  numeroConfirmacion: reservaCreada.numeroConfirmacion,
-                  fechaEntrada: reservaCreada.fechaEntrada.toLocaleDateString('es-ES'),
-                  fechaSalida: reservaCreada.fechaSalida.toLocaleDateString('es-ES'),
-                  totalNoches: Math.round((reservaCreada.fechaSalida - reservaCreada.fechaEntrada) / (1000 * 60 * 60 * 24)) || 1,
-                  precio: reservaCreada.precio,
-                  metodoPago: reservaCreada.metodoPago.charAt(0).toUpperCase() + reservaCreada.metodoPago.slice(1)
-              });
-            }
-          } else {
-            console.warn(`[Email Send ${reservaCreada._id}] No se pudo determinar el email del cliente.`);
+                // Adaptar descripción para múltiples habitaciones?
+                tipoHabitacion: resultados.map(r => r.habitacion).join(', '), 
+                numeroConfirmacion: primeraReservaCreada.numeroConfirmacion, // O un número de lote
+                fechaEntrada: primeraReservaCreada.fechaEntrada.toLocaleDateString('es-ES'),
+                fechaSalida: primeraReservaCreada.fechaSalida.toLocaleDateString('es-ES'),
+                totalNoches: Math.round((primeraReservaCreada.fechaSalida - primeraReservaCreada.fechaEntrada) / (1000 * 60 * 60 * 24)) || 1,
+                precio: resultados.reduce((sum, r) => sum + (r.precio || 0), 0),
+                metodoPago: 'Efectivo (a pagar en recepción)'
+            });
           }
-
-          // 6b. Email al Admin
-          if (adminEmailArray.length > 0) {
-              const htmlAdmin = notificacionGestionAdmin({
-                  accion: "Nueva Reserva",
-                  tipoReserva: `Habitación (${reservaCreada.tipoReserva || 'hotel'})`,
-                  numeroConfirmacion: reservaCreada.numeroConfirmacion,
-                  nombreCliente: nombreCliente,
-                  emailCliente: clienteEmail || 'No disponible',
-                  detallesAdicionales: {
-                    telefono: reservaCreada.telefonoContacto || 'No disponible',
-                    habitacion: `${reservaCreada.habitacion} (${reservaCreada.tipoHabitacion || 'No especificado'})`,
-                    fechas: `${reservaCreada.fechaEntrada.toLocaleDateString('es-ES')} - ${reservaCreada.fechaSalida.toLocaleDateString('es-ES')}`,
-                    precio: `${reservaCreada.precio} MXN`,
-                    metodoPago: reservaCreada.metodoPago.charAt(0).toUpperCase() + reservaCreada.metodoPago.slice(1),
-                    estado: reservaCreada.estadoReserva || 'pendiente',
-                    notas: reservaCreada.infoHuespedes?.detalles || 'Ninguna'
-                  },
-                  urlGestionReserva: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reservas/habitaciones/${reservaCreada._id}`
-              });
-              console.log(`>>> [ReservaHabitación ${reservaCreada._id}] Enviando notificación a admin: ${adminEmailArray.join(', ')}`);
-              await sendEmail({
-                  email: adminEmailArray,
-                  subject: `Nueva Reserva Habitación #${reservaCreada.numeroConfirmacion}`,
-                  html: htmlAdmin
-              });
-          } else {
-              console.warn(`[Email Send ${reservaCreada._id}] ADMIN_EMAIL no configurado o vacío. No se envió notificación.`);
-          }
-
-        } catch (emailError) {
-            console.error(`[Email Send ${reservaCreada?._id}] Error enviando emails DESPUÉS de crear reserva:`, emailError);
-            // No relanzar el error para no afectar la respuesta principal
+          // No se envía nada para 'tarjeta' aquí, se maneja por webhook
+        } else {
+          console.warn(`[Email Send /batch] No se pudo determinar el email del cliente para el lote.`);
         }
-      }
-      // --- FIN ENVÍO DE EMAILS ---
 
-    } catch (error) {
-      console.error(`Error detallado al crear reserva para habitación ${reservaData.habitacionLetra || 'desconocida'}:`, error);
-      errores.push({
-        habitacionLetra: reservaData.habitacionLetra || 'desconocida',
-        message: error.message,
+        // 6b. Email al Admin (Solo uno para todo el lote)
+        if (adminEmailArray.length > 0) {
+            const detallesLote = resultados.map(r => (
+              `Hab. ${r.habitacion} (${r.tipoHabitacion}): ${r.fechaEntrada.toLocaleDateString('es-ES')} - ${r.fechaSalida.toLocaleDateString('es-ES')} ($${r.precio})`
+            )).join('\n');
+            
+            const htmlAdmin = notificacionGestionAdmin({
+                accion: "Nuevas Reservas (Lote)",
+                tipoReserva: `Habitaciones (${primeraReservaCreada.tipoReserva || 'hotel'})`,
+                // Usar confirmación de la primera o un identificador de lote
+                numeroConfirmacion: primeraReservaCreada.numeroConfirmacion, 
+                nombreCliente: nombreCliente,
+                emailCliente: clienteEmail || 'No disponible',
+                detallesAdicionales: {
+                  telefono: primeraReservaCreada.telefonoContacto || 'No disponible',
+                  // Detalle de todas las habitaciones en el lote
+                  habitacion: `Lote: \n${detallesLote}`,
+                  // Fechas de la primera como referencia
+                  fechas: `${primeraReservaCreada.fechaEntrada.toLocaleDateString('es-ES')} - ${primeraReservaCreada.fechaSalida.toLocaleDateString('es-ES')}`,
+                  // Precio total del lote
+                  precio: `${resultados.reduce((sum, r) => sum + (r.precio || 0), 0)} MXN`, 
+                  metodoPago: metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1),
+                  // Estado de la primera como referencia
+                  estado: primeraReservaCreada.estadoReserva || 'pendiente',
+                  notas: primeraReservaCreada.infoHuespedes?.detalles || 'Ninguna' 
+                },
+                // Enlace a la página general de reservas de admin?
+                urlGestionReserva: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reservaciones`
+            });
+            console.log(`>>> [ReservaHabitación /batch] Enviando notificación de lote a admin: ${adminEmailArray.join(', ')}`);
+            await sendEmail({
+                email: adminEmailArray,
+                subject: `Nuevas Reservas Habitación (Lote) - Cliente: ${nombreCliente}`,
+                html: htmlAdmin
+            });
+        } else {
+            console.warn(`[Email Send /batch] ADMIN_EMAIL no configurado. No se envió notificación de lote.`);
+        }
+
+      } catch (emailError) {
+          console.error(`[Email Send /batch] Error enviando emails DESPUÉS de procesar lote:`, emailError);
+          // No relanzar el error, la reserva ya se creó
+      }
+    } // Fin if (primeraReservaCreada)
+    // --- FIN ENVÍO DE EMAILS ---
+
+    // Respuesta final
+    if (resultados.length > 0) {
+      res.status(201).json({
+        success: true,
+        message: `Se crearon ${resultados.length} de ${reservas.length} reservas exitosamente.`,
+        data: resultados,
+        errors: errores.length > 0 ? errores : undefined
+      });
+    } else {
+      // Si llegamos aquí, significa que la transacción falló o no se creó nada
+      res.status(400).json({ 
+        success: false,
+        message: 'No se pudo crear ninguna reserva.',
+        errors: errores // Devolver los errores individuales
       });
     }
-  }
 
-  if (resultados.length > 0) {
-    res.status(201).json({
-      success: true,
-      message: `Se crearon ${resultados.length} de ${reservas.length} reservas.`,
-      data: resultados, // Devolver las reservas creadas
+  } catch (error) {
+    // Error durante la transacción o fuera del bucle
+    console.error('Error general durante la creación múltiple de reservas:', error);
+    await session.abortTransaction(); // Asegurar aborto si no se hizo ya
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || 'Error al procesar el lote de reservas.',
       errors: errores.length > 0 ? errores : undefined // Incluir errores si los hubo
     });
-  } else {
-    res.status(400).json({ // O 500 si el fallo fue inesperado
-      success: false,
-      message: 'No se pudo crear ninguna reserva.',
-      errors: errores
-    });
+  } finally {
+    await session.endSession();
   }
 };
-// --- FIN NUEVO CONTROLADOR ---
 
 // Exportaciones finales (asegurando que todas las usadas estén aquí)
 module.exports = {

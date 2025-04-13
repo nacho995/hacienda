@@ -26,10 +26,17 @@ router.post('/habitaciones/verificar-disponibilidad', verificarDisponibilidadHab
 // --- NUEVA RUTA PARA CREACIÓN MÚLTIPLE ---
 router.post('/reservas/habitaciones/batch', createMultipleReservacionesHabitacion);
 
-// --- Añadir ruta singular si no estaba definida explícitamente antes ---
-// Mantener esta protegida si es necesario, o ajustar según lógica
-router.post('/reservas/habitaciones', protectRoute, createReservaHabitacion);
+// --- RUTA SINGULAR ---
+router.post('/reservas/habitaciones', createReservaHabitacion);
 
-// ... resto de las rutas ...
+// --- RUTAS PROTEGIDAS PARA USUARIOS LOGUEADOS ---
+// (Las rutas GET /usuario, POST /usuario/:id/cancelar deben seguir protegidas)
+router.get('/reservas/habitaciones/usuario', protectRoute, getReservasHabitacionUsuario);
+router.post('/reservas/habitaciones/usuario/:id/cancelar', protectRoute, cancelarReservaHabitacionUsuario);
+
+// --- OTRAS RUTAS (Revisar si necesitan protección) ---
+router.get('/reservas/habitaciones/:id', getReservaHabitacionById); // ¿Debería ser pública o protegida?
+router.put('/reservas/habitaciones/:id', protectRoute, updateReservaHabitacion); // Probablemente protegida (Admin?)
+router.delete('/reservas/habitaciones/:id', protectRoute, deleteReservaHabitacion); // Probablemente protegida (Admin?)
 
 module.exports = router; 
