@@ -121,8 +121,8 @@ export default function AdminLayout({ children }) {
     );
   }
 
-  // Si es la página de login, mostrar sin layout
-  if (pathname === '/admin/login') {
+  // Si es la página de login o registro, mostrar sin layout
+  if (pathname === '/admin/login' || pathname === '/admin/registro') {
     return children;
   }
 

@@ -23,7 +23,7 @@ export default function AdminRegistro() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black/70 via-black/50 to-black/70">
         <div className="absolute inset-0 z-[-1]">
           <Image 
-            src="/imagendron2.jpg" 
+            src="/images/imagendron2.jpg" 
             alt="Hacienda San Carlos" 
             fill 
             className="object-cover opacity-40"
