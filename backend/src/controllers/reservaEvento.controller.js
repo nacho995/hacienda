@@ -118,6 +118,7 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
       reservaCreada = reservaEventoCreada; // Guardar para uso fuera de transacción
 
       // --- Crear Reservas de Habitaciones Asociadas DENTRO de la Transacción ---
+      let referenciasHabitaciones = []; // Array para guardar las referencias
       if (modo_gestion_habitaciones === 'hacienda') {
         const habitacionesEstandar = await Habitacion.find({ estado: 'Disponible' })
            .limit(14)
@@ -159,9 +160,15 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
             if (!habCreada) {
                  throw new ErrorResponse(`Error al crear habitación asociada ${habitacionValor}. Abortando.`, 500);
             }
-            habitacionesCreadas.push(habCreada); // Guardar para la respuesta final
+            habitacionesCreadas.push(habCreada);
+            // AÑADIDO: Guardar referencia para actualizar el evento
+            referenciasHabitaciones.push({
+              reservaHabitacionId: habCreada._id,
+              tipo: habCreada.tipoHabitacion || 'Estándar',
+              noches: 1, // Asumiendo 1 noche por defecto para gestión hacienda
+              precio: habCreada.precio || 0
+            });
         }
-
       } else if (Array.isArray(habitaciones) && habitaciones.length > 0) { // modo_gestion_habitaciones === 'usuario'
           for (const hab of habitaciones) {
               let entrada, salida;
@@ -200,8 +207,29 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
               if (!habCreada) {
                   throw new ErrorResponse(`Error al crear habitación asociada ${hab.letra}. Abortando.`, 500);
               }
-              habitacionesCreadas.push(habCreada); // Guardar para respuesta final
+              habitacionesCreadas.push(habCreada);
+              // AÑADIDO: Guardar referencia para actualizar el evento
+              referenciasHabitaciones.push({
+                reservaHabitacionId: habCreada._id,
+                tipo: habCreada.tipoHabitacion || 'Estándar',
+                noches: hab.noches || 1,
+                precio: habCreada.precio || 0
+              });
           }
+      }
+      
+      // AÑADIDO: Actualizar el Evento con las referencias a las habitaciones creadas
+      if (referenciasHabitaciones.length > 0) {
+          console.log(`[Transacción] Actualizando evento ${reservaCreada._id} con ${referenciasHabitaciones.length} referencias de habitación.`);
+          // Asegurarse de que serviciosAdicionales exista
+          if (!reservaCreada.serviciosAdicionales) {
+             reservaCreada.serviciosAdicionales = { habitaciones: [], masajes: [] };
+          }
+          reservaCreada.serviciosAdicionales.habitaciones = referenciasHabitaciones;
+          // Guardar el evento actualizado DENTRO de la transacción
+          await reservaCreada.save({ session }); 
+      } else {
+          console.log(`[Transacción] No se crearon referencias de habitación para evento ${reservaCreada._id}. No se actualiza el array.`);
       }
       // Si llegamos aquí sin errores, la transacción se confirmará automáticamente
 
@@ -397,20 +425,12 @@ exports.obtenerReservasEvento = async (req, res) => {
         path: 'tipoEvento',
         strictPopulate: false
       })
-      .populate({
-        path: 'serviciosAdicionales',
-        populate: {
-           path: 'reservaHabitacionId',
-           model: 'ReservaHabitacion',
-           select: '_id letraHabitacion'
-        }
-      })
       .sort({ fecha: 1, horaInicio: 1 });
       
     res.status(200).json({
       success: true,
       count: reservas.length,
-      data: reservas
+      data: reservas // Enviar las reservas como vienen
     });
   } catch (error) {
     console.error('Error al obtener reservas de eventos:', error);
@@ -1442,6 +1462,55 @@ exports.asignarEventoAdmin = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Obtener fechas ocupadas por eventos en un rango
+ * @route   GET /api/reservas/eventos/fechas-en-rango
+ * @access  Public
+ */
+const getEventDatesInRange = asyncHandler(async (req, res, next) => {
+  const { fechaInicio, fechaFin } = req.query;
+
+  if (!fechaInicio || !fechaFin) {
+    return next(new ErrorResponse('Se requieren fechaInicio y fechaFin como parámetros query', 400));
+  }
+
+  const inicio = new Date(fechaInicio);
+  inicio.setUTCHours(0, 0, 0, 0); // Asegurar inicio del día en UTC
+  const fin = new Date(fechaFin);
+  fin.setUTCHours(23, 59, 59, 999); // Asegurar fin del día en UTC
+
+  if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+    return next(new ErrorResponse('Formato de fecha inválido', 400));
+  }
+
+  // Buscar eventos cuya fecha única caiga dentro del rango.
+  // Incluimos eventos pendientes y confirmados.
+  const eventos = await ReservaEvento.find({
+    fecha: {
+      $gte: inicio,
+      $lte: fin
+    },
+    estadoReserva: { $in: ['pendiente', 'confirmada', 'pago_parcial'] } // Estados activos
+  }).select('fecha'); // Solo necesitamos la fecha
+
+  // Extraer las fechas y formatearlas a YYYY-MM-DD en UTC
+  const occupiedDates = eventos.map(evento => {
+    const date = new Date(evento.fecha);
+    // Formatear a YYYY-MM-DD asegurando UTC para evitar problemas de zona horaria
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+
+  // Devolver un array único de fechas
+  res.status(200).json({
+    success: true,
+    count: [...new Set(occupiedDates)].length,
+    data: [...new Set(occupiedDates)], // Asegurar fechas únicas
+  });
+});
+
 module.exports = {
     createReservaEvento,
     obtenerReservasEvento: exports.obtenerReservasEvento,
@@ -1459,5 +1528,6 @@ module.exports = {
     removeEventoServicio: exports.removeEventoServicio,
     addHabitacionAEvento: exports.addHabitacionAEvento,
     removeHabitacionDeEvento: exports.removeHabitacionDeEvento,
-    asignarEventoAdmin: exports.asignarEventoAdmin
+    asignarEventoAdmin: exports.asignarEventoAdmin,
+    getEventDatesInRange
 };

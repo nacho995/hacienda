@@ -1294,4 +1294,101 @@ export const asignarHabitacionAdmin = async (id) => {
     console.error(`Error al asignar habitación ${id} al admin:`, error.response || error);
     return { success: false, message: error.response?.data?.message || 'Error al asignar la habitación' };
   }
+};
+
+// --- NUEVA FUNCIÓN PARA VERIFICAR DISPONIBILIDAD DE VARIAS HABITACIONES ---
+/**
+ * Verifica si un conjunto de habitaciones está disponible en un rango de fechas.
+ * @param {Object} data - Datos para la verificación.
+ * @param {string[]} data.habitacionIds - Array de IDs/Letras de las habitaciones a verificar.
+ * @param {string} data.fechaInicio - Fecha de inicio en formato YYYY-MM-DD.
+ * @param {string} data.fechaFin - Fecha de fin en formato YYYY-MM-DD.
+ * @param {string} [data.reservaActualId] - ID de la reserva actual (si se está editando) para excluirla de la verificación.
+ * @returns {Promise<Object>} Objeto con { success: boolean, disponibles: boolean, habitacionesOcupadas?: string[], message?: string }
+ */
+export const verificarDisponibilidadHabitaciones = async (data) => {
+  try {
+    console.log('[verificarDisponibilidadHabitaciones] Verificando:', data);
+    // Llama al nuevo endpoint del backend
+    const response = await apiClient.post('/reservas/habitaciones/verificar-disponibilidad-rango', data);
+    // El backend devolverá 200 OK si la verificación se hizo, y el campo 'disponibles' indicará el resultado.
+    // O 409 Conflict si no están disponibles.
+    console.log('[verificarDisponibilidadHabitaciones] Respuesta API:', response);
+    return response; // Devuelve la respuesta completa del backend (que incluye success, disponibles, habitacionesOcupadas, message)
+  } catch (error) {
+    console.error('[verificarDisponibilidadHabitaciones] Error en la llamada API:', error.response || error);
+    // Si el error es 409 (Conflict), el backend ya indica que no está disponible.
+    // Devolvemos esa información estructurada.
+    if (error.response && error.response.status === 409) {
+      return {
+        success: true, // La operación de verificación se completó (aunque el resultado sea no disponible)
+        disponibles: false,
+        message: error.response.data?.message || 'Conflicto de disponibilidad detectado.',
+        habitacionesOcupadas: error.response.data?.habitacionesOcupadas || []
+      };
+    }
+    // Para otros errores, devolvemos un objeto de error genérico
+    return {
+      success: false,
+      disponibles: false, // Asumimos no disponible en caso de error desconocido
+      message: error.response?.data?.message || 'Error al verificar la disponibilidad'
+    };
+  }
+};
+
+// --- FIN NUEVA FUNCIÓN --- 
+
+/**
+ * Obtiene las fechas ocupadas para una habitación específica.
+ * Utiliza el endpoint que solo considera reservas de esa habitación.
+ */
+export const getFechasOcupadasPorHabitacion = async (habitacionLetra, fechaInicio, fechaFin) => {
+  try {
+    const params = { habitacionLetra, fechaInicio, fechaFin };
+    // Asegúrate que la URL es correcta según tu implementación de rutas
+    const response = await apiClient.get('/reservas/habitaciones/fechas-ocupadas', { params });
+    // Asumiendo que la respuesta tiene { success: true, data: [...] }
+    // y data es un array de strings YYYY-MM-DD
+    return response.data.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+  } catch (error) {
+    console.error('Error fetching occupied dates for room:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene las fechas en las que hay eventos generales programados.
+ */
+export const getFechasEventosEnRango = async (fechaInicio, fechaFin) => {
+  try {
+    const params = { fechaInicio, fechaFin };
+    // Llama al nuevo endpoint de eventos
+    const response = await apiClient.get('/reservas/eventos/fechas-en-rango', { params });
+    return response.data.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+  } catch (error) {
+    console.error('Error fetching event dates:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtiene todas las fechas ocupadas globalmente (cualquier habitación o evento).
+ */
+export const getFechasOcupadasGlobales = async (fechaInicio, fechaFin) => {
+  try {
+    const params = { fechaInicio, fechaFin };
+    // Llama al nuevo endpoint global
+    const response = await apiClient.get('/reservas/habitaciones/fechas-ocupadas-global', { params });
+    return response.data.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+  } catch (error) {
+    console.error('Error fetching global occupied dates:', error);
+    throw error;
+  }
+};
+
+export default {
+  // ... (resto de las funciones existentes)
+  getFechasOcupadasPorHabitacion,
+  getFechasEventosEnRango,
+  getFechasOcupadasGlobales
 }; 

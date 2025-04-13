@@ -166,9 +166,45 @@ const enviarNotificacionGestionAdmin = async (datos) => {
   });
 };
 
+/**
+ * Envía un correo con instrucciones para pago por transferencia.
+ * @param {Object} datos - Datos necesarios para el correo.
+ * @param {string} datos.email - Email del destinatario.
+ * @param {string} datos.nombreCliente - Nombre del cliente.
+ * @param {string} datos.numeroConfirmacion - Número de confirmación de la reserva.
+ * @param {number} datos.montoTotal - Monto a pagar.
+ * @returns {Promise}
+ */
+const sendBankTransferInstructions = async (datos) => {
+  const { email, nombreCliente, numeroConfirmacion, montoTotal } = datos;
+  
+  const detallesBancarios = process.env.BANK_TRANSFER_DETAILS;
+  if (!detallesBancarios) {
+    console.error('Error: La variable de entorno BANK_TRANSFER_DETAILS no está definida. No se pueden enviar instrucciones de transferencia.');
+    // Podríamos lanzar un error o simplemente no enviar el email
+    return Promise.reject(new Error('Configuración de datos bancarios faltante.')); 
+  }
+
+  const bankTransferTemplate = require('../emails/bankTransferInstructions');
+  const htmlContent = bankTransferTemplate({
+    nombreCliente,
+    numeroConfirmacion,
+    montoTotal,
+    detallesBancarios
+  });
+
+  console.log(`>>> Intentando enviar instrucciones de transferencia a: ${email}`);
+  return sendEmail({
+    email: email,
+    subject: `Instrucciones para completar tu reserva #${numeroConfirmacion} - Hacienda San Carlos`,
+    html: htmlContent
+  });
+};
+
 module.exports = {
   sendEmail,
   enviarConfirmacionReservaEvento,
   enviarConfirmacionReservaHabitacion,
-  enviarNotificacionGestionAdmin
+  enviarNotificacionGestionAdmin,
+  sendBankTransferInstructions
 }; 

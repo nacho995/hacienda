@@ -1,12 +1,15 @@
-import React from 'react';
+"use client";
+
+import React, { useState, useEffect } from 'react';
 // AÑADIDO: Imports necesarios para react-datepicker
-import DatePicker, { registerLocale } from 'react-datepicker';
+import DatePicker, { registerLocale, setDefaultLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import es from 'date-fns/locale/es';
 import { FaCalendarAlt, FaSpinner } from 'react-icons/fa';
 
 // Registrar el locale español
 registerLocale('es', es);
+setDefaultLocale('es');
 
 /**
  * Componente de calendario basado en react-datepicker

@@ -8,12 +8,10 @@ import { useForm } from 'react-hook-form';
 import { useAuth } from '@/context/AuthContext'; 
 import { useReservation } from '@/context/ReservationContext'; 
 import { getTiposEvento } from '@/services/tiposEvento.service';
-import { // crearReservaEvento, // Comentado temporalmente
-         createHabitacionReservation,
-         createEventoReservation, // Posible reemplazo
-         getEventoOccupiedDates, // Fechas ocupadas por eventos
-         getAllHabitacionOccupiedDates // Fechas ocupadas por habitaciones
-       } from '@/services/reservationService'; 
+import { 
+    createEventoReservation, 
+    getFechasOcupadasGlobales // <-- Usaremos la nueva función global
+} from '@/services/reservationService'; 
 
 import ModoSeleccionEvento from '@/components/reservas/ModoSeleccionEvento';
 import ModoGestionServicios from '@/components/reservas/ModoGestionServicios';
@@ -23,6 +21,17 @@ import CalendarioReserva from '@/components/reservas/CalendarioReserva';
 import NavbarReservar from '@/components/layout/NavbarReservar';
 import Footer from '@/components/layout/Footer';
 
+// --- Helper Functions ---
+// Función auxiliar para formatear fecha para la API (consistentemente YYYY-MM-DD)
+const formatApiDate = (date) => {
+  if (!date || !(date instanceof Date)) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// --- Componente Principal y Wizard ---
 const ReservarPage = () => {
   return (
     <div className="min-h-screen bg-gray-100">
@@ -83,76 +92,38 @@ const ReservaWizard = () => {
   const [selectedEventType, setSelectedEventType] = useState(formData.tipoEvento || null);
   const router = useRouter();
   
-  // --- Estados para fechas ocupadas (combinadas) --- 
-  const [occupiedDates, setOccupiedDates] = useState([]);
+  // --- Estados para fechas ocupadas globales --- 
+  const [occupiedDates, setOccupiedDates] = useState([]); // Almacena objetos Date
   const [loadingOccupiedDates, setLoadingOccupiedDates] = useState(false);
 
-  // --- Función para cargar fechas ocupadas (eventos Y habitaciones) --- 
-  const fetchOccupiedDates = useCallback(async (fechaInicioVisible, fechaFinVisible) => {
+  // --- Función para cargar fechas ocupadas GLOBALES --- 
+  const fetchGlobalOccupiedDates = useCallback(async (fechaInicioVisible, fechaFinVisible) => {
     setLoadingOccupiedDates(true);
     try {
-      const formatApiDate = (date) => date.toISOString().split('T')[0];
-      const params = {
-        fechaInicio: formatApiDate(fechaInicioVisible),
-        fechaFin: formatApiDate(fechaFinVisible),
-      };
+      const inicioStr = formatApiDate(fechaInicioVisible);
+      const finStr = formatApiDate(fechaFinVisible);
       
-      // Llamadas en paralelo
-      const [eventDatesResponse, roomDatesResponse] = await Promise.all([
-        getEventoOccupiedDates(params), // Devuelve array de objetos { fecha: Date }
-        getAllHabitacionOccupiedDates(params) // Devuelve { success: boolean, data: Date[] }
-      ]);
-
-      let combinedDates = [];
-
-      // Procesar fechas de eventos
-      if (Array.isArray(eventDatesResponse)) {
-        const validEventDates = eventDatesResponse
-          .map(item => item?.fecha) 
-          .filter(date => date instanceof Date && !isNaN(date.getTime()));
-        combinedDates.push(...validEventDates);
-      } else {
-        console.error('Respuesta inesperada al obtener fechas ocupadas de eventos (no es un array):', eventDatesResponse);
-      }
-
-      // Procesar fechas de habitaciones
-      if (roomDatesResponse?.success && Array.isArray(roomDatesResponse.data)) {
-        const validRoomDates = roomDatesResponse.data.filter(date => date instanceof Date && !isNaN(date.getTime()));
-        combinedDates.push(...validRoomDates);
-      } else {
-        console.error('Error al obtener fechas ocupadas de habitaciones:', roomDatesResponse?.message);
-      }
-
-      // Eliminar duplicados y asegurarse de que son objetos Date válidos
-      const uniqueDatesMap = new Map();
-      combinedDates.forEach(date => {
-        if (date instanceof Date && !isNaN(date.getTime())) {
-           // Usar YYYY-MM-DD como clave para unicidad
-           const key = date.toISOString().split('T')[0]; 
-           if (!uniqueDatesMap.has(key)) {
-             uniqueDatesMap.set(key, date);
-           }
-        }
-      });
-
-      const finalOccupiedDates = Array.from(uniqueDatesMap.values());
-
-      setOccupiedDates(finalOccupiedDates); // Actualizar estado combinado
+      // Llamar al nuevo servicio global
+      const globalOccupiedDates = await getFechasOcupadasGlobales(inicioStr, finStr); 
+      
+      setOccupiedDates(globalOccupiedDates || []); // El servicio ya devuelve objetos Date
+      
     } catch (error) {
-      console.error('Excepción al obtener fechas ocupadas (eventos o habitaciones):', error);
+      console.error('Excepción al obtener fechas ocupadas globales:', error);
+      toast.error('Error al cargar la disponibilidad del calendario.');
       setOccupiedDates([]); // Resetear en caso de error
     } finally {
       setLoadingOccupiedDates(false);
     }
-  }, []);
+  }, []); // Dependencia vacía
 
   // --- Efecto para cargar fechas ocupadas al inicio --- 
   useEffect(() => {
     // Cargar fechas para los próximos 6 meses por defecto
     const hoy = new Date();
     const seisMesesDespues = new Date(hoy.getFullYear(), hoy.getMonth() + 6, hoy.getDate());
-    fetchOccupiedDates(hoy, seisMesesDespues);
-  }, [fetchOccupiedDates]);
+    fetchGlobalOccupiedDates(hoy, seisMesesDespues);
+  }, [fetchGlobalOccupiedDates]); // Ejecutar al montar y si la función cambia (poco probable)
 
   // AÑADIDO: useEffect para resetear el formulario al montar el componente
   useEffect(() => {
@@ -214,57 +185,51 @@ const ReservaWizard = () => {
       return;
     }
     
-    // MODIFICADO: Validar rango de fechas y fechas ocupadas
+    // MODIFICADO: Validar rango de fechas contra fechas ocupadas GLOBALES
     if (currentStep === 2) {
       if (!formData.fechaInicio || !formData.fechaFin) {
         toast.error('Por favor, seleccione un rango de fechas para su evento');
         return;
       }
 
-      // Crear un set de fechas ocupadas (en formato YYYY-MM-DD para comparación fácil)
+      // Crear un set de fechas ocupadas GLOBALES (en formato YYYY-MM-DD para comparación fácil)
       const occupiedSet = new Set(
         occupiedDates.map(date => {
           // Asegurarse de que 'date' sea un objeto Date válido
           if (date instanceof Date && !isNaN(date.getTime())) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+            return formatApiDate(date); // Usar helper
           }
           return null; // Ignorar fechas inválidas
         }).filter(Boolean) // Filtrar nulos
       );
 
-      // Iterar sobre el rango seleccionado
+      // Iterar sobre el rango seleccionado por el usuario
       let currentDate = new Date(formData.fechaInicio);
       const endDate = new Date(formData.fechaFin);
       currentDate.setHours(0, 0, 0, 0); // Normalizar hora para la comparación
       endDate.setHours(0, 0, 0, 0); // Normalizar hora
 
+      let conflictFound = false;
       while (currentDate <= endDate) {
-        const year = currentDate.getFullYear();
-        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDate.getDate()).padStart(2, '0');
-        const dateString = `${year}-${month}-${day}`;
+        const dateString = formatApiDate(currentDate);
 
         if (occupiedSet.has(dateString)) {
-          setValidationErrorMessage("El rango de fechas seleccionado contiene días que no están disponibles para eventos.");
-          setShowValidationModal(true);
-          // setValidationRedirectStep(2); // Opcional: redirigir al paso 2
-          return; // Detener el avance
+          toast.error(`Conflicto de fechas: El día ${dateString} no está disponible. Por favor, elija otro rango.`);
+          conflictFound = true;
+          break; // Salir del bucle al encontrar el primer conflicto
         }
-        // Avanzar al día siguiente
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      // Añadido: Validar número de habitaciones (7-14)
-      const numHabitaciones = parseInt(formData.numeroHabitaciones, 10);
-      if (isNaN(numHabitaciones) || numHabitaciones < 7 || numHabitaciones > 14) {
-        setValidationErrorMessage("El número estimado de habitaciones debe estar entre 7 y 14.");
-        setShowValidationModal(true);
-        // Opcional: setValidationRedirectStep(2); // Para ofrecer ir al paso 2
-        return; // Detener el avance
+      if (conflictFound) {
+        return; // Detener si se encontró conflicto
       }
+      
+      // Resto de validaciones del paso 2 (ej. número de habitaciones si aplica)
+      // if (!formData.numeroHabitaciones || formData.numeroHabitaciones < 1) {
+      //   toast.error('Por favor, indique el número de habitaciones');
+      //   return;
+      // }
     }
 
     // AÑADIDO: Validación para asegurar que se elija un modo en paso 3 antes de avanzar con 'Siguiente'
@@ -458,30 +423,16 @@ const ReservaWizard = () => {
             <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-[#D1B59B]">
               <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Seleccione las fechas</h3>
               <p className="text-[#8A6E52] mb-6 italic">Elija la fecha de inicio y fin de su evento.</p>
-              <DatePicker
-                selected={formData.fechaInicio}
-                onChange={handleDateRangeChange}
-                startDate={formData.fechaInicio}
-                endDate={formData.fechaFin}
-                excludeDates={occupiedDates.map(date => new Date(date))} // <-- Asegurar que pasamos objetos Date
-                selectsRange
-                inline
-                locale={es} 
-                minDate={new Date()} // No permitir fechas pasadas
-                monthsShown={2}
-                dateFormat="dd/MM/yyyy"
-                calendarClassName="reserva-datepicker"
-                dayClassName={(date) => {
-                  // Lógica para clases de días (opcional)
-                  return undefined; 
-                }}
-                filterDate={(date) => {
-                  // Opcional: deshabilitar fines de semana si es necesario
-                  // const day = date.getDay();
-                  // return day !== 0 && day !== 6; 
-                  return true; // Permitir todos los días por defecto
-                }}
-                isLoading={loadingOccupiedDates} // Mostrar indicador de carga
+              <CalendarioReserva 
+                occupiedDates={occupiedDates} // Pasar fechas ocupadas GLOBALES
+                loadingDates={loadingOccupiedDates} // Pasar estado de carga
+                onDateChange={handleDateRangeChange} // Manejador para selección de fecha
+                initialStartDate={formData.fechaInicio} // Pasar fecha inicio inicial
+                initialEndDate={formData.fechaFin} // Pasar fecha fin inicial
+                onMonthChange={(startDate, endDate) => fetchGlobalOccupiedDates(startDate, endDate)} // Recargar fechas globales al cambiar mes
+                // Pasar el número de habitaciones si es relevante para este paso
+                // numHabitaciones={formData.numeroHabitaciones} 
+                // onNumHabitacionesChange={(num) => updateFormSection('numeroHabitaciones', num)}
               />
               {loadingOccupiedDates && <p className="text-sm text-gray-500 mt-2">Cargando disponibilidad...</p>}
               {!loadingOccupiedDates && occupiedDates.length > 0 && 

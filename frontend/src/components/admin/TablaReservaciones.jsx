@@ -246,19 +246,27 @@ const TablaReservaciones = ({
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {/* Usar nombreMostrado */} 
-                      {reservation.nombreMostrado || 'No especificado'}
-                    </div>
-                    {reservation.modoReserva && (
-                      <div className="text-xs text-gray-500">
-                        {reservation.modoReserva === 'hacienda' ? 'Gestión: Hacienda' : 'Gestión: Cliente'}
+                    {reservation.tipo === 'evento' ? (
+                       // Si es evento, mostrar el nombreMostrado que ya viene formateado
+                      <div className="text-sm text-gray-900">
+                         {reservation.nombreMostrado || 'Evento no especificado'}
                       </div>
+                    ) : (
+                       // Si es habitación, aplicar formato especial
+                      <div className="text-sm text-gray-900">
+                         <span>Habitación {reservation.letraHabitacionReal && reservation.letraHabitacionReal !== '?' ? reservation.letraHabitacionReal : 'N/A'}</span>
+                         {/* Si hay un evento asociado, mostrarlo al lado */} 
+                         {reservation.nombreEventoAsociado && (
+                           <span className="ml-2 text-xs text-gray-500">
+                             / {reservation.nombreEventoAsociado}
+                           </span>
+                         )}
+                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(currentStatus)}`}>
-                      {currentStatus || 'No especificado'}
+                      {currentStatus || 'Desconocido'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -269,59 +277,77 @@ const TablaReservaciones = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                     <div className="relative inline-block text-left">
-                      <button
-                        onClick={() => setOpenMenuId(openMenuId === reservationId ? null : reservationId)}
-                        className="p-2 rounded-full text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        <FaEllipsisV />
-                      </button>
+                      <div>
+                        <button
+                          type="button"
+                          className="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-[var(--color-primary)]"
+                          id={`menu-button-${reservationId}`}
+                          aria-expanded={openMenuId === reservationId}
+                          aria-haspopup="true"
+                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === reservationId ? null : reservationId); }}
+                        >
+                          <FaEllipsisV />
+                        </button>
+                      </div>
 
                       {openMenuId === reservationId && (
                         <div 
-                          className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10"
+                          className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10" 
                           role="menu" 
                           aria-orientation="vertical" 
-                          aria-labelledby="menu-button"
+                          aria-labelledby={`menu-button-${reservationId}`} 
+                          tabIndex="-1"
+                          onClick={() => setOpenMenuId(null)}
                         >
                           <div className="py-1" role="none">
-                            <Link href={`/admin/reservaciones/${reservationType}/${reservationId}`} passHref>
-                              <MenuButton onClick={() => setOpenMenuId(null)}> 
-                                <FaEye className="inline mr-2"/> Ver Detalles
-                              </MenuButton>
+                            <Link 
+                              href={`/admin/reservaciones/${reservation.tipo}/${reservationId}`} 
+                              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" 
+                              role="menuitem" 
+                              tabIndex="-1"
+                            >
+                              <FaEye className="mr-3" /> Ver Detalles
                             </Link>
                             
-                            {onAssign && !reservation.asignadoA && (
-                              <MenuButton onClick={() => { onAssign(reservationType, reservationId); setOpenMenuId(null); }}>
-                                <FaHandPointer className="inline mr-2"/> Asignar a mi cuenta
+                            {!isAssigned && (
+                              <MenuButton onClick={() => { onAssign(reservationId, reservationType); setOpenMenuId(null); }}>
+                                <FaHandPointer className="mr-3 inline-block" /> Asignarme
                               </MenuButton>
                             )}
-                            
-                            {onUnassign && reservation.asignadoA && (
-                              <MenuButton onClick={() => { onUnassign(reservationType, reservationId); setOpenMenuId(null); }}>
-                                <FaUndo className="inline mr-2"/> Desasignar de mi cuenta
+
+                            {isAssigned && (
+                              <MenuButton onClick={() => { onUnassign(reservationId, reservationType); setOpenMenuId(null); }}>
+                                <FaUndo className="mr-3 inline-block" /> Desasignar
                               </MenuButton>
                             )}
-                            
-                            {onChangeStatus && currentStatus !== 'confirmada' && (
-                                <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'confirmada'); setOpenMenuId(null); }}>
-                                    <FaCheckCircle className="inline mr-2 text-green-500"/> Confirmar Reserva
-                                </MenuButton>
+
+                            {canPerformCriticalActions && (
+                              <>
+                                {currentStatus !== 'confirmada' && (
+                                  <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'confirmada'); setOpenMenuId(null); }}>
+                                    <FaCheckCircle className="mr-3 inline-block text-green-500" /> Marcar Confirmada
+                                  </MenuButton>
+                                )}
+                                {currentStatus !== 'pendiente' && (
+                                  <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'pendiente'); setOpenMenuId(null); }}>
+                                     <FaHourglassHalf className="mr-3 inline-block text-yellow-500" /> Marcar Pendiente
+                                  </MenuButton>
+                                )}
+                                {currentStatus !== 'cancelada' && (
+                                  <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'cancelada'); setOpenMenuId(null); }}>
+                                    <FaTimesCircle className="mr-3 inline-block text-red-500" /> Marcar Cancelada
+                                  </MenuButton>
+                                )}
+                              </>
                             )}
-                            {onChangeStatus && currentStatus !== 'cancelada' && (
-                                <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'cancelada'); setOpenMenuId(null); }}>
-                                    <FaTimesCircle className="inline mr-2 text-orange-500"/> Cancelar Reserva
+
+                            {canPerformCriticalActions && (
+                              <>
+                                <div className="border-t border-gray-100 my-1"></div>
+                                <MenuButton onClick={() => { onDelete(reservationType, reservationId); setOpenMenuId(null); }}>
+                                  <FaTrashAlt className="mr-3 inline-block text-red-600" /> Eliminar Reserva
                                 </MenuButton>
-                            )}
-                            {onChangeStatus && currentStatus !== 'pendiente' && (
-                                <MenuButton onClick={() => { onChangeStatus(reservationType, reservationId, 'pendiente'); setOpenMenuId(null); }}>
-                                    <FaHourglassHalf className="inline mr-2 text-yellow-500"/> Marcar Pendiente
-                                </MenuButton>
-                            )}
-                            
-                            {onDelete && (
-                              <MenuButton onClick={() => { openConfirmationModal(reservationId, 'eliminar', 'Confirmar Eliminación', `¿Estás seguro de que deseas eliminar permanentemente la reserva #${reservationId}? Esta acción no se puede deshacer.`); }}>
-                                <FaTrashAlt className="inline mr-2 text-red-500"/> Eliminar Reserva
-                              </MenuButton>
+                              </>
                             )}
                           </div>
                         </div>

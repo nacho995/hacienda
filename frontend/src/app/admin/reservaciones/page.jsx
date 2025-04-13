@@ -16,13 +16,54 @@ import {
   deleteEventoReservation,
   deleteHabitacionReservation,
   // --- Importar funciones de asignación a admin --- 
-  asignarEventoAdmin,
-  asignarHabitacionAdmin,
+  assignEventoReservation,
+  assignHabitacionReservation,
   // --- Importar funciones de desasignación --- 
   unassignEventoReservation,
   unassignHabitacionReservation
 } from '@/services/reservationService';
 import { useConfirmationModal } from '@/hooks/useConfirmationModal';
+
+// <<< INICIO FUNCION getLetraHabitacion MOVIDA AFUERA >>>
+const getLetraHabitacion = (reserva) => {
+  // Prioridad 1: Campo directo en la reserva (ej. si se denormaliza al crear la reserva)
+  if (reserva?.letraHabitacion) return reserva.letraHabitacion.toUpperCase();
+
+  // Prioridad 2: Objeto 'habitacion' populado
+  if (typeof reserva?.habitacion === 'object' && reserva.habitacion?.letra) {
+    return reserva.habitacion.letra.toUpperCase();
+  }
+
+  // Prioridad 3: Objeto 'habitacionId' populado (nombre común para referencias)
+  if (typeof reserva?.habitacionId === 'object' && reserva.habitacionId?.letra) {
+    return reserva.habitacionId.letra.toUpperCase();
+  }
+
+  // Prioridad 4: Objeto 'habitacion_id' populado (otra convención)
+  if (typeof reserva?.habitacion_id === 'object' && reserva.habitacion_id?.letra) {
+      return reserva.habitacion_id.letra.toUpperCase();
+  }
+
+  // Fallback 1: Si 'habitacion' es una string, verificar si es una letra válida
+  if (typeof reserva?.habitacion === 'string') {
+      const habString = reserva.habitacion.trim().toUpperCase();
+      // Check if it's a single uppercase letter A-O (typical room letters)
+      if (habString.length === 1 && habString >= 'A' && habString <= 'O') {
+          return habString;
+      }
+      // If not a letter, it might be an ID, return '?'
+  }
+
+  // Fallback 2: Si 'habitacionId' es un string (probablemente ID)
+  if (typeof reserva?.habitacionId === 'string') {
+    // No podemos obtener la letra solo del ID aquí, devolvemos '?'
+  }
+
+  // Fallback final si no se encontró nada
+  // console.warn(`getLetraHabitacion: No se pudo determinar la letra para la reserva ID: ${reserva?._id}`);
+  return '?';
+};
+// <<< FIN FUNCION getLetraHabitacion MOVIDA AFUERA >>>
 
 export default function ReservacionesPage() {
   const router = useRouter();
@@ -36,6 +77,19 @@ export default function ReservacionesPage() {
     error
   } = useReservation();
 
+  // LOG: Verificar datos recibidos del hook useReservation
+  useEffect(() => {
+    // Solo loguear si no está cargando para evitar logs excesivos
+    if (!reservationsLoading) { 
+        console.log('%c[ReservacionesPage] Datos recibidos de useReservation:', 'color: blue; font-weight: bold;', {
+          habitacionReservations: habitacionReservations ? JSON.parse(JSON.stringify(habitacionReservations)) : [], // Clonar para inspección segura
+          eventoReservations: eventoReservations ? JSON.parse(JSON.stringify(eventoReservations)) : [], // Clonar
+          loading: reservationsLoading,
+          error
+        });
+    }
+  }, [habitacionReservations, eventoReservations, reservationsLoading, error]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [filteredReservations, setFilteredReservations] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,47 +101,6 @@ export default function ReservacionesPage() {
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const { showConfirmation } = useConfirmationModal();
-
-  // <<< INICIO FUNCION getLetraHabitacion COPIADA >>>
-  const getLetraHabitacion = (reserva) => {
-    // Prioridad 1: Campo directo en la reserva (ej. si se denormaliza al crear la reserva)
-    if (reserva?.letraHabitacion) return reserva.letraHabitacion.toUpperCase();
-
-    // Prioridad 2: Objeto 'habitacion' populado
-    if (typeof reserva?.habitacion === 'object' && reserva.habitacion?.letra) {
-      return reserva.habitacion.letra.toUpperCase();
-    }
-
-    // Prioridad 3: Objeto 'habitacionId' populado (nombre común para referencias)
-    if (typeof reserva?.habitacionId === 'object' && reserva.habitacionId?.letra) {
-      return reserva.habitacionId.letra.toUpperCase();
-    }
-
-    // Prioridad 4: Objeto 'habitacion_id' populado (otra convención)
-    if (typeof reserva?.habitacion_id === 'object' && reserva.habitacion_id?.letra) {
-        return reserva.habitacion_id.letra.toUpperCase();
-    }
-
-    // Fallback 1: Si 'habitacion' es una string, verificar si es una letra válida
-    if (typeof reserva?.habitacion === 'string') {
-        const habString = reserva.habitacion.trim().toUpperCase();
-        // Check if it's a single uppercase letter A-O (typical room letters)
-        if (habString.length === 1 && habString >= 'A' && habString <= 'O') {
-            return habString;
-        }
-        // If not a letter, it might be an ID, return '?'
-    }
-
-    // Fallback 2: Si 'habitacionId' es un string (probablemente ID)
-    if (typeof reserva?.habitacionId === 'string') {
-      // No podemos obtener la letra solo del ID aquí, devolvemos '?'
-    }
-
-    // Fallback final si no se encontró nada
-    // console.warn(`getLetraHabitacion: No se pudo determinar la letra para la reserva ID: ${reserva?._id}`);
-    return '?';
-  };
-  // <<< FIN FUNCION getLetraHabitacion COPIADA >>>
 
   // Cargar usuarios
   const loadUsers = useCallback(async () => {
@@ -128,75 +141,81 @@ export default function ReservacionesPage() {
       return;
     }
 
-    // Crear un Set con los IDs de las habitaciones asociadas a eventos
-    const habitacionesEventosIds = new Set();
-    eventoReservations.forEach(evento => {
-      if (evento.serviciosAdicionales && Array.isArray(evento.serviciosAdicionales)) {
-        evento.serviciosAdicionales.forEach(servicio => {
-          // Asegurarse de que reservaHabitacionId existe y es un string o puede ser convertido
-          const habitacionId = servicio?.reservaHabitacion?._id || servicio?.reservaHabitacionId;
-          if (habitacionId) {
-            habitacionesEventosIds.add(habitacionId.toString());
-          }
-        });
-      }
-    });
-    
-    // Log para verificar los IDs recolectados
-    console.log('IDs de habitaciones asociadas a eventos:', Array.from(habitacionesEventosIds));
-
-    // Ya no filtramos, usamos todas las habitaciones
-    // const habitacionesIndependientes = habitacionReservations.filter(hab => { ... });
-
     // Combinar eventos y TODAS las habitaciones
     const allReservations = [
-      ...eventoReservations.map(res => ({
-        ...res,
-        tipo: 'evento',
-        fechaMostrada: res.fecha,
-        // Usar nombreContacto para el cliente del evento
-        clientePrincipal: res.nombreContacto || res.usuario?.nombre || 'No especificado',
-        nombreMostrado: `Evento: ${res.nombreEvento || 'Sin nombre'}`, // Nombre para la columna TIPO
-        uniqueId: `evento_${res._id || res.id}`
-      })),
+      ...eventoReservations.map(res => {
+        return {
+          ...res,
+          tipo: 'evento',
+          fechaMostrada: res.fecha,
+          clientePrincipal: res.nombreContacto || res.usuario?.nombre || 'No especificado',
+          nombreMostrado: `Evento: ${res.nombreEvento || 'Sin nombre'}`,
+          uniqueId: `evento_${res._id || res.id}`,
+        };
+      }),
       ...habitacionReservations.map(res => {
         const habId = (res._id || res.id)?.toString();
-        
-        // --- Buscar evento asociado directamente usando el ID --- 
         let asociada = false;
         let eventoEncontrado = null;
-        if (res.reservaEvento) { // Si la habitación tiene ID de evento asociado
-           eventoEncontrado = eventoReservations.find(evento => 
-                // Comparar IDs como string por seguridad
-                String(evento._id || evento.id) === String(res.reservaEvento)
-           );
-           asociada = !!eventoEncontrado; // Marcar como asociada si se encontró el evento
-        }
-        // -----------------------------------------------------
         
-        // --- USAR getLetraHabitacion ---
-        const letra = getLetraHabitacion(res); // Llamar a la función copiada
-        const letraMostrada = letra === '?' ? 'N/A' : letra; // Usar N/A si la función devuelve '?'
+        // LOG: Verificar si la habitación tiene referencia a evento
+        console.log(`[applyFilters-Hab] Habitación ID: ${habId}, reservaEvento ID: ${res.reservaEvento}`);
+        
+        if (res.reservaEvento) { 
+           // --- CORREGIDO: Extraer ID si res.reservaEvento es un objeto --- 
+           const eventoIdDeHabitacion = typeof res.reservaEvento === 'object' && res.reservaEvento !== null
+             ? String(res.reservaEvento._id || res.reservaEvento.id)
+             : String(res.reservaEvento);
+           // -------------------------------------------------------------
 
+           eventoEncontrado = eventoReservations.find(evento => 
+                // Comparar IDs como strings
+                String(evento._id || evento.id) === eventoIdDeHabitacion
+           );
+           asociada = !!eventoEncontrado;
+           // LOG: Resultado de la búsqueda del evento asociado
+           if (asociada) {
+               console.log(`[applyFilters-Hab] Evento asociado ENCONTRADO para hab ${habId}:`, eventoEncontrado);
+           } else {
+               // --- LOG MEJORADO: Mostrar el ID que se buscó --- 
+               console.warn(`[applyFilters-Hab] Evento asociado NO ENCONTRADO para hab ${habId} con ID evento buscado: ${eventoIdDeHabitacion}`);
+               // ---------------------------------------------
+           }
+        } else {
+            // LOG: No hay referencia a evento
+            console.log(`[applyFilters-Hab] Habitación ID: ${habId} no tiene reservaEvento.`);
+        }
+        
+        const letra = getLetraHabitacion(res);
+        // <<< INICIO LOG ASIGNADOA HABITACION >>>
+        console.log(`[applyFilters-Hab] Procesando hab ${habId}, Asociada: ${asociada}, Asignado a (raw):`, res.asignadoA);
+        // <<< FIN LOG ASIGNADOA HABITACION >>>
+        const letraMostrada = letra === '?' ? 'N/A' : letra;
         const primerHuesped = res.infoHuespedes?.nombres?.[0] || res.nombreHuespedes || res.huesped?.nombre;
         const clienteFinal = primerHuesped || res.huesped?.email || res.email || 'No especificado';
-        let nombreTipo = `Habitación ${letraMostrada}`; // Usar letraMostrada aquí
-        if (asociada && eventoEncontrado) { // Usar el evento encontrado
+        let nombreTipo = `Habitación ${letraMostrada}`;
+        
+        // LOG: Antes de añadir nombre de evento
+        console.log(`[applyFilters-Hab] Nombre base para hab ${habId}: ${nombreTipo}, asociada: ${asociada}`);
+        
+        if (asociada && eventoEncontrado) {
           const nombreEventoAsociado = eventoEncontrado.nombreEvento || 'Sin nombre';
-          // Eliminar log anterior que ya no aplica
-          // console.log(`[Debug Hab ${habId}] Asociada: ${asociada}, Evento Encontrado:`, servicioAsociado, `Nombre: ${nombreEventoAsociado}`);
           nombreTipo += ` (Evento: ${nombreEventoAsociado})`;
+          // LOG: Nombre final con evento
+          console.log(`[applyFilters-Hab] Nombre final para hab ${habId}: ${nombreTipo}`);
         }
         
         return {
           ...res,
           tipo: 'habitacion',
-          fechaMostrada: res.fechaEntrada, // Fecha principal para habitaciones
-          clientePrincipal: clienteFinal, // Cliente principal de la habitación (con fallback de email)
-          nombreMostrado: nombreTipo, // Nombre para la columna TIPO
-          asociadaAEvento: asociada, // Marcar si está asociada
-          letraHabitacionReal: letra, // Guardar la letra real (puede ser '?')
-          uniqueId: `habitacion_${habId}`
+          fechaMostrada: res.fechaEntrada,
+          clientePrincipal: clienteFinal,
+          nombreMostrado: nombreTipo,
+          asociadaAEvento: asociada,
+          letraHabitacionReal: letra,
+          uniqueId: `habitacion_${habId}`,
+          // Pasar el nombre del evento asociado si se encontró
+          nombreEventoAsociado: asociada && eventoEncontrado ? (eventoEncontrado.nombreEvento || 'Sin nombre') : null
         };
       })
     ];
@@ -242,21 +261,189 @@ export default function ReservacionesPage() {
       const aValue = a.fechaMostrada;
       const bValue = b.fechaMostrada;
 
-      if (!aValue || !bValue) return 0;
+      if (!aValue || !bValue) {
+        console.warn('Valores de fecha inválidos para ordenar:', { aValue, bValue });
+        return 0; // No ordenar si falta alguna fecha
+      }
 
+      // Convertir a fechas si son strings
       const dateA = new Date(aValue);
       const dateB = new Date(bValue);
 
-      if (sortConfig.direction === 'asc') {
-        return dateA - dateB;
-      } else {
-        return dateB - dateA;
+      // Validar fechas
+      if (isNaN(dateA.getTime()) || isNaN(dateB.getTime())) {
+        console.warn('Fechas inválidas detectadas en ordenamiento:', { aValue, bValue });
+        // Decidir cómo manejar fechas inválidas, por ejemplo, moverlas al final
+        if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+        if (isNaN(dateA.getTime())) return 1; // a después de b
+        if (isNaN(dateB.getTime())) return -1; // a antes de b
       }
+
+      let comparison = 0;
+      if (dateA < dateB) {
+        comparison = -1;
+      } else if (dateA > dateB) {
+        comparison = 1;
+      }
+
+      return sortConfig.direction === 'asc' ? comparison : comparison * -1;
     });
 
-    console.log('Reservas filtradas:', filtered.length);
     setFilteredReservations(filtered);
-  }, [searchTerm, filterStatus, filterType, filterUsuario, sortConfig, habitacionReservations, eventoReservations, user?.id]);
+    console.log('Reservaciones filtradas y ordenadas:', filtered.length);
+  }, [
+    habitacionReservations, 
+    eventoReservations, 
+    searchTerm, 
+    filterStatus, 
+    filterType, 
+    filterUsuario, 
+    sortConfig, 
+    user?.id // Añadir user.id como dependencia si se usa en el filtro 'mine'
+  ]);
+
+  // <<< INICIO NUEVAS FUNCIONES HANDLEASIGNAR/DESASIGNAR >>>
+  const handleAsignar = useCallback(async (reservationId, reservationType) => {
+    if (!user || !user.id) {
+      toast.error('No se pudo obtener la información del administrador.');
+      return;
+    }
+    const adminId = user.id;
+    const toastId = toast.loading('Asignando reserva...');
+
+    try {
+      let assignPromise;
+
+      if (reservationType === 'evento') {
+        assignPromise = assignEventoReservation(reservationId, adminId);
+      } else if (reservationType === 'habitacion') {
+        assignPromise = assignHabitacionReservation(reservationId, adminId);
+      } else {
+        throw new Error('Tipo de reserva inválido');
+      }
+
+      const result = await assignPromise;
+
+      if (!result || !result.success) {
+        throw new Error(result?.message || 'Error asignando la reserva principal.');
+      }
+      
+      // --- REINTRODUCIDO: Buscar y asignar habitaciones asociadas explícitamente --- 
+      let roomErrors = [];
+      if (reservationType === 'evento') {
+        // Buscar habitaciones asociadas en el estado actual del frontend
+        const associatedRooms = habitacionReservations.filter(
+          hab => String(hab.reservaEvento?._id || hab.reservaEvento) === String(reservationId)
+        );
+        
+        if (associatedRooms.length > 0) {
+          toast.loading(`Asignando ${associatedRooms.length} habitacion(es) asociada(s)...`, { id: toastId });
+          const roomPromises = associatedRooms.map(room => 
+            assignHabitacionReservation(room._id || room.id, adminId)
+              .catch(err => ({ // Capturar errores individuales
+                success: false, 
+                roomId: room._id || room.id, 
+                message: err.message || 'Error desconocido' 
+              }))
+          );
+          
+          const roomResults = await Promise.all(roomPromises);
+          roomErrors = roomResults.filter(res => !res.success);
+          
+          if (roomErrors.length > 0) {
+             console.error('Errores al asignar habitaciones asociadas:', roomErrors);
+             // No sobreescribir el toast principal todavía, esperar a la recarga
+          }
+        }
+      }
+      // --- FIN REINTRODUCIDO ---
+      
+      await loadAllReservations(); // Recargar todas las reservas
+
+      // Mostrar éxito o advertencia DESPUÉS de recargar
+      if (roomErrors.length > 0) {
+        toast.warning(
+          `Reserva principal asignada, pero falló la asignación de ${roomErrors.length} habitacion(es). Revisar consola.`,
+          { id: toastId, duration: 5000 }
+        );
+      } else {
+         toast.success("Reserva asignada correctamente (y asociadas si aplica).", { id: toastId });
+      }
+
+    } catch (error) {
+      console.error('Error en handleAsignar:', error);
+      toast.error(`Error al asignar: ${error.message}`, { id: toastId });
+    }
+  }, [user, loadAllReservations, habitacionReservations]);
+
+  const handleDesasignar = useCallback(async (reservationId, reservationType) => {
+    const toastId = toast.loading('Desasignando reserva...');
+
+    try {
+      let unassignPromise;
+
+      if (reservationType === 'evento') {
+        unassignPromise = unassignEventoReservation(reservationId);
+      } else if (reservationType === 'habitacion') {
+        unassignPromise = unassignHabitacionReservation(reservationId);
+      } else {
+        throw new Error('Tipo de reserva inválido');
+      }
+
+      const result = await unassignPromise;
+
+      if (!result || !result.success) {
+        throw new Error(result?.message || 'Error desasignando la reserva principal.');
+      }
+
+      // --- REINTRODUCIDO: Buscar y desasignar habitaciones asociadas explícitamente --- 
+      let roomErrors = [];
+      if (reservationType === 'evento') {
+        // Buscar habitaciones asociadas en el estado actual del frontend
+        const associatedRooms = habitacionReservations.filter(
+          hab => String(hab.reservaEvento?._id || hab.reservaEvento) === String(reservationId)
+        );
+        
+        if (associatedRooms.length > 0) {
+          toast.loading(`Desasignando ${associatedRooms.length} habitacion(es) asociada(s)...`, { id: toastId });
+          const roomPromises = associatedRooms.map(room => 
+            unassignHabitacionReservation(room._id || room.id)
+              .catch(err => ({ // Capturar errores individuales
+                success: false, 
+                roomId: room._id || room.id, 
+                message: err.message || 'Error desconocido' 
+              }))
+          );
+          
+          const roomResults = await Promise.all(roomPromises);
+          roomErrors = roomResults.filter(res => !res.success);
+
+          if (roomErrors.length > 0) {
+             console.error('Errores al desasignar habitaciones asociadas:', roomErrors);
+             // No sobreescribir el toast principal todavía, esperar a la recarga
+          }
+        }
+      }
+      // --- FIN REINTRODUCIDO ---
+
+      await loadAllReservations(); // Recargar todas las reservas
+
+      // Mostrar éxito o advertencia DESPUÉS de recargar
+      if (roomErrors.length > 0) {
+        toast.warning(
+          `Reserva principal desasignada, pero falló la desasignación de ${roomErrors.length} habitacion(es). Revisar consola.`,
+          { id: toastId, duration: 5000 }
+        );
+      } else {
+         toast.success("Reserva desasignada correctamente (y asociadas si aplica).", { id: toastId });
+      }
+
+    } catch (error) {
+      console.error('Error en handleDesasignar:', error);
+      toast.error(`Error al desasignar: ${error.message}`, { id: toastId });
+    }
+  }, [loadAllReservations, habitacionReservations]);
+  // <<< FIN NUEVAS FUNCIONES HANDLEASIGNAR/DESASIGNAR >>>
 
   // Efecto para cargar datos iniciales
   useEffect(() => {
@@ -279,12 +466,12 @@ export default function ReservacionesPage() {
     initializeData();
   }, [authLoading, isAuthenticated, initialLoadDone, loadAllReservations, loadUsers]);
 
-  // Efecto para aplicar filtros cuando cambian los datos
+  // Efecto para aplicar filtros cuando cambian los datos o los filtros
   useEffect(() => {
     if (initialLoadDone) {
       applyFiltersAndSort();
     }
-  }, [initialLoadDone, applyFiltersAndSort, habitacionReservations, eventoReservations]);
+  }, [initialLoadDone, habitacionReservations, eventoReservations, searchTerm, filterStatus, filterType, filterUsuario, sortConfig, applyFiltersAndSort]);
 
   // Efecto para redirigir si no está autenticado
   useEffect(() => {
@@ -317,7 +504,7 @@ export default function ReservacionesPage() {
     }));
   };
 
-  // --- INICIO: Nuevas funciones Handler para acciones ---
+  // --- INICIO: Funciones Handler para acciones --- 
 
   const handleDeleteReservation = useCallback((tipo, id) => {
     if (!id) {
@@ -409,78 +596,7 @@ export default function ReservacionesPage() {
     });
   }, [loadAllReservations, showConfirmation]);
 
-  // --- NUEVA FUNCIÓN --- 
-  const handleAssignReservation = useCallback(async (tipo, id) => {
-    if (!id) {
-      toast.error('ID de reserva inválido para asignar.');
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      let response;
-      if (tipo === 'evento') {
-        response = await asignarEventoAdmin(id);
-      } else { // tipo === 'habitacion'
-        response = await asignarHabitacionAdmin(id);
-      }
-
-      if (response && response.success) {
-        toast.success('Reserva asignada a tu cuenta correctamente');
-        await loadAllReservations(); // Recargar para reflejar el cambio y el filtro
-        // --- Log para verificar datos post-recarga ---
-        console.log('[Asignar] Datos después de recarga:', { habitacionReservations, eventoReservations });
-      } else {
-        throw new Error(response?.message || 'Error al asignar la reserva');
-      }
-    } catch (error) {
-      console.error('Error al asignar reserva:', error);
-      toast.error('Error al asignar reserva: ' + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadAllReservations]);
-
-  // --- NUEVA FUNCIÓN --- 
-  const handleUnassignReservation = useCallback((tipo, id) => {
-    if (!id) {
-      toast.error('ID de reserva inválido para desasignar.');
-      return;
-    }
-    
-    showConfirmation({
-      title: 'Desasignar Reserva',
-      message: '¿Estás seguro de que quieres desasignarte esta reserva? Quedará como \'Sin asignar\'.',
-      iconType: 'warning',
-      confirmText: 'Sí, desasignar',
-      onConfirm: async () => {
-        setIsLoading(true);
-        try {
-          let response;
-          if (tipo === 'evento') {
-            response = await unassignEventoReservation(id);
-          } else { // tipo === 'habitacion'
-            response = await unassignHabitacionReservation(id);
-          }
-
-          if (response && response.success) {
-            toast.success('Reserva desasignada correctamente');
-            await loadAllReservations();
-            console.log('[Desasignar] Datos después de recarga:', { habitacionReservations, eventoReservations });
-          } else {
-            throw new Error(response?.message || 'Error al desasignar la reserva'); 
-          }
-        } catch (error) {
-          console.error('Error al desasignar reserva:', error);
-          toast.error('Error al desasignar reserva: ' + error.message);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    });
-  }, [loadAllReservations, showConfirmation]);
-
-  // --- FIN: Nuevas funciones Handler ---
+  // --- FIN: Nuevas funciones Handler para acciones ---
 
   // Manejo de estados de carga
   if (authLoading || (isLoading && !initialLoadDone)) {
@@ -509,7 +625,7 @@ export default function ReservacionesPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="container mx-auto p-4 md:p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">Gestión de Reservaciones</h1>
         
@@ -588,8 +704,8 @@ export default function ReservacionesPage() {
           usuarios={usuarios}
           onDelete={handleDeleteReservation}
           onChangeStatus={handleChangeReservationStatus}
-          onAssign={handleAssignReservation}
-          onUnassign={handleUnassignReservation}
+          onAssign={handleAsignar}
+          onUnassign={handleDesasignar}
         />
 
         {/* Mensaje cuando no hay resultados para los filtros aplicados */}

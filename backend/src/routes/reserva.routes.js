@@ -11,7 +11,8 @@ const {
   desasignarReservaHabitacion,
   updateReservaHabitacionHuespedes,
   getAllHabitacionOccupiedDates,
-  actualizarEstadoReservaHabitacion
+  actualizarEstadoReservaHabitacion,
+  verificarDisponibilidadRango
 } = require('../controllers/reservaHabitacionController');
 
 // Importar controladores para eventos
@@ -45,6 +46,7 @@ const router = express.Router();
 // ========================
 
 // Rutas públicas para habitaciones
+router.post('/habitaciones/verificar-disponibilidad-rango', verificarDisponibilidadRango);
 router.get('/habitaciones/fechas-ocupadas-todas', getAllHabitacionOccupiedDates);
 router.post('/habitaciones/disponibilidad', checkHabitacionAvailability);
 router.get('/habitaciones/fechas-ocupadas', getHabitacionOccupiedDates);

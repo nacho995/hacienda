@@ -6,9 +6,11 @@ import {
   getHabitacionReservation, 
   updateHabitacionReservation, 
   deleteHabitacionReservation, 
-  updateReservaHabitacionHuespedes // Importar servicio específico
+  updateReservaHabitacionHuespedes, 
+  assignHabitacionReservation // <-- Importar servicio de asignación
 } from '@/services/reservationService';
-import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaBed, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaRuler, FaSave, FaTimes, FaEdit, FaPlus, FaTrashAlt, FaUserPlus, FaInfoCircle } from 'react-icons/fa';
+import apiClient from '@/services/apiClient'; // <-- Importar apiClient
+import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaBed, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaRuler, FaSave, FaTimes, FaEdit, FaPlus, FaTrashAlt, FaUserPlus, FaInfoCircle, FaUserShield } from 'react-icons/fa'; // <-- Añadir FaUserShield
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
@@ -18,7 +20,7 @@ import ConfirmationModal from '@/components/modals/ConfirmationModal';
 
 export default function HabitacionReservationDetail({ params }) {
   const router = useRouter();
-  const id = React.use(params).id;
+  const { id } = params; // Forma más estándar de obtener el id
   const { user } = useAuth();
   
   const [reservation, setReservation] = useState(null);
@@ -44,6 +46,35 @@ export default function HabitacionReservationDetail({ params }) {
     confirmText: 'Confirmar'
   });
   
+  // --- Estados para Asignación a Admin ---
+  const [showAsignarAdminModal, setShowAsignarAdminModal] = useState(false);
+  const [usuariosAdmin, setUsuariosAdmin] = useState([]);
+  const [loadingUsuariosAdmin, setLoadingUsuariosAdmin] = useState(false);
+  const [isAsignandoAdmin, setIsAsignandoAdmin] = useState(false);
+  // --------------------------------------
+  
+  // --- Función para cargar Usuarios Admin ---
+  const cargarUsuariosAdmin = useCallback(async () => {
+    setLoadingUsuariosAdmin(true);
+    try {
+      const response = await apiClient.get('/users');
+      if (response?.data && Array.isArray(response.data)) {
+        const admins = response.data.filter(u => u.role === 'admin');
+        setUsuariosAdmin(admins);
+      } else {
+        setUsuariosAdmin([]);
+        console.error("Respuesta inválida al cargar usuarios");
+      }
+    } catch (err) {
+      console.error('Error al cargar usuarios administradores:', err);
+      setUsuariosAdmin([]);
+      // No mostraremos toast aquí para no molestar, pero sí en la consola.
+    } finally {
+      setLoadingUsuariosAdmin(false);
+    }
+  }, []);
+  // ----------------------------------------
+
   const cargarReserva = useCallback(async () => {
     if (!id) return;
     
@@ -74,6 +105,11 @@ export default function HabitacionReservationDetail({ params }) {
         });
         setCurrentGuestName(''); // Limpiar input al cargar
         console.log('[cargarReserva] Estado "reservation" y "editedData" establecidos.');
+        
+        // Cargar usuarios admin si no se han cargado
+        if (usuariosAdmin.length === 0) {
+          cargarUsuariosAdmin(); 
+        }
       }
     } catch (err) {
       console.error('Error fetching reservation:', err);
@@ -81,7 +117,7 @@ export default function HabitacionReservationDetail({ params }) {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, usuariosAdmin.length, cargarUsuariosAdmin]);
 
   useEffect(() => {
     cargarReserva();
@@ -298,6 +334,39 @@ export default function HabitacionReservationDetail({ params }) {
     toast.info('Redirigiendo para crear nueva reserva...'); // Opcional
   };
   
+  // --- Funciones para Modal Asignación Admin ---
+  const abrirModalAsignarAdmin = () => {
+    if (!reservation) return;
+    // Recargar usuarios admin por si acaso han cambiado
+    cargarUsuariosAdmin();
+    setShowAsignarAdminModal(true);
+  };
+
+  const handleAsignarAdmin = async (adminId) => {
+    if (!reservation || !adminId) {
+      toast.error('Faltan datos para asignar.');
+      return;
+    }
+    setIsAsignandoAdmin(true);
+    try {
+      // Usamos el servicio assignHabitacionReservation que ya existe
+      const response = await assignHabitacionReservation(reservation._id, adminId);
+      if (response.success) {
+        toast.success('Reserva asignada al administrador correctamente.');
+        await cargarReserva(); // Recargar datos para ver cambio
+        setShowAsignarAdminModal(false); // Cerrar modal
+      } else {
+        toast.error(response.message || 'Error al asignar la reserva.');
+      }
+    } catch (error) {
+      console.error('Error asignando reserva a admin:', error);
+      toast.error('Error de red al asignar la reserva.');
+    } finally {
+      setIsAsignandoAdmin(false);
+    }
+  };
+  // -------------------------------------------
+
   // Obtener el estado correcto (campo puede variar)
   const estadoActual = reservation?.estadoReserva || reservation?.estado || 'Pendiente';
   
@@ -525,6 +594,63 @@ export default function HabitacionReservationDetail({ params }) {
         onClose={() => setIsModalOpen(false)} 
         {...modalConfig} 
       />
+
+      {/* --- NUEVO: Modal Asignar Admin --- */}
+      {showAsignarAdminModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-lg shadow-xl p-5 max-w-lg w-full mx-auto">
+               <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
+                   <h3 className="text-lg font-semibold text-gray-800">
+                      Asignar Reserva a Administrador
+                   </h3>
+                   <button onClick={() => setShowAsignarAdminModal(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+               </div>
+                {loadingUsuariosAdmin ? (
+                    <div className="text-center py-4">
+                       <FaSpinner className="animate-spin text-cyan-600 mx-auto h-8 w-8 mb-2" />
+                       <p className="text-sm text-gray-600">Cargando administradores...</p>
+                    </div>
+                ) : usuariosAdmin.length > 0 ? (
+                    <>
+                       <p className="text-sm text-gray-600 mb-3">Selecciona un administrador para asignar esta reserva:</p>
+                       <div className="max-h-60 overflow-y-auto space-y-2 pr-2 -mr-2">
+                           {usuariosAdmin.map(admin => (
+                               <button
+                                   key={admin._id}
+                                   onClick={() => handleAsignarAdmin(admin._id)}
+                                   disabled={isAsignandoAdmin}
+                                   className={`w-full p-3 border rounded-lg text-left flex items-center gap-3 transition duration-150 ${
+                                       isAsignandoAdmin ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-cyan-50 hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-1'
+                                   }`}
+                               >
+                                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                                       {admin.nombre?.charAt(0).toUpperCase()}{admin.apellidos?.charAt(0).toUpperCase()}
+                                   </div>
+                                   <div className="flex-grow">
+                                       <span className="block font-medium text-sm text-gray-800">{admin.nombre} {admin.apellidos || ''}</span>
+                                       <span className="block text-xs text-gray-500">{admin.email}</span>
+                                   </div>
+                                   {isAsignandoAdmin && <FaSpinner className="animate-spin text-cyan-600 ml-auto h-4 w-4"/>}
+                               </button>
+                           ))}
+                       </div>
+                    </>
+                ) : (
+                    <p className="text-sm text-center text-gray-500 py-4">No se encontraron otros administradores.</p>
+                )}
+               <div className="mt-5 pt-4 border-t border-gray-200 flex justify-end">
+                   <button
+                       onClick={() => setShowAsignarAdminModal(false)}
+                       disabled={isAsignandoAdmin}
+                       className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg text-sm transition duration-150 disabled:opacity-50"
+                   >
+                       Cancelar
+                   </button>
+               </div>
+            </div>
+          </div>
+      )}
+      {/* --------------------------------- */}
     </div>
   );
 }

@@ -4,7 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { FaCalendarAlt, FaWifi, FaUserFriends, FaEnvelope, FaPhone, FaSpinner, FaBed, FaEuroSign, FaBuilding } from 'react-icons/fa';
 import { toast } from 'sonner';
-import { createMultipleReservaciones, getHabitacionOccupiedDates } from '@/services/reservationService';
+import { 
+  createMultipleReservaciones, 
+  getFechasOcupadasPorHabitacion, // Renombrado desde getHabitacionOccupiedDates
+  getFechasEventosEnRango, // Nuevo servicio
+  verificarDisponibilidadHabitaciones // Importar si no estaba ya
+} from '@/services/reservationService';
 import { useAuth } from '@/context/AuthContext';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
@@ -12,6 +17,7 @@ import { registerLocale, setDefaultLocale } from 'react-datepicker';
 import es from 'date-fns/locale/es';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReservationSuccessModal from '@/components/modals/ReservationSuccessModal';
+import AvailabilityConflictModal from '@/components/modals/AvailabilityConflictModal'; // Importar modal de conflicto si existe, o crear uno
 
 registerLocale('es', es);
 setDefaultLocale('es');
@@ -31,6 +37,23 @@ const getHabitacionImage = (letra) => {
   return `/Habitacion${imageNumber}.jpeg`; 
 };
 
+// Función auxiliar para comparar fechas ignorando hora/zona horaria (simplificado)
+const isSameDate = (d1, d2) => {
+  if (!d1 || !d2 || !(d1 instanceof Date) || !(d2 instanceof Date)) return false;
+  return d1.getFullYear() === d2.getFullYear() &&
+         d1.getMonth() === d2.getMonth() &&
+         d1.getDate() === d2.getDate();
+};
+
+// Función auxiliar para formatear fecha para la API (consistentemente YYYY-MM-DD)
+const formatApiDate = (date) => {
+  if (!date || !(date instanceof Date)) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function BookingFormSection({ 
   selectedRooms = [], 
   isLoadingDetails,
@@ -42,9 +65,15 @@ function BookingFormSection({
   const [showReservationSuccess, setShowReservationSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reservationError, setReservationError] = useState(null);
-  const [fechasPorHabitacion, setFechasPorHabitacion] = useState({});
-  const [fechasOcupadasPorHabitacion, setFechasOcupadasPorHabitacion] = useState({});
-  const [loadingFechasOcupadas, setLoadingFechasOcupadas] = useState({});
+  const [fechasPorHabitacion, setFechasPorHabitacion] = useState({}); // Fechas seleccionadas por el usuario
+  
+  // Estados para las fechas ocupadas
+  const [fechasOcupadasSoloHabitacion, setFechasOcupadasSoloHabitacion] = useState({}); // { K: [Date, Date], L: [Date] }
+  const [fechasEventosGenerales, setFechasEventosGenerales] = useState([]); // [Date, Date]
+  const [loadingFechasHabitacion, setLoadingFechasHabitacion] = useState({}); // { K: true/false }
+  const [loadingFechasEventos, setLoadingFechasEventos] = useState(false);
+
+  // Estados del formulario y pago (sin cambios relevantes aquí)
   const [metodoPago, setMetodoPago] = useState('');
   const [mostrarPago, setMostrarPago] = useState(false);
   const [mostrarFormularioTarjeta, setMostrarFormularioTarjeta] = useState(false);
@@ -62,55 +91,69 @@ function BookingFormSection({
   const [multipleReservationConfirmations, setMultipleReservationConfirmations] = useState([]);
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictMessage, setConflictMessage] = useState('');
-  
-  const fetchOccupiedDates = useCallback(async (roomLetra, fechaInicioVisible, fechaFinVisible) => {
-    if (!roomLetra) { 
-      console.warn("fetchOccupiedDates llamado sin roomLetra válida.");
-      return; 
-    }
-      
-    setLoadingFechasOcupadas(prev => ({ ...prev, [roomLetra]: true }));
-    try {
-      const formatApiDate = (date) => date.toISOString().split('T')[0];
-      
-      const params = { 
-        habitacionLetra: roomLetra, 
-        fechaInicio: formatApiDate(fechaInicioVisible), 
-        fechaFin: formatApiDate(fechaFinVisible)
-      };
-      
-      const response = await getHabitacionOccupiedDates(params);
-      
-      if (response && response.success && Array.isArray(response.data)) {
-        const occupiedDates = response.data.map(dateString => new Date(dateString + 'T00:00:00'));
-        setFechasOcupadasPorHabitacion(prev => ({ ...prev, [roomLetra]: occupiedDates }));
-      } else {
-        console.error(`Error al obtener fechas ocupadas para habitación ${roomLetra}:`, response?.message || 'Respuesta inválida del servicio');
-        setFechasOcupadasPorHabitacion(prev => ({ ...prev, [roomLetra]: [] }));
-      }
-    } catch (error) {
-      console.error(`Excepción al obtener fechas ocupadas para habitación ${roomLetra}:`, error?.message || error);
-      setFechasOcupadasPorHabitacion(prev => ({ ...prev, [roomLetra]: [] }));
-    } finally {
-      setLoadingFechasOcupadas(prev => ({ ...prev, [roomLetra]: false }));
-    }
-  }, []);
 
-  useEffect(() => {
-    if (!isLoadingDetails && selectedRooms.length > 0) { 
-      selectedRooms.forEach(room => {
-        if (room && room.letra) { 
-          const hoy = new Date();
-          const fechaFinRango = new Date(hoy.getFullYear(), hoy.getMonth() + 2, hoy.getDate()); 
-          fetchOccupiedDates(room.letra, hoy, fechaFinRango); 
-        } else {
-          console.warn("Intento de buscar fechas para una habitación sin letra:", room);
-        }
-      });
+  // --- Fetch de Fechas Ocupadas ---
+
+  // 1. Fetch fechas ocupadas ESPECÍFICAS de cada habitación seleccionada
+  const fetchFechasSoloHabitacion = useCallback(async (roomLetra, fechaInicioVisible, fechaFinVisible) => {
+    if (!roomLetra) return;
+    setLoadingFechasHabitacion(prev => ({ ...prev, [roomLetra]: true }));
+    try {
+      const inicioStr = formatApiDate(fechaInicioVisible);
+      const finStr = formatApiDate(fechaFinVisible);
+      // Usa el servicio renombrado/corregido
+      const occupiedDates = await getFechasOcupadasPorHabitacion(roomLetra, inicioStr, finStr); 
+      setFechasOcupadasSoloHabitacion(prev => ({ ...prev, [roomLetra]: occupiedDates || [] }));
+    } catch (error) {
+      console.error(`Error fetching specific occupied dates for room ${roomLetra}:`, error);
+      setFechasOcupadasSoloHabitacion(prev => ({ ...prev, [roomLetra]: [] })); // Fallback a array vacío
+    } finally {
+      setLoadingFechasHabitacion(prev => ({ ...prev, [roomLetra]: false }));
     }
-    
-    const currentRoomLetras = new Set(selectedRooms.map(r => r.letra).filter(Boolean));
-    setFechasOcupadasPorHabitacion(prev => {
+  }, []); // Dependencia vacía si getFechasOcupadasPorHabitacion está fuera o no cambia
+
+  // 2. Fetch fechas con EVENTOS GENERALES
+  const fetchFechasDeEventos = useCallback(async (fechaInicioVisible, fechaFinVisible) => {
+    setLoadingFechasEventos(true);
+    try {
+      const inicioStr = formatApiDate(fechaInicioVisible);
+      const finStr = formatApiDate(fechaFinVisible);
+      const eventDates = await getFechasEventosEnRango(inicioStr, finStr);
+      setFechasEventosGenerales(eventDates || []);
+    } catch (error) {
+      console.error('Error fetching general event dates:', error);
+      setFechasEventosGenerales([]); // Fallback
+    } finally {
+      setLoadingFechasEventos(false);
+    }
+  }, []); // Dependencia vacía
+
+  // Efecto para cargar datos cuando cambian las habitaciones seleccionadas o el rango visible del calendario
+  useEffect(() => {
+    if (isLoadingDetails) return; // No hacer nada si los detalles aún cargan
+
+    const hoy = new Date();
+    // Rango más amplio para asegurar que tenemos datos de eventos futuros visibles
+    const fechaInicioRango = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1); // Mes anterior 
+    const fechaFinRango = new Date(hoy.getFullYear(), hoy.getMonth() + 3, 0); // Dos meses en el futuro
+
+    // Cargar fechas de eventos una vez
+    fetchFechasDeEventos(fechaInicioRango, fechaFinRango);
+
+    // Cargar fechas específicas para cada habitación seleccionada
+    const currentRoomLetras = new Set();
+    selectedRooms.forEach(room => {
+      if (room && room.letra) {
+        currentRoomLetras.add(room.letra);
+        // Solo recargar si no están ya cargadas o si el rango cambió significativamente (opcional)
+        if (!fechasOcupadasSoloHabitacion[room.letra]) {
+          fetchFechasSoloHabitacion(room.letra, fechaInicioRango, fechaFinRango);
+        }
+      }
+    });
+
+    // Limpiar fechas de habitaciones que ya no están seleccionadas
+    setFechasOcupadasSoloHabitacion(prev => {
       const newState = { ...prev };
       Object.keys(newState).forEach(roomLetra => {
         if (!currentRoomLetras.has(roomLetra)) {
@@ -119,17 +162,22 @@ function BookingFormSection({
       });
       return newState;
     });
-  }, [selectedRooms, fetchOccupiedDates, isLoadingDetails]);
 
+  }, [selectedRooms, isLoadingDetails, fetchFechasSoloHabitacion, fetchFechasDeEventos]); // Dependencias clave
+
+  // --- Lógica del Formulario (Manejo de Inputs y Fechas) ---
+
+  // Inicializar fechas cuando cambian las habitaciones seleccionadas
   useEffect(() => {
     const initialFechas = {};
     selectedRooms.forEach(room => {
       initialFechas[room.letra] = fechasPorHabitacion[room.letra] || { fechaEntrada: null, fechaSalida: null };
     });
     setFechasPorHabitacion(initialFechas);
-    validateForm(formData, initialFechas);
-  }, [selectedRooms]);
+    // La validación se recalcula en el useEffect de calcularPrecioTotal
+  }, [selectedRooms]); 
 
+  // Calcular precio total (sin cambios relevantes aquí)
   const calcularPrecioTotal = () => {
     let precioTotalCalculado = 0;
     let todasFechasValidas = true;
@@ -144,87 +192,22 @@ function BookingFormSection({
           if (noches > 0) {
             precioTotalCalculado += (room.precioPorNoche || 0) * noches;
           } else {
-            todasFechasValidas = false;
+            todasFechasValidas = false; // Fecha salida <= fecha entrada
           }
         } else {
-          todasFechasValidas = false;
+          todasFechasValidas = false; // Fecha salida <= fecha entrada
         }
       } else {
-        todasFechasValidas = false;
+        todasFechasValidas = false; // Fechas no seleccionadas
       }
     });
 
     return todasFechasValidas ? precioTotalCalculado : 0;
   };
 
-  useEffect(() => {
-    const precio = calcularPrecioTotal();
-    setFormData(prev => ({ ...prev, precioTotal: precio }));
-    validateForm(formData, fechasPorHabitacion);
-  }, [fechasPorHabitacion, formData.nombre, formData.apellidos, formData.email, formData.telefono, formData.huespedes]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    const newFormData = { ...formData, [name]: value };
-    setFormData(newFormData);
-    validateForm(newFormData, fechasPorHabitacion);
-  };
-
-  const handleFechasHabitacionChange = (roomLetra, dates) => {
-    const [start, end] = dates;
-
-    if (start && end) {
-      const occupiedDatesForRoom = fechasOcupadasPorHabitacion[roomLetra] || [];
-      const occupiedSet = new Set(
-        occupiedDatesForRoom.map(date => {
-          if (date instanceof Date && !isNaN(date.getTime())) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-          }
-          return null;
-        }).filter(Boolean)
-      );
-
-      let currentDate = new Date(start);
-      const endDate = new Date(end);
-      currentDate.setHours(0, 0, 0, 0);
-      endDate.setHours(0, 0, 0, 0);
-
-      while (currentDate <= endDate) {
-        const year = currentDate.getFullYear();
-        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-        const day = String(currentDate.getDate()).padStart(2, '0');
-        const dateString = `${year}-${month}-${day}`;
-
-        if (occupiedSet.has(dateString)) {
-          setConflictMessage(`La habitación ${roomLetra} no está disponible en el rango de fechas seleccionado.`);
-          setShowConflictModal(true);
-          setFechasPorHabitacion(prev => ({
-            ...prev,
-            [roomLetra]: { fechaEntrada: null, fechaSalida: null },
-          }));
-          return;
-        }
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-    }
-
-    const newFechasPorHabitacion = {
-      ...fechasPorHabitacion,
-      [roomLetra]: { fechaEntrada: start, fechaSalida: end },
-    };
-    setFechasPorHabitacion(newFechasPorHabitacion);
-  };
-
-  const handleCardInputChange = (e) => {
-    const { name, value } = e.target;
-    setDatosTarjeta(prev => ({ ...prev, [name]: value }));
-  };
-
+  // Validar formulario general
   const validateForm = (currentFormData, currentFechasPorHabitacion) => {
-    const { nombre, apellidos, email, telefono, huespedes } = currentFormData;
+    const { nombre, apellidos, email, telefono } = currentFormData;
     let allDatesSetAndValid = selectedRooms.length > 0;
     
     if (selectedRooms.length === 0) {
@@ -232,6 +215,7 @@ function BookingFormSection({
     } else {
         selectedRooms.forEach(room => {
           const fechas = currentFechasPorHabitacion[room.letra];
+          // Asegurar que ambas fechas existen y salida es posterior a entrada
           if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
             allDatesSetAndValid = false;
           }
@@ -241,540 +225,536 @@ function BookingFormSection({
     const isValid = 
       nombre?.trim() !== '' && 
       apellidos?.trim() !== '' &&
-      email?.trim() !== '' && 
-      telefono?.trim() !== '' &&
-      huespedes > 0 && 
-      allDatesSetAndValid;
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email?.trim() || '') && // Validación básica email
+      telefono?.trim().length >= 7 && // Validación básica teléfono
+      allDatesSetAndValid &&
+      metodoPago !== ''; // Asegurar que se eligió método de pago
       
     setIsFormValid(isValid);
     return isValid;
   };
+  
+  // Recalcular precio y validar cuando cambian datos clave
+  useEffect(() => {
+    const precio = calcularPrecioTotal();
+    setFormData(prev => ({ ...prev, precioTotal: precio }));
+    validateForm(formData, fechasPorHabitacion);
+  }, [fechasPorHabitacion, formData.nombre, formData.apellidos, formData.email, formData.telefono, metodoPago, selectedRooms]); // Añadir selectedRooms y metodoPago
 
-  const procesarPagoTarjeta = async () => {
-    if (!datosTarjeta.numeroTarjeta || !datosTarjeta.nombreTitular || !datosTarjeta.fechaExpiracion || !datosTarjeta.cvv) {
-      setReservationError('Por favor, complete todos los campos obligatorios de la tarjeta');
-      return;
-    }
+  // Manejador input general (sin cambios)
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    const newFormData = { ...formData, [name]: value };
+    setFormData(newFormData);
+    // La validación se dispara en el useEffect
+  };
+
+  // *** MANEJADOR CLAVE: Cambio de Fechas en DatePicker ***
+  const handleFechasHabitacionChange = (roomLetra, dates) => {
+    const [start, end] = dates;
+
+    // Combinar fechas ocupadas específicas y fechas de eventos para la *visualización/validación inicial*
+    const occupiedDatesForRoom = fechasOcupadasSoloHabitacion[roomLetra] || [];
+    const allVisuallyBlockedDates = [...occupiedDatesForRoom, ...fechasEventosGenerales];
     
-    setIsSubmitting(true);
-    setReservationError(null);
-    
-    try {
-      const reservas = selectedRooms.map(room => {
-        const fechas = fechasPorHabitacion[room.letra];
-        if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
-           throw new Error(`Fechas inválidas o faltantes para la habitación ${room.letra}`);
+    const blockedSet = new Set(
+      allVisuallyBlockedDates.map(date => {
+        if (date instanceof Date && !isNaN(date.getTime())) {
+          return formatApiDate(date); // Usar formato YYYY-MM-DD para la comparación
         }
-        const noches = Math.ceil((fechas.fechaSalida - fechas.fechaEntrada) / (1000 * 60 * 60 * 24));
-        const precioTotalHabitacion = (room.precioPorNoche || 0) * noches;
+        return null;
+      }).filter(Boolean)
+    );
 
-        return {
-          nombreContacto: formData.nombre,
-          apellidosContacto: formData.apellidos,
-          emailContacto: formData.email,
-          telefonoContacto: formData.telefono,
-          numHuespedes: formData.huespedes,
-          mensaje: formData.mensaje,
-          habitacion: room.letra,
-          tipoHabitacion: room.tipoHabitacion,
-          precioPorNoche: room.precioPorNoche || 0,
-          fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
-          fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
-          precio: precioTotalHabitacion,
-          numeroHabitaciones: 1,
-          metodoPago: 'tarjeta',
-          tipoReserva: 'hotel',
-          estadoReserva: 'confirmada',
-          infoPago: {
-            ultimosDigitos: datosTarjeta.numeroTarjeta.slice(-4),
-            titular: datosTarjeta.nombreTitular
-          }
-        };
-      });
-        
-      console.log('Datos de reservas múltiples con tarjeta (fechas individuales):', reservas);
-      const response = await createMultipleReservaciones(reservas);
-      
-      if (response.success && Array.isArray(response.data)) {
-          setMultipleReservationConfirmations(response.data);
-          setShowReservationSuccess(true);
-          toast.success('Pago procesado correctamente. Sus habitaciones han sido reservadas con éxito');
-        } else {
-          console.error('Error en la respuesta:', response);
-        setReservationError(response.message || 'Error al procesar su reserva múltiple');
-        toast.error(response.message || 'Error al procesar la reserva múltiple');
+    // Verificar si el rango seleccionado incluye alguna fecha bloqueada (visualmente)
+    if (start && end && end > start) {
+      let currentDate = new Date(start);
+      const finalDate = new Date(end);
+      finalDate.setHours(0,0,0,0); // Asegurar comparación de día completo
+
+      // Iterar día por día DENTRO del rango seleccionado (sin incluir el día de salida)
+      while (currentDate < finalDate) { 
+        currentDate.setHours(0, 0, 0, 0); // Normalizar hora para comparación
+        const dateString = formatApiDate(currentDate);
+
+        if (blockedSet.has(dateString)) {
+          // Mostrar mensaje genérico, la verificación final dirá el motivo exacto si falla
+          toast.error(`Conflicto de fechas detectado para la habitación ${roomLetra} en el rango seleccionado. Por favor, elija otras fechas.`);
+          // Resetear fechas para esta habitación específica
+          setFechasPorHabitacion(prev => ({
+            ...prev,
+            [roomLetra]: { fechaEntrada: null, fechaSalida: null },
+          }));
+          return; // Detener el proceso para esta habitación
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
       }
+    }
+
+    // Si no hay conflicto visual, actualizar el estado
+    const newFechasPorHabitacion = {
+      ...fechasPorHabitacion,
+      [roomLetra]: { fechaEntrada: start, fechaSalida: end },
+    };
+    setFechasPorHabitacion(newFechasPorHabitacion);
+    // La validación y cálculo de precio se actualizan vía useEffect
+  };
+
+  // Manejador cambio método pago (sin cambios)
+  const handleMetodoPagoChange = (e) => {
+      setMetodoPago(e.target.value);
+      setMostrarPago(true); 
+      setMostrarFormularioTarjeta(e.target.value === 'tarjeta');
+      // Validar formulario de nuevo
+      validateForm(formData, fechasPorHabitacion); 
+  };
+  
+  // Manejador input tarjeta (sin cambios)
+  const handleCardInputChange = (e) => {
+    // ... (lógica existente)
+    const { name, value } = e.target;
+    setDatosTarjeta(prev => ({ ...prev, [name]: value }));
+  };
+
+  // --- Lógica de Envío ---
+
+  // Función auxiliar para la verificación final de disponibilidad ANTES del pago/submit
+  const runAvailabilityCheck = async (reservationsData) => {
+    try {
+      const response = await verificarDisponibilidadHabitaciones({
+        reservas: reservationsData.map(r => ({
+          habitacionLetra: r.letraHabitacion,
+          fechaEntrada: formatApiDate(r.fechaEntrada),
+          fechaSalida: formatApiDate(r.fechaSalida),
+        }))
+      });
+      
+      if (!response.success || !response.disponibles) {
+          // Actualizar fechas ocupadas AHORA MISMO basado en la respuesta
+          if (response.fechasOcupadas) {
+              // Podríamos actualizar el estado aquí para reflejar el conflicto real
+              console.warn("Actualizando fechas ocupadas después de conflicto:", response.fechasOcupadas);
+              // Opcional: Forzar recarga de fechas para las habitaciones en conflicto
+          }
+          setConflictMessage(response.message || 'Una o más habitaciones ya no están disponibles en las fechas seleccionadas.');
+          setShowConflictModal(true);
+          return false; // Indicar fallo
+      }
+      
+      return true; // Indicar éxito
+      
     } catch (error) {
-      console.error('Error al preparar o procesar el pago múltiple con tarjeta:', error);
-      setReservationError(error.message || 'Error al procesar el pago. Verifique las fechas e inténtelo de nuevo.');
-      toast.error(error.message || 'Error de red o datos inválidos al procesar el pago');
-    } finally {
-      setIsSubmitting(false);
+        console.error('Error en la verificación de disponibilidad previa:', error);
+        setConflictMessage(error.response?.data?.error || error.message || 'Error inesperado al verificar disponibilidad.');
+        setShowConflictModal(true);
+        return false; // Indicar fallo
     }
   };
 
+  // Manejador principal de envío
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm(formData, fechasPorHabitacion) || isSubmitting) {
-      toast.warning('Por favor, complete todos los campos requeridos y seleccione fechas válidas para todas las habitaciones.');
+    if (!validateForm(formData, fechasPorHabitacion)) {
+      toast.error('Por favor, complete todos los campos requeridos y seleccione fechas válidas.');
+      return;
+    }
+    if (!metodoPago) {
+      toast.error('Por favor, seleccione un método de pago.');
       return;
     }
 
     setIsSubmitting(true);
     setReservationError(null);
-    setShowReservationSuccess(false);
-    setMultipleReservationConfirmations([]);
-    
-    try {
-      const reservacionesParaEnviar = selectedRooms.map(room => {
-        const fechas = fechasPorHabitacion[room.letra];
-        if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida) {
-          throw new Error(`Fechas inválidas para la habitación ${room.letra}`);
-        }
-        
-        return {
-          nombreContacto: formData.nombre,
-          apellidosContacto: formData.apellidos,
-          emailContacto: formData.email,
-          telefonoContacto: formData.telefono,
-          numHuespedes: formData.huespedes,
-          mensaje: formData.mensaje,
-          habitacion: room.letra,
-          tipoHabitacion: room.tipoHabitacion,
-          categoriaHabitacion: room.categoriaHabitacion,
-          precioPorNoche: room.precioPorNoche,
-          fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
-          fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
-          numeroHabitaciones: 1,
-          metodoPago: metodoPago || 'efectivo',
-          tipoReserva: 'hotel',
-          estadoReserva: 'pendiente' 
-        };
-      });
-      
-      console.log("Enviando reservas múltiples:", reservacionesParaEnviar);
+    setMultipleReservationConfirmations([]); // Resetear confirmaciones previas
 
-      const response = await createMultipleReservaciones(reservacionesParaEnviar);
-      
-      console.log("Respuesta de createMultipleReservaciones:", response);
+    const reservacionesParaEnviar = selectedRooms.map(room => {
+      const fechas = fechasPorHabitacion[room.letra];
+      // Asegurarse que las fechas son objetos Date válidos antes de formatear
+      const fechaEntrada = fechas?.fechaEntrada instanceof Date ? fechas.fechaEntrada : null;
+      const fechaSalida = fechas?.fechaSalida instanceof Date ? fechas.fechaSalida : null;
 
-      if (response.success) {
-        setShowReservationSuccess(true);
-        setMultipleReservationConfirmations(response.data || []);
-        toast.success(response.message || '¡Reservas creadas con éxito!');
-      } else {
-        if (response.errores && response.errores.length > 0) {
-            const errorMessages = response.errores.map(err => err.message || `Error al reservar habitación ${err.habitacion || 'desconocida'}`).join('\n');
-            setConflictMessage(errorMessages || response.message || 'Algunas habitaciones no pudieron ser reservadas.');
-            setShowConflictModal(true);
-            setMultipleReservationConfirmations(response.data || []);
-        } else if (response.status === 409) {
-             setConflictMessage(response.message || 'Conflicto de disponibilidad detectado. Verifique las fechas.');
-             setShowConflictModal(true);
-        } else {
-            setReservationError(response.message || 'Ocurrió un error al procesar la reserva.');
-            toast.error(response.message || 'Error al crear las reservas.');
-        }
+      if (!fechaEntrada || !fechaSalida) {
+        // Esto no debería ocurrir si la validación pasó, pero es una salvaguarda
+        throw new Error(`Fechas inválidas para la habitación ${room.letra}`); 
       }
 
+      return {
+        habitacionLetra: room.letra,
+        tipoHabitacion: room.tipo,
+        precioPorNoche: room.precioPorNoche,
+        numHuespedes: formData.huespedes, // O tomarlo de room.capacidad si es variable?
+        fechaEntrada: fechaEntrada, // Enviar como objeto Date
+        fechaSalida: fechaSalida,   // Enviar como objeto Date
+        nombreContacto: formData.nombre,
+        apellidosContacto: formData.apellidos,
+        emailContacto: formData.email,
+        telefonoContacto: formData.telefono,
+        metodoPago: metodoPago, // Añadir método de pago
+        // Incluir datos de tarjeta si el método es 'tarjeta' (simplificado, requiere manejo seguro real)
+        ...(metodoPago === 'tarjeta' && { datosTarjeta: datosTarjeta }) 
+      };
+    });
+
+    // *** Verificación de disponibilidad ANTES de intentar crear ***
+    const availabilityCheckPassed = await runAvailabilityCheck(reservacionesParaEnviar);
+    if (!availabilityCheckPassed) {
+        setIsSubmitting(false); 
+        // El modal de conflicto ya se muestra desde runAvailabilityCheck
+        return; 
+    }
+
+    // --- Si la disponibilidad es correcta, proceder con la creación ---
+    try {
+      // Ajustar la llamada para enviar objetos Date directamente si el backend los maneja
+      // o formatear aquí si el backend espera strings YYYY-MM-DD
+      const formattedReservations = reservacionesParaEnviar.map(r => ({
+        ...r,
+        fechaEntrada: formatApiDate(r.fechaEntrada),
+        fechaSalida: formatApiDate(r.fechaSalida)
+      }));
+
+      const response = await createMultipleReservaciones({
+        reservas: formattedReservations,
+        // Podría necesitar enviar datos de usuario o pago adicionales aquí
+      });
+
+      if (response.success && response.data) {
+        setMultipleReservationConfirmations(response.data); // Guardar detalles de éxito
+        setShowReservationSuccess(true); // Mostrar modal de éxito
+        toast.success('¡Reserva(s) creada(s) exitosamente!');
+        // Resetear formulario o redirigir opcionalmente
+        // setFormData({ nombre: '', apellidos: '', email: '', telefono: '', huespedes: 1, precioTotal: 0 });
+        // setFechasPorHabitacion({});
+        // setMetodoPago('');
+        // setDatosTarjeta({ ...initialCardData }); 
+      } else {
+        // Error específico devuelto por el backend
+        setReservationError(response.message || 'Error al crear la(s) reserva(s).');
+        toast.error(response.message || 'Error al crear la(s) reserva(s).');
+        // Si el error fue por conflicto de disponibilidad detectado en el backend
+        if (response.code === 'CONFLICT_DATES') {
+             setConflictMessage(response.message);
+             setShowConflictModal(true);
+             // Opcional: forzar recarga de fechas aquí también
+        }
+      }
     } catch (error) {
-      console.error('Error en handleSubmit:', error);
-      if (error.response && error.response.status === 409) {
-           setConflictMessage(error.response.data?.message || 'Una o más habitaciones no están disponibles para las fechas seleccionadas.');
-           setShowConflictModal(true);
-       } else {
-           setReservationError(error.message || 'Error de conexión o desconocido.');
-           toast.error('Error inesperado al conectar con el servidor.');
+      console.error('Error submitting reservation:', error);
+      const errMsg = error.response?.data?.error || error.message || 'Ocurrió un error inesperado.';
+      setReservationError(errMsg);
+      toast.error(`Error: ${errMsg}`);
+       // Si el error fue por conflicto de disponibilidad detectado en el backend (ej. 409)
+       if (error.response?.status === 409 || error.message?.includes('conflicto')) {
+            setConflictMessage(errMsg);
+            setShowConflictModal(true);
+            // Opcional: forzar recarga de fechas
        }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const procesarPago = async (metodo) => {
-    setIsSubmitting(true);
-    setReservationError(null);
-    
-    try {
-       const reservas = selectedRooms.map(room => {
-         const fechas = fechasPorHabitacion[room.letra];
-         if (!fechas || !fechas.fechaEntrada || !fechas.fechaSalida || fechas.fechaSalida <= fechas.fechaEntrada) {
-            throw new Error(`Fechas inválidas o faltantes para la habitación ${room.letra}`);
-         }
-         const noches = Math.ceil((fechas.fechaSalida - fechas.fechaEntrada) / (1000 * 60 * 60 * 24));
-         const precioTotalHabitacion = (room.precioPorNoche || 0) * noches;
-
-         return {
-            nombreContacto: formData.nombre,
-            apellidosContacto: formData.apellidos,
-            emailContacto: formData.email,
-            telefonoContacto: formData.telefono,
-            numHuespedes: formData.huespedes,
-            mensaje: formData.mensaje,
-            habitacion: room.letra,
-            tipoHabitacion: room.tipoHabitacion,
-            precioPorNoche: room.precioPorNoche || 0,
-            fechaEntrada: fechas.fechaEntrada.toISOString().split('T')[0],
-            fechaSalida: fechas.fechaSalida.toISOString().split('T')[0],
-            precio: precioTotalHabitacion,
-            numeroHabitaciones: 1,
-            metodoPago: metodo,
-            tipoReserva: 'hotel',
-            estadoReserva: metodo === 'tarjeta' ? 'confirmada' : 'pendiente',
-         };
-      });
-       
-       console.log(`Datos de reservas múltiples con ${metodo} (fechas individuales):`, reservas);
-        const response = await createMultipleReservaciones(reservas);
-        
-       if (response.success && Array.isArray(response.data)) {
-          setMultipleReservationConfirmations(response.data);
-          setShowReservationSuccess(true);
-         toast.success(`Reserva con ${metodo} registrada. Recibirá instrucciones por correo.`);
-        } else {
-          console.error('Error en la respuesta:', response);
-         setReservationError(response.message || 'Error al procesar su reserva múltiple');
-         toast.error(response.message || 'Error al procesar la reserva múltiple');
-      }
-    } catch (error) {
-       console.error(`Error al preparar o procesar reserva múltiple con ${metodo}:`, error);
-       setReservationError(error.message || `Error al registrar la reserva con ${metodo}. Verifique las fechas.`);
-       toast.error(error.message || `Error de red o datos inválidos al registrar la reserva con ${metodo}`);
-    } finally {
-      setIsSubmitting(false);
-       setMostrarPago(false);
-    }
-  };
+  // --- Renderizado del Componente ---
 
   return (
-    <motion.section 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="booking-form-section py-12 bg-gradient-to-b from-gray-50 to-white mt-[-1px]"
+      className="max-w-6xl mx-auto p-4 md:p-8 bg-[var(--color-cream-light)] rounded-lg shadow-lg"
     >
-      <div className="container-custom max-w-4xl mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-8 text-[var(--color-primary)]">Completa tu Reserva</h2>
+      <h2 className="text-3xl font-[var(--font-display)] text-[var(--color-brown-dark)] mb-6 text-center">
+        {selectedRooms.length > 1 ? 'Detalles de tu Reserva' : 'Detalles de la Habitación'}
+      </h2>
 
-        <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
-          <h3 className="text-xl font-semibold text-blue-800 mb-4">Habitaciones Seleccionadas</h3>
-          {isLoadingDetails ? (
-            <div className="flex items-center justify-center text-blue-600">
-              <FaSpinner className="animate-spin mr-2" /> Cargando detalles...
-                  </div>
-          ) : selectedRooms.length > 0 ? (
-            <ul className="space-y-5">
-              {selectedRooms.map((room, index) => {
-                const roomLetra = room.letra;
-                const roomDates = fechasPorHabitacion[roomLetra] || { fechaEntrada: null, fechaSalida: null };
-                const hasValidDates = roomDates.fechaEntrada && roomDates.fechaSalida && roomDates.fechaSalida > roomDates.fechaEntrada;
-
-                return (
-                  <li key={room._id || roomLetra || index} className={`p-4 bg-white rounded shadow-sm border ${!hasValidDates && roomDates.fechaEntrada ? 'border-red-300' : 'border-gray-100'}`}>
-                     <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-3">
-                       <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden border border-gray-200">
+      {isLoadingDetails ? (
+        <div className="flex justify-center items-center h-64">
+          <FaSpinner className="animate-spin text-4xl text-[var(--color-primary)]" />
+          <p className="ml-4 text-lg text-[var(--color-brown-medium)]">Cargando detalles...</p>
+        </div>
+      ) : selectedRooms.length > 0 ? (
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Columna de Habitaciones */}
+            <div className="lg:col-span-2 space-y-6">
+              {selectedRooms.map((room, index) => (
+                <motion.div 
+                  key={room.letra || index} // Usar letra como key si está disponible
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  className="bg-white p-4 rounded-md shadow-md border border-gray-200"
+                >
+                   <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="flex-shrink-0 w-full sm:w-40 h-32 relative rounded overflow-hidden">
+                        {room.letra ? (
                           <Image 
-                            src={getHabitacionImage(room.letra)}
-                            alt={room.nombre}
-                            width={80}
-                            height={80}
-                            className="object-cover"
-                    />
-                  </div>
-                       <div className="flex-grow">
-                         <p className="font-semibold text-gray-800 text-lg">{room.nombre}</p>
-                         <p className="text-sm text-gray-600">Tipo: {room.tipo || room.tipoHabitacion}</p>
-                         <p className="font-semibold text-[var(--color-primary)] mt-1">${room.precioPorNoche || 0} / noche</p>
-                    </div>
-                       <div className="w-full md:w-auto md:min-w-[280px]">
-                          <label htmlFor={`fechas-${roomLetra}`} className="block text-xs font-medium text-gray-600 mb-1">Fechas para Habitación {roomLetra} *</label>
-                          <div className="w-full relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none z-10">
-                              <FaCalendarAlt className="text-[#A5856A]" />
-                            </div>
-                            <DatePicker
-                              selected={roomDates.fechaEntrada}
-                              onChange={(dates) => handleFechasHabitacionChange(roomLetra, dates)}
-                              startDate={roomDates.fechaEntrada}
-                              endDate={roomDates.fechaSalida}
-                              selectsRange={true}
-                              filterDate={date => {
-                                const roomOccupiedDates = fechasOcupadasPorHabitacion[roomLetra] || [];
-                                return !roomOccupiedDates.some(occupiedDate => 
-                                  occupiedDate.getDate() === date.getDate() &&
-                                  occupiedDate.getMonth() === date.getMonth() &&
-                                  occupiedDate.getFullYear() === date.getFullYear()
-                                );
-                              }}
-                              minDate={new Date()}
-                              locale="es"
-                              dateFormat="dd/MM/yyyy"
-                              placeholderText="Check-in / Check-out"
-                              className="w-full pl-10 p-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow cursor-pointer"
-                              wrapperClassName="w-full"
-                              calendarClassName="border-gray-300 shadow-lg rounded-lg"
-                              dayClassName={date => {
-                                const roomOccupiedDates = fechasOcupadasPorHabitacion[roomLetra] || [];
-                                return roomOccupiedDates.some(occupiedDate => 
-                                  occupiedDate.getDate() === date.getDate() &&
-                                  occupiedDate.getMonth() === date.getMonth() &&
-                                  occupiedDate.getFullYear() === date.getFullYear()
-                                ) ? 'react-datepicker__day--disabled occupied-date' : undefined;
-                              }}
-                              popperPlacement="bottom-start"
-                            />
-                             {loadingFechasOcupadas[roomLetra] && (
-                              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                <FaSpinner className="animate-spin text-[#A5856A]" />
+                            src={getHabitacionImage(room.letra)} 
+                            alt={`Habitación ${room.letra}`} 
+                            layout="fill" 
+                            objectFit="cover" 
+                          />
+                        ) : (
+                           <div className="bg-gray-200 h-full flex items-center justify-center">
+                               <FaBed className="text-gray-400 text-3xl"/>
+                           </div> 
+                        )}
+                      </div>
+                      <div className="flex-grow">
+                        <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-2">
+                          Habitación {room.letra || 'Desconocida'} ({room.tipo || 'Estándar'})
+                        </h3>
+                         <div className="flex items-center text-sm text-gray-600 mb-1">
+                           <FaUserFriends className="mr-2 text-[var(--color-primary)]"/> Capacidad: {room.capacidad || 'N/A'} personas
+                         </div>
+                         <div className="flex items-center text-sm text-gray-600 mb-3">
+                           <FaEuroSign className="mr-2 text-green-600"/> Precio por noche: ${room.precioPorNoche ? room.precioPorNoche.toFixed(2) : 'N/A'} MXN
+                         </div>
+
+                        {/* DatePicker específico para esta habitación */}
+                        <div className="mb-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Fechas de Estancia (Habitación {room.letra})
+                          </label>
+                          <DatePicker
+                            selected={fechasPorHabitacion[room.letra]?.fechaEntrada}
+                            onChange={(dates) => handleFechasHabitacionChange(room.letra, dates)}
+                            startDate={fechasPorHabitacion[room.letra]?.fechaEntrada}
+                            endDate={fechasPorHabitacion[room.letra]?.fechaSalida}
+                            minDate={new Date()} // No permitir fechas pasadas
+                            selectsRange
+                            inline={false} // O true si prefieres mostrarlo siempre
+                            monthsShown={2} // Mostrar dos meses
+                            locale="es"
+                            dateFormat="dd/MM/yyyy"
+                            placeholderText="Selecciona Check-in y Check-out"
+                            className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            calendarClassName="custom-datepicker-calendar" // Clase para estilos personalizados
+                            wrapperClassName="w-full" 
+                            // *** Lógica de filtrado de fechas ***
+                            filterDate={date => {
+                              // 1. No permitir fechas pasadas
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              if (date < today) return false;
+
+                              // 2. Comprobar si la fecha está ocupada *específicamente* por esta habitación
+                              const isRoomOccupied = (fechasOcupadasSoloHabitacion[room.letra] || []).some(occupiedDate => 
+                                isSameDate(date, occupiedDate)
+                              );
+                              
+                              // 3. Comprobar si la fecha tiene un evento general
+                              const isEventDay = fechasEventosGenerales.some(eventDate => 
+                                isSameDate(date, eventDate)
+                              );
+                              
+                              // Permitir la fecha SOLO si NO está ocupada por la habitación Y NO es día de evento
+                              return !isRoomOccupied && !isEventDay;
+                            }}
+                            // Opcional: Añadir clase para días de evento (diferente a ocupado)
+                            dayClassName={date => {
+                              const isRoomOccupied = (fechasOcupadasSoloHabitacion[room.letra] || []).some(occupiedDate => isSameDate(date, occupiedDate));
+                              const isEventDay = fechasEventosGenerales.some(eventDate => isSameDate(date, eventDate));
+                              
+                              if (isRoomOccupied) return 'react-datepicker__day--disabled room-occupied-visual'; // Clase específica si habitación ocupada
+                              if (isEventDay) return 'react-datepicker__day--disabled event-day-visual'; // Clase específica si hay evento
+                              return undefined; // Día normal
+                            }}
+                            // Mostrar indicador de carga mientras se obtienen fechas
+                            isLoading={loadingFechasHabitacion[room.letra] || loadingFechasEventos} 
+                          />
+                           {loadingFechasHabitacion[room.letra] && (
+                              <div className="text-xs text-gray-500 mt-1 flex items-center">
+                                 <FaSpinner className="animate-spin mr-1" /> Verificando disponibilidad...
                               </div>
-                            )}
-                          </div>
-                          {!hasValidDates && roomDates.fechaEntrada && (
-                              <p className="text-xs text-red-600 mt-1">La fecha de salida debe ser posterior a la de entrada.</p>
-                          )}
-                    </div>
-                  </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="text-center text-gray-500 italic">No has seleccionado ninguna habitación aún.</p>
-          )}
-           {selectedRooms.length > 0 && !isLoadingDetails && (
-             <div className="mt-5 pt-4 border-t border-blue-200 text-right">
-                <p className="text-lg font-semibold text-gray-800">Precio Total Estimado: 
-                   <span className={`ml-2 ${calcularPrecioTotal() > 0 ? 'text-[var(--color-primary)]' : 'text-gray-500'}`}>
-                      ${calcularPrecioTotal().toFixed(2)}
-                   </span>
-                </p>
-                <p className="text-xs text-gray-500">
-                    {calcularPrecioTotal() > 0 ? '(Suma de todas las habitaciones y noches)' : '(Selecciona fechas válidas para todas las habitaciones)'}
-                </p>
-                  </div>
-           )}
-                  </div>
-                  
-        <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow-lg border border-gray-200">
-           <h3 className="text-xl font-semibold text-gray-800 border-b pb-2 mb-5">Datos del Contacto Principal</h3>
+                           )}
+                        </div>
+                      </div>
+                   </div>
+                </motion.div>
+              ))}
+            </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                <input type="text" name="nombre" id="nombre" required value={formData.nombre} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
-                  </div>
-              <div>
-                <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-1">Apellidos *</label>
-                <input type="text" name="apellidos" id="apellidos" required value={formData.apellidos} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
-                </div>
-              <div>
-                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico *</label>
-                 <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FaEnvelope className="h-5 w-5 text-gray-400"/></div>
-                    <input type="email" name="email" id="email" required value={formData.email} onChange={handleInputChange} className="w-full p-3 pl-10 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
-                </div>
-              </div>
-              <div>
-                 <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">Teléfono *</label>
-                 <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FaPhone className="h-5 w-5 text-gray-400"/></div>
-                    <input type="tel" name="telefono" id="telefono" required value={formData.telefono} onChange={handleInputChange} className="w-full p-3 pl-10 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" />
-                  </div>
-              </div>
-                  </div>
-                  
-                  <div>
-             <label htmlFor="huespedes" className="block text-sm font-medium text-gray-700 mb-1">Número Total de Huéspedes *</label>
-                    <input
-               type="number" 
-               name="huespedes" 
-               id="huespedes" 
-               min="1" 
-               max={selectedRooms.reduce((acc, room) => {
-                   const capacity = typeof room.capacidad === 'object' 
-                                    ? (room.capacidad.adultos || 0) + (room.capacidad.ninos || 0)
-                                    : (typeof room.capacidad === 'number' ? room.capacidad : 2);
-                   return acc + capacity; 
-               }, 0) || 1}
-                      required
-               value={formData.huespedes}
-                      onChange={handleInputChange}
-               className="w-full md:w-1/2 p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" 
-               placeholder="Total de personas"
-                    />
-             <p className="text-xs text-gray-500 mt-1">Indica el número total de personas que se hospedarán en todas las habitaciones seleccionadas.</p>
-                  </div>
-                  
-                  <div>
-             <label htmlFor="mensaje" className="block text-sm font-medium text-gray-700 mb-1">Mensaje Adicional (opcional)</label>
-             <textarea name="mensaje" id="mensaje" rows="4" value={formData.mensaje} onChange={handleInputChange} className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Alergias, preferencias, hora estimada de llegada..."></textarea>
-                  </div>
+            {/* Columna de Detalles del Huésped y Pago */}
+            <div className="space-y-6">
+              <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className="bg-white p-6 rounded-md shadow-md border border-gray-200"
+              >
+                <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Tus Datos</h3>
+                {/* Campos del formulario: Nombre, Apellidos, Email, Teléfono */}
+                 <div className="mb-4">
+                    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                    <input type="text" id="nombre" name="nombre" value={formData.nombre} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
+                 </div>
+                 <div className="mb-4">
+                     <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
+                     <input type="text" id="apellidos" name="apellidos" value={formData.apellidos} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
+                 </div>
+                 <div className="mb-4">
+                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                     <input type="email" id="email" name="email" value={formData.email} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
+                 </div>
+                 <div className="mb-4">
+                     <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                     <input type="tel" id="telefono" name="telefono" value={formData.telefono} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
+                 </div>
+              </motion.div>
 
-           <div className="text-center pt-4">
-             <button 
-               type="submit" 
-               disabled={!isFormValid || isSubmitting || isLoadingDetails}
-               className="w-full md:w-auto px-10 py-3 bg-[var(--color-primary)] text-white text-lg font-semibold rounded-full shadow-lg hover:bg-[var(--color-primary-dark)] transition-colors duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto"
-             >
-               {isSubmitting ? <FaSpinner className="animate-spin"/> : (isLoadingDetails ? 'Cargando...' : 'Continuar al Pago')}
-             </button>
-             {!isFormValid && selectedRooms.length > 0 && !isLoadingDetails && (
-                 <p className="text-xs text-red-500 mt-2">Completa los datos y selecciona fechas válidas para continuar.</p>
-             )}
-                </div>
-                
-           {reservationError && !mostrarPago && (
-             <p className="text-red-600 text-center mt-4">Error: {reservationError}</p>
-           )}
-         </form>
+              {/* Selección Método de Pago */}
+               <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4, delay: 0.1 }}
+                  className="bg-white p-6 rounded-md shadow-md border border-gray-200"
+               >
+                   <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Método de Pago</h3>
+                   <div className="space-y-3">
+                       {/* Opciones de Pago */}
+                       <label className="flex items-center space-x-3 cursor-pointer">
+                          <input 
+                              type="radio" 
+                              name="metodoPago" 
+                              value="transferencia" 
+                              checked={metodoPago === 'transferencia'} 
+                              onChange={handleMetodoPagoChange}
+                              className="form-radio h-4 w-4 text-indigo-600 transition duration-150 ease-in-out"
+                          />
+                          <span className="text-gray-700">Transferencia Bancaria</span>
+                       </label>
+                       <label className="flex items-center space-x-3 cursor-pointer">
+                           <input 
+                               type="radio" 
+                               name="metodoPago" 
+                               value="tarjeta" 
+                               checked={metodoPago === 'tarjeta'} 
+                               onChange={handleMetodoPagoChange}
+                               className="form-radio h-4 w-4 text-indigo-600 transition duration-150 ease-in-out"
+                           />
+                           <span className="text-gray-700">Tarjeta de Crédito/Débito</span>
+                       </label>
+                   </div>
 
-         <AnimatePresence>
-           {mostrarPago && (
-             <motion.div 
-               initial={{ opacity: 0, scale: 0.9 }} 
-               animate={{ opacity: 1, scale: 1 }} 
-               exit={{ opacity: 0, scale: 0.9 }} 
-               transition={{ duration: 0.3 }}
-               className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4"
-             >
-                <div className="bg-white rounded-lg shadow-xl p-6 max-w-lg w-full mx-auto relative">
-                   <button onClick={() => {setMostrarPago(false); setMostrarFormularioTarjeta(false); setReservationError(null);}} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 z-10">
-                     &times;
-                   </button>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">Selecciona Método de Pago</h3>
-                  <p className="text-center text-lg font-semibold text-gray-700 mb-4">Total: ${calcularPrecioTotal().toFixed(2)}</p>
+                   {/* Formulario Tarjeta (Condicional) */}
+                   <AnimatePresence>
+                       {mostrarFormularioTarjeta && (
+                           <motion.div 
+                               initial={{ opacity: 0, height: 0 }}
+                               animate={{ opacity: 1, height: 'auto' }}
+                               exit={{ opacity: 0, height: 0 }}
+                               transition={{ duration: 0.3 }}
+                               className="mt-6 border-t pt-4"
+                           >
+                               <h4 className="text-md font-medium text-gray-800 mb-3">Datos de la Tarjeta</h4>
+                               {/* Campos tarjeta: numero, titular, expiracion, cvv, etc. */}
+                               {/* Simplificado - añadir validaciones y campos necesarios */}
+                                <div className="mb-3">
+                                    <label htmlFor="numeroTarjeta" className="text-sm font-medium text-gray-600 block mb-1">Número</label>
+                                    <input type="text" id="numeroTarjeta" name="numeroTarjeta" value={datosTarjeta.numeroTarjeta} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="**** **** **** ****"/>
+                                </div>
+                                <div className="mb-3">
+                                    <label htmlFor="nombreTitular" className="text-sm font-medium text-gray-600 block mb-1">Nombre del Titular</label>
+                                    <input type="text" id="nombreTitular" name="nombreTitular" value={datosTarjeta.nombreTitular} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm"/>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                       <label htmlFor="fechaExpiracion" className="text-sm font-medium text-gray-600 block mb-1">Expira (MM/AA)</label>
+                                       <input type="text" id="fechaExpiracion" name="fechaExpiracion" value={datosTarjeta.fechaExpiracion} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="MM/AA"/>
+                                    </div>
+                                     <div>
+                                       <label htmlFor="cvv" className="text-sm font-medium text-gray-600 block mb-1">CVV</label>
+                                       <input type="text" id="cvv" name="cvv" value={datosTarjeta.cvv} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="***"/>
+                                    </div>
+                                </div>
+                           </motion.div>
+                       )}
+                   </AnimatePresence>
+               </motion.div>
+
+              {/* Resumen y Botón de Reserva */}
+              <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4, delay: 0.2 }}
+                  className="bg-white p-6 rounded-md shadow-md border border-gray-200 sticky top-24" // Sticky para que quede visible
+              >
+                  <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Resumen</h3>
+                  {selectedRooms.map(room => (
+                      <div key={room.letra} className="text-sm mb-2 flex justify-between">
+                          <span>Habitación {room.letra} ({fechasPorHabitacion[room.letra]?.fechaEntrada ? formatApiDate(fechasPorHabitacion[room.letra].fechaEntrada) : 'N/A'} - {fechasPorHabitacion[room.letra]?.fechaSalida ? formatApiDate(fechasPorHabitacion[room.letra].fechaSalida) : 'N/A'})</span>
+                          {/* Podríamos calcular el precio por habitación aquí si es necesario */}
+                      </div>
+                  ))}
+                  <div className="text-lg font-bold text-[var(--color-brown-dark)] mt-4 pt-4 border-t flex justify-between items-center">
+                      <span>Total Estimado:</span>
+                      <span>${formData.precioTotal ? formData.precioTotal.toFixed(2) : '0.00'} MXN</span>
+                  </div>
                   
                   {reservationError && (
-                     <p className="text-red-600 text-center mb-4">{reservationError}</p>
-                   )}
-                  
-                  <div className="space-y-4">
-                     <button 
-                        onClick={() => { setMostrarFormularioTarjeta(true); setReservationError(null); }}
-                        disabled={isSubmitting}
-                        className="w-full flex items-center justify-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                     >
-                        Pagar con Tarjeta
-                     </button>
-                     
-                     <AnimatePresence>
-                       {mostrarFormularioTarjeta && (
-                         <motion.div 
-                           initial={{ height: 0, opacity: 0 }} 
-                           animate={{ height: 'auto', opacity: 1 }} 
-                           exit={{ height: 0, opacity: 0 }} 
-                           transition={{ duration: 0.3 }}
-                           className="overflow-hidden"
-                         >
-                           <div className="space-y-4 border p-4 rounded-md bg-gray-50 mt-4">
-                             <h4 className="text-md font-medium text-gray-700">Datos de la Tarjeta</h4>
-                    <div>
-                                <label htmlFor="numeroTarjeta" className="block text-sm font-medium text-gray-700 mb-1">Número Tarjeta *</label>
-                                <input type="text" name="numeroTarjeta" id="numeroTarjeta" required value={datosTarjeta.numeroTarjeta} onChange={handleCardInputChange} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" />
-                              </div>
-                              <div>
-                                <label htmlFor="nombreTitular" className="block text-sm font-medium text-gray-700 mb-1">Nombre Titular *</label>
-                                <input type="text" name="nombreTitular" id="nombreTitular" required value={datosTarjeta.nombreTitular} onChange={handleCardInputChange} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" />
-                              </div>
-                             <div className="grid grid-cols-2 gap-4">
-                    <div>
-                                 <label htmlFor="fechaExpiracion" className="block text-sm font-medium text-gray-700 mb-1">Expiración (MM/AA) *</label>
-                                 <input type="text" name="fechaExpiracion" id="fechaExpiracion" placeholder="MM/AA" required value={datosTarjeta.fechaExpiracion} onChange={handleCardInputChange} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" />
-                    </div>
-                    <div>
-                                 <label htmlFor="cvv" className="block text-sm font-medium text-gray-700 mb-1">CVV *</label>
-                                 <input type="text" name="cvv" id="cvv" required value={datosTarjeta.cvv} onChange={handleCardInputChange} className="w-full p-2 border border-gray-300 rounded-md shadow-sm" />
-                      </div>
-                    </div>
-                              
-                             <button 
-                               onClick={procesarPagoTarjeta} 
-                               disabled={isSubmitting}
-                               className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-                             >
-                               {isSubmitting ? <FaSpinner className="animate-spin" /> : 'Confirmar Pago'}
-                             </button>
-                    </div>
-                         </motion.div>
+                      <p className="text-red-600 text-sm mt-4">{reservationError}</p>
+                  )}
+
+                  <button 
+                      type="submit" 
+                      disabled={!isFormValid || isSubmitting || isLoadingDetails} 
+                      className={`w-full mt-6 py-3 px-4 rounded-md text-white font-semibold transition-colors duration-200 flex items-center justify-center ${(!isFormValid || isSubmitting || isLoadingDetails) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)]'}`}
+                  >
+                      {isSubmitting ? (
+                          <FaSpinner className="animate-spin mr-2" /> 
+                      ) : (
+                          <FaCalendarAlt className="mr-2" />
                       )}
-                     </AnimatePresence>
-                    
-                    <button 
-                       onClick={() => procesarPago('transferencia')}
-                       disabled={isSubmitting || mostrarFormularioTarjeta}
-                       className="w-full flex items-center justify-center px-6 py-3 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                    >
-                       Pagar por Transferencia
-                    </button>
-                    
-                  <button
-                       onClick={() => procesarPago('efectivo')}
-                       disabled={isSubmitting || mostrarFormularioTarjeta}
-                       className="w-full flex items-center justify-center px-6 py-3 border border-gray-300 rounded-md shadow-sm text-base font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                    >
-                       Pagar en Efectivo (en Hacienda)
+                      {isSubmitting ? 'Procesando Reserva...' : 'Confirmar Reserva'}
                   </button>
-                 </div>
-                </div>
-               </motion.div>
-           )}
-         </AnimatePresence>
-
-        <AnimatePresence>
-          {showConflictModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowConflictModal(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9, y: -20 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.9, y: -20 }}
-                className="bg-white rounded-xl shadow-2xl p-6 md:p-8 max-w-md w-full text-center relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                 <button 
-                   onClick={() => setShowConflictModal(false)}
-                   className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
-                   aria-label="Cerrar modal"
-                 >
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-5">
-                  <svg className="h-10 w-10 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.008v.008H12v-.008Z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-3">Fechas No Disponibles</h3>
-                <p className="text-gray-600 whitespace-pre-line">{conflictMessage}</p>
-                <button
-                  onClick={() => setShowConflictModal(false)}
-                  className="mt-6 w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:text-sm transition-colors"
-                >
-                  Entendido
-                </button>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
+        </form>
+      ) : (
+        <div className="text-center py-10">
+           <FaBed className="text-5xl text-gray-400 mx-auto mb-4"/>
+           <p className="text-lg text-[var(--color-brown-medium)]">
+               Selecciona una o más habitaciones en la sección anterior para comenzar tu reserva.
+           </p>
+        </div>
+      )}
 
-        {/* Success Modal */}
-        <AnimatePresence>
-           {showReservationSuccess && multipleReservationConfirmations.length > 0 && (
-            <ReservationSuccessModal
-              isOpen={showReservationSuccess}
-              onClose={() => setShowReservationSuccess(false)}
-              reservationDetails={multipleReservationConfirmations}
-            />
-           )}
-         </AnimatePresence>
+      {/* --- Modales --- */}
+      <AnimatePresence>
+        {showReservationSuccess && multipleReservationConfirmations.length > 0 && (
+          <ReservationSuccessModal 
+            isOpen={showReservationSuccess} 
+            onClose={() => setShowReservationSuccess(false)}
+            reservations={multipleReservationConfirmations} 
+          />
+        )}
+      </AnimatePresence>
+      
+      <AnimatePresence>
+         {showConflictModal && (
+             <AvailabilityConflictModal
+                 isOpen={showConflictModal}
+                 onClose={() => {
+                     setShowConflictModal(false);
+                     // Opcional: Forzar recarga de fechas al cerrar el modal de conflicto
+                     // const hoy = new Date();
+                     // const fechaFinRango = new Date(hoy.getFullYear(), hoy.getMonth() + 3, 0);
+                     // fetchFechasDeEventos(hoy, fechaFinRango);
+                     // selectedRooms.forEach(room => fetchFechasSoloHabitacion(room.letra, hoy, fechaFinRango));
+                 }}
+                 message={conflictMessage}
+             />
+         )}
+      </AnimatePresence>
 
-      </div>
-    </motion.section>
+    </motion.div>
   );
 }
 
 export default BookingFormSection;
+
+// Estilos CSS en globales o específicos del componente para:
+// .react-datepicker__day--disabled.room-occupied-visual { background-color: #fecaca; color: #991b1b; } /* Rojo claro */
+// .react-datepicker__day--disabled.event-day-visual { background-color: #bfdbfe; color: #1e40af; } /* Azul claro */
