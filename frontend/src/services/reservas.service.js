@@ -143,3 +143,23 @@ export const actualizarReservaHabitacion = async (habitacionId, updateData) => {
     };
   }
 };
+
+/**
+ * Obtiene los datos públicos de una reserva (evento o habitación) por su ID
+ * @param {string} id - ID de la reserva
+ * @returns {Promise<Object>} Datos públicos de la reserva
+ */
+export const obtenerReservaPublica = async (id) => {
+  try {
+    // Llama al endpoint público usando apiClient
+    const response = await apiClient.get(`/public/reserva/${id}`);
+    // apiClient ya debería devolver { success: true, data: ... } o lanzar un error
+    return response;
+  } catch (error) {
+    console.error(`Error al obtener la reserva pública ${id}:`, error);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'Error al obtener los detalles de la reserva'
+    };
+  }
+};

@@ -6,6 +6,7 @@ const {
   logout,
   getMe,
   confirmAccount,
+  approveAccountWithRole,
   forgotPassword,
   resetPassword
 } = require('../controllers/auth.controller');
@@ -18,6 +19,7 @@ const router = express.Router();
 router.post('/register', register);
 router.post('/login', login);
 router.get('/confirm/:token', confirmAccount);
+router.get('/approve/:token', approveAccountWithRole);
 router.post('/password/forgot', forgotPassword);
 router.put('/password/reset/:token', resetPassword);
 

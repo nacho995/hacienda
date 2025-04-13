@@ -3,7 +3,7 @@
  * Diseño premium y elegante
  */
 
-const adminApprovalRequestTemplate = ({ nuevoAdminNombre, nuevoAdminEmail, nuevoAdminTelefono, confirmUrl }) => {
+const adminApprovalRequestTemplate = ({ nuevoAdminNombre, nuevoAdminEmail, nuevoAdminTelefono, token }) => {
   // Paleta de colores sofisticada
   const colors = {
     gold: '#D4AF37',           // Dorado elegante
@@ -83,6 +83,9 @@ const adminApprovalRequestTemplate = ({ nuevoAdminNombre, nuevoAdminEmail, nuevo
       </svg>
     </div>
   `;
+
+  // Base URL para los enlaces de aprobación
+  const baseURL = `${process.env.CLIENT_URL}/admin/approve/${token}`;
 
   return `
     <!DOCTYPE html>
@@ -259,26 +262,49 @@ const adminApprovalRequestTemplate = ({ nuevoAdminNombre, nuevoAdminEmail, nuevo
           width: 100px;
         }
         
+        .button-container {
+          text-align: center;
+          margin: 30px 0;
+        }
         .cta-button {
           display: inline-block;
-          background: linear-gradient(135deg, ${colors.gold} 0%, ${colors.goldDark} 100%);
-          color: white;
-          text-decoration: none;
-          padding: 15px 40px;
-          margin: 30px 0;
-          border-radius: 2px;
+          padding: 12px 25px;
+          margin: 8px;
           font-family: 'Lato', Arial, sans-serif;
+          font-size: 15px;
           font-weight: 700;
+          text-decoration: none;
+          border-radius: 4px;
+          transition: all 0.3s ease;
           text-transform: uppercase;
           letter-spacing: 1px;
-          text-align: center;
-          transition: all 0.3s;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+          cursor: pointer;
         }
-        
-        .cta-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        .cta-button-admin {
+          background: linear-gradient(135deg, ${colors.gold} 0%, ${colors.goldDark} 100%);
+          color: ${colors.textLight};
+          border: 1px solid ${colors.goldDark};
+          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .cta-button-admin:hover {
+          background: linear-gradient(135deg, ${colors.goldDark} 0%, ${colors.gold} 100%);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .cta-button-editor {
+          background: linear-gradient(135deg, ${colors.secondary} 0%, ${colors.primary} 100%);
+          color: ${colors.textLight};
+          border: 1px solid ${colors.primary};
+        }
+        .cta-button-editor:hover {
+          background: linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%);
+        }
+        .cta-button-user {
+          background-color: #f0f0f0;
+          color: ${colors.textDark};
+          border: 1px solid #ccc;
+        }
+        .cta-button-user:hover {
+          background-color: #e0e0e0;
         }
         
         .additional-info {
@@ -456,25 +482,26 @@ const adminApprovalRequestTemplate = ({ nuevoAdminNombre, nuevoAdminEmail, nuevo
               </div>
             </div>
             
-            <p class="intro-text">Para aprobar esta solicitud y activar la cuenta de administrador, por favor haga clic en el siguiente botón:</p>
+            <p class="intro-text">Por favor, seleccione el rol con el que desea aprobar esta solicitud:</p>
             
-            <div style="text-align: center;">
-              <a href="${confirmUrl || '#'}" class="cta-button">Aprobar Cuenta de Administrador</a>
+            <div class="button-container">
+              <a href="${baseURL}?role=admin" class="cta-button cta-button-admin">Aprobar como Administrador</a>
+              <a href="${baseURL}?role=editor" class="cta-button cta-button-editor">Aprobar como Editor</a>
+              <a href="${baseURL}?role=usuario" class="cta-button cta-button-user">Aprobar como Usuario</a>
             </div>
             
             <div class="additional-info">
               <p><strong>Aviso importante:</strong></p>
+              <p>• Aprobar como <strong>Administrador</strong> otorga permisos completos.</p>
+              <p>• Aprobar como <strong>Editor</strong> otorga permisos limitados de gestión de contenido.</p>
+              <p>• Aprobar como <strong>Usuario</strong> otorga permisos básicos de cliente.</p>
               <p>• Si usted no reconoce esta solicitud o no desea aprobarla, puede ignorar este correo electrónico de forma segura.</p>
-              <p>• La aprobación de un nuevo administrador implica otorgarle permisos completos de gestión en el sistema.</p>
               <p>• Si tiene alguna pregunta, contacte al administrador principal del sistema.</p>
             </div>
             
-            ${decorativeDivider}
-            
-            <div class="signature-section">
-              <p>Atentamente,</p>
-              <p class="signature-name">Sistema de Hacienda San Carlos Borromeo</p>
-            </div>
+            <p style="text-align:center; margin-top: 30px; font-size: 12px; color: #888;">
+              ID de Solicitud (Token): ${token ? token.substring(0, 8) + '...' : 'N/A'}
+            </p>
           </div>
           
           <footer class="footer">

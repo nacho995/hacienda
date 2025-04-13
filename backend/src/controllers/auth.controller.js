@@ -156,7 +156,7 @@ exports.registerAdmin = async (req, res) => {
               nuevoAdminNombre: `${nombre} ${apellidos}`,
               nuevoAdminEmail: email,
               nuevoAdminTelefono: telefono,
-              confirmUrl: confirmUrl
+              token: confirmToken
             });
             
             console.log(`>>> [Auth/RegisterAdmin] Intentando enviar solicitud de aprobación a admin: ${adminEmails}`);
@@ -570,6 +570,92 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al restablecer la contraseña'
+    });
+  }
+};
+
+// @desc    Aprobar cuenta y asignar rol (Nueva función)
+// @route   GET /api/auth/approve/:token?role=...
+// @access  Public (enlace accedido por Admin)
+exports.approveAccountWithRole = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const { role: requestedRole } = req.query;
+
+    // Validar que el rol solicitado sea uno de los permitidos
+    const allowedRoles = ['admin', 'editor', 'usuario'];
+    if (!requestedRole || !allowedRoles.includes(requestedRole)) {
+      console.log(`Intento de aprobación con rol inválido: ${requestedRole}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Rol especificado inválido o no proporcionado.'
+      });
+    }
+
+    // Obtener el token hasheado
+    const tokenConfirmacion = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    // Buscar usuario con ese token y que no haya expirado
+    const user = await User.findOne({
+      tokenConfirmacion,
+      tokenExpiracion: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      console.log(`Intento de aprobación con token inválido/expirado: ${token}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Token inválido o expirado'
+      });
+    }
+
+    console.log(`Aprobando usuario ${user.email} con rol ${requestedRole}`);
+
+    // Actualizar usuario
+    user.confirmado = true;
+    user.role = requestedRole; // Asignar el rol solicitado
+    user.tokenConfirmacion = undefined;
+    user.tokenExpiracion = undefined;
+    await user.save();
+
+    // Enviar correo de confirmación al usuario aprobado
+    try {
+      const loginUrl = `${process.env.CLIENT_URL}/login`; // O la ruta de login correcta
+      const htmlUserApproved = userAccountApprovedTemplate({
+        nombreUsuario: user.nombre,
+        loginUrl: loginUrl,
+        rolAsignado: requestedRole // Podríamos añadir el rol al email si quisiéramos
+      });
+
+      await sendEmail({
+        to: user.email,
+        subject: '¡Tu cuenta ha sido aprobada! - Hacienda San Carlos Borromeo',
+        html: htmlUserApproved
+      });
+      console.log(`Correo de aprobación enviado a ${user.email} con rol ${requestedRole}`);
+    } catch (emailError) {
+      console.error(`Error al enviar correo de aprobación al usuario ${user.email}:`, emailError);
+      // No fallar la operación principal si el correo no se envía, pero sí loggearlo
+    }
+
+    // Redirigir al admin a una página de confirmación o mostrar mensaje
+    // Podríamos redirigir a una página simple en el frontend:
+    // res.redirect(`${process.env.CLIENT_URL}/admin/approval-success?user=${user.email}&role=${requestedRole}`);
+    
+    // O simplemente devolver un JSON de éxito
+    res.status(200).json({
+      success: true,
+      message: `Cuenta de ${user.email} aprobada exitosamente con el rol ${requestedRole}. Se envió notificación al usuario.`
+    });
+
+  } catch (error) {
+    console.error('Error al aprobar la cuenta con rol:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno al procesar la aprobación'
     });
   }
 }; 
