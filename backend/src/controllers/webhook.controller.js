@@ -2,7 +2,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const ReservaEvento = require('../models/ReservaEvento');
 const ReservaHabitacion = require('../models/ReservaHabitacion');
 const ErrorResponse = require('../utils/errorResponse');
-const { enviarConfirmacionReservaEvento, enviarNotificacionGestionAdmin } = require('../utils/email');
+const { enviarConfirmacionReservaEvento, enviarNotificacionGestionAdmin, enviarConfirmacionReservaHabitacion } = require('../utils/email');
 
 // Endpoint secret obtenido del Dashboard de Stripe
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -78,15 +78,15 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
     // Actualizar estado de la reserva
     if (reserva.estadoReserva !== 'confirmada') {
       reserva.estadoReserva = 'confirmada';
-      reserva.metodoPago = 'tarjeta'; // Asegurarse que esté como tarjeta
-      reserva.stripePaymentIntentId = paymentIntent.id; // Guardar ID de Stripe (Asegúrate que este campo exista en tu modelo ReservaEvento/Habitacion)
+      reserva.estadoPago = 'completado';
+      reserva.metodoPago = 'tarjeta';
+      reserva.stripePaymentIntentId = paymentIntent.id;
       await reserva.save();
-      console.log(`>>> [Webhook Stripe] Reserva ${tipoReserva} ${reservaId} actualizada a confirmada.`);
+      console.log(`>>> [Webhook Stripe] Reserva ${tipoReserva} ${reservaId} actualizada a confirmada y pagada.`);
 
-      // Opcional: Enviar correo de confirmación final al cliente
+      // Enviar correo de confirmación final al cliente
       if (reserva.emailContacto) {
          if (tipoReserva === 'evento') {
-           // Asegúrate de pasar todos los datos que espera tu plantilla
            await enviarConfirmacionReservaEvento({
              email: reserva.emailContacto,
              nombreCliente: `${reserva.nombreContacto || 'Cliente'} ${reserva.apellidosContacto || ''}`.trim(),
@@ -97,16 +97,24 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
              horaFin: reserva.horaFin,
              numInvitados: reserva.numInvitados,
              precioTotal: reserva.precio,
-             metodoPago: 'Tarjeta (Pagado)', // Indicar pagado
-             // Añade aquí otros campos que use la plantilla, ej:
-             // detallesEvento: { ... },
-             // habitacionesReservadas: [...]
+             metodoPago: 'Tarjeta (Pagado)',
            });
            console.log(`>>> [Webhook Stripe] Email de confirmación final enviado para evento ${reservaId}`);
+         } else if (tipoReserva === 'habitacion') {
+            console.log(`>>> [Webhook Stripe] Enviando email de confirmación final para habitación ${reservaId}`);
+            await enviarConfirmacionReservaHabitacion({
+               email: reserva.emailContacto,
+               nombreCliente: `${reserva.nombreContacto || 'Cliente'} ${reserva.apellidosContacto || ''}`.trim(),
+               tipoHabitacion: reserva.tipoHabitacion || 'Estándar',
+               numeroConfirmacion: reserva.numeroConfirmacion,
+               fechaEntrada: reserva.fechaEntrada.toLocaleDateString('es-ES'),
+               fechaSalida: reserva.fechaSalida.toLocaleDateString('es-ES'),
+               totalNoches: Math.round((reserva.fechaSalida - reserva.fechaEntrada) / (1000 * 60 * 60 * 24)) || 1,
+               precio: reserva.precio,
+               metodoPago: 'Tarjeta (Pagado)'
+             });
+            console.log(`>>> [Webhook Stripe] Email de confirmación final enviado para habitación ${reservaId}`);
          }
-         // else if (tipoReserva === 'habitacion') {
-         //   await enviarConfirmacionReservaHabitacion({...}); // Necesitarías plantilla y función similar
-         // }
       }
     } else {
       console.log(`>>> [Webhook Stripe] Reserva ${tipoReserva} ${reservaId} ya estaba confirmada.`);

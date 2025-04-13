@@ -3,7 +3,7 @@ const ErrorResponse = require('../utils/errorResponse');
 const ReservaHabitacion = require('../models/ReservaHabitacion');
 const ReservaEvento = require('../models/ReservaEvento');
 const User = require('../models/User');
-const { sendEmail, sendBankTransferInstructions } = require('../utils/email');
+const { sendEmail, sendBankTransferInstructions, enviarConfirmacionReservaHabitacion } = require('../utils/email');
 const mongoose = require('mongoose'); // Importar mongoose
 const Habitacion = require('../models/Habitacion');
 const bankTransferInstructionsTemplate = require('../emails/bankTransferInstructions');
@@ -11,6 +11,7 @@ const { format } = require('date-fns');
 const { es } = require('date-fns/locale');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // <-- IMPORTAR Y CONFIGURAR STRIPE
 const TipoHabitacion = require('../models/TipoHabitacion'); // <-- Importar TipoHabitacion
+const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin'); // Importar plantilla admin
 
 // @desc    Crear una nueva reserva de habitación
 // @route   POST /api/reservas/habitaciones
@@ -177,7 +178,6 @@ const createReservaHabitacion = asyncHandler(async (req, res, next) => {
         if (adminEmailsString) {
             const adminEmailArray = adminEmailsString.split(',').map(email => email.trim());
             if (adminEmailArray.length > 0) {
-                const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
                 const htmlAdmin = notificacionGestionAdmin({
                   accion: "Nueva Reserva",
                   tipoReserva: `Habitación (${reserva.tipoReserva})`,
@@ -978,18 +978,17 @@ const seleccionarMetodoPagoHabitacion = asyncHandler(async (req, res, next) => {
       } else if (metodoPago === 'efectivo') {
         console.log(`>>> [Pago Habitación ${reservaId}] Enviando confirmación para pago en efectivo a: ${emailCliente}`);
         // Necesitarías una función enviarConfirmacionReservaHabitacion si no existe
-        const { enviarConfirmacionReservaHabitacion } = require('../utils/email'); // Importar si es necesario
-         await enviarConfirmacionReservaHabitacion({
-           email: emailCliente,
-           nombreCliente: nombreClienteCompleto,
-           tipoHabitacion: reserva.tipoHabitacion || 'Estándar',
-           numeroConfirmacion: reserva.numeroConfirmacion,
-           fechaEntrada: reserva.fechaEntrada.toLocaleDateString(),
-           fechaSalida: reserva.fechaSalida.toLocaleDateString(),
-           totalNoches: Math.round((reserva.fechaSalida - reserva.fechaEntrada) / (1000 * 60 * 60 * 24)) || 1,
-           precio: reserva.precio,
-           metodoPago: 'Efectivo (a pagar en recepción)'
-         });
+        await enviarConfirmacionReservaHabitacion({
+          email: emailCliente,
+          nombreCliente: nombreClienteCompleto,
+          tipoHabitacion: reserva.tipoHabitacion || 'Estándar',
+          numeroConfirmacion: reserva.numeroConfirmacion,
+          fechaEntrada: reserva.fechaEntrada.toLocaleDateString(),
+          fechaSalida: reserva.fechaSalida.toLocaleDateString(),
+          totalNoches: Math.round((reserva.fechaSalida - reserva.fechaEntrada) / (1000 * 60 * 60 * 24)) || 1,
+          precio: reserva.precio,
+          metodoPago: 'Efectivo (a pagar en recepción)'
+        });
       } 
       // No hacemos nada aquí para 'tarjeta', eso se maneja al crear PaymentIntent y webhook
     } else {
@@ -1010,7 +1009,7 @@ const seleccionarMetodoPagoHabitacion = asyncHandler(async (req, res, next) => {
   });
 });
 
-// --- CONTROLADOR PARA CREACIÓN MÚLTIPLE (CORREGIDO) --- 
+// --- CONTROLADOR PARA CREACIÓN MÚLTIPLE (CON EMAILS) --- 
 const createMultipleReservacionesHabitacion = async (req, res) => {
   const { reservas } = req.body; 
   const userId = req.user.id; 
@@ -1026,6 +1025,7 @@ const createMultipleReservacionesHabitacion = async (req, res) => {
   const errores = [];
 
   for (const reservaData of reservas) {
+    let reservaCreada = null; // Definir fuera del try para usarla en el bloque de email
     try {
       // Validar datos básicos
       if (!reservaData.habitacionLetra || !reservaData.fechaEntrada || !reservaData.fechaSalida || reservaData.precioPorNoche === undefined) {
@@ -1083,8 +1083,82 @@ const createMultipleReservacionesHabitacion = async (req, res) => {
       };
 
       // 5. Crear la ReservaHabitacion
-      const reservaCreada = await ReservaHabitacion.create(nuevaReservaData);
+      reservaCreada = await ReservaHabitacion.create(nuevaReservaData);
       resultados.push(reservaCreada);
+
+      // --- 6. ENVÍO DE EMAILS DESPUÉS DE CREAR (AÑADIDO) ---
+      if (reservaCreada) {
+        try {
+          const clienteEmail = reservaCreada.emailContacto;
+          const nombreCliente = `${reservaCreada.nombreContacto || 'Cliente'} ${reservaCreada.apellidosContacto || ''}`.trim();
+          const adminEmailsString = process.env.ADMIN_EMAIL;
+          const adminEmailArray = adminEmailsString ? adminEmailsString.split(',').map(email => email.trim()).filter(email => email) : [];
+
+          // 6a. Email al Cliente
+          if (clienteEmail) {
+            if (reservaCreada.metodoPago === 'transferencia') {
+              console.log(`>>> [ReservaHabitación ${reservaCreada._id}] Enviando instrucciones de transferencia a: ${clienteEmail}`);
+              await sendBankTransferInstructions({
+                email: clienteEmail,
+                nombreCliente: nombreCliente,
+                numeroConfirmacion: reservaCreada.numeroConfirmacion,
+                montoTotal: reservaCreada.precio
+              });
+            } else {
+              // Enviar confirmación simple para otros métodos (ej. efectivo)
+              console.log(`>>> [ReservaHabitación ${reservaCreada._id}] Enviando confirmación (${reservaCreada.metodoPago}) a: ${clienteEmail}`);
+              // Asumiendo que enviarConfirmacionReservaHabitacion existe y acepta estos parámetros
+              await enviarConfirmacionReservaHabitacion({
+                  email: clienteEmail,
+                  nombreCliente: nombreCliente,
+                  tipoHabitacion: reservaCreada.tipoHabitacion || 'Estándar',
+                  numeroConfirmacion: reservaCreada.numeroConfirmacion,
+                  fechaEntrada: reservaCreada.fechaEntrada.toLocaleDateString('es-ES'),
+                  fechaSalida: reservaCreada.fechaSalida.toLocaleDateString('es-ES'),
+                  totalNoches: Math.round((reservaCreada.fechaSalida - reservaCreada.fechaEntrada) / (1000 * 60 * 60 * 24)) || 1,
+                  precio: reservaCreada.precio,
+                  metodoPago: reservaCreada.metodoPago.charAt(0).toUpperCase() + reservaCreada.metodoPago.slice(1)
+              });
+            }
+          } else {
+            console.warn(`[Email Send ${reservaCreada._id}] No se pudo determinar el email del cliente.`);
+          }
+
+          // 6b. Email al Admin
+          if (adminEmailArray.length > 0) {
+              const htmlAdmin = notificacionGestionAdmin({
+                  accion: "Nueva Reserva",
+                  tipoReserva: `Habitación (${reservaCreada.tipoReserva || 'hotel'})`,
+                  numeroConfirmacion: reservaCreada.numeroConfirmacion,
+                  nombreCliente: nombreCliente,
+                  emailCliente: clienteEmail || 'No disponible',
+                  detallesAdicionales: {
+                    telefono: reservaCreada.telefonoContacto || 'No disponible',
+                    habitacion: `${reservaCreada.habitacion} (${reservaCreada.tipoHabitacion || 'No especificado'})`,
+                    fechas: `${reservaCreada.fechaEntrada.toLocaleDateString('es-ES')} - ${reservaCreada.fechaSalida.toLocaleDateString('es-ES')}`,
+                    precio: `${reservaCreada.precio} MXN`,
+                    metodoPago: reservaCreada.metodoPago.charAt(0).toUpperCase() + reservaCreada.metodoPago.slice(1),
+                    estado: reservaCreada.estadoReserva || 'pendiente',
+                    notas: reservaCreada.infoHuespedes?.detalles || 'Ninguna'
+                  },
+                  urlGestionReserva: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reservas/habitaciones/${reservaCreada._id}`
+              });
+              console.log(`>>> [ReservaHabitación ${reservaCreada._id}] Enviando notificación a admin: ${adminEmailArray.join(', ')}`);
+              await sendEmail({
+                  email: adminEmailArray,
+                  subject: `Nueva Reserva Habitación #${reservaCreada.numeroConfirmacion}`,
+                  html: htmlAdmin
+              });
+          } else {
+              console.warn(`[Email Send ${reservaCreada._id}] ADMIN_EMAIL no configurado o vacío. No se envió notificación.`);
+          }
+
+        } catch (emailError) {
+            console.error(`[Email Send ${reservaCreada?._id}] Error enviando emails DESPUÉS de crear reserva:`, emailError);
+            // No relanzar el error para no afectar la respuesta principal
+        }
+      }
+      // --- FIN ENVÍO DE EMAILS ---
 
     } catch (error) {
       console.error(`Error detallado al crear reserva para habitación ${reservaData.habitacionLetra || 'desconocida'}:`, error);
