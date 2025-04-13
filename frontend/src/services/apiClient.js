@@ -117,15 +117,6 @@ apiClient.interceptors.request.use(
       console.warn('Intentando acceder a ruta protegida sin token:', config.url);
     }
     
-    // Añadir from_admin=true a las peticiones GET que no son públicas
-    if (config.method?.toLowerCase() === 'get' && !isPublicRoute(config.url)) {
-      if (!config.params) {
-        config.params = {};
-      }
-      config.params.from_admin = true;
-      console.log('Parámetro from_admin=true añadido a la petición GET');
-    }
-    
     return config;
   },
   (error) => {
