@@ -318,7 +318,7 @@ export default function ContactForm() {
                   </button>
                 </motion.div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
                   {serverError && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 mb-4">
                       {serverError}
@@ -438,6 +438,7 @@ export default function ContactForm() {
                   <div className="pt-2">
                     <button
                       type="submit"
+                      onClick={handleSubmit}
                       disabled={isSubmitting}
                       className={`w-full px-8 py-4 bg-[var(--color-brown-medium)] text-black text-lg uppercase tracking-wider hover:bg-[var(--color-brown-dark)] transition-colors duration-300 flex items-center justify-center ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
