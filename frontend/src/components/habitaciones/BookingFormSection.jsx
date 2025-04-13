@@ -328,36 +328,26 @@ function BookingFormSection({
 
   // Función auxiliar para la verificación final de disponibilidad ANTES del pago/submit
   const runAvailabilityCheck = async (reservationsData) => {
-    // Asegurarse de que hay reservaciones para verificar
     if (!reservationsData || reservationsData.length === 0) {
       console.warn('[runAvailabilityCheck] No hay datos de reservaciones para verificar.');
-      return true; // Si no hay nada que verificar, asumimos que está bien
+      return true;
     }
 
     try {
-      // --- CORRECCIÓN DEL PAYLOAD ---
-      // 1. Extraer todas las letras de habitación
-      const habitacionIds = reservationsData.map(r => r.habitacionLetra);
+      // --- NUEVO PAYLOAD: Array de objetos con rangos individuales ---
+      const payload = reservationsData.map(r => ({
+        habitacionId: r.habitacionLetra, // O el ID si se usa en el backend
+        fechaInicio: formatApiDate(r.fechaEntrada), // Usar formato YYYY-MM-DD
+        fechaFin: formatApiDate(r.fechaSalida)    // Usar formato YYYY-MM-DD
+      }));
 
-      // 2. Encontrar la fecha de inicio más temprana y la fecha de fin más tardía
-      const fechasEntrada = reservationsData.map(r => r.fechaEntrada); // Son objetos Date
-      const fechasSalida = reservationsData.map(r => r.fechaSalida);   // Son objetos Date
+      console.log('[runAvailabilityCheck] Payload enviado a verificarDisponibilidadHabitaciones (individual):', payload);
 
-      const fechaInicio = new Date(Math.min(...fechasEntrada.map(d => d.getTime())));
-      const fechaFin = new Date(Math.max(...fechasSalida.map(d => d.getTime())));
-
-      // 3. Formatear fechas y construir el payload correcto
-      const payload = {
-        habitacionIds: habitacionIds,
-        fechaInicio: formatApiDate(fechaInicio), // Usar función de formato existente
-        fechaFin: formatApiDate(fechaFin)      // Usar función de formato existente
-      };
-
-      console.log('[runAvailabilityCheck] Payload enviado a verificarDisponibilidadHabitaciones:', payload);
-
-      // 4. Llamar al servicio con el payload correcto
+      // Llamar al servicio (asumiendo que el endpoint acepta POST con este array)
+      // El endpoint sigue siendo /reservas/habitaciones/verificar-disponibilidad-rango
+      // pero ahora el backend interpretará el payload diferente.
       const response = await verificarDisponibilidadHabitaciones(payload);
-      // --- FIN CORRECCIÓN ---
+      // --- FIN NUEVO PAYLOAD ---
       
       if (!response.success || !response.disponibles) {
           // Actualizar fechas ocupadas AHORA MISMO basado en la respuesta

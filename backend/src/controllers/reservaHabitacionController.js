@@ -710,87 +710,121 @@ const asignarHabitacionAdmin = asyncHandler(async (req, res, next) => {
   }
 });
 
-// @desc    Comprobar disponibilidad de múltiples habitaciones en un rango de fechas
+// @desc    Comprobar disponibilidad de múltiples habitaciones en rangos de fechas individuales
 // @route   POST /api/reservas/habitaciones/verificar-disponibilidad-rango
-// @access  Public (o Private si se necesita contexto de usuario)
+// @access  Public
 const verificarDisponibilidadRango = asyncHandler(async (req, res, next) => {
-  const { habitacionIds, fechaInicio, fechaFin, reservaActualId } = req.body;
+  // El payload ahora es un array de objetos: [{ habitacionId, fechaInicio, fechaFin }, ...]
+  const checkRequests = req.body;
+  const reservaActualId = req.query.reservaActualId; // Obtener de query params si se envía
 
-  // Validaciones de entrada
-  if (!Array.isArray(habitacionIds) || habitacionIds.length === 0) {
-    return next(new ErrorResponse('Se requiere un array de IDs de habitación.', 400));
-  }
-  if (!fechaInicio || !fechaFin) {
-    return next(new ErrorResponse('Se requieren fecha de inicio y fecha de fin.', 400));
+  // Validación de entrada: verificar que es un array y que cada objeto tiene los campos necesarios
+  if (!Array.isArray(checkRequests) || checkRequests.length === 0) {
+    return next(new ErrorResponse('Se requiere un array de solicitudes de verificación.', 400));
   }
 
-  const fechaInicioObj = new Date(fechaInicio);
-  const fechaFinObj = new Date(fechaFin);
+  const validationError = checkRequests.find(req => 
+    !req.habitacionId || !req.fechaInicio || !req.fechaFin
+  );
 
-  if (isNaN(fechaInicioObj.getTime()) || isNaN(fechaFinObj.getTime())) {
-    return next(new ErrorResponse('Fechas inválidas.', 400));
-  }
-  if (fechaInicioObj >= fechaFinObj) {
-    return next(new ErrorResponse('La fecha de inicio debe ser anterior a la fecha de fin.', 400));
+  if (validationError) {
+    return next(new ErrorResponse('Cada solicitud debe incluir habitacionId, fechaInicio y fechaFin.', 400));
   }
 
   try {
-    const habitacionesOcupadas = [];
+    const habitacionesConflictivas = []; // Guardará { habitacionId, motivo }
     let todasDisponibles = true;
 
-    // Construir la consulta base para buscar conflictos
-    const conflictQuery = {
-      estadoReserva: { $in: ['pendiente', 'confirmada'] }, // Solo reservas activas
-      fechaEntrada: { $lt: fechaFinObj }, // La reserva existente empieza antes de que termine la nueva
-      fechaSalida: { $gt: fechaInicioObj } // La reserva existente termina después de que empiece la nueva
-    };
+    // Iterar sobre cada solicitud de verificación individual
+    for (const request of checkRequests) {
+      const { habitacionId, fechaInicio, fechaFin } = request;
 
-    // Si estamos editando, excluimos la reserva actual de la comprobación
-    if (reservaActualId) {
-      conflictQuery._id = { $ne: new mongoose.Types.ObjectId(reservaActualId) };
-    }
+      const fechaInicioObj = new Date(fechaInicio);
+      const fechaFinObj = new Date(fechaFin);
 
-    // Iterar sobre cada habitación solicitada
-    for (const habitacionId of habitacionIds) {
-      const queryForThisRoom = { 
-        ...conflictQuery,
-        habitacion: habitacionId // Añadir filtro por habitación específica
+      if (isNaN(fechaInicioObj.getTime()) || isNaN(fechaFinObj.getTime())) {
+        // Podríamos devolver error 400 o marcar esta habitación como no disponible
+        habitacionesConflictivas.push({ habitacionId, motivo: 'Fechas inválidas' });
+        todasDisponibles = false;
+        continue; // Pasar a la siguiente solicitud
+      }
+      if (fechaInicioObj >= fechaFinObj) {
+        habitacionesConflictivas.push({ habitacionId, motivo: 'Fecha inicio debe ser anterior a fecha fin' });
+        todasDisponibles = false;
+        continue; 
+      }
+
+      // Construir la consulta base para buscar conflictos para ESTA habitación/rango
+      const conflictQuery = {
+        estadoReserva: { $in: ['pendiente', 'confirmada', 'pendiente_pago'] }, // Ajustar estados si es necesario
+        fechaEntrada: { $lt: fechaFinObj }, 
+        fechaSalida: { $gt: fechaInicioObj } 
       };
 
-      const reservaSolapada = await ReservaHabitacion.findOne(queryForThisRoom).lean(); // Usar lean() para eficiencia
+      // Excluir la reserva actual si se está editando
+      if (reservaActualId) {
+        conflictQuery._id = { $ne: new mongoose.Types.ObjectId(reservaActualId) };
+      }
 
-      if (reservaSolapada) {
+      // 1. Buscar conflicto en ReservaHabitacion
+      const queryHabitacion = { 
+        ...conflictQuery,
+        habitacion: habitacionId 
+      };
+      const reservaHabitacionSolapada = await ReservaHabitacion.findOne(queryHabitacion).lean();
+
+      if (reservaHabitacionSolapada) {
         todasDisponibles = false;
-        habitacionesOcupadas.push(habitacionId); 
-        // Podríamos parar aquí si solo necesitamos saber si *alguna* está ocupada
-        // break; 
-        // O continuar para obtener la lista completa de las ocupadas
+        // Solo añadir si no está ya (por si otra comprobación la añadió)
+        if (!habitacionesConflictivas.some(h => h.habitacionId === habitacionId)) {
+            habitacionesConflictivas.push({ habitacionId, motivo: 'Reserva Habitación' });
+        }
+        continue; // Conflicto encontrado, pasar a la siguiente solicitud
+      }
+
+      // 2. Buscar conflicto en ReservaEvento (si aplica)
+      // Asumiendo que los eventos bloquean TODAS las habitaciones en su fecha
+      const eventosSolapados = await ReservaEvento.find({
+          fecha: { $gte: fechaInicioObj, $lt: fechaFinObj }, // Evento ocurre DENTRO del rango solicitado
+          estadoReserva: { $in: ['pendiente', 'confirmada'] } // Evento activo
+          // Podríamos añadir un filtro para eventos que realmente bloqueen habitaciones
+      }).select('fecha').lean(); 
+
+      if (eventosSolapados.length > 0) {
+          todasDisponibles = false;
+          if (!habitacionesConflictivas.some(h => h.habitacionId === habitacionId)) {
+              // Indicar que el conflicto es por un evento en esas fechas
+              const fechasEvento = eventosSolapados.map(e => format(new Date(e.fecha), 'dd/MM/yyyy')).join(', ');
+              habitacionesConflictivas.push({ habitacionId, motivo: `Evento(s) en fecha(s): ${fechasEvento}` });
+          }
+          // No necesitamos 'continue' aquí si queremos reportar conflictos de ambos tipos
       }
     }
 
+    // Responder basado en el resultado final
     if (todasDisponibles) {
       res.status(200).json({
         success: true,
         disponibles: true,
-        message: 'Todas las habitaciones seleccionadas están disponibles para el rango especificado.'
+        message: 'Todas las habitaciones y rangos solicitados están disponibles.'
       });
     } else {
-      // Devolver un código 409 (Conflict) si no están disponibles
+      // Devolver un código 409 (Conflict)
       res.status(409).json({
-        success: true, // La operación de verificación fue exitosa, pero el resultado es no disponible
+        success: true, // La operación de verificación fue exitosa
         disponibles: false,
-        message: `Una o más habitaciones no están disponibles en las fechas seleccionadas.`,
-        habitacionesOcupadas: habitacionesOcupadas
+        message: `Conflicto de disponibilidad detectado.`, // Mensaje más genérico
+        // Devolver detalles de qué habitaciones y por qué fallaron
+        habitacionesConflictivas: habitacionesConflictivas 
       });
     }
 
   } catch (error) {
     console.error('Error en verificarDisponibilidadRango:', error);
-    // Manejar errores específicos como ID inválido si es necesario
     if (error.name === 'CastError') {
       return next(new ErrorResponse('Uno o más IDs de habitación o el ID de reserva actual son inválidos', 400));
     }
-    next(error); // Pasar a manejador de errores global
+    next(error); 
   }
 });
 
