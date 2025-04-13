@@ -8,9 +8,11 @@ const contactFormConfirmation = require('../emails/contactFormConfirmation');
  * @access  Public
  */
 exports.enviarFormularioContacto = asyncHandler(async (req, res) => {
+  console.log('>>> Petición POST recibida en /api/contacto');
   const { nombre, email, telefono, fecha, tipoEvento, invitados, mensaje } = req.body;
   
   if (!nombre || !email || !telefono || !tipoEvento) {
+    console.log('>>> Faltan campos obligatorios en /api/contacto');
     return res.status(400).json({
       success: false,
       message: 'Por favor complete todos los campos obligatorios'
