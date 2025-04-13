@@ -22,6 +22,7 @@ import {
   unassignEventoReservation,
   unassignHabitacionReservation
 } from '@/services/reservationService';
+import { useConfirmationModal } from '@/hooks/useConfirmationModal';
 
 export default function ReservacionesPage() {
   const router = useRouter();
@@ -44,6 +45,8 @@ export default function ReservacionesPage() {
   const [usuarios, setUsuarios] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: 'fechaEvento', direction: 'asc' });
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+  const { showConfirmation } = useConfirmationModal();
 
   // <<< INICIO FUNCION getLetraHabitacion COPIADA >>>
   const getLetraHabitacion = (reserva) => {
@@ -316,71 +319,95 @@ export default function ReservacionesPage() {
 
   // --- INICIO: Nuevas funciones Handler para acciones ---
 
-  const handleDeleteReservation = useCallback(async (tipo, id) => {
+  const handleDeleteReservation = useCallback((tipo, id) => {
     if (!id) {
       toast.error('ID de reserva inválido.');
       return;
     }
     
-    const userConfirmed = window.confirm('¿Estás seguro de que deseas eliminar esta reservación permanentemente?');
-    
-    if (userConfirmed) {
-      setIsLoading(true);
-      try {
-        let response;
-        if (tipo === 'evento') {
-          response = await deleteEventoReservation(id);
-        } else { // tipo === 'habitacion'
-          response = await deleteHabitacionReservation(id);
-        }
+    showConfirmation({
+      title: 'Eliminar Reservación',
+      message: '¿Estás seguro de que deseas eliminar esta reservación permanentemente? Esta acción no se puede deshacer.',
+      iconType: 'danger',
+      confirmText: 'Sí, eliminar',
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          let response;
+          if (tipo === 'evento') {
+            response = await deleteEventoReservation(id);
+          } else { // tipo === 'habitacion'
+            response = await deleteHabitacionReservation(id);
+          }
 
-        if (response && response.success) {
-          toast.success('Reservación eliminada correctamente');
-          await loadAllReservations(); // Recarga los datos
-        } else {
-          // Usar el mensaje de error de la respuesta si existe
-          throw new Error(response?.message || 'Error al eliminar la reservación'); 
+          if (response && response.success) {
+            toast.success('Reservación eliminada correctamente');
+            await loadAllReservations();
+          } else {
+            throw new Error(response?.message || 'Error al eliminar la reservación'); 
+          }
+        } catch (error) {
+          console.error('Error al eliminar reservación:', error);
+          toast.error('Error al eliminar la reservación: ' + error.message);
+        } finally {
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.error('Error al eliminar reservación:', error);
-        toast.error('Error al eliminar la reservación: ' + error.message);
-      } finally {
-        setIsLoading(false);
       }
-    }
-  }, [loadAllReservations]);
+    });
+  }, [loadAllReservations, showConfirmation]);
 
-  const handleChangeReservationStatus = useCallback(async (tipo, id, newStatus) => {
+  const handleChangeReservationStatus = useCallback((tipo, id, newStatus) => {
     if (!id || !newStatus) {
       toast.error('Datos inválidos para actualizar estado.');
       return;
     }
     
-    setIsLoading(true);
-    try {
-      let response;
-      const payload = { estadoReserva: newStatus.toLowerCase() };
-      
-      if (tipo === 'evento') {
-        response = await updateEventoReservation(id, payload);
-      } else { // tipo === 'habitacion'
-        response = await updateHabitacionReservation(id, payload);
-      }
-
-      if (response && response.success) {
-        toast.success(`Estado de la reserva actualizado a ${newStatus}`);
-        await loadAllReservations(); // Recarga los datos
-      } else {
-        // Usar el mensaje de error de la respuesta si existe
-        throw new Error(response?.message || 'Error al actualizar estado'); 
-      }
-    } catch (error) {
-      console.error('Error al actualizar estado:', error);
-      toast.error('Error al actualizar estado: ' + error.message);
-    } finally {
-      setIsLoading(false);
+    // Mapeo de estados a configuración del modal
+    const statusConfig = {
+      confirmada: { title: 'Confirmar Reserva', message: '¿Marcar esta reserva como confirmada?', icon: 'confirm', confirm: 'Sí, confirmar' },
+      cancelada: { title: 'Cancelar Reserva', message: '¿Cancelar esta reserva? Esto podría ser irreversible.', icon: 'danger', confirm: 'Sí, cancelar' },
+      pendiente: { title: 'Marcar Pendiente', message: '¿Marcar esta reserva como pendiente?', icon: 'info', confirm: 'Sí, marcar pendiente' },
+      // Añadir otros estados si es necesario
+    };
+    
+    const config = statusConfig[newStatus.toLowerCase()];
+    if (!config) {
+        toast.error(`Estado objetivo desconocido: ${newStatus}`);
+        return;
     }
-  }, [loadAllReservations]);
+
+    showConfirmation({
+      title: config.title,
+      message: config.message,
+      iconType: config.icon,
+      confirmText: config.confirm,
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          let response;
+          const payload = { estadoReserva: newStatus.toLowerCase() };
+          
+          if (tipo === 'evento') {
+            response = await updateEventoReservation(id, payload);
+          } else { // tipo === 'habitacion'
+            response = await updateHabitacionReservation(id, payload);
+          }
+
+          if (response && response.success) {
+            toast.success(`Estado de la reserva actualizado a ${newStatus}`);
+            await loadAllReservations();
+          } else {
+            throw new Error(response?.message || 'Error al actualizar estado'); 
+          }
+        } catch (error) {
+          console.error('Error al actualizar estado:', error);
+          toast.error('Error al actualizar estado: ' + error.message);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    });
+  }, [loadAllReservations, showConfirmation]);
 
   // --- NUEVA FUNCIÓN --- 
   const handleAssignReservation = useCallback(async (tipo, id) => {
@@ -415,37 +442,43 @@ export default function ReservacionesPage() {
   }, [loadAllReservations]);
 
   // --- NUEVA FUNCIÓN --- 
-  const handleUnassignReservation = useCallback(async (tipo, id) => {
+  const handleUnassignReservation = useCallback((tipo, id) => {
     if (!id) {
       toast.error('ID de reserva inválido para desasignar.');
       return;
     }
     
-    setIsLoading(true);
-    try {
-      let response;
-      if (tipo === 'evento') {
-        response = await unassignEventoReservation(id);
-      } else { // tipo === 'habitacion'
-        response = await unassignHabitacionReservation(id);
-      }
+    showConfirmation({
+      title: 'Desasignar Reserva',
+      message: '¿Estás seguro de que quieres desasignarte esta reserva? Quedará como \'Sin asignar\'.',
+      iconType: 'warning',
+      confirmText: 'Sí, desasignar',
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          let response;
+          if (tipo === 'evento') {
+            response = await unassignEventoReservation(id);
+          } else { // tipo === 'habitacion'
+            response = await unassignHabitacionReservation(id);
+          }
 
-      if (response && response.success) {
-        toast.success('Reserva desasignada correctamente');
-        await loadAllReservations(); // Recargar para reflejar el cambio y el filtro
-        // --- Log para verificar datos post-recarga ---
-        console.log('[Desasignar] Datos después de recarga:', { habitacionReservations, eventoReservations });
-      } else {
-        // Usar el mensaje de error de la respuesta si existe
-        throw new Error(response?.message || 'Error al desasignar la reserva'); 
+          if (response && response.success) {
+            toast.success('Reserva desasignada correctamente');
+            await loadAllReservations();
+            console.log('[Desasignar] Datos después de recarga:', { habitacionReservations, eventoReservations });
+          } else {
+            throw new Error(response?.message || 'Error al desasignar la reserva'); 
+          }
+        } catch (error) {
+          console.error('Error al desasignar reserva:', error);
+          toast.error('Error al desasignar reserva: ' + error.message);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Error al desasignar reserva:', error);
-      toast.error('Error al desasignar reserva: ' + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadAllReservations]);
+    });
+  }, [loadAllReservations, showConfirmation]);
 
   // --- FIN: Nuevas funciones Handler ---
 
