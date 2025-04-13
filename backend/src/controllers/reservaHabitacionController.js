@@ -3,7 +3,7 @@ const ErrorResponse = require('../utils/errorResponse');
 const ReservaHabitacion = require('../models/ReservaHabitacion');
 const ReservaEvento = require('../models/ReservaEvento');
 const User = require('../models/User');
-const sendEmail = require('../utils/email');
+const { sendEmail } = require('../utils/email');
 const mongoose = require('mongoose'); // Importar mongoose
 
 // @desc    Crear una nueva reserva de habitación

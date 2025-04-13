@@ -1,6 +1,8 @@
 const crypto = require('crypto');
+const asyncHandler = require('../middleware/async');
 const User = require('../models/User');
-const sendEmail = require('../utils/email');
+const ErrorResponse = require('../utils/errorResponse');
+const { sendEmail } = require('../utils/email');
 const emailConfirmacionAdmin = require('../emails/confirmacionAdmin');
 const bcrypt = require('bcryptjs');
 const confirmacionTemplate = require('../emails/confirmacionReserva');

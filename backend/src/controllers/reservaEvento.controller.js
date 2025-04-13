@@ -9,7 +9,7 @@ const confirmacionTemplate = require('../emails/confirmacionReserva');
 const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
 const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
 const Servicio = require('../models/Servicio');
-const asyncHandler = require('../middleware/async.js');
+const asyncHandler = require('../middleware/async');
 const ErrorResponse = require('../utils/errorResponse');
 const generarNumeroConfirmacion = require('../utils/confirmNumGen');
 
