@@ -939,21 +939,23 @@ const ReservaWizard = () => {
       
       case 7:
         const handlePaymentSelection = async (metodo) => {
-          updateFormSection('metodoPago', metodo);
-          setStripeClientSecret(''); // Limpiar secret anterior
+          setLoading(true); 
+          setIsProcessingPayment(false); // Resetear procesamiento
           setShowCheckoutForm(false); // Ocultar form por defecto
-          setIsProcessingPayment(false); // Resetear estado procesamiento
+          setStripeClientSecret(''); // Limpiar secret
 
           if (!createdReservationId) {
             toast.error('Error: No se encontró el ID de la reserva creada.');
+            setLoading(false);
             return;
           }
 
+          // Lógica separada por método
           if (metodo === 'tarjeta') {
-            setLoading(true);
             let loadingToastId = toast.loading('Preparando pago seguro...');
             try {
-              // 1. Llamar al backend para crear PaymentIntent
+              // Llamar al backend para crear PaymentIntent
+              // Asegúrate que la función importada sea correcta y esté disponible
               const response = await createEventoPaymentIntent(createdReservationId);
               toast.dismiss(loadingToastId);
 
@@ -962,36 +964,57 @@ const ReservaWizard = () => {
                 setShowCheckoutForm(true); // Mostrar el formulario de Stripe
                 toast.info('Por favor, introduce los datos de tu tarjeta.');
               } else {
-                toast.error(response.message || 'No se pudo iniciar el pago con tarjeta.');
+                // Si response existe pero no tiene clientSecret o success es false
+                toast.error(response?.message || 'No se pudo iniciar el pago con tarjeta. Respuesta inesperada del servidor.');
               }
             } catch (error) {
               toast.dismiss(loadingToastId);
               console.error("Error creando PaymentIntent:", error);
-              toast.error(error.response?.data?.message || error.message || 'Error al preparar el pago con tarjeta.');
+              // Mostrar mensaje de error más específico si está disponible
+              const errorMessage = error.response?.data?.message || error.message || 'Error al preparar el pago con tarjeta.';
+              toast.error(errorMessage);
+              // Asegurarse de limpiar el clientSecret si falla
+              setStripeClientSecret(''); 
             } finally {
               setLoading(false);
             }
+            
           } else { // Transferencia o Efectivo
-              // ... (Lógica existente para transferencia/efectivo usando seleccionarMetodoPago)
-              let initialToastId = null;
-              if (metodo === 'transferencia') {
-                initialToastId = toast.loading('Enviando instrucciones de pago a tu correo...');
-              } else if (metodo === 'efectivo') {
-                initialToastId = toast.loading('Confirmando selección de pago en efectivo...');
+            let initialToastId = null;
+            if (metodo === 'transferencia') {
+              initialToastId = toast.loading('Enviando instrucciones de pago a tu correo...');
+            } else if (metodo === 'efectivo') {
+              initialToastId = toast.loading('Confirmando selección de pago en efectivo...');
+            }
+
+            try {
+              // Llamar al servicio para seleccionar el método (AHORA PÚBLICO)
+              const response = await seleccionarMetodoPago(createdReservationId, metodo);
+              if(initialToastId) toast.dismiss(initialToastId);
+
+              if (response.success) {
+                // Éxito: Mostrar mensaje y actualizar estado si es necesario
+                if (metodo === 'transferencia') {
+                  toast.success('Instrucciones enviadas a tu correo.');
+                } else if (metodo === 'efectivo') {
+                  toast.success('Selección confirmada. Paga en recepción.');
+                }
+                updateFormSection('metodoPago', metodo); // Actualizar estado local
+                // Opcional: Podríamos ir a un paso de "Gracias" o mostrar resumen final
+                // setCurrentStep(prev => prev + 1); 
+              } else {
+                // Fallo reportado por la API
+                toast.error(response.message || 'Error al procesar la selección de pago.');
               }
-              setLoading(true); 
-              try {
-                 const response = await seleccionarMetodoPago(createdReservationId, metodo);
-                 if(initialToastId) toast.dismiss(initialToastId);
-                 if (response.success) {
-                    if (metodo === 'transferencia') { toast.success('Instrucciones enviadas.'); }
-                    else if (metodo === 'efectivo') { toast.success('Selección confirmada.'); }
-                 } else { toast.error(response.message || 'Error al procesar.'); }
-              } catch (error) {
-                 if(initialToastId) toast.dismiss(initialToastId);
-                 console.error("Error seleccionando ${metodo}:", error);
-                 toast.error(error.response?.data?.message || 'Error al procesar.');
-              } finally { setLoading(false); }
+            } catch (error) {
+              // Error en la llamada (red, 404, 500, etc.)
+              if(initialToastId) toast.dismiss(initialToastId);
+              console.error(`Error seleccionando ${metodo}:`, error);
+              const errorMessage = error.response?.data?.message || error.message || 'Error al procesar la selección de pago.';
+              toast.error(errorMessage);
+            } finally {
+              setLoading(false);
+            }
           }
         };
 

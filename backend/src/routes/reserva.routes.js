@@ -111,7 +111,7 @@ router.post('/eventos/:id/servicios', protectRoute, authorize('admin'), addEvent
 router.delete('/eventos/:id/servicios/:servicioId', protectRoute, authorize('admin'), removeEventoServicio);
 
 // --- RUTAS DE PAGO (al final de las rutas con /:id) ---
-router.put('/eventos/:id/seleccionar-pago', protectRoute, seleccionarMetodoPagoEvento);
+router.put('/eventos/:id/seleccionar-pago', seleccionarMetodoPagoEvento);
 router.post('/eventos/:id/create-payment-intent', protectRoute, createEventoPaymentIntent);
 
 // ==========================
