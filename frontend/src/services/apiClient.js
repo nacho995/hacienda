@@ -110,7 +110,7 @@ apiClient.interceptors.request.use(
           window.dispatchEvent(authErrorEvent);
         }
       } else {
-        console.log('Token válido, añadiendo a headers');
+        console.log('>>> INTERCEPTOR: Token válido y no expirado. Añadiendo cabecera Authorization...'); 
         config.headers.Authorization = `Bearer ${token}`;
       }
     } else if (!isPublicRoute(config.url)) {

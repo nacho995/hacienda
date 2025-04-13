@@ -24,11 +24,11 @@ router.get('/habitaciones/fechas-ocupadas', getHabitacionOccupiedDates);
 router.post('/habitaciones/verificar-disponibilidad', verificarDisponibilidadHabitaciones);
 
 // --- NUEVA RUTA PARA CREACIÓN MÚLTIPLE ---
-router.post('/habitaciones/batch', protectRoute, createMultipleReservacionesHabitacion);
+router.post('/reservas/habitaciones/batch', createMultipleReservacionesHabitacion);
 
 // --- Añadir ruta singular si no estaba definida explícitamente antes ---
-// Asumiendo que la ruta base para crear una sola es POST /habitaciones
-router.post('/habitaciones', protectRoute, createReservaHabitacion);
+// Mantener esta protegida si es necesario, o ajustar según lógica
+router.post('/reservas/habitaciones', protectRoute, createReservaHabitacion);
 
 // ... resto de las rutas ...
 
