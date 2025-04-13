@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import apiClient from '@/services/apiClient';
+import { useConfirmationModal } from '@/hooks/useConfirmationModal';
 
 export default function AdminEventRooms() {
   const router = useRouter();
@@ -34,6 +35,8 @@ export default function AdminEventRooms() {
   const [showDropdownFilter, setShowDropdownFilter] = useState(false);
   const [showDropdownSort, setShowDropdownSort] = useState(false);
   const [openActionMenu, setOpenActionMenu] = useState(null);
+
+  const { showConfirmation } = useConfirmationModal();
 
   const cargarUsuarios = useCallback(async () => {
     try {
@@ -117,26 +120,32 @@ export default function AdminEventRooms() {
     }
   };
 
-  const handleDesasignarHabitacion = async (reservaId) => {
-    // console.log(`[handleDesasignar HabitaciónEvento] Intentando desasignar ID: ${reservaId}`);
-    try {
-      setIsAsignando(true);
-      const response = await unassignHabitacionReservation(reservaId);
-      // console.log(`[handleDesasignar HabitaciónEvento] Respuesta API para ${reservaId}:`, response);
-      if (response.success) {
-        toast.success('Reserva de evento desasignada correctamente');
-        // console.log(`[handleDesasignar HabitaciónEvento] Llamando a loadAllReservations tras éxito para ${reservaId}`);
-        loadAllReservations(false);
-      } else {
-        toast.error(response.message || 'Error al desasignar la reserva del evento');
+  const handleDesasignarHabitacion = (reservaId) => {
+    setOpenActionMenu(null); // Cerrar menú antes de mostrar modal
+    showConfirmation({
+      title: 'Desasignar Habitación de Evento',
+      message: '¿Estás seguro de que quieres desasignar esta habitación del evento? El usuario asignado dejará de estar asociado.',
+      iconType: 'warning',
+      confirmText: 'Sí, desasignar',
+      onConfirm: async () => {
+        // La lógica original de desasignar va aquí
+        setIsAsignando(true); 
+        try {
+          const response = await unassignHabitacionReservation(reservaId);
+          if (response.success) {
+            toast.success('Habitación desasignada del evento');
+            loadAllReservations(false);
+          } else {
+            toast.error(response.message || 'Error al desasignar la habitación del evento');
+          }
+        } catch (error) {
+          console.error('[handleDesasignar HabitaciónEvento] Error en catch:', error);
+          toast.error('No se pudo desasignar la habitación del evento');
+        } finally {
+          setIsAsignando(false); 
+        }
       }
-    } catch (error) {
-      console.error('[handleDesasignar HabitaciónEvento] Error en catch:', error);
-      toast.error('No se pudo desasignar la reserva del evento');
-    } finally {
-      setIsAsignando(false);
-      setOpenActionMenu(null);
-    }
+    });
   };
 
   const abrirModalAsignar = (reservaHabitacion) => {
@@ -314,114 +323,132 @@ export default function AdminEventRooms() {
     return sortOrder === 'asc' ? <FaArrowUp className="ml-1 inline-block w-3 h-3" /> : <FaArrowDown className="ml-1 inline-block w-3 h-3" />;
   };
 
-  const handleConfirmarReserva = async (reservaId) => {
+  const handleConfirmarReserva = (reservaId) => {
     if (!reservaId) return;
-    // console.log(`[AdminEventRooms] INICIO handleConfirmarReserva (ID: ${reservaId})`);
-    setIsLoading(true);
-    try {
-      const url = `/reservas/habitaciones/${reservaId}/estado`;
-      // console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, { estado: 'confirmada' });
-      // console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
-      
-      if (response && response.success === true) {
-        toast.success('Reserva confirmada correctamente');
-        loadAllReservations(false); // Sin await
-      } else {
-        throw new Error(response?.message || 'Error al confirmar la reserva');
+    setOpenActionMenu(null); // Cerrar menú antes de mostrar modal
+    showConfirmation({
+      title: 'Confirmar Reserva',
+      message: '¿Estás seguro de que quieres marcar esta reserva como confirmada?',
+      iconType: 'confirm',
+      confirmText: 'Sí, confirmar',
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          const url = `/reservas/habitaciones/${reservaId}/estado`;
+          const response = await apiClient.patch(url, { estado: 'confirmada' });
+          if (response && response.success === true) {
+            toast.success('Reserva confirmada correctamente');
+            loadAllReservations(false);
+          } else {
+            throw new Error(response?.message || 'Error al confirmar la reserva');
+          }
+        } catch (error) {
+          console.error('Error confirmando reserva (evento):', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          toast.error('Error al confirmar reserva: ' + errorMessage);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Error confirmando reserva (evento):', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      toast.error('Error al confirmar reserva: ' + errorMessage);
-    } finally {
-      setIsLoading(false);
-      setOpenActionMenu(null); // Cerrar menú
-    }
+    });
   };
 
-  const handleCancelarReserva = async (reservaId) => {
+  const handleCancelarReserva = (reservaId) => {
     if (!reservaId) return;
-    // console.log(`[AdminEventRooms] INICIO handleCancelarReserva (ID: ${reservaId})`);
-    setIsLoading(true);
-    try {
-      const url = `/reservas/habitaciones/${reservaId}/estado`;
-      // console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, { estado: 'cancelada' });
-      // console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
-
-      if (response && response.success === true) {
-        toast.success('Reserva cancelada correctamente');
-        loadAllReservations(false); // Sin await
-      } else {
-        throw new Error(response?.message || 'Error al cancelar la reserva');
+    setOpenActionMenu(null);
+    showConfirmation({
+      title: 'Cancelar Reserva',
+      message: '¿Estás seguro de que quieres cancelar esta reserva? Esta acción podría ser irreversible.',
+      iconType: 'danger',
+      confirmText: 'Sí, cancelar reserva',
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          const url = `/reservas/habitaciones/${reservaId}/estado`;
+          const response = await apiClient.patch(url, { estado: 'cancelada' });
+          if (response && response.success === true) {
+            toast.success('Reserva cancelada correctamente');
+            loadAllReservations(false);
+          } else {
+            throw new Error(response?.message || 'Error al cancelar la reserva');
+          }
+        } catch (error) {
+          console.error('Error cancelando reserva (evento):', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          toast.error('Error al cancelar reserva: ' + errorMessage);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Error cancelando reserva (evento):', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      toast.error('Error al cancelar reserva: ' + errorMessage);
-    } finally {
-      setIsLoading(false);
-      setOpenActionMenu(null); // Cerrar menú
-    }
+    });
   };
   
-  const handleMarcarPendiente = async (reservaId) => {
+  const handleMarcarPendiente = (reservaId) => {
     if (!reservaId) return;
-    // console.log(`[AdminEventRooms] INICIO handleMarcarPendiente (ID: ${reservaId})`);
-    setIsLoading(true);
-    try {
-      const url = `/reservas/habitaciones/${reservaId}/estado`;
-      // console.log(`[AdminEventRooms] Llamando apiClient.patch directamente a ${url}...`);
-      const response = await apiClient.patch(url, { estado: 'pendiente' });
-      // console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
-
-      if (response && response.success === true) {
-        toast.success('Reserva marcada como pendiente');
-        loadAllReservations(false); // Sin await
-      } else {
-        throw new Error(response?.message || 'Error al marcar como pendiente');
+    setOpenActionMenu(null);
+    showConfirmation({
+      title: 'Marcar como Pendiente',
+      message: '¿Estás seguro de que quieres marcar esta reserva como pendiente?',
+      iconType: 'info',
+      confirmText: 'Sí, marcar pendiente',
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          const url = `/reservas/habitaciones/${reservaId}/estado`;
+          const response = await apiClient.patch(url, { estado: 'pendiente' });
+          if (response && response.success === true) {
+            toast.success('Reserva marcada como pendiente');
+            loadAllReservations(false);
+          } else {
+            throw new Error(response?.message || 'Error al marcar como pendiente');
+          }
+        } catch (error) {
+          console.error('Error marcando pendiente reserva (evento):', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          toast.error('Error al marcar pendiente: ' + errorMessage);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      console.error('Error marcando pendiente reserva (evento):', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      toast.error('Error al marcar pendiente: ' + errorMessage);
-    } finally {
-      setIsLoading(false);
-      setOpenActionMenu(null); // Cerrar menú
-    }
+    });
   };
 
-  const handleEliminarReserva = async (reservaId) => {
+  const handleEliminarReserva = (reservaId) => {
     if (!reservaId) {
       toast.error('ID inválido para eliminar.');
       return;
     }
-    const confirm = window.confirm('¿Seguro que quieres eliminar esta reserva de habitación?');
-    if (confirm) {
-      setIsLoading(true);
-      try {
-        // Podríamos llamar a apiClient.delete directamente o usar servicio si existe
-        const url = `/reservas/habitaciones/${reservaId}`;
-        // console.log(`[AdminEventRooms] Llamando apiClient.delete directamente a ${url}...`);
-        const response = await apiClient.delete(url);
-        // console.log('[AdminEventRooms] Respuesta DIRECTA de API recibida:', JSON.stringify(response));
-
-        if (response && response.success) { // Asumiendo que delete devuelve { success: true }
-          toast.success('Reserva eliminada con éxito');
-          loadAllReservations(false); // Sin await
-        } else {
-          throw new Error(response?.message || 'Error al eliminar');
+    setOpenActionMenu(null);
+    showConfirmation({
+      title: 'Eliminar Reserva',
+      message: '¿Estás absolutamente seguro de que quieres eliminar esta reserva de habitación? Esta acción no se puede deshacer.',
+      iconType: 'danger',
+      confirmText: 'Sí, eliminar permanentemente',
+      onConfirm: async () => {
+        setIsLoading(true);
+        try {
+          const url = `/reservas/habitaciones/${reservaId}`;
+          const response = await apiClient.delete(url);
+          if (response && response.success) {
+            toast.success('Reserva eliminada con éxito');
+            loadAllReservations(false);
+          } else {
+            // Si el delete falla pero devuelve un mensaje (ej. por estar asociada a evento)
+            if (response?.message) {
+              toast.error(response.message);
+            } else {
+              throw new Error(response?.message || 'Error al eliminar');
+            }
+          }
+        } catch (error) {
+          console.error('Error eliminando reserva (evento):', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          toast.error('Error al eliminar: ' + errorMessage);
+        } finally {
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.error('Error eliminando reserva (evento):', error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        toast.error('Error al eliminar: ' + errorMessage);
-      } finally {
-        setIsLoading(false);
-        setOpenActionMenu(null);
       }
-    }
+    });
   };
 
   if (authLoading) {
