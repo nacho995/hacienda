@@ -6,7 +6,7 @@ import { FaCalendarAlt, FaWifi, FaUserFriends, FaEnvelope, FaPhone, FaSpinner, F
 import { toast } from 'sonner';
 import { 
   createMultipleReservaciones, 
-  createReservaHabitacion,
+  createHabitacionReservation,
   getFechasOcupadasPorHabitacion, // Renombrado desde getHabitacionOccupiedDates
   getFechasEventosEnRango, // Nuevo servicio
   verificarDisponibilidadHabitaciones // Importar si no estaba ya
@@ -447,11 +447,10 @@ function BookingFormSection({
 
       let response;
       if (formattedReservations.length === 1) {
-        // Llamar a la API para una sola habitación
-        response = await createReservaHabitacion(formattedReservations[0]);
+        // Llamar a la API para una sola habitación con el nombre correcto
+        response = await createHabitacionReservation(formattedReservations[0]);
       } else {
         // Llamar a la API para múltiples habitaciones (batch)
-        // Asegurarse de enviar el formato esperado { reservas: [...] }
         response = await createMultipleReservaciones({ reservas: formattedReservations }); 
       }
 
