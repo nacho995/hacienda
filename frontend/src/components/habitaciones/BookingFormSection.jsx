@@ -6,6 +6,7 @@ import { FaCalendarAlt, FaWifi, FaUserFriends, FaEnvelope, FaPhone, FaSpinner, F
 import { toast } from 'sonner';
 import { 
   createMultipleReservaciones, 
+  createReservaHabitacion,
   getFechasOcupadasPorHabitacion, // Renombrado desde getHabitacionOccupiedDates
   getFechasEventosEnRango, // Nuevo servicio
   verificarDisponibilidadHabitaciones // Importar si no estaba ya
@@ -454,10 +455,20 @@ function BookingFormSection({
         fechaSalida: formatApiDate(r.fechaSalida)
       }));
 
-      const response = await createMultipleReservaciones(formattedReservations);
+      let response;
+      if (formattedReservations.length === 1) {
+        // Llamar a la API para una sola habitación
+        response = await createReservaHabitacion(formattedReservations[0]);
+      } else {
+        // Llamar a la API para múltiples habitaciones (batch)
+        // Asegurarse de enviar el formato esperado { reservas: [...] }
+        response = await createMultipleReservaciones({ reservas: formattedReservations }); 
+      }
 
       if (response.success && response.data) {
-        setMultipleReservationConfirmations(response.data); // Guardar detalles de éxito
+        // Ajustar para manejar tanto respuesta individual como múltiple
+        const confirmations = Array.isArray(response.data) ? response.data : [response.data];
+        setMultipleReservationConfirmations(confirmations); // Guardar detalles de éxito
         setShowReservationSuccess(true); // Mostrar modal de éxito
         toast.success('¡Reserva(s) creada(s) exitosamente!');
         // Resetear formulario o redirigir opcionalmente
