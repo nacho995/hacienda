@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { FaCheck, FaExclamationTriangle } from 'react-icons/fa';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FaCalendarAlt, FaArrowRight } from 'react-icons/fa';
@@ -8,6 +10,81 @@ import { FaCalendarAlt, FaArrowRight } from 'react-icons/fa';
 export default function CTASection() {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef(null);
+  
+  const [formState, setFormState] = useState({
+    nombre: '',
+    email: '',
+    telefono: '',
+    tipoEvento: '',
+    mensaje: '',
+  });
+  const [errors, setErrors] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverError, setServerError] = useState(null);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormState(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: null }));
+    }
+    if (serverError) setServerError(null);
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formState.nombre.trim()) newErrors.nombre = "Nombre requerido";
+    if (!formState.email.trim()) {
+      newErrors.email = "Email requerido";
+    } else if (!/\S+@\S+\.\S+/.test(formState.email)) {
+      newErrors.email = "Email inválido";
+    }
+    // Añadir más validaciones si se desea (teléfono, tipo evento)
+    return newErrors;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    console.log('>>> CTA handleSubmit INICIADO');
+    const formErrors = validateForm();
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setServerError(null);
+    setSubmitted(false);
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/contacto`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formState),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Hubo un problema al enviar la solicitud');
+      }
+
+      setIsSubmitting(false);
+      setSubmitted(true);
+      setFormState({ nombre: '', email: '', telefono: '', tipoEvento: '', mensaje: '' });
+      setErrors({});
+      // Opcional: ocultar mensaje de éxito después de unos segundos
+      // setTimeout(() => setSubmitted(false), 5000);
+    } catch (error) {
+      console.error('>>> ERROR en CTA handleSubmit:', error);
+      setIsSubmitting(false);
+      setServerError(error.message || 'Error enviando. Intente más tarde.');
+    }
+  };
   
   // Detectar cuando la sección es visible
   useEffect(() => {
@@ -106,23 +183,42 @@ export default function CTASection() {
                   Solicita Información
                 </h3>
                 
-                <form className="space-y-6">
+                {submitted && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 p-4 bg-green-100 border border-green-300 text-green-800 rounded flex items-center">
+                    <FaCheck className="mr-2" /> ¡Solicitud enviada con éxito!
+                  </motion.div>
+                )}
+                {serverError && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded flex items-center">
+                    <FaExclamationTriangle className="mr-2" /> {serverError}
+                  </motion.div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Nombre</label>
                       <input 
                         type="text" 
-                        className="w-full border-b-2 border-gray-300 py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        name="nombre"
+                        value={formState.nombre}
+                        onChange={handleChange}
+                        className={`w-full border-b-2 ${errors.nombre ? 'border-red-500' : 'border-gray-300'} py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors`}
                         placeholder="Tu nombre"
                       />
+                      {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre}</p>}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Correo Electrónico</label>
                       <input 
                         type="email" 
-                        className="w-full border-b-2 border-gray-300 py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        name="email"
+                        value={formState.email}
+                        onChange={handleChange}
+                        className={`w-full border-b-2 ${errors.email ? 'border-red-500' : 'border-gray-300'} py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors`}
                         placeholder="correo@ejemplo.com"
                       />
+                      {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                     </div>
                   </div>
                   
@@ -131,18 +227,26 @@ export default function CTASection() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono</label>
                       <input 
                         type="tel" 
+                        name="telefono"
+                        value={formState.telefono}
+                        onChange={handleChange}
                         className="w-full border-b-2 border-gray-300 py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
                         placeholder="Tu teléfono"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Evento</label>
-                      <select className="w-full border-b-2 border-gray-300 py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors appearance-none bg-transparent">
+                      <select 
+                        name="tipoEvento"
+                        value={formState.tipoEvento}
+                        onChange={handleChange}
+                        className="w-full border-b-2 border-gray-300 py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors appearance-none bg-transparent">
                         <option value="">Seleccionar...</option>
                         <option value="boda">Boda</option>
                         <option value="corporativo">Evento Corporativo</option>
                         <option value="social">Evento Social</option>
                         <option value="ceremonia">Ceremonia Religiosa</option>
+                        <option value="otro">Otro</option>
                       </select>
                     </div>
                   </div>
@@ -150,6 +254,9 @@ export default function CTASection() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Mensaje</label>
                     <textarea 
+                      name="mensaje"
+                      value={formState.mensaje}
+                      onChange={handleChange}
                       className="w-full border-b-2 border-gray-300 py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors min-h-[100px]"
                       placeholder="Cuéntanos sobre tu evento..."
                     ></textarea>
@@ -158,9 +265,12 @@ export default function CTASection() {
                   <div>
                     <button
                       type="submit"
-                      className="w-full py-4 bg-[var(--color-primary)] text-black hover:bg-[var(--color-primary-dark)] transition-colors tracking-wider uppercase text-sm font-medium"
+                      disabled={isSubmitting}
+                      className={`w-full py-4 bg-[var(--color-primary)] text-black hover:bg-[var(--color-primary-dark)] transition-colors tracking-wider uppercase text-sm font-medium ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
-                      <span className="text-black">Enviar Solicitud</span>
+                      <span className="text-black">
+                        {isSubmitting ? 'Enviando...' : 'Enviar Solicitud'}
+                      </span>
                     </button>
                   </div>
                 </form>
