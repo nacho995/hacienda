@@ -62,6 +62,7 @@ exports.register = async (req, res) => {
                 <p>Si no reconoces esta solicitud, por favor ignórala.</p>
               `;
             
+            console.log(`>>> [Auth/Register] Intentando enviar solicitud de aprobación a admin: ${adminEmails}`);
             await sendEmail({
               to: adminEmails, // Pasa la matriz de correos
               subject: 'Nueva solicitud de registro de Usuario - Hacienda San Carlos Borromeo',
@@ -74,6 +75,16 @@ exports.register = async (req, res) => {
       } else {
           console.warn("ADMIN_EMAIL (registro usuario) no está configurado.");
       }
+
+      console.log(`>>> [Auth/Register] Intentando enviar bienvenida a: ${user.email}`);
+      await sendEmail({
+        to: user.email,
+        subject: '¡Tu cuenta ha sido aprobada! - Hacienda San Carlos Borromeo',
+        html: userAccountApprovedTemplate({
+          nombreUsuario: user.nombre,
+          loginUrl: `${process.env.CLIENT_URL}/login`
+        })
+      });
 
       res.status(201).json({
         success: true,
@@ -146,6 +157,7 @@ exports.registerAdmin = async (req, res) => {
               confirmUrl: confirmUrl
             });
             
+            console.log(`>>> [Auth/RegisterAdmin] Intentando enviar solicitud de aprobación a admin: ${adminEmails}`);
             await sendEmail({
               to: adminEmails, // Pasa la matriz de correos
               subject: 'Nueva solicitud de cuenta de administrador - Hacienda San Carlos Borromeo',
@@ -224,6 +236,7 @@ exports.confirmAccount = async (req, res) => {
         loginUrl: loginUrl
       });
       
+      console.log(`>>> [Auth/ConfirmAccount] Intentando enviar correo de aprobación al usuario: ${user.email}`);
       await sendEmail({
         to: user.email,
         subject: '¡Tu cuenta ha sido aprobada! - Hacienda San Carlos Borromeo',
@@ -437,6 +450,7 @@ exports.forgotPassword = async (req, res) => {
     // Crear URL de reseteo
     const resetUrl = `${process.env.CLIENT_URL}/restablecer-contrasena/${resetToken}`;
 
+    console.log(`>>> [Auth/ForgotPass] Intentando enviar email a: ${user.email}`);
     try {
       // --- Actualizar envío de email --- (Usar nueva plantilla)
       const htmlResetRequest = passwordResetRequestTemplate({
@@ -533,6 +547,7 @@ exports.resetPassword = async (req, res) => {
           loginUrl: loginUrl
       });
       
+      console.log(`>>> [Auth/ResetPass] Intentando enviar correo de confirmación de reseteo a: ${user.email}`);
       await sendEmail({
         to: user.email,
         subject: 'Contraseña restablecida - Hacienda San Carlos Borromeo',

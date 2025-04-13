@@ -113,6 +113,9 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
     const reserva = req.reservaCreada;
     const metodoPagoSeleccionado = req.metodoPago;
 
+    console.log(`>>> [ReservaHabitación] Valor de 'reserva' antes del IF de email: ${reserva ? reserva._id : String(reserva)}`);
+    console.log(`>>> [ReservaHabitación] typeof sendEmail: ${typeof sendEmail}`);
+
     if (reserva && typeof sendEmail === 'function') {
       try {
         let mensajeAdicionalCliente = '';

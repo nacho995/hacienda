@@ -1,6 +1,7 @@
 const asyncHandler = require('../middleware/async');
 const { sendEmail } = require('../utils/email');
 const contactFormConfirmation = require('../emails/contactFormConfirmation');
+const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
 
 /**
  * @desc    Envía mensaje de contacto desde el formulario
@@ -55,20 +56,22 @@ exports.enviarFormularioContacto = asyncHandler(async (req, res) => {
       }
       
       if (adminEmails) { // Comprobamos si hay emails válidos (string o array no vacío)
-        const htmlAdmin = `
-          <h1>Nuevo mensaje de contacto</h1>
-          <p>Se ha recibido un nuevo mensaje de contacto con los siguientes detalles:</p>
-          <ul>
-            <li><strong>Nombre:</strong> ${nombreCompleto}</li>
-            <li><strong>Email:</strong> ${email}</li>
-            <li><strong>Teléfono:</strong> ${telefono}</li>
-            <li><strong>Fecha tentativa:</strong> ${fecha || 'No especificada'}</li>
-            <li><strong>Tipo de evento:</strong> ${tipoEvento}</li>
-            <li><strong>Número de invitados:</strong> ${invitados || 'No especificado'}</li>
-          </ul>
-          <h2>Mensaje:</h2>
-          <p>${mensaje || 'Sin mensaje adicional'}</p>
-        `;
+        // Usar la plantilla notificacionGestionAdmin
+        const htmlAdmin = notificacionGestionAdmin({
+          tipo: 'info', // o 'contact'
+          asunto: `Nuevo Contacto: ${nombreCompleto} (${tipoEvento || 'Sin especificar'})`,
+          mensaje: `Se ha recibido un nuevo mensaje de contacto.<br/><br/>
+                     <strong>Nombre:</strong> ${nombreCompleto}<br/>
+                     <strong>Email:</strong> ${email}<br/>
+                     <strong>Teléfono:</strong> ${telefono || 'No especificado'}<br/>
+                     <strong>Fecha tentativa:</strong> ${fecha ? new Date(fecha).toLocaleDateString('es-ES') : 'No especificada'}<br/>
+                     <strong>Tipo de evento:</strong> ${tipoEvento || 'No especificado'}<br/>
+                     <strong>Invitados:</strong> ${invitados || 'No especificado'}<br/><br/>
+                     <strong>Mensaje:</strong><br/>${mensaje || 'Sin mensaje adicional'}`,
+          // Opcional: enlace para ver detalles en un panel de admin
+          // enlaceAccion: `${process.env.FRONTEND_URL}/admin/mensajes`, 
+          // textoEnlace: 'Ver Mensaje'
+        });
         
         console.log(`>>> [Contacto] Intentando enviar email de notificación a administradores: ${adminEmails}`);
         await sendEmail({
