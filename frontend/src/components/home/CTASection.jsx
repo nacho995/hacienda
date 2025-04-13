@@ -40,13 +40,33 @@ export default function CTASection() {
     } else if (!/\S+@\S+\.\S+/.test(formState.email)) {
       newErrors.email = "Email inválido";
     }
-    // Añadir más validaciones si se desea (teléfono, tipo evento)
+    // --- VALIDACIÓN TELÉFONO MX/ES --- 
+    const telefonoLimpio = formState.telefono?.trim().replace(/\s+/g, '') || '';
+    const mexicoRegex = /^\d{10}$/;
+    const españaRegex = /^[6789]\d{8}$/;
+    if (telefonoLimpio && !mexicoRegex.test(telefonoLimpio) && !españaRegex.test(telefonoLimpio)) { 
+      newErrors.telefono = "Teléfono inválido (10 dígitos MX o 9 ES)";
+    }
+    // ---------------------------------
+    // Añadir más validaciones si se desea (tipo evento)
     return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log('>>> CTA handleSubmit INICIADO');
+    
+    // --- VALIDACIÓN TELÉFONO MX/ES (en handleSubmit) ---
+    const telefonoLimpioSubmit = formState.telefono?.trim().replace(/\s+/g, '') || '';
+    const mexicoRegexSubmit = /^\d{10}$/;
+    const españaRegexSubmit = /^[6789]\d{8}$/;
+    if (telefonoLimpioSubmit && !mexicoRegexSubmit.test(telefonoLimpioSubmit) && !españaRegexSubmit.test(telefonoLimpioSubmit)) {
+        // Añadir error al estado de errores para mostrarlo visualmente
+        setErrors(prev => ({ ...prev, telefono: "Teléfono inválido (10 dígitos MX o 9 ES)" }));
+        return; // Detener envío si el teléfono es inválido (incluso si es opcional)
+    }
+    // -----------------------------------------------------
+
     const formErrors = validateForm();
     if (Object.keys(formErrors).length > 0) {
       setErrors(formErrors);
@@ -230,9 +250,10 @@ export default function CTASection() {
                         name="telefono"
                         value={formState.telefono}
                         onChange={handleChange}
-                        className="w-full border-b-2 border-gray-300 py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors"
+                        className={`w-full border-b-2 ${errors.telefono ? 'border-red-500' : 'border-gray-300'} py-3 px-4 focus:border-[var(--color-primary)] focus:outline-none transition-colors`}
                         placeholder="Tu teléfono"
                       />
+                      {errors.telefono && <p className="text-red-500 text-xs mt-1">{errors.telefono}</p>}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Evento</label>

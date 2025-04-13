@@ -50,7 +50,14 @@ export default function ContactForm() {
     } else if (!/\S+@\S+\.\S+/.test(formState.email)) {
       newErrors.email = "Por favor ingrese un email válido";
     }
-    if (!formState.telefono.trim()) newErrors.telefono = "Por favor ingrese su teléfono";
+    const telefonoLimpio = formState.telefono?.trim().replace(/\s+/g, '') || '';
+    const mexicoRegex = /^\d{10}$/;
+    const españaRegex = /^[6789]\d{8}$/;
+    if (!telefonoLimpio) {
+      newErrors.telefono = "Por favor ingrese su teléfono";
+    } else if (!mexicoRegex.test(telefonoLimpio) && !españaRegex.test(telefonoLimpio)) { 
+      newErrors.telefono = "Teléfono inválido (10 dígitos MX o 9 ES)";
+    }
     if (!formState.tipoEvento) newErrors.tipoEvento = "Por favor seleccione un tipo de evento";
     
     return newErrors;
@@ -59,6 +66,14 @@ export default function ContactForm() {
   const handleSubmit = async (e) => {
     console.log('>>> handleSubmit INICIADO');
     e.preventDefault();
+    
+    const telefonoLimpioSubmit = formState.telefono?.trim().replace(/\s+/g, '') || '';
+    const mexicoRegexSubmit = /^\d{10}$/;
+    const españaRegexSubmit = /^[6789]\d{8}$/;
+    if (telefonoLimpioSubmit && !mexicoRegexSubmit.test(telefonoLimpioSubmit) && !españaRegexSubmit.test(telefonoLimpioSubmit)) {
+        setErrors(prev => ({ ...prev, telefono: "Teléfono inválido (10 dígitos MX o 9 ES)" }));
+        return;
+    }
     
     const formErrors = validateForm();
     if (Object.keys(formErrors).length > 0) {

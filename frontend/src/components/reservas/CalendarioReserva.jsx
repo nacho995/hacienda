@@ -12,28 +12,38 @@ registerLocale('es', es);
 setDefaultLocale('es');
 
 /**
- * Componente de calendario basado en react-datepicker
+ * Componente de calendario basado en react-datepicker para SELECCIÓN DE RANGO DE FECHAS
  */
-// MODIFICADO: Cambiar las props recibidas
 const CalendarioReserva = ({ 
-  startDate, 
-  endDate, 
-  onChange, // Espera una función que recibe [start, end]
+  startDate, // Fecha de inicio seleccionada
+  endDate,   // Fecha de fin seleccionada
+  onChange,  // Espera una función que recibe el array [startDate, endDate]
   occupiedDates = [], 
   loadingOccupiedDates = false, 
-  placeholderText = "Seleccione una fecha" 
+  placeholderText = "Seleccione un rango de fechas", // Placeholder actualizado
+  onMonthChange // Prop para manejar cambio de mes (pasarla si existe)
 }) => {
-
-  // Eliminamos el estado interno y la lógica de carga/estilos, 
-  // ya que ahora se manejan en el componente padre (ReservaWizard)
 
   // Función para determinar si una fecha debe estar deshabilitada
   const isDateOccupied = (date) => {
-    return occupiedDates.some(occupied => 
-      occupied.getDate() === date.getDate() &&
-      occupied.getMonth() === date.getMonth() &&
-      occupied.getFullYear() === date.getFullYear()
-    );
+    // Normalizar la fecha a medianoche UTC para comparación consistente
+    const dateOnly = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    return occupiedDates.some(occupied => {
+      // Asegurarse que occupied es un objeto Date válido
+      if (!(occupied instanceof Date) || isNaN(occupied.getTime())) return false;
+      const occupiedOnly = new Date(Date.UTC(occupied.getFullYear(), occupied.getMonth(), occupied.getDate()));
+      return occupiedOnly.getTime() === dateOnly.getTime();
+    });
+  };
+  
+  // Función interna para manejar el cambio de mes y llamar a la prop si existe
+  const handleInternalMonthChange = (date) => {
+    if (onMonthChange) {
+      // Calcular inicio y fin del mes visible para pasar a la prop
+      const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+      const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      onMonthChange(firstDayOfMonth, lastDayOfMonth);
+    }
   };
 
   return (
@@ -42,23 +52,26 @@ const CalendarioReserva = ({
         <FaCalendarAlt className="text-[#A5856A]" />
       </div>
       <DatePicker
-        selected={startDate} // Usar startDate como la fecha "seleccionada" inicial
-        onChange={onChange} // La función que actualiza [startDate, endDate]
-        startDate={startDate}
-        endDate={endDate}
-        selectsRange={true} // Habilitar selección de rango
+        selectsRange={true} // <-- HABILITAR SELECCIÓN DE RANGO
+        startDate={startDate} // <-- Pasar fecha de inicio
+        endDate={endDate}     // <-- Pasar fecha de fin
+        onChange={onChange}   // <-- Pasar la función que recibe el array [start, end]
         filterDate={date => !isDateOccupied(date)} // Deshabilitar fechas ocupadas
         minDate={new Date()} // No permitir fechas pasadas
         locale="es" // Usar español
         dateFormat="dd/MM/yyyy" // Formato de fecha
-        placeholderText={placeholderText} // Texto de ayuda
+        placeholderText={placeholderText} // Texto de ayuda actualizado
         className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow cursor-pointer"
-        wrapperClassName="w-full" // Asegurar que el wrapper ocupe todo el ancho
-        calendarClassName="border-[#D1B59B] shadow-lg rounded-lg" // Estilos para el popover del calendario
+        wrapperClassName="w-full" 
+        calendarClassName="border-[#D1B59B] shadow-lg rounded-lg"
         dayClassName={date => 
           isDateOccupied(date) ? 'react-datepicker__day--disabled occupied-date' : undefined
-        } // Clases para días (opcional, filterDate ya deshabilita)
-        popperPlacement="bottom-start" // Posición del calendario
+        } 
+        popperPlacement="bottom-start"
+        monthsShown={1} // Mostrar un mes a la vez por defecto
+        shouldCloseOnSelect={false} // <-- IMPORTANTE: No cerrar al seleccionar la primera fecha del rango
+        onMonthChange={handleInternalMonthChange} // <-- Usar handler interno para pasar fechas correctas
+        // selected={undefined} // <-- Asegurarse de que 'selected' no esté presente
       />
       {/* Indicador de carga */} 
       {loadingOccupiedDates && (
@@ -66,7 +79,6 @@ const CalendarioReserva = ({
           <FaSpinner className="animate-spin text-[#A5856A]" />
         </div>
       )}
-      {/* Eliminamos la leyenda anterior, ya que react-datepicker maneja la deshabilitación visual */}
     </div>
   );
 };

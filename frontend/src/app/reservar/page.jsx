@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle, FaUsers, FaUserCog } from 'react-icons/fa';
+import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle, FaUsers, FaUserCog, FaCreditCard, FaUniversity, FaMoneyBillWave, FaCheckCircle, FaClock } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@/context/AuthContext'; 
@@ -10,7 +10,9 @@ import { useReservation } from '@/context/ReservationContext';
 import { getTiposEvento } from '@/services/tiposEvento.service';
 import { 
     createEventoReservation, 
-    getFechasOcupadasGlobales // <-- Usaremos la nueva función global
+    getFechasOcupadasGlobales,
+    seleccionarMetodoPago,
+    createEventoPaymentIntent
 } from '@/services/reservationService'; 
 
 import ModoSeleccionEvento from '@/components/reservas/ModoSeleccionEvento';
@@ -20,6 +22,13 @@ import ModalModoGestionHabitaciones from '@/components/reservas/ModalModoGestion
 import CalendarioReserva from '@/components/reservas/CalendarioReserva';
 import NavbarReservar from '@/components/layout/NavbarReservar';
 import Footer from '@/components/layout/Footer';
+import { Elements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
+import CheckoutForm from '@/components/reservas/CheckoutForm';
+
+// Cargar Stripe fuera del render para evitar recargas
+// Usa tu clave pública de Stripe (debería estar en variables de entorno)
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'TU_CLAVE_PUBLICA_DE_STRIPE'); 
 
 // --- Helper Functions ---
 // Función auxiliar para formatear fecha para la API (consistentemente YYYY-MM-DD)
@@ -33,9 +42,18 @@ const formatApiDate = (date) => {
 
 // --- Componente Principal y Wizard ---
 const ReservarPage = () => {
+  // Opciones para el Elements provider (puedes personalizar apariencia, etc.)
+  const options = {
+    // clientSecret: se pasará más adelante cuando creemos el PaymentIntent
+    // appearance: { theme: 'stripe' }, 
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
-      <ReservaWizard />
+      {/* Envolver el Wizard con Elements */}
+      <Elements stripe={stripePromise} options={options}>
+        <ReservaWizard />
+      </Elements>
     </div>
   );
 };
@@ -91,10 +109,16 @@ const ReservaWizard = () => {
   const [validationRedirectStep, setValidationRedirectStep] = useState(null);
   const [selectedEventType, setSelectedEventType] = useState(formData.tipoEvento || null);
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const wizardContentRef = useRef(null);
+  const [createdReservationId, setCreatedReservationId] = useState(null);
   
   // --- Estados para fechas ocupadas globales --- 
   const [occupiedDates, setOccupiedDates] = useState([]); // Almacena objetos Date
   const [loadingOccupiedDates, setLoadingOccupiedDates] = useState(false);
+  const [stripeClientSecret, setStripeClientSecret] = useState('');
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // --- Función para cargar fechas ocupadas GLOBALES --- 
   const fetchGlobalOccupiedDates = useCallback(async (fechaInicioVisible, fechaFinVisible) => {
@@ -175,6 +199,11 @@ const ReservaWizard = () => {
       title: 'Resumen de la Reserva',
       description: 'Revise los detalles de su reserva',
       icon: FaCheck
+    },
+    {
+      title: 'Seleccionar Método de Pago',
+      description: 'Elija cómo desea pagar su reserva',
+      icon: FaCreditCard
     }
   ];
 
@@ -267,11 +296,16 @@ const ReservaWizard = () => {
         toast.error('Por favor, ingrese un email válido');
         return;
       }
-      const telefonoRegex = /^\d{9,}$/;
-      if (!telefonoRegex.test(telefono.replace(/\s+/g, ''))) {
-        toast.error('Por favor, ingrese un número de teléfono válido (mínimo 9 dígitos)');
+      // --- VALIDACIÓN TELÉFONO MX/ES ---
+      const telefonoLimpio = telefono.replace(/\s+/g, ''); // Quitar espacios
+      const mexicoRegex = /^\d{10}$/; // 10 dígitos MX
+      const españaRegex = /^[6789]\d{8}$/; // 9 dígitos ES (empieza por 6, 7, 8 o 9)
+
+      if (!mexicoRegex.test(telefonoLimpio) && !españaRegex.test(telefonoLimpio)) {
+        toast.error('Por favor, ingrese un número de teléfono válido (10 dígitos para MX o 9 dígitos para ES)');
         return;
       }
+      // ---------------------------------
     }
     
     if (currentStep === 6) {
@@ -289,11 +323,14 @@ const ReservaWizard = () => {
 
   // Añadido: Manejador para el cambio de rango de fechas
   const handleDateRangeChange = (dates) => {
+    console.log("[handleDateRangeChange] Fechas recibidas:", dates);
     const [start, end] = dates;
     // Asegurarse de que las fechas sean válidas antes de actualizar
     const startDate = start instanceof Date && !isNaN(start) ? start : null;
     const endDate = end instanceof Date && !isNaN(end) ? end : null;
     
+    console.log("[handleDateRangeChange] Actualizando estado con:", { startDate, endDate });
+
     updateFormSection('fechaInicio', startDate);
     updateFormSection('fechaFin', endDate);
   };
@@ -323,48 +360,35 @@ const ReservaWizard = () => {
   };
 
   const handleSubmit = async () => {
-    // Prevalidación final (opcional, ya se validó por pasos)
-    // ...
-
     setLoading(true);
     try {
-      // Preparar datos para la API
       const apiData = {
-        tipo_evento: formData.tipoEvento?.titulo || formData.tipoEvento, // Enviar el título o el string
+        tipo_evento: formData.tipoEvento, 
         fecha: formData.fechaInicio ? formData.fechaInicio.toISOString().split('T')[0] : null,
-        // Incluir fechas inicio/fin si es necesario por el backend, aunque el modelo de evento solo usa una fecha?
-        // fechaInicio: formData.fechaInicio?.toISOString(),
-        // fechaFin: formData.fechaFin?.toISOString(),
-        nombre_contacto: formData.datosContacto.nombre,
-        apellidos_contacto: formData.datosContacto.apellidos,
-        email_contacto: formData.datosContacto.email,
-        telefono_contacto: formData.datosContacto.telefono,
-        mensaje: formData.datosContacto.mensaje,
+        nombre_contacto: formData.datosContacto?.nombre,
+        apellidos_contacto: formData.datosContacto?.apellidos,
+        email_contacto: formData.datosContacto?.email,
+        telefono_contacto: formData.datosContacto?.telefono,
+        mensaje: formData.datosContacto?.mensaje,
         modo_gestion_habitaciones: formData.modoGestionHabitaciones,
-        // Solo enviar habitaciones si el modo es 'usuario'
         habitaciones: formData.modoGestionHabitaciones === 'usuario' ? formData.habitacionesSeleccionadas : undefined,
         modo_gestion_servicios: formData.modoGestionServicios,
-        // Solo enviar servicios si el modo es 'usuario'
-        serviciosContratados: formData.modoGestionServicios === 'usuario' ? formData.serviciosSeleccionados.map(s => s._id) : undefined,
-        // Pasar servicios completos para cálculo de precio si modo es 'usuario'
+        serviciosContratados: formData.modoGestionServicios === 'usuario' ? formData.serviciosSeleccionados?.map(s => s._id) : undefined,
         _serviciosCompletosParaPrecio: formData.modoGestionServicios === 'usuario' ? formData.serviciosSeleccionados : undefined,
-        // Otros campos necesarios por el backend...
-        numInvitados: formData.numeroInvitados || 50, // Añadir numInvitados si se pide en algún paso
+        numInvitados: formData.numeroInvitados || 50,
       };
 
-      console.log("Enviando datos de reserva a la API:", apiData);
+      console.log(">>> Datos EXACTOS a enviar a createEventoReservation:", JSON.stringify(apiData, null, 2));
 
       // Llamar a la API
       const response = await createEventoReservation(apiData);
 
       console.log("Respuesta de la API:", response);
 
-      if (response.success) {
+      if (response.success && response.data) {
         toast.success(response.message || '¡Reserva creada con éxito! Nos pondremos en contacto pronto.');
-        // Avanzar al paso de confirmación (si existe) o resetear/redirigir
-        setCurrentStep(steps.length + 1); // Ir a un paso final de confirmación
-        // resetForm(); // O resetear aquí
-        // router.push('/gracias-reserva'); // O redirigir
+        setCreatedReservationId(response.data._id);
+        setCurrentStep(7);
       } else {
         // --- MANEJO DE ERROR 409 y OTROS --- 
         if (response.status === 409) {
@@ -398,7 +422,15 @@ const ReservaWizard = () => {
     updateFormSection('tipoEvento', eventType);
   };
 
-  // Renderizar el contenido según el paso actual
+  // Función para manejar el éxito del pago desde CheckoutForm (opcional)
+  const handlePaymentSuccess = () => {
+    toast.success('¡Pago realizado con éxito!');
+    // Podrías redirigir a la página de confirmación aquí si no usas return_url
+    // router.push(`/reserva-confirmada?reservaId=${createdReservationId}`);
+    // O simplemente mostrar un mensaje y actualizar UI
+     setShowCheckoutForm(false); // Ocultar formulario de pago
+  };
+  
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -426,13 +458,10 @@ const ReservaWizard = () => {
               <CalendarioReserva 
                 occupiedDates={occupiedDates} // Pasar fechas ocupadas GLOBALES
                 loadingDates={loadingOccupiedDates} // Pasar estado de carga
-                onDateChange={handleDateRangeChange} // Manejador para selección de fecha
-                initialStartDate={formData.fechaInicio} // Pasar fecha inicio inicial
-                initialEndDate={formData.fechaFin} // Pasar fecha fin inicial
+                onChange={handleDateRangeChange} // <- Nombre correcto
+                startDate={formData.fechaInicio} // <- Cambiado de initialStartDate
+                endDate={formData.fechaFin}       // <- Cambiado de initialEndDate
                 onMonthChange={(startDate, endDate) => fetchGlobalOccupiedDates(startDate, endDate)} // Recargar fechas globales al cambiar mes
-                // Pasar el número de habitaciones si es relevante para este paso
-                // numHabitaciones={formData.numeroHabitaciones} 
-                // onNumHabitacionesChange={(num) => updateFormSection('numeroHabitaciones', num)}
               />
               {loadingOccupiedDates && <p className="text-sm text-gray-500 mt-2">Cargando disponibilidad...</p>}
               {!loadingOccupiedDates && occupiedDates.length > 0 && 
@@ -736,310 +765,292 @@ const ReservaWizard = () => {
         );
       
       case 6:
-        // Paso 6: Resumen de la reserva
         return (
           <div className="max-w-3xl mx-auto">
-            <div className="bg-gradient-to-r from-[#F0E8DC] to-[#E6DCC6] p-6 rounded-xl shadow-md mb-8 border border-[#D1B59B]">
+            <div className="bg-gradient-to-r from-[#F0E8DC] to-[#E6DCC6] p-6 rounded-xl shadow-md border border-[#D1B59B]">
               <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Resumen de su reserva</h3>
-              <p className="text-[#8A6E52] mb-6 italic">Por favor, revise los detalles de su reserva antes de confirmar</p>
-              
-              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-5 mb-6 shadow-sm border border-[#D1B59B]/50">
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 rounded-full bg-[#A5856A]/20 flex items-center justify-center mr-3">
-                    <FaCalendarAlt className="text-[#A5856A]" />
-                  </div>
-                  <h4 className="text-lg font-semibold text-[#5D4B3A]">Detalles del evento</h4>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-12">
-                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
-                    <p className="text-[#8A6E52] text-sm font-medium">Tipo de evento</p>
-                    <p className="font-semibold text-[#5D4B3A] capitalize">
-                      {typeof formData.tipoEvento === 'object' && formData.tipoEvento ? 
-                        (formData.tipoEvento.titulo || formData.tipoEvento.nombre || 'No especificado') : 
-                        (formData.tipoEvento || 'No especificado')}
-                    </p>
-                  </div>
-                  
-                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
-                    <p className="text-[#8A6E52] text-sm font-medium">Fecha</p>
-                    <p className="font-semibold text-[#5D4B3A]">
-                      {formData.fechaInicio ? 
-                        new Date(formData.fechaInicio).toLocaleDateString('es-ES', {
-                          day: 'numeric', month: 'long', year: 'numeric'
-                        })
-                        : 'No especificada'}
-                      {formData.fechaFin && formData.fechaFin !== formData.fechaInicio ?
-                        ` - ${new Date(formData.fechaFin).toLocaleDateString('es-ES', {
-                            day: 'numeric', month: 'long', year: 'numeric'
-                          })}`
-                        : ''} 
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-5 mb-6 shadow-sm border border-[#D1B59B]/50">
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 rounded-full bg-[#A5856A]/20 flex items-center justify-center mr-3">
-                    <FaBed className="text-[#A5856A]" />
-                  </div>
-                  <h4 className="text-lg font-semibold text-[#5D4B3A]">Habitaciones</h4>
-                </div>
-                
-                <div className="pl-12">
-                  <div className="border-l-2 border-[#D1B59B]/30 pl-4 mb-4">
-                    <p className="text-[#8A6E52] text-sm font-medium">Modo de gestión</p>
-                    <p className="font-semibold text-[#5D4B3A]">
-                      {formData.modoGestionHabitaciones === 'usuario' 
-                        ? 'Gestión por el organizador' 
-                        : 'Gestión por la hacienda'}
-                    </p>
-                  </div>
-                  
-                  {formData.modoGestionHabitaciones === 'usuario' && formData.habitacionesSeleccionadas?.length > 0 && (
-                    <div className="border-l-2 border-[#D1B59B]/30 pl-4">
-                      <p className="text-[#8A6E52] text-sm font-medium mb-2">Habitaciones seleccionadas:</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {formData.habitacionesSeleccionadas.map((habitacion, index) => (
-                          <div key={index} className="flex items-center py-1 px-2 rounded bg-[#F5F0E8] mb-1">
-                            <FaBed className="text-[#A5856A] mr-2 flex-shrink-0" />
-                            <span className="text-sm text-[#5D4B3A]">{habitacion.nombre} - {habitacion.precio}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-[#8A6E52] text-sm mt-2">
-                        Total: {formData.habitacionesSeleccionadas.length} habitaciones
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-5 mb-6 shadow-sm border border-[#D1B59B]/50">
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 rounded-full bg-[#A5856A]/20 flex items-center justify-center mr-3">
-                    <FaUtensils className="text-[#A5856A]" />
-                  </div>
-                  <h4 className="text-lg font-semibold text-[#5D4B3A]">Servicios</h4>
-                </div>
-                
-                <div className="pl-12">
-                  <div className="border-l-2 border-[#D1B59B]/30 pl-4 mb-4">
-                    <p className="text-[#8A6E52] text-sm font-medium">Modo de gestión</p>
-                    <p className="font-semibold text-[#5D4B3A]">
-                      {formData.modoGestionServicios === 'usuario' 
-                        ? 'Selección por el organizador' 
-                        : 'Consulta con la hacienda'}
-                    </p>
-                  </div>
-                  
-                  {formData.modoGestionServicios === 'usuario' && formData.serviciosSeleccionados?.length > 0 && (
-                    <div className="border-l-2 border-[#D1B59B]/30 pl-4">
-                      <p className="text-[#8A6E52] text-sm font-medium mb-2">Servicios seleccionados:</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {formData.serviciosSeleccionados.map((servicio, index) => (
-                          <div key={index} className="flex items-center py-1 px-2 rounded bg-[#F5F0E8] mb-1">
-                            <FaUtensils className="text-[#A5856A] mr-2 flex-shrink-0" />
-                            <span className="text-sm text-[#5D4B3A]">
-                              {typeof servicio === 'object' ? 
-                                (servicio.titulo || servicio.nombre || `Servicio ${index + 1}`) : 
-                                `Servicio ${servicio}`}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="bg-white/80 backdrop-blur-sm rounded-lg p-5 shadow-sm border border-[#D1B59B]/50">
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 rounded-full bg-[#A5856A]/20 flex items-center justify-center mr-3">
-                    <FaUser className="text-[#A5856A]" />
-                  </div>
-                  <h4 className="text-lg font-semibold text-[#5D4B3A]">Datos de contacto</h4>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-12">
-                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
-                    <p className="text-[#8A6E52] text-sm font-medium">Nombre completo</p>
-                    <p className="font-semibold text-[#5D4B3A]">{formData.datosContacto?.nombre} {formData.datosContacto?.apellidos}</p>
-                  </div>
-                  
-                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
-                    <p className="text-[#8A6E52] text-sm font-medium">Email</p>
-                    <p className="font-semibold text-[#5D4B3A]">{formData.datosContacto?.email}</p>
-                  </div>
-                  
-                  <div className="border-l-2 border-[#D1B59B]/30 pl-4">
-                    <p className="text-[#8A6E52] text-sm font-medium">Teléfono</p>
-                    <p className="font-semibold text-[#5D4B3A]">{formData.datosContacto?.telefono}</p>
-                  </div>
-                </div>
-                
-                {formData.datosContacto?.mensaje && (
-                  <div className="pl-12 mt-4">
-                    <div className="border-l-2 border-[#D1B59B]/30 pl-4">
-                      <p className="text-[#8A6E52] text-sm font-medium">Mensaje</p>
-                      <p className="font-semibold text-[#5D4B3A]">{formData.datosContacto.mensaje}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <p className="text-[#8A6E52] mb-6 italic">Por favor, revise los detalles antes de proceder al pago.</p>
+              {/* Añadir aquí más detalles del formData si es necesario */}
+              <p>Tipo Evento: {typeof formData.tipoEvento === 'object' ? formData.tipoEvento?.titulo : formData.tipoEvento}</p>
+              <p>Fechas: {formData.fechaInicio ? formatApiDate(formData.fechaInicio) : 'N/A'} - {formData.fechaFin ? formatApiDate(formData.fechaFin) : 'N/A'}</p>
+              <p>Contacto: {formData.datosContacto?.nombre} {formData.datosContacto?.apellidos}</p>
+              {/* ... más detalles ... */}
             </div>
-            
-            <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <FaCalendarAlt className="h-5 w-5 text-yellow-500" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">Confirmación pendiente</h3>
-                  <div className="mt-2 text-sm text-yellow-700">
-                    <p>
-                      Al completar la reserva, recibirá un email de confirmación con los detalles. Nuestro equipo se pondrá en contacto con usted para confirmar la disponibilidad y los detalles finales.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+             <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+               <div className="flex items-start">
+                 <div className="flex-shrink-0">
+                   <FaInfoCircle className="h-5 w-5 text-yellow-500" />
+                 </div>
+                 <div className="ml-3">
+                   <h3 className="text-sm font-medium text-yellow-800">Confirmación pendiente</h3>
+                   <div className="mt-2 text-sm text-yellow-700">
+                     <p>
+                       Al completar la reserva, recibirá un email. Nuestro equipo se pondrá en contacto para confirmar disponibilidad y detalles finales.
+                     </p>
+                   </div>
+                 </div>
+               </div>
+             </div>
           </div>
         );
       
-      case 6:
-        // Paso 6: Confirmación
+      case 7:
+        // Función para manejar la selección de pago (simplificada, asumiendo que existe fuera)
+        const handlePaymentSelection = async (metodo) => {
+          updateFormSection('metodoPago', metodo); // Asegúrate que esta variable de estado exista
+          setStripeClientSecret(''); 
+          setShowCheckoutForm(false);
+          setIsProcessingPayment(false);
+
+          if (!createdReservationId) {
+            toast.error('Error: No se encontró el ID de la reserva creada.');
+            return;
+          }
+
+          if (metodo === 'tarjeta') {
+            setLoading(true);
+            let loadingToastId = toast.loading('Preparando pago seguro...');
+            try {
+              const response = await createEventoPaymentIntent(createdReservationId);
+              toast.dismiss(loadingToastId);
+              if (response && response.clientSecret) {
+                setStripeClientSecret(response.clientSecret);
+                setShowCheckoutForm(true);
+                toast.info('Por favor, introduce los datos de tu tarjeta.');
+              } else {
+                toast.error(response.message || 'No se pudo iniciar el pago con tarjeta.');
+              }
+            } catch (error) {
+              toast.dismiss(loadingToastId);
+              console.error("Error creando PaymentIntent:", error);
+              toast.error(error.response?.data?.message || error.message || 'Error al preparar el pago con tarjeta.');
+            } finally {
+              setLoading(false);
+            }
+          } else { // Transferencia o Efectivo
+              let initialToastId = null;
+              if (metodo === 'transferencia') {
+                initialToastId = toast.loading('Enviando instrucciones de pago a tu correo...');
+              } else if (metodo === 'efectivo') {
+                initialToastId = toast.loading('Confirmando selección de pago en efectivo...');
+              }
+              setLoading(true); 
+              try {
+                 const response = await seleccionarMetodoPago(createdReservationId, metodo);
+                 if(initialToastId) toast.dismiss(initialToastId);
+                 if (response.success) {
+                    // Avanzar al paso de confirmación después de seleccionar transferencia/efectivo
+                    setCurrentStep(prev => prev + 1);
+                    if (metodo === 'transferencia') { toast.success('Instrucciones enviadas. Su reserva está pendiente de pago.'); }
+                    else if (metodo === 'efectivo') { toast.success('Selección confirmada. Su reserva está pendiente de pago.'); }
+                 } else { toast.error(response.message || 'Error al procesar.'); }
+              } catch (error) {
+                 if(initialToastId) toast.dismiss(initialToastId);
+                 console.error(`Error seleccionando ${metodo}:`, error);
+                 toast.error(error.response?.data?.message || 'Error al procesar.');
+              } finally { setLoading(false); }
+          }
+        };
+
         return (
-          <div className="text-center max-w-2xl mx-auto">
-            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
-              <FaCheck className="w-10 h-10 text-green-500" />
-            </div>
-            <h2 className="text-2xl font-bold text-[var(--color-primary)]">
-              ¡Reserva Confirmada!
-            </h2>
-            <p className="text-gray-600 max-w-md mx-auto">
-              Hemos recibido su solicitud de reserva. En breve recibirá un correo electrónico con los detalles y los siguientes pasos a seguir.
-            </p>
-            <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 max-w-md mx-auto text-left">
-              <p><span className="font-medium">Número de Reserva:</span> {Math.floor(Math.random() * 10000).toString().padStart(4, '0')}</p>
-              <p><span className="font-medium">Evento:</span> {formData.tipoEvento}</p>
-              <p><span className="font-medium">Fecha:</span> {formData.fecha}</p>
-            </div>
+          <div className="max-w-2xl mx-auto bg-white/90 backdrop-blur-sm p-8 rounded-xl shadow-lg border border-[#D1B59B]">
+            <h3 className="text-2xl font-semibold text-[#5D4B3A] mb-6 text-center">
+              {showCheckoutForm ? 'Completa el Pago con Tarjeta' : 'Seleccione un Método de Pago'}
+            </h3>
+            {createdReservationId && !showCheckoutForm && 
+              <p className="text-center text-sm text-gray-500 mb-4">Reserva #{createdReservationId.slice(-6)} creada.</p>}
+            
+            {showCheckoutForm && stripeClientSecret ? (
+              <Elements stripe={stripePromise} options={{ clientSecret: stripeClientSecret }}>
+                <CheckoutForm 
+                  clientSecret={stripeClientSecret} 
+                  onPaymentSuccess={handlePaymentSuccess} 
+                  onPaymentProcessing={setIsProcessingPayment}
+                />
+              </Elements>
+            ) : (
+              <div className="flex flex-col space-y-4">
+                {/* Botones de pago (ajustar estilos si es necesario) */}
+                <button onClick={() => handlePaymentSelection('tarjeta')} disabled={loading || isProcessingPayment} className={`w-full flex items-center justify-center px-6 py-3 rounded-lg shadow-md transition-all duration-300 ${loading || isProcessingPayment ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-[#A5856A] to-[#8B6B4F] text-white hover:shadow-lg'}`}> <FaCreditCard className="mr-2" /> Pagar con Tarjeta </button>
+                <button onClick={() => handlePaymentSelection('transferencia')} disabled={loading || isProcessingPayment} className={`w-full flex items-center justify-center px-6 py-3 rounded-lg shadow-md transition-all duration-300 ${loading || isProcessingPayment ? 'bg-gray-400 cursor-not-allowed' : 'bg-white text-[#5D4B3A] border border-[#D1B59B] hover:bg-gray-50'}`}> <FaUniversity className="mr-2" /> Pagar por Transferencia </button>
+                <button onClick={() => handlePaymentSelection('efectivo')} disabled={loading || isProcessingPayment} className={`w-full flex items-center justify-center px-6 py-3 rounded-lg shadow-md transition-all duration-300 ${loading || isProcessingPayment ? 'bg-gray-400 cursor-not-allowed' : 'bg-white text-[#5D4B3A] border border-[#D1B59B] hover:bg-gray-50'}`}> <FaMoneyBillWave className="mr-2" /> Pagar en Efectivo </button>
+              </div>
+            )}
+            
+            {!showCheckoutForm &&
+              <p className="text-center text-sm text-gray-500 mt-6 italic">
+                Su reserva ha sido creada. Complete el pago o seleccione un método para finalizar.
+              </p>
+            }
           </div>
         );
+
+      case 8:
+        let confirmationIcon = <FaCheckCircle className="text-green-500 text-5xl mx-auto mb-4" />;
+        let confirmationTitle = "¡Reserva Confirmada!";
+        let confirmationMessage = "";
+        const confirmationNumber = createdReservationId ? createdReservationId.slice(-6) : 'N/A'; // O usar el número de confirmación real si lo tienes
+
+        // Determinar mensaje según el método de pago usado (asumiendo que está en formData.metodoPago)
+        switch (formData.metodoPago) {
+          case 'tarjeta': // Asumiendo que onPaymentSuccess te trajo aquí
+            confirmationMessage = `El pago con tarjeta ha sido procesado exitosamente. Recibirá un correo con todos los detalles. Su número de referencia es #${confirmationNumber}.`;
+            break;
+          case 'transferencia':
+            confirmationIcon = <FaClock className="text-blue-500 text-5xl mx-auto mb-4" />;
+            confirmationTitle = "Reserva Pendiente de Pago";
+            confirmationMessage = `Hemos recibido su solicitud de reserva. Por favor, revise su correo electrónico (${formData.datosContacto?.email || 'su email'}) donde encontrará las instrucciones para completar el pago mediante transferencia bancaria. Su número de referencia es #${confirmationNumber}.`;
+            break;
+          case 'efectivo':
+            confirmationIcon = <FaCash className="text-emerald-500 text-5xl mx-auto mb-4" />;
+            confirmationTitle = "Reserva Confirmada - Pago en Efectivo";
+            confirmationMessage = `¡Su reserva ha sido realizada con éxito! El pago se realizará en efectivo al momento de su llegada en la recepción de la Hacienda. Por favor, tenga a mano su número de referencia: #${confirmationNumber}. ¡Le esperamos!`;
+            break;
+          default: // Caso inesperado
+             confirmationIcon = <FaCheckCircle className="text-gray-500 text-5xl mx-auto mb-4" />;
+             confirmationTitle = "Reserva Recibida";
+             confirmationMessage = `Hemos recibido su solicitud de reserva con referencia #${confirmationNumber}. Recibirá más detalles por correo electrónico.`;
+        }
+
+        return (
+          <div className="max-w-2xl mx-auto text-center bg-gradient-to-br from-white to-gray-50 p-8 rounded-xl shadow-lg border border-gray-200">
+            {confirmationIcon}
+            <h3 className="text-2xl font-semibold text-[var(--color-brown-dark)] mb-3">
+              {confirmationTitle}
+            </h3>
+            <p className="text-gray-600 leading-relaxed">
+              {confirmationMessage}
+            </p>
+            {/* Podrías añadir botones para "Ver mis reservas" o "Volver al inicio" aquí */}
+            {/* Ejemplo:
+            <div className="mt-8 flex justify-center gap-4">
+              <Link href="/usuario/reservas" className="px-6 py-2 rounded-lg bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] transition-colors">
+                Ver Mis Reservas
+              </Link>
+              <Link href="/" className="px-6 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors">
+                Volver al Inicio
+              </Link>
+            </div>
+            */}
+          </div>
+        );
+
       default:
-        return null;
+        // Si currentStep es inesperado (no debería ocurrir ahora)
+        console.warn("Estado de paso inesperado:", currentStep);
+        return <div>Paso desconocido ({currentStep})</div>; 
     }
   };
 
   return (
-    <div className="min-h-screen relative">
-      <div 
-        className="fixed inset-0 z-0" 
-        style={{
-          backgroundImage: 'url(/images/imagendron3.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundAttachment: 'fixed',
-          filter: 'brightness(0.3)'
-        }}
-      />
-      <NavbarReservar />
-      <main className="relative z-10 container mx-auto px-4 py-8 min-h-screen flex flex-col">
-        <div className="flex-grow max-w-7xl mx-auto w-full">
-        
-        {/* --- Modal de Error de Validación (se mantiene) --- */}
-        <ValidationModal
-          isOpen={showValidationModal}
-          onClose={() => setShowValidationModal(false)}
-          message={validationErrorMessage}
-          setCurrentStep={setCurrentStep}
-          redirectToStep={validationRedirectStep}
+    <>
+      <div className="min-h-screen relative">
+        <div 
+          className="fixed inset-0 z-0" 
+          style={{
+            backgroundImage: 'url(/images/imagendron3.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed',
+            filter: 'brightness(0.3)'
+          }}
         />
-
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-[#A5856A]/20" 
-            style={wizardContainerStyle}>
-          <h1 className="text-3xl font-extrabold text-[#0F0F0F] mb-8">
-            Reservar Evento
-          </h1>
+        <NavbarReservar />
+        <main className="relative z-10 container mx-auto px-4 py-8 min-h-screen flex flex-col">
+          <div className="flex-grow max-w-7xl mx-auto w-full">
           
-          {/* Wizard Steps */}
-          <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center space-x-4">
-              {steps.map((step, index) => (
-                <div 
-                  key={index}
-                  className={`flex items-center ${index !== steps.length - 1 ? 'mr-4' : ''}`}
-                >
-                  <div 
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transform transition-all duration-300 shadow-lg ${
-                      currentStep > index + 1 
-                        ? 'bg-[#A5856A] text-white' 
-                        : currentStep === index + 1 
-                          ? 'bg-[var(--color-primary)] text-white'
-                          : 'bg-gray-200 text-gray-500'
-                    }`}
-                  >
-                    {currentStep > index + 1 ? (
-                      <FaCheck className="w-5 h-5" />
-                    ) : (
-                      <span className="font-bold text-black">{index + 1}</span>
-                    )}
-                  </div>
-                  {index !== steps.length - 1 && (
-                    <div className={`w-10 h-0.5 ${currentStep > index + 1 ? 'bg-[#A5856A]' : 'bg-gray-200'}`}></div>
+            {/* --- Modal de Error de Validación (se mantiene) --- */}
+            <ValidationModal
+              isOpen={showValidationModal}
+              onClose={() => setShowValidationModal(false)}
+              message={validationErrorMessage}
+              setCurrentStep={setCurrentStep}
+              redirectToStep={validationRedirectStep}
+            />
+
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-[#A5856A]/20" 
+                style={wizardContainerStyle}>
+              <h1 className="text-3xl font-extrabold text-[#0F0F0F] mb-8">
+                Reservar Evento
+              </h1>
+              
+              {/* Wizard Steps */}
+              <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center space-x-4">
+                  {steps.map((step, index) => (
+                    <div 
+                      key={index}
+                      className={`flex items-center ${index !== steps.length - 1 ? 'mr-4' : ''}`}
+                    >
+                      <div 
+                        className={`w-12 h-12 rounded-full flex items-center justify-center transform transition-all duration-300 shadow-lg ${
+                          currentStep > index + 1 
+                            ? 'bg-[#A5856A] text-white' 
+                            : currentStep === index + 1 
+                              ? 'bg-[var(--color-primary)] text-white'
+                              : 'bg-gray-200 text-gray-500'
+                        }`}
+                      >
+                        {currentStep > index + 1 ? (
+                          <FaCheck className="w-5 h-5" />
+                        ) : (
+                          <span className="font-bold text-black">{index + 1}</span>
+                        )}
+                      </div>
+                      {index !== steps.length - 1 && (
+                        <div className={`w-10 h-0.5 ${currentStep > index + 1 ? 'bg-[#A5856A]' : 'bg-gray-200'}`}></div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Step Content */}
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold text-[#0F0F0F] mb-4">
+                  {currentStep <= steps.length ? steps[currentStep - 1].title : 'Confirmación'}
+                </h2>
+                <p className="text-gray-600 mb-6 font-medium">
+                  {currentStep <= steps.length ? steps[currentStep - 1].description : 'Su reserva ha sido confirmada'}
+                </p>
+                
+                {renderStepContent()}
+              </div>
+              
+              {/* Navigation Buttons */}
+              <div className="flex justify-between items-center mt-8">
+                <div>
+                  {currentStep > 1 && currentStep <= steps.length + 1 && (
+                    <button
+                      onClick={() => setCurrentStep(prev => prev - 1)}
+                      className="px-6 py-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
+                    >
+                      <div className="flex items-center">
+                        <FaChevronLeft className="mr-2" />
+                        <span>Anterior</span>
+                      </div>
+                    </button>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Step Content */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-[#0F0F0F] mb-4">
-              {currentStep <= steps.length ? steps[currentStep - 1].title : 'Confirmación'}
-            </h2>
-            <p className="text-gray-600 mb-6 font-medium">
-              {currentStep <= steps.length ? steps[currentStep - 1].description : 'Su reserva ha sido confirmada'}
-            </p>
-            
-            {renderStepContent()}
-          </div>
-          
-          {/* Navigation Buttons */}
-          <div className="flex justify-between items-center mt-8">
-            <div>
-              {currentStep > 1 && currentStep <= steps.length + 1 && (
-                <button
-                  onClick={() => setCurrentStep(prev => prev - 1)}
-                  className="px-6 py-3 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2"
-                >
-                  <div className="flex items-center">
-                    <FaChevronLeft className="mr-2" />
-                    <span>Anterior</span>
-                  </div>
-                </button>
-              )}
-            </div>
 
-            {currentStep <= steps.length && (
-              <button
-                onClick={handleNextStep}
-                className="px-8 py-3 rounded-lg transition-all duration-300 flex items-center space-x-2 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5" style={{
-                  background: 'linear-gradient(145deg, #A5856A, #8B6B4F)',
-                }}
-                disabled={(currentStep === 3 && !formData.modoGestionHabitaciones) || (currentStep === 4 && !formData.modoGestionServicios)}
-              >
-                <span>{currentStep === steps.length ? 'Finalizar' : 'Siguiente'}</span>
-                <FaChevronRight />
-              </button>
-            )}
+                {currentStep <= steps.length && (
+                  <button
+                    onClick={handleNextStep}
+                    className="px-8 py-3 rounded-lg transition-all duration-300 flex items-center space-x-2 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5" style={{
+                      background: 'linear-gradient(145deg, #A5856A, #8B6B4F)',
+                    }}
+                    disabled={(currentStep === 3 && !formData.modoGestionHabitaciones) || (currentStep === 4 && !formData.modoGestionServicios)}
+                  >
+                    <span>{currentStep === steps.length ? 'Finalizar Reserva' : 'Siguiente'}</span>
+                    <FaChevronRight />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </main>
+        <Footer />
       </div>
-    </main>
-    <Footer />
-  </div>
-);
+    </>
+  );
 };

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { FaCalendarAlt, FaWifi, FaUserFriends, FaEnvelope, FaPhone, FaSpinner, FaBed, FaEuroSign, FaBuilding } from 'react-icons/fa';
+import { FaCalendarAlt, FaWifi, FaUserFriends, FaEnvelope, FaPhone, FaSpinner, FaBed, FaEuroSign, FaBuilding, FaCreditCard, FaUniversity, FaMoneyBillWave } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { 
   createMultipleReservaciones, 
@@ -222,11 +222,18 @@ function BookingFormSection({
         });
     }
 
+    // --- VALIDACIÓN TELÉFONO MX/ES (en validateForm) ---
+    const telefonoLimpio = telefono?.trim().replace(/\s+/g, '') || ''; 
+    const mexicoRegex = /^\d{10}$/;
+    const españaRegex = /^[6789]\d{8}$/;
+    const isTelefonoValid = mexicoRegex.test(telefonoLimpio) || españaRegex.test(telefonoLimpio);
+    // -----------------------------------------------------
+
     const isValid = 
       nombre?.trim() !== '' && 
       apellidos?.trim() !== '' &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email?.trim() || '') && // Validación básica email
-      telefono?.trim().length >= 7 && // Validación básica teléfono
+      isTelefonoValid && // <-- Usar la nueva validación
       allDatesSetAndValid &&
       metodoPago !== ''; // Asegurar que se eligió método de pago
       
@@ -320,14 +327,36 @@ function BookingFormSection({
 
   // Función auxiliar para la verificación final de disponibilidad ANTES del pago/submit
   const runAvailabilityCheck = async (reservationsData) => {
+    // Asegurarse de que hay reservaciones para verificar
+    if (!reservationsData || reservationsData.length === 0) {
+      console.warn('[runAvailabilityCheck] No hay datos de reservaciones para verificar.');
+      return true; // Si no hay nada que verificar, asumimos que está bien
+    }
+
     try {
-      const response = await verificarDisponibilidadHabitaciones({
-        reservas: reservationsData.map(r => ({
-          habitacionLetra: r.letraHabitacion,
-          fechaEntrada: formatApiDate(r.fechaEntrada),
-          fechaSalida: formatApiDate(r.fechaSalida),
-        }))
-      });
+      // --- CORRECCIÓN DEL PAYLOAD ---
+      // 1. Extraer todas las letras de habitación
+      const habitacionIds = reservationsData.map(r => r.habitacionLetra);
+
+      // 2. Encontrar la fecha de inicio más temprana y la fecha de fin más tardía
+      const fechasEntrada = reservationsData.map(r => r.fechaEntrada); // Son objetos Date
+      const fechasSalida = reservationsData.map(r => r.fechaSalida);   // Son objetos Date
+
+      const fechaInicio = new Date(Math.min(...fechasEntrada.map(d => d.getTime())));
+      const fechaFin = new Date(Math.max(...fechasSalida.map(d => d.getTime())));
+
+      // 3. Formatear fechas y construir el payload correcto
+      const payload = {
+        habitacionIds: habitacionIds,
+        fechaInicio: formatApiDate(fechaInicio), // Usar función de formato existente
+        fechaFin: formatApiDate(fechaFin)      // Usar función de formato existente
+      };
+
+      console.log('[runAvailabilityCheck] Payload enviado a verificarDisponibilidadHabitaciones:', payload);
+
+      // 4. Llamar al servicio con el payload correcto
+      const response = await verificarDisponibilidadHabitaciones(payload);
+      // --- FIN CORRECCIÓN ---
       
       if (!response.success || !response.disponibles) {
           // Actualizar fechas ocupadas AHORA MISMO basado en la respuesta
@@ -354,8 +383,20 @@ function BookingFormSection({
   // Manejador principal de envío
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // --- VALIDACIÓN TELÉFONO MX/ES (en handleSubmit) ---
+    const telefonoLimpioSubmit = formData.telefono?.trim().replace(/\s+/g, '') || '';
+    const mexicoRegexSubmit = /^\d{10}$/;
+    const españaRegexSubmit = /^[6789]\d{8}$/;
+    if (!mexicoRegexSubmit.test(telefonoLimpioSubmit) && !españaRegexSubmit.test(telefonoLimpioSubmit)) {
+        toast.error('Por favor, ingrese un número de teléfono válido (10 dígitos para MX o 9 dígitos para ES)');
+        return; 
+    }
+    // -----------------------------------------------------
+
     if (!validateForm(formData, fechasPorHabitacion)) {
-      toast.error('Por favor, complete todos los campos requeridos y seleccione fechas válidas.');
+      // La validación ya incluye el teléfono, pero podemos mostrar un mensaje genérico
+      toast.error('Por favor, complete todos los campos requeridos, seleccione fechas válidas y un método de pago.');
       return;
     }
     if (!metodoPago) {
@@ -413,10 +454,7 @@ function BookingFormSection({
         fechaSalida: formatApiDate(r.fechaSalida)
       }));
 
-      const response = await createMultipleReservaciones({
-        reservas: formattedReservations,
-        // Podría necesitar enviar datos de usuario o pago adicionales aquí
-      });
+      const response = await createMultipleReservaciones(formattedReservations);
 
       if (response.success && response.data) {
         setMultipleReservationConfirmations(response.data); // Guardar detalles de éxito
@@ -474,12 +512,11 @@ function BookingFormSection({
         </div>
       ) : selectedRooms.length > 0 ? (
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Columna de Habitaciones */}
-            <div className="lg:col-span-2 space-y-6">
+          {/* --- SECCIÓN DE HABITACIONES SELECCIONADAS (Ahora ocupa todo el ancho) --- */}
+          <div className="mb-8 space-y-6"> {/* Añadido margen inferior */}
               {selectedRooms.map((room, index) => (
                 <motion.div 
-                  key={room.letra || index} // Usar letra como key si está disponible
+                  key={room.letra || index} 
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.4, delay: index * 0.1 }}
@@ -573,144 +610,189 @@ function BookingFormSection({
                    </div>
                 </motion.div>
               ))}
-            </div>
-
-            {/* Columna de Detalles del Huésped y Pago */}
-            <div className="space-y-6">
-              <motion.div 
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4 }}
-                  className="bg-white p-6 rounded-md shadow-md border border-gray-200"
-              >
-                <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Tus Datos</h3>
-                {/* Campos del formulario: Nombre, Apellidos, Email, Teléfono */}
-                 <div className="mb-4">
-                    <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                    <input type="text" id="nombre" name="nombre" value={formData.nombre} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
-                 </div>
-                 <div className="mb-4">
-                     <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
-                     <input type="text" id="apellidos" name="apellidos" value={formData.apellidos} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
-                 </div>
-                 <div className="mb-4">
-                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                     <input type="email" id="email" name="email" value={formData.email} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
-                 </div>
-                 <div className="mb-4">
-                     <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                     <input type="tel" id="telefono" name="telefono" value={formData.telefono} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
-                 </div>
-              </motion.div>
-
-              {/* Selección Método de Pago */}
-               <motion.div 
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4, delay: 0.1 }}
-                  className="bg-white p-6 rounded-md shadow-md border border-gray-200"
-               >
-                   <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Método de Pago</h3>
-                   <div className="space-y-3">
-                       {/* Opciones de Pago */}
-                       <label className="flex items-center space-x-3 cursor-pointer">
-                          <input 
-                              type="radio" 
-                              name="metodoPago" 
-                              value="transferencia" 
-                              checked={metodoPago === 'transferencia'} 
-                              onChange={handleMetodoPagoChange}
-                              className="form-radio h-4 w-4 text-indigo-600 transition duration-150 ease-in-out"
-                          />
-                          <span className="text-gray-700">Transferencia Bancaria</span>
-                       </label>
-                       <label className="flex items-center space-x-3 cursor-pointer">
-                           <input 
-                               type="radio" 
-                               name="metodoPago" 
-                               value="tarjeta" 
-                               checked={metodoPago === 'tarjeta'} 
-                               onChange={handleMetodoPagoChange}
-                               className="form-radio h-4 w-4 text-indigo-600 transition duration-150 ease-in-out"
-                           />
-                           <span className="text-gray-700">Tarjeta de Crédito/Débito</span>
-                       </label>
-                   </div>
-
-                   {/* Formulario Tarjeta (Condicional) */}
-                   <AnimatePresence>
-                       {mostrarFormularioTarjeta && (
-                           <motion.div 
-                               initial={{ opacity: 0, height: 0 }}
-                               animate={{ opacity: 1, height: 'auto' }}
-                               exit={{ opacity: 0, height: 0 }}
-                               transition={{ duration: 0.3 }}
-                               className="mt-6 border-t pt-4"
-                           >
-                               <h4 className="text-md font-medium text-gray-800 mb-3">Datos de la Tarjeta</h4>
-                               {/* Campos tarjeta: numero, titular, expiracion, cvv, etc. */}
-                               {/* Simplificado - añadir validaciones y campos necesarios */}
-                                <div className="mb-3">
-                                    <label htmlFor="numeroTarjeta" className="text-sm font-medium text-gray-600 block mb-1">Número</label>
-                                    <input type="text" id="numeroTarjeta" name="numeroTarjeta" value={datosTarjeta.numeroTarjeta} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="**** **** **** ****"/>
-                                </div>
-                                <div className="mb-3">
-                                    <label htmlFor="nombreTitular" className="text-sm font-medium text-gray-600 block mb-1">Nombre del Titular</label>
-                                    <input type="text" id="nombreTitular" name="nombreTitular" value={datosTarjeta.nombreTitular} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm"/>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 mb-3">
-                                    <div>
-                                       <label htmlFor="fechaExpiracion" className="text-sm font-medium text-gray-600 block mb-1">Expira (MM/AA)</label>
-                                       <input type="text" id="fechaExpiracion" name="fechaExpiracion" value={datosTarjeta.fechaExpiracion} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="MM/AA"/>
-                                    </div>
-                                     <div>
-                                       <label htmlFor="cvv" className="text-sm font-medium text-gray-600 block mb-1">CVV</label>
-                                       <input type="text" id="cvv" name="cvv" value={datosTarjeta.cvv} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="***"/>
-                                    </div>
-                                </div>
-                           </motion.div>
-                       )}
-                   </AnimatePresence>
-               </motion.div>
-
-              {/* Resumen y Botón de Reserva */}
-              <motion.div 
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4, delay: 0.2 }}
-                  className="bg-white p-6 rounded-md shadow-md border border-gray-200 sticky top-24" // Sticky para que quede visible
-              >
-                  <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Resumen</h3>
-                  {selectedRooms.map(room => (
-                      <div key={room.letra} className="text-sm mb-2 flex justify-between">
-                          <span>Habitación {room.letra} ({fechasPorHabitacion[room.letra]?.fechaEntrada ? formatApiDate(fechasPorHabitacion[room.letra].fechaEntrada) : 'N/A'} - {fechasPorHabitacion[room.letra]?.fechaSalida ? formatApiDate(fechasPorHabitacion[room.letra].fechaSalida) : 'N/A'})</span>
-                          {/* Podríamos calcular el precio por habitación aquí si es necesario */}
-                      </div>
-                  ))}
-                  <div className="text-lg font-bold text-[var(--color-brown-dark)] mt-4 pt-4 border-t flex justify-between items-center">
-                      <span>Total Estimado:</span>
-                      <span>${formData.precioTotal ? formData.precioTotal.toFixed(2) : '0.00'} MXN</span>
-                  </div>
-                  
-                  {reservationError && (
-                      <p className="text-red-600 text-sm mt-4">{reservationError}</p>
-                  )}
-
-                  <button 
-                      type="submit" 
-                      disabled={!isFormValid || isSubmitting || isLoadingDetails} 
-                      className={`w-full mt-6 py-3 px-4 rounded-md text-white font-semibold transition-colors duration-200 flex items-center justify-center ${(!isFormValid || isSubmitting || isLoadingDetails) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)]'}`}
-                  >
-                      {isSubmitting ? (
-                          <FaSpinner className="animate-spin mr-2" /> 
-                      ) : (
-                          <FaCalendarAlt className="mr-2" />
-                      )}
-                      {isSubmitting ? 'Procesando Reserva...' : 'Confirmar Reserva'}
-                  </button>
-              </motion.div>
-            </div>
           </div>
+          {/* --- FIN SECCIÓN DE HABITACIONES --- */}
+
+          {/* --- NUEVO CONTENEDOR HORIZONTAL PARA DETALLES, PAGO Y RESUMEN --- */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+            
+            {/* Tarjeta "Tus Datos" */}
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="bg-white p-6 rounded-md shadow-md border border-gray-200"
+            >
+              <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Tus Datos</h3>
+              {/* Campos del formulario: Nombre, Apellidos, Email, Teléfono */}
+               <div className="mb-4">
+                  <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                  <input type="text" id="nombre" name="nombre" value={formData.nombre} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
+               </div>
+               <div className="mb-4">
+                   <label htmlFor="apellidos" className="block text-sm font-medium text-gray-700 mb-1">Apellidos</label>
+                   <input type="text" id="apellidos" name="apellidos" value={formData.apellidos} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
+               </div>
+               <div className="mb-4">
+                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                   <input type="email" id="email" name="email" value={formData.email} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
+               </div>
+               <div className="mb-4">
+                   <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                   <input type="tel" id="telefono" name="telefono" value={formData.telefono} onChange={handleInputChange} required className="w-full p-2 border border-gray-300 rounded-md"/>
+               </div>
+            </motion.div>
+
+            {/* Tarjeta "Método de Pago" */}
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="bg-white p-6 rounded-md shadow-md border border-gray-200"
+             >
+                 <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Método de Pago</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     {/* Botón/Tarjeta Transferencia */}
+                     <button
+                         type="button"
+                         onClick={() => {
+                             setMetodoPago('transferencia');
+                             setMostrarPago(true);
+                             setMostrarFormularioTarjeta(false);
+                             validateForm(formData, fechasPorHabitacion);
+                         }}
+                         className={`flex flex-col items-center justify-center p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+                             metodoPago === 'transferencia' 
+                             ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-md ring-2 ring-[var(--color-primary)]' 
+                             : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                         }`}
+                     >
+                         <FaUniversity className={`text-3xl mb-2 ${metodoPago === 'transferencia' ? 'text-[var(--color-primary)]' : 'text-gray-500'}`} />
+                         <span className={`text-sm font-medium ${metodoPago === 'transferencia' ? 'text-[var(--color-primary-dark)]' : 'text-gray-700'}`}>
+                             Transferencia
+                         </span>
+                     </button>
+
+                     {/* Botón/Tarjeta Tarjeta */}
+                     <button
+                         type="button"
+                         onClick={() => {
+                             setMetodoPago('tarjeta');
+                             setMostrarPago(true);
+                             setMostrarFormularioTarjeta(true);
+                             validateForm(formData, fechasPorHabitacion);
+                         }}
+                         className={`flex flex-col items-center justify-center p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+                             metodoPago === 'tarjeta' 
+                             ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-md ring-2 ring-[var(--color-primary)]' 
+                             : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                         }`}
+                     >
+                         <FaCreditCard className={`text-3xl mb-2 ${metodoPago === 'tarjeta' ? 'text-[var(--color-primary)]' : 'text-gray-500'}`} />
+                         <span className={`text-sm font-medium ${metodoPago === 'tarjeta' ? 'text-[var(--color-primary-dark)]' : 'text-gray-700'}`}>
+                             Tarjeta
+                         </span>
+                     </button>
+
+                     {/* Botón/Tarjeta Efectivo */}
+                     <button
+                         type="button"
+                         onClick={() => {
+                             setMetodoPago('efectivo');
+                             setMostrarPago(true);
+                             setMostrarFormularioTarjeta(false);
+                             validateForm(formData, fechasPorHabitacion);
+                         }}
+                         className={`flex flex-col items-center justify-center p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+                             metodoPago === 'efectivo' 
+                             ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-md ring-2 ring-[var(--color-primary)]' 
+                             : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                         }`}
+                     >
+                         <FaMoneyBillWave className={`text-3xl mb-2 ${metodoPago === 'efectivo' ? 'text-[var(--color-primary)]' : 'text-gray-500'}`} />
+                         <span className={`text-sm font-medium ${metodoPago === 'efectivo' ? 'text-[var(--color-primary-dark)]' : 'text-gray-700'}`}>
+                             Efectivo
+                         </span>
+                         <span className="text-xs text-gray-500 mt-1">(Pagar al llegar)</span>
+                     </button>
+                 </div>
+
+                 {/* Formulario Tarjeta (Condicional - sin cambios en su lógica interna) */}
+                 <AnimatePresence>
+                     {mostrarFormularioTarjeta && (
+                         <motion.div 
+                             initial={{ opacity: 0, height: 0 }}
+                             animate={{ opacity: 1, height: 'auto' }}
+                             exit={{ opacity: 0, height: 0 }}
+                             transition={{ duration: 0.3 }}
+                             className="mt-6 border-t pt-4"
+                         >
+                             <h4 className="text-md font-medium text-gray-800 mb-3">Datos de la Tarjeta</h4>
+                             {/* Campos tarjeta: numero, titular, expiracion, cvv, etc. */}
+                             {/* Simplificado - añadir validaciones y campos necesarios */}
+                              <div className="mb-3">
+                                  <label htmlFor="numeroTarjeta" className="text-sm font-medium text-gray-600 block mb-1">Número</label>
+                                  <input type="text" id="numeroTarjeta" name="numeroTarjeta" value={datosTarjeta.numeroTarjeta} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="**** **** **** ****"/>
+                              </div>
+                              <div className="mb-3">
+                                  <label htmlFor="nombreTitular" className="text-sm font-medium text-gray-600 block mb-1">Nombre del Titular</label>
+                                  <input type="text" id="nombreTitular" name="nombreTitular" value={datosTarjeta.nombreTitular} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm"/>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3 mb-3">
+                                  <div>
+                                     <label htmlFor="fechaExpiracion" className="text-sm font-medium text-gray-600 block mb-1">Expira (MM/AA)</label>
+                                     <input type="text" id="fechaExpiracion" name="fechaExpiracion" value={datosTarjeta.fechaExpiracion} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="MM/AA"/>
+                                  </div>
+                                   <div>
+                                     <label htmlFor="cvv" className="text-sm font-medium text-gray-600 block mb-1">CVV</label>
+                                     <input type="text" id="cvv" name="cvv" value={datosTarjeta.cvv} onChange={handleCardInputChange} className="w-full p-2 border rounded-md text-sm" placeholder="***"/>
+                                  </div>
+                              </div>
+                         </motion.div>
+                     )}
+                 </AnimatePresence>
+             </motion.div>
+
+            {/* Tarjeta "Resumen" */}
+            <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="bg-white p-6 rounded-md shadow-md border border-gray-200 h-fit" // añadido h-fit para que no se estire innecesariamente
+            >
+                <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Resumen</h3>
+                {selectedRooms.map(room => (
+                    <div key={room.letra} className="text-sm mb-2 flex justify-between">
+                        <span>Habitación {room.letra} ({fechasPorHabitacion[room.letra]?.fechaEntrada ? formatApiDate(fechasPorHabitacion[room.letra].fechaEntrada) : 'N/A'} - {fechasPorHabitacion[room.letra]?.fechaSalida ? formatApiDate(fechasPorHabitacion[room.letra].fechaSalida) : 'N/A'})</span>
+                        {/* Podríamos calcular el precio por habitación aquí si es necesario */}
+                    </div>
+                ))}
+                <div className="text-lg font-bold text-[var(--color-brown-dark)] mt-4 pt-4 border-t flex justify-between items-center">
+                    <span>Total Estimado:</span>
+                    <span>${formData.precioTotal ? formData.precioTotal.toFixed(2) : '0.00'} MXN</span>
+                </div>
+                
+                {reservationError && (
+                    <p className="text-red-600 text-sm mt-4">{reservationError}</p>
+                )}
+
+                <button 
+                    type="submit" 
+                    disabled={!isFormValid || isSubmitting || isLoadingDetails} 
+                    className={`w-full mt-6 py-3 px-4 rounded-md text-white font-semibold transition-colors duration-200 flex items-center justify-center ${(!isFormValid || isSubmitting || isLoadingDetails) ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)]'}`}
+                >
+                    {isSubmitting ? (
+                        <FaSpinner className="animate-spin mr-2" /> 
+                    ) : (
+                        <FaCalendarAlt className="mr-2" />
+                    )}
+                    {isSubmitting ? 'Procesando Reserva...' : 'Confirmar Reserva'}
+                </button>
+            </motion.div>
+
+          </div>
+          {/* --- FIN CONTENEDOR HORIZONTAL --- */}
+
         </form>
       ) : (
         <div className="text-center py-10">

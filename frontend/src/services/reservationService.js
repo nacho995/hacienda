@@ -764,7 +764,7 @@ export const checkHabitacionAvailability = async (availabilityData) => {
     
     return {
       disponible: false,
-      mensaje: error.response?.data?.mensaje || error.message || 'Error al verificar disponibilidad',
+      mensaje: error.response?.data?.message || error.message || 'Error al verificar disponibilidad',
       habitacionesRestantes: 0
     };
   }
@@ -1122,49 +1122,40 @@ export const createReservacion = async (reservaData) => {
 
 // Crear múltiples reservaciones de habitación
 export const createMultipleReservaciones = async (reservasData) => {
-  try {
-    console.log('Enviando reservas múltiples:', reservasData);
-    const responses = [];
-    const errores = [];
-    
-    // Procesar cada reserva individualmente
-    for (const reservaData of reservasData) {
-      try {
-        const response = await apiClient.post('/reservas/habitaciones', reservaData);
-        responses.push(response.data);
-        console.log('Reserva creada exitosamente:', response.data);
-      } catch (err) {
-        console.error('Error al crear reserva individual:', err);
-        errores.push({
-          habitacion: reservaData.habitacion,
-          error: err.message || 'Error desconocido'
-        });
-      }
-    }
-    
-    console.log('Respuestas de reservas múltiples:', responses);
-    
-    if (errores.length > 0) {
-      console.warn('Algunas reservas no pudieron ser creadas:', errores);
-    }
-    
-    // Consideramos éxito si al menos una reserva se creó correctamente
-    return {
-      success: responses.length > 0,
-      data: responses,
-      errores: errores,
-      message: responses.length > 0 
-        ? (errores.length > 0 
-            ? `Se crearon ${responses.length} de ${reservasData.length} reservas` 
-            : 'Todas las reservas fueron creadas exitosamente')
-        : 'No se pudo crear ninguna reserva'
-    };
-  } catch (error) {
-    console.error('Error general al crear múltiples reservas:', error);
+  // Verificar que reservasData es un array no vacío
+  if (!Array.isArray(reservasData) || reservasData.length === 0) {
+    console.error('createMultipleReservaciones: Se esperaba un array de reservaciones.');
     return {
       success: false,
+      message: 'No se proporcionaron datos de reserva válidos.',
       data: null,
-      message: error.response?.data?.message || 'Error al crear las reservas. Por favor intente nuevamente.'
+      errors: []
+    };
+  }
+
+  try {
+    console.log('Enviando múltiples reservas a /batch:', reservasData);
+    
+    // --- MODIFICACIÓN: Llamada única a la ruta batch --- 
+    const response = await apiClient.post('/reservas/habitaciones/batch', { 
+      reservas: reservasData // Enviar el array dentro de la clave 'reservas'
+    });
+    // --- FIN MODIFICACIÓN ---
+
+    console.log('Respuesta de creación múltiple /batch:', response);
+
+    // Asumimos que apiClient devuelve la respuesta parseada, 
+    // incluyendo success, data, message, y opcionalmente errors
+    return response; 
+
+  } catch (error) {
+    // El interceptor de apiClient ya debería haber formateado el error
+    console.error('Error en llamada API createMultipleReservaciones:', error.response?.data || error.message || error);
+    return {
+      success: false,
+      message: error.response?.data?.message || error.message || 'Error inesperado al crear múltiples reservas.',
+      data: null,
+      errors: error.response?.data?.errors || []
     };
   }
 };
@@ -1347,12 +1338,22 @@ export const getFechasOcupadasPorHabitacion = async (habitacionLetra, fechaInici
     const params = { habitacionLetra, fechaInicio, fechaFin };
     // Asegúrate que la URL es correcta según tu implementación de rutas
     const response = await apiClient.get('/reservas/habitaciones/fechas-ocupadas', { params });
-    // Asumiendo que la respuesta tiene { success: true, data: [...] }
-    // y data es un array de strings YYYY-MM-DD
-    return response.data.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+
+    // --- NUEVA VERIFICACIÓN ---
+    if (response && response.success && Array.isArray(response.data)) {
+      // Ahora es seguro usar map
+      return response.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+    } else {
+      // Si la respuesta no es exitosa o no es un array, loguear y devolver vacío
+      console.warn('Respuesta inválida o no exitosa para getFechasOcupadasPorHabitacion:', response);
+      return [];
+    }
+    // --- FIN VERIFICACIÓN ---
+
   } catch (error) {
     console.error('Error fetching occupied dates for room:', error);
-    throw error;
+    // También devolver un array vacío en caso de error de red/API
+    return []; // Devolver array vacío en lugar de lanzar error para evitar crash
   }
 };
 
@@ -1362,12 +1363,23 @@ export const getFechasOcupadasPorHabitacion = async (habitacionLetra, fechaInici
 export const getFechasEventosEnRango = async (fechaInicio, fechaFin) => {
   try {
     const params = { fechaInicio, fechaFin };
-    // Llama al nuevo endpoint de eventos
     const response = await apiClient.get('/reservas/eventos/fechas-en-rango', { params });
-    return response.data.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+
+    // --- MODIFICACIÓN --- 
+    // Verificar que la respuesta sea exitosa y que response.data sea un array
+    if (response && response.success && Array.isArray(response.data)) {
+      // Acceder directamente a response.data
+      return response.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+    } else {
+      console.warn('Respuesta no exitosa o datos inválidos para fechas de eventos:', response);
+      return []; // Devolver array vacío si la respuesta no es válida
+    }
+    // --- FIN MODIFICACIÓN ---
+
   } catch (error) {
     console.error('Error fetching event dates:', error);
-    throw error;
+    // Devolver array vacío en caso de error para evitar crash
+    return []; 
   }
 };
 
@@ -1378,17 +1390,102 @@ export const getFechasOcupadasGlobales = async (fechaInicio, fechaFin) => {
   try {
     const params = { fechaInicio, fechaFin };
     // Llama al nuevo endpoint global
-    const response = await apiClient.get('/reservas/habitaciones/fechas-ocupadas-global', { params });
-    return response.data.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+    const response = await apiClient.get('/reservas/habitaciones/fechas-ocupadas-todas', { params });
+
+    // Verificar que la respuesta sea exitosa y que response.data sea un array
+    if (response && response.success && Array.isArray(response.data)) {
+      return response.data.map(dateStr => new Date(dateStr + 'T00:00:00Z')); // Convertir a objetos Date UTC
+    } else {
+      console.warn('Respuesta no exitosa o datos inválidos para fechas ocupadas globales:', response);
+      return []; // Devolver array vacío si la respuesta no es válida
+    }
   } catch (error) {
     console.error('Error fetching global occupied dates:', error);
-    throw error;
+    // Podríamos devolver un array vacío o relanzar el error según la necesidad
+    // Devolver vacío es más seguro para evitar que falle el .map en el componente
+    return [];
   }
 };
+
+// --- Selección de Método de Pago (NUEVA) ---
+export const seleccionarMetodoPago = async (id, metodo) => {
+  if (!id || !metodo) {
+    console.error('seleccionarMetodoPago: Se requiere ID de reserva y método de pago.');
+    return { success: false, message: 'Datos incompletos para seleccionar método de pago.' };
+  }
+  try {
+    console.log(`>>> Servicio: Intentando seleccionar método ${metodo} para reserva ${id}`);
+    // Usar la URL correcta del endpoint creado en el backend
+    const response = await apiClient.put(`/reservas/eventos/${id}/seleccionar-pago`, { metodoPago: metodo });
+    console.log(`>>> Servicio: Respuesta de seleccionar método pago:`, response);
+    // Devolver la respuesta completa (o adaptarla si es necesario)
+    return response || { success: false, message: 'No se recibió respuesta del servidor.' };
+  } catch (error) {
+    console.error(`Error en servicio seleccionarMetodoPago para reserva ${id}:`, error.response?.data || error.message || error);
+    return {
+      success: false,
+      message: error.response?.data?.message || `Error al seleccionar método de pago ${metodo}.`,
+      error: error // Devolver el error completo puede ser útil para depurar
+    };
+  }
+};
+
+// --- Crear Payment Intent para Habitación (NUEVA) ---
+export const createHabitacionPaymentIntent = async (id) => {
+  if (!id) {
+    console.error('createHabitacionPaymentIntent: Se requiere ID de reserva.');
+    return { success: false, message: 'Datos incompletos para crear intento de pago.' };
+  }
+  try {
+    console.log(`>>> Servicio: Intentando crear PaymentIntent para reserva habitación ${id}`);
+    // Usar la URL correcta del endpoint creado en el backend
+    const response = await apiClient.post(`/reservas/habitaciones/${id}/create-payment-intent`);
+    console.log(`>>> Servicio: Respuesta de crear PaymentIntent habitación:`, response);
+    // Devolver la respuesta completa (que debe incluir clientSecret)
+    return response || { success: false, message: 'No se recibió respuesta del servidor.' };
+  } catch (error) {
+    console.error(`Error en servicio createHabitacionPaymentIntent para reserva ${id}:`, error.response?.data || error.message || error);
+    return {
+      success: false,
+      message: error.response?.data?.message || `Error al iniciar el pago para la habitación.`,
+      error: error
+    };
+  }
+};
+// --- FIN Crear Payment Intent Habitación ---
+
+// --- Selección de Método de Pago para Habitación (NUEVA) ---
+export const seleccionarMetodoPagoHabitacion = async (id, metodo) => {
+  if (!id || !metodo) {
+    console.error('seleccionarMetodoPagoHabitacion: Se requiere ID de reserva y método.');
+    return { success: false, message: 'Datos incompletos.' };
+  }
+  // Excluir 'tarjeta' porque se maneja al crear el PaymentIntent
+  if (metodo === 'tarjeta') {
+     console.warn('seleccionarMetodoPagoHabitacion no debe llamarse para tarjeta.');
+     return { success: false, message: 'Método inválido para esta función.' };
+  }
+  try {
+    console.log(`>>> Servicio: Actualizando método ${metodo} para reserva habitación ${id}`);
+    const response = await apiClient.put(`/reservas/habitaciones/${id}/seleccionar-pago`, { metodoPago: metodo });
+    console.log(`>>> Servicio: Respuesta de seleccionar método pago habitación:`, response);
+    return response || { success: false, message: 'No se recibió respuesta.' };
+  } catch (error) {
+    console.error(`Error en servicio seleccionarMetodoPagoHabitacion ${id}:`, error.response?.data || error.message || error);
+    return {
+      success: false,
+      message: error.response?.data?.message || `Error al seleccionar método ${metodo}.`,
+      error: error
+    };
+  }
+};
+// --- FIN Selección Método Pago Habitación ---
 
 export default {
   // ... (resto de las funciones existentes)
   getFechasOcupadasPorHabitacion,
   getFechasEventosEnRango,
-  getFechasOcupadasGlobales
+  getFechasOcupadasGlobales,
+  createHabitacionPaymentIntent,
+  seleccionarMetodoPagoHabitacion
 }; 
