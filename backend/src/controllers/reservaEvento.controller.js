@@ -4,7 +4,7 @@ const TipoEvento = require('../models/TipoEvento');
 const ReservaHabitacion = require('../models/ReservaHabitacion');
 const Habitacion = require('../models/Habitacion');
 const mongoose = require('mongoose');
-const { sendEmail, enviarConfirmacionReservaEvento } = require('../utils/email');
+const { sendEmail, enviarConfirmacionReservaEvento, sendBankTransferInstructions } = require('../utils/email');
 const confirmacionTemplate = require('../emails/confirmacionReserva');
 const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
 const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
@@ -12,6 +12,7 @@ const Servicio = require('../models/Servicio');
 const asyncHandler = require('../middleware/async');
 const ErrorResponse = require('../utils/errorResponse');
 const generarNumeroConfirmacion = require('../utils/confirmNumGen');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 /**
  * @desc    Crear una reserva de evento
@@ -19,7 +20,7 @@ const generarNumeroConfirmacion = require('../utils/confirmNumGen');
  * @access  Public
  */
 const createReservaEvento = asyncHandler(async (req, res, next) => {
-  const session = await mongoose.startSession(); // Iniciar sesión
+  const session = await mongoose.startSession();
   let reservaCreada;
   const habitacionesCreadas = [];
 
@@ -37,7 +38,8 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
         modo_gestion_habitaciones,
         modo_gestion_servicios,
         serviciosContratados,
-        _serviciosCompletosParaPrecio // Asumiendo que esto viene del frontend
+        _serviciosCompletosParaPrecio,
+        numInvitados
       } = req.body;
 
       // --- Validaciones Iniciales (dentro de la transacción) ---
@@ -98,7 +100,7 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
         horaInicio: '12:00',
         horaFin: '18:00',
         espacioSeleccionado: 'jardin',
-        numInvitados: 50, 
+        numInvitados: numInvitados || 50,
         precio: precioTotalCalculado,
         peticionesEspeciales: mensaje || '',
         estadoReserva: 'pendiente',
@@ -111,11 +113,11 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
         fechaHoraCreacion: new Date(),
       };
 
-      const [reservaEventoCreada] = await ReservaEvento.create([reservaData], { session }); // <-- Incluir sesión
+      const [reservaEventoCreada] = await ReservaEvento.create([reservaData], { session });
       if (!reservaEventoCreada) {
         throw new ErrorResponse('No se pudo crear la reserva del evento', 500);
       }
-      reservaCreada = reservaEventoCreada; // Guardar para uso fuera de transacción
+      reservaCreada = reservaEventoCreada;
 
       // --- Crear Reservas de Habitaciones Asociadas DENTRO de la Transacción ---
       let referenciasHabitaciones = []; // Array para guardar las referencias
@@ -235,51 +237,16 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
 
     }); // Fin de session.withTransaction
 
-    // --- Operaciones Post-Transacción (Email y Respuesta) ---
+    // --- Operaciones Post-Transacción (SOLO RESPUESTA) ---
     if (reservaCreada) {
-       // Usar directamente el email de contacto guardado en la reserva
-       const emailCliente = reservaCreada.emailContacto;
-       const nombreCliente = reservaCreada.nombreContacto;
-
-       if (emailCliente) {
-          // Enviar correo de confirmación al cliente usando la nueva plantilla
-          console.log(`>>> [Evento] Intentando enviar confirmación a cliente: ${emailCliente}`);
-          try {
-            await enviarConfirmacionReservaEvento({
-              email: emailCliente,
-              nombreCliente: nombreCliente || 'Cliente',
-              tipoEvento: reservaCreada.nombreEvento || 'Evento Especial',
-              numeroConfirmacion: reservaCreada.numeroConfirmacion,
-              fechaEvento: reservaCreada.fecha,
-              horaInicio: reservaCreada.horaInicio || '12:00',
-              horaFin: reservaCreada.horaFin || '00:00',
-              numInvitados: reservaCreada.numeroInvitados || 0,
-              precioTotal: reservaCreada.precio || 0,
-              porcentajePago: 30, // Porcentaje de pago inicial - ajustar según política
-              metodoPago: reservaCreada.metodoPago || 'No especificado',
-              detallesEvento: {
-                tipoComida: reservaCreada.tipoComida || 'No especificado',
-                serviciosAdicionales: reservaCreada.serviciosContratados?.join(', ') || 'Ninguno',
-                estado: reservaCreada.estadoReserva || 'Pendiente de confirmación'
-              },
-              habitacionesReservadas: habitacionesCreadas.map(hab => ({
-                tipoHabitacion: hab.tipoHabitacion || 'Estándar',
-                fechaEntrada: hab.fechaEntrada,
-                fechaSalida: hab.fechaSalida,
-                precio: hab.precio || 0
-              }))
-            });
-            console.log(`Correo de confirmación enviado a ${emailCliente}`);
-          } catch (error) {
-            console.error(`Error al enviar correo de confirmación al cliente ${emailCliente}:`, error);
-            // No lanzar error aquí, la reserva ya se creó. Solo registrar el fallo.
-          }
-       }
-
-       // Notificar a los administradores
+       console.log(`>>> [Evento] Reserva ${reservaCreada._id} creada exitosamente (post-transacción).`);
+       
+       // --- Notificación al Admin (Opcional aquí, o mover a selección de pago?) ---
+       // Considerar si la notificación al admin debe esperar a que se seleccione pago.
+       // Por ahora, la dejamos aquí si existe.
        const adminEmailsString = process.env.ADMIN_EMAIL;
        if (adminEmailsString) {
-          try {
+         try {
               // Dividir por comas y eliminar espacios en blanco
               const adminEmails = adminEmailsString.split(',').map(email => email.trim());
               
@@ -292,8 +259,8 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
                   accion: "Nueva Reserva",
                   tipoReserva: reservaCreada.nombreEvento || "Evento",
                   numeroConfirmacion: reservaCreada.numeroConfirmacion,
-                  nombreCliente: `${nombreCliente || 'Cliente'} ${reservaCreada.apellidosContacto || ''}`,
-                  emailCliente: emailCliente || 'No disponible',
+                  nombreCliente: `${reservaCreada.nombreContacto || 'Cliente'} ${reservaCreada.apellidosContacto || ''}`,
+                  emailCliente: reservaCreada.emailContacto || 'No disponible',
                   detallesAdicionales: {
                     fecha: new Date(reservaCreada.fecha).toLocaleDateString('es-ES'),
                     telefono: reservaCreada.telefonoContacto || 'No disponible',
@@ -316,37 +283,28 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
           }
        }
 
-       // --- Respuesta Final ---
-       // Poblar detalles antes de responder si es necesario (opcional)
-       const reservaConDetalles = await ReservaEvento.findById(reservaCreada._id)
-           .populate('tipoEvento', 'titulo'); // Ejemplo: Poblar el título del tipo de evento
-           // .populate('serviciosContratados') // Si necesitas detalles de servicios
-           // .populate('usuario', 'nombre email'); // Si necesitas detalles del usuario (si existe)
-
+       // --- Respuesta Exitosa --- 
+       // Devolver solo los datos esenciales, el frontend tiene el ID
        res.status(201).json({
          success: true,
-         message: 'Reserva de evento creada con éxito. Se ha enviado un correo de confirmación.',
-         data: reservaConDetalles || reservaCreada
+         message: 'Reserva de evento creada con éxito. Seleccione método de pago.',
+         data: {
+           _id: reservaCreada._id,
+           numeroConfirmacion: reservaCreada.numeroConfirmacion 
+           // Añadir otros campos si son útiles para el frontend en este punto
+         } 
        });
-        
-       return; // Terminar aquí para evitar la duplicación de respuesta
 
     } else {
-      // Esto no debería ocurrir si la transacción tuvo éxito y reservaCreada se asignó
-      console.error("Error crítico: La transacción pareció tener éxito pero reservaCreada está vacía.");
-      next(new ErrorResponse('Error al procesar la reserva después de la creación', 500));
+      // Esto no debería ocurrir si la transacción tuvo éxito
+      console.error('>>> [Evento] Error crítico: Transacción completada pero reservaCreada es undefined');
+      throw new ErrorResponse('Error interno al finalizar la reserva', 500);
     }
 
   } catch (error) {
-    // El error puede venir de las validaciones o de la transacción
-    console.error('Error durante la transacción de creación de reserva de evento:', error);
-    const statusCode = error.statusCode || 500;
-    const message = error.message || 'Error al crear la reserva del evento';
-    res.status(statusCode).json({ success: false, message: message });
-
-  } finally {
-    // Siempre terminar la sesión
-    await session.endSession();
+    console.error('>>> [Evento] Error en createReservaEvento (fuera de transacción o commit fallido):', error);
+    // Asegurarse de pasar el error al manejador de errores
+    next(error); 
   }
 });
 
@@ -1511,6 +1469,198 @@ const getEventDatesInRange = asyncHandler(async (req, res, next) => {
   });
 });
 
+/**
+ * @desc    Seleccionar método de pago para una reserva de evento y realizar acciones asociadas
+ * @route   PUT /api/reservas/eventos/:id/seleccionar-pago
+ * @access  Private (Usuario que hizo la reserva o Admin)
+ */
+const seleccionarMetodoPagoEvento = asyncHandler(async (req, res, next) => {
+  const { metodoPago } = req.body; // Esperamos 'transferencia', 'efectivo', 'tarjeta'
+  const reservaId = req.params.id;
+
+  if (!metodoPago || !['transferencia', 'efectivo', 'tarjeta'].includes(metodoPago)) {
+    return next(new ErrorResponse('Método de pago no válido', 400));
+  }
+
+  const reserva = await ReservaEvento.findById(reservaId);
+
+  if (!reserva) {
+    return next(new ErrorResponse(`Reserva no encontrada con ID ${reservaId}`, 404));
+  }
+
+  // Opcional: Verificar permisos (que el usuario actual sea el dueño o admin)
+  // if (reserva.usuario && req.user.id !== reserva.usuario.toString() && req.user.role !== 'admin') {
+  //   return next(new ErrorResponse('No autorizado para actualizar esta reserva', 401));
+  // }
+
+  // Actualizar el método de pago
+  reserva.metodoPago = metodoPago;
+  // Potencialmente actualizar estado si es necesario (ej. a 'confirmada' si es efectivo?)
+  // if (metodoPago === 'efectivo') reserva.estadoReserva = 'confirmada'; 
+
+  await reserva.save();
+
+  console.log(`>>> [Pago Evento ${reservaId}] Método de pago actualizado a: ${metodoPago}`);
+
+  // Realizar acciones según el método
+  try {
+    const emailCliente = reserva.emailContacto;
+    const nombreClienteCompleto = `${reserva.nombreContacto || 'Cliente'} ${reserva.apellidosContacto || ''}`.trim();
+
+    if (!emailCliente) {
+      console.warn(`>>> [Pago Evento ${reservaId}] No se encontró email del cliente. No se pueden enviar notificaciones.`);
+    } else {
+      if (metodoPago === 'transferencia') {
+        console.log(`>>> [Pago Evento ${reservaId}] Enviando instrucciones de transferencia a: ${emailCliente}`);
+        await sendBankTransferInstructions({
+          email: emailCliente,
+          nombreCliente: nombreClienteCompleto,
+          numeroConfirmacion: reserva.numeroConfirmacion,
+          montoTotal: reserva.precio
+        });
+      } else if (metodoPago === 'tarjeta') {
+        console.log(`>>> [Pago Evento ${reservaId}] Método tarjeta seleccionado. Lógica de Stripe se manejará por separado (PaymentIntent).`);
+        // Aquí NO se crea el PaymentIntent aún, eso será otro endpoint llamado desde el form de tarjeta.
+        // Podríamos enviar un email de confirmación simple si queremos.
+         await enviarConfirmacionReservaEvento({
+           email: emailCliente,
+           nombreCliente: nombreClienteCompleto,
+           // ... otros datos de la reserva ...
+           metodoPago: 'Tarjeta (Pendiente de pago)' // Indicar estado
+         });
+      } else if (metodoPago === 'efectivo') {
+        console.log(`>>> [Pago Evento ${reservaId}] Enviando confirmación para pago en efectivo a: ${emailCliente}`);
+        // Enviar confirmación normal indicando pago en efectivo
+         await enviarConfirmacionReservaEvento({
+           email: emailCliente,
+           nombreCliente: nombreClienteCompleto,
+           // ... otros datos de la reserva ...
+           metodoPago: 'Efectivo (a pagar en recepción)' 
+         });
+      }
+    }
+  } catch (emailError) {
+    console.error(`>>> [Pago Evento ${reservaId}] Error enviando notificación post-pago a ${reserva.emailContacto}:`, emailError);
+    // No fallar la respuesta principal por el email, solo loggear
+  }
+
+  // Responder al frontend
+  res.status(200).json({
+    success: true,
+    message: `Método de pago actualizado a ${metodoPago}.`,
+    data: {
+      _id: reserva._id,
+      metodoPago: reserva.metodoPago,
+      estadoReserva: reserva.estadoReserva
+      // Devolver otros datos si son útiles para el frontend
+    }
+  });
+});
+
+/**
+ * @desc    Crear una Intención de Pago (PaymentIntent) con Stripe para una reserva de evento
+ * @route   POST /api/reservas/eventos/:id/create-payment-intent
+ * @access  Private (Usuario que hizo la reserva o Admin)
+ */
+const createEventoPaymentIntent = asyncHandler(async (req, res, next) => {
+  const reservaId = req.params.id;
+
+  try {
+    const reserva = await ReservaEvento.findById(reservaId);
+
+    if (!reserva) {
+      return next(new ErrorResponse(`Reserva no encontrada con ID ${reservaId}`, 404));
+    }
+
+    // Opcional: Verificar permisos
+    // ...
+
+    if (!reserva.precio || reserva.precio <= 0) {
+      return next(new ErrorResponse('El precio de la reserva no es válido para crear un intento de pago', 400));
+    }
+
+    const amountInCents = Math.round(Number(reserva.precio) * 100);
+    const currency = 'mxn'; 
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: currency,
+      metadata: { 
+        reservaId: reserva._id.toString(),
+        tipoReserva: 'evento' 
+      },
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    console.log(`>>> [Stripe Evento ${reservaId}] PaymentIntent ${paymentIntent.id} creado.`);
+
+    res.status(200).send({
+      clientSecret: paymentIntent.client_secret,
+      reservaId: reserva._id
+    });
+
+  } catch (error) {
+    console.error(`>>> [Stripe Evento ${reservaId}] Error creando PaymentIntent:`, error);
+    next(new ErrorResponse(error.message || 'Error al crear la intención de pago', 500)); 
+  }
+});
+
+// --- NUEVA FUNCIÓN --- 
+const getEventoFechasEnRango = async (req, res) => {
+  const { fechaInicio, fechaFin } = req.query;
+
+  if (!fechaInicio || !fechaFin) {
+    return res.status(400).json({
+      success: false,
+      message: 'Se requieren fechaInicio y fechaFin como parámetros de consulta.'
+    });
+  }
+
+  try {
+    const inicio = new Date(fechaInicio + 'T00:00:00Z');
+    const fin = new Date(fechaFin + 'T23:59:59Z');
+
+    if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fechas inválidas.'
+      });
+    }
+
+    // Buscar eventos cuya fecha esté dentro del rango
+    const eventos = await ReservaEvento.find({
+      fecha: {
+        $gte: inicio,
+        $lte: fin
+      }
+    }).select('fecha'); // Seleccionar solo el campo fecha
+
+    // Extraer solo las fechas y formatearlas como YYYY-MM-DD
+    const fechasOcupadas = eventos.map(evento => {
+      return evento.fecha.toISOString().split('T')[0];
+    });
+
+    // Eliminar duplicados (si un mismo día tiene múltiples eventos)
+    const fechasUnicas = [...new Set(fechasOcupadas)];
+
+    res.status(200).json({
+      success: true,
+      data: fechasUnicas
+    });
+
+  } catch (error) {
+    console.error("Error en getEventoFechasEnRango:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las fechas de los eventos.',
+      error: error.message
+    });
+  }
+};
+
+// --- Exportar la nueva función junto con las existentes ---
 module.exports = {
     createReservaEvento,
     obtenerReservasEvento: exports.obtenerReservasEvento,
@@ -1529,5 +1679,8 @@ module.exports = {
     addHabitacionAEvento: exports.addHabitacionAEvento,
     removeHabitacionDeEvento: exports.removeHabitacionDeEvento,
     asignarEventoAdmin: exports.asignarEventoAdmin,
-    getEventDatesInRange
+    getEventDatesInRange,
+    seleccionarMetodoPagoEvento,
+    createEventoPaymentIntent,
+    getEventoFechasEnRango
 };

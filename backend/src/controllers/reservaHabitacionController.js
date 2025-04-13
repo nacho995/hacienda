@@ -9,6 +9,8 @@ const Habitacion = require('../models/Habitacion');
 const bankTransferInstructionsTemplate = require('../emails/bankTransferInstructions');
 const { format } = require('date-fns');
 const { es } = require('date-fns/locale');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // <-- IMPORTAR Y CONFIGURAR STRIPE
+const TipoHabitacion = require('../models/TipoHabitacion'); // <-- Importar TipoHabitacion
 
 // @desc    Crear una nueva reserva de habitación
 // @route   POST /api/reservas/habitaciones
@@ -300,9 +302,9 @@ const getReservaHabitacionById = asyncHandler(async (req, res, next) => {
     .populate('habitacion')
     .populate('reservaEvento');
 
-  if (!reserva) {
-    return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
-  }
+    if (!reserva) {
+      return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
+    }
 
   // TODO: Revisar lógica de autorización.
   // La comprobación original `reserva.usuario.toString() !== req.user.id` podría fallar
@@ -315,7 +317,7 @@ const getReservaHabitacionById = asyncHandler(async (req, res, next) => {
   }
   */
 
-  res.status(200).json({ success: true, data: reserva });
+    res.status(200).json({ success: true, data: reserva });
 });
 
 // @desc    Actualizar una reserva de habitación
@@ -870,6 +872,246 @@ const getGlobalOccupiedDates = asyncHandler(async (req, res, next) => {
   });
 });
 
+/**
+ * @desc    Crear una Intención de Pago (PaymentIntent) con Stripe para una reserva de habitación
+ * @route   POST /api/reservas/habitaciones/:id/create-payment-intent
+ * @access  Private (Usuario que hizo la reserva o Admin)
+ */
+const createHabitacionPaymentIntent = asyncHandler(async (req, res, next) => {
+  const reservaId = req.params.id;
+
+  try {
+    // Incluir populate para obtener datos del usuario si es necesario para Stripe customer
+    const reserva = await ReservaHabitacion.findById(reservaId); //.populate('usuario', 'stripeCustomerId');
+
+    if (!reserva) {
+      return next(new ErrorResponse(`Reserva de habitación no encontrada con ID ${reservaId}`, 404));
+    }
+
+    // Opcional: Verificar permisos
+    // ...
+
+    if (!reserva.precio || reserva.precio <= 0) {
+      return next(new ErrorResponse('El precio de la reserva no es válido', 400));
+    }
+
+    const amountInCents = Math.round(Number(reserva.precio) * 100);
+    const currency = 'mxn'; // O la moneda que uses
+
+    // Metadata para identificar la reserva en el webhook
+    const metadata = { 
+      reservaId: reserva._id.toString(),
+      tipoReserva: 'habitacion' 
+    };
+
+    // Opcional: Si tienes un customer de Stripe asociado al usuario
+    // const stripeCustomerId = reserva.usuario?.stripeCustomerId;
+    // const customerParam = stripeCustomerId ? { customer: stripeCustomerId } : {};
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: currency,
+      metadata: metadata,
+      // ...customerParam, // Añadir si se usa customer
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    console.log(`>>> [Stripe Habitación ${reservaId}] PaymentIntent ${paymentIntent.id} creado.`);
+
+    res.status(200).send({
+      clientSecret: paymentIntent.client_secret,
+      reservaId: reserva._id 
+    });
+
+  } catch (error) {
+    console.error(`>>> [Stripe Habitación ${reservaId}] Error creando PaymentIntent:`, error);
+    next(new ErrorResponse(error.message || 'Error al crear la intención de pago', 500));
+  }
+});
+
+/**
+ * @desc    Seleccionar método de pago para una reserva de HABITACIÓN y realizar acciones
+ * @route   PUT /api/reservas/habitaciones/:id/seleccionar-pago
+ * @access  Private (Usuario que hizo la reserva o Admin)
+ */
+const seleccionarMetodoPagoHabitacion = asyncHandler(async (req, res, next) => {
+  const { metodoPago } = req.body;
+  const reservaId = req.params.id;
+
+  if (!metodoPago || !['transferencia', 'efectivo', 'tarjeta'].includes(metodoPago)) {
+    return next(new ErrorResponse('Método de pago no válido', 400));
+  }
+
+  const reserva = await ReservaHabitacion.findById(reservaId);
+
+  if (!reserva) {
+    return next(new ErrorResponse(`Reserva de habitación no encontrada con ID ${reservaId}`, 404));
+  }
+
+  // Opcional: Verificar permisos
+  // ...
+
+  // Actualizar método de pago
+  reserva.metodoPago = metodoPago;
+  // Actualizar estado de pago/reserva si corresponde (ej. 'confirmada' para efectivo?)
+  // if (metodoPago === 'efectivo') reserva.estadoReserva = 'confirmada';
+
+  await reserva.save();
+  console.log(`>>> [Pago Habitación ${reservaId}] Método de pago actualizado a: ${metodoPago}`);
+
+  // Realizar acciones post-selección
+  try {
+    const emailCliente = reserva.emailContacto;
+    const nombreClienteCompleto = `${reserva.nombreContacto || 'Cliente'} ${reserva.apellidosContacto || ''}`.trim();
+
+    if (emailCliente) {
+      if (metodoPago === 'transferencia') {
+        console.log(`>>> [Pago Habitación ${reservaId}] Enviando instrucciones de transferencia a: ${emailCliente}`);
+        await sendBankTransferInstructions({
+          email: emailCliente,
+          nombreCliente: nombreClienteCompleto,
+          numeroConfirmacion: reserva.numeroConfirmacion, // Asegúrate que las reservas de habitación tengan numeroConfirmacion
+          montoTotal: reserva.precio
+        });
+      } else if (metodoPago === 'efectivo') {
+        console.log(`>>> [Pago Habitación ${reservaId}] Enviando confirmación para pago en efectivo a: ${emailCliente}`);
+        // Necesitarías una función enviarConfirmacionReservaHabitacion si no existe
+        const { enviarConfirmacionReservaHabitacion } = require('../utils/email'); // Importar si es necesario
+         await enviarConfirmacionReservaHabitacion({
+           email: emailCliente,
+           nombreCliente: nombreClienteCompleto,
+           tipoHabitacion: reserva.tipoHabitacion || 'Estándar',
+           numeroConfirmacion: reserva.numeroConfirmacion,
+           fechaEntrada: reserva.fechaEntrada.toLocaleDateString(),
+           fechaSalida: reserva.fechaSalida.toLocaleDateString(),
+           totalNoches: Math.round((reserva.fechaSalida - reserva.fechaEntrada) / (1000 * 60 * 60 * 24)) || 1,
+           precio: reserva.precio,
+           metodoPago: 'Efectivo (a pagar en recepción)'
+         });
+      } 
+      // No hacemos nada aquí para 'tarjeta', eso se maneja al crear PaymentIntent y webhook
+    } else {
+      console.warn(`>>> [Pago Habitación ${reservaId}] No se encontró email, no se envía notificación.`);
+    }
+  } catch(emailError) {
+     console.error(`>>> [Pago Habitación ${reservaId}] Error enviando email post-pago:`, emailError);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `Método de pago actualizado a ${metodoPago}.`,
+    data: {
+      _id: reserva._id,
+      metodoPago: reserva.metodoPago,
+      estadoReserva: reserva.estadoReserva
+    }
+  });
+});
+
+// --- CONTROLADOR PARA CREACIÓN MÚLTIPLE (CORREGIDO) --- 
+const createMultipleReservacionesHabitacion = async (req, res) => {
+  const { reservas } = req.body; 
+  const userId = req.user.id; 
+
+  if (!Array.isArray(reservas) || reservas.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'El cuerpo de la solicitud debe contener un array \'reservas\' no vacío.'
+    });
+  }
+
+  const resultados = [];
+  const errores = [];
+
+  for (const reservaData of reservas) {
+    try {
+      // Validar datos básicos
+      if (!reservaData.habitacionLetra || !reservaData.fechaEntrada || !reservaData.fechaSalida || reservaData.precioPorNoche === undefined) {
+        throw new Error('Faltan datos requeridos (habitacionLetra, fechaEntrada, fechaSalida, precioPorNoche).');
+      }
+
+      // 1. Buscar la Habitación por letra
+      const habitacionDoc = await Habitacion.findOne({ letra: reservaData.habitacionLetra });
+      if (!habitacionDoc) {
+        throw new Error(`No se encontró una habitación con la letra ${reservaData.habitacionLetra}.`);
+      }
+      if (!habitacionDoc.tipoHabitacion) {
+        throw new Error(`La habitación ${reservaData.habitacionLetra} encontrada no tiene un tipoHabitacion ObjectId asociado.`);
+      }
+
+      // 2. Buscar el TipoHabitacion usando el ObjectId
+      const tipoHabDoc = await TipoHabitacion.findById(habitacionDoc.tipoHabitacion);
+      if (!tipoHabDoc || !tipoHabDoc.nombre) {
+         throw new Error(`No se pudo encontrar el nombre del TipoHabitacion asociado a la habitación ${reservaData.habitacionLetra}.`);
+      }
+      const tipoHabitacionNombre = tipoHabDoc.nombre; // <-- Nombre del tipo (String)
+      
+      // 3. Calcular precio total
+      const fechaEntradaObj = new Date(reservaData.fechaEntrada + 'T00:00:00Z');
+      const fechaSalidaObj = new Date(reservaData.fechaSalida + 'T00:00:00Z');
+      if (isNaN(fechaEntradaObj.getTime()) || isNaN(fechaSalidaObj.getTime()) || fechaEntradaObj >= fechaSalidaObj) {
+        throw new Error('Fechas inválidas o fecha de entrada posterior/igual a fecha de salida.');
+      }
+      const duracionEstancia = Math.ceil((fechaSalidaObj - fechaEntradaObj) / (1000 * 60 * 60 * 24));
+      const precioTotal = Number(reservaData.precioPorNoche) * duracionEstancia;
+      
+      // 4. Construir datos para ReservaHabitacion
+      const nuevaReservaData = {
+        habitacion: habitacionDoc.letra,          // <-- Usar la letra (String)
+        tipoHabitacion: tipoHabitacionNombre,    // <-- Usar el nombre del tipo (String)
+        fechaEntrada: fechaEntradaObj, 
+        fechaSalida: fechaSalidaObj,   
+        numHuespedes: reservaData.numHuespedes,
+        precio: precioTotal,
+        precioPorNoche: Number(reservaData.precioPorNoche),
+        nombreContacto: reservaData.nombreContacto,
+        apellidosContacto: reservaData.apellidosContacto,
+        emailContacto: reservaData.emailContacto,
+        telefonoContacto: reservaData.telefonoContacto,
+        metodoPago: reservaData.metodoPago || 'pendiente',
+        estadoReserva: 'pendiente', 
+        estadoPago: 'pendiente',
+        tipoReserva: reservaData.tipoReserva || 'hotel',
+        creadoPor: userId, // Usar creadoPor en lugar de usuario si ese es el campo
+        // Añadir campos con defaults si no vienen
+        numeroHabitaciones: reservaData.numeroHabitaciones || 1,
+        letraHabitacion: habitacionDoc.letra, // Puede ser redundante si ya está en 'habitacion'
+        infoHuespedes: reservaData.infoHuespedes || { nombres: [], detalles: '' },
+        // Omitir campos que ReservaHabitacion no espera directamente (como tipoHabitacion ObjectId)
+      };
+
+      // 5. Crear la ReservaHabitacion
+      const reservaCreada = await ReservaHabitacion.create(nuevaReservaData);
+      resultados.push(reservaCreada);
+
+    } catch (error) {
+      console.error(`Error detallado al crear reserva para habitación ${reservaData.habitacionLetra || 'desconocida'}:`, error);
+      errores.push({
+        habitacionLetra: reservaData.habitacionLetra || 'desconocida',
+        message: error.message,
+      });
+    }
+  }
+
+  if (resultados.length > 0) {
+    res.status(201).json({
+      success: true,
+      message: `Se crearon ${resultados.length} de ${reservas.length} reservas.`,
+      data: resultados, // Devolver las reservas creadas
+      errors: errores.length > 0 ? errores : undefined // Incluir errores si los hubo
+    });
+  } else {
+    res.status(400).json({ // O 500 si el fallo fue inesperado
+      success: false,
+      message: 'No se pudo crear ninguna reserva.',
+      errors: errores
+    });
+  }
+};
+// --- FIN NUEVO CONTROLADOR ---
+
 // Exportaciones finales (asegurando que todas las usadas estén aquí)
 module.exports = {
   createReservaHabitacion,
@@ -886,4 +1128,7 @@ module.exports = {
   checkHabitacionAvailability,
   getAllHabitacionOccupiedDates,
   updateReservaHabitacionHuespedes,
+  createHabitacionPaymentIntent,
+  seleccionarMetodoPagoHabitacion,
+  createMultipleReservacionesHabitacion
 }; 

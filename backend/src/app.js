@@ -3,6 +3,12 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const errorHandler = require('./middleware/error');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
+const connectDB = require('./config/db');
 
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
@@ -16,6 +22,9 @@ const adminRoutes = require('./routes/admin.routes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const contactoRoutes = require('./routes/contacto.routes');
 const publicRoutes = require('./routes/public.routes');
+
+// Importar controlador de webhook
+const { handleStripeWebhook } = require('./controllers/webhook.controller');
 
 const app = express();
 
@@ -47,10 +56,32 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Webhook Route (ANTES de express.json())
+app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), handleStripeWebhook);
+
 // Logging en desarrollo
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
+
+// Sanitize data (NoSQL injection)
+app.use(mongoSanitize());
+
+// Set security headers (Helmet)
+app.use(helmet());
+
+// Prevent XSS attacks
+app.use(xss());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 mins
+  max: 100
+});
+app.use(limiter);
+
+// Prevent http param pollution
+app.use(hpp());
 
 // Rutas API
 app.use('/api/auth', authRoutes);
