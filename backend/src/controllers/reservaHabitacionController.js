@@ -125,12 +125,9 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
         }
         
         // --- EMAIL AL CLIENTE ---
-        const clienteEmail = reserva.emailContacto || (reserva.usuario?.email); // Usar optional chaining
+        const clienteEmail = reserva.emailContacto || (reserva.usuario?.email);
         if (clienteEmail) {
-          // Importar la plantilla de confirmación de reserva
           const confirmacionReserva = require('../emails/confirmacionReserva');
-          
-          // Adaptar la plantilla para una reserva de habitación
           const htmlCliente = confirmacionReserva({
             nombreCliente: `${reserva.nombreContacto || 'Cliente'} ${reserva.apellidosContacto || ''}`,
             tipoEvento: `Habitación ${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'})`,
@@ -144,6 +141,7 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
             urlConfirmacion: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/perfil/reservas/${reserva.numeroConfirmacion}`
           });
           
+          console.log(`>>> [ReservaHabitación] Intentando enviar confirmación a cliente: ${clienteEmail}`);
           await sendEmail({
             email: clienteEmail,
             subject: 'Confirmación de reserva - Hacienda San Carlos Borromeo',
@@ -156,14 +154,9 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
         // --- EMAIL A LA HACIENDA (ADMIN) ---
         const adminEmailsString = process.env.ADMIN_EMAIL;
         if (adminEmailsString) {
-            // Dividir la cadena de emails por comas y quitar espacios en blanco
             const adminEmailArray = adminEmailsString.split(',').map(email => email.trim());
-
             if (adminEmailArray.length > 0) {
-                // Importar la plantilla de notificación para administradores
                 const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
-                
-                // Crear la plantilla para admin con la notificación de nueva reserva
                 const htmlAdmin = notificacionGestionAdmin({
                   accion: "Nueva Reserva",
                   tipoReserva: `Habitación (${reserva.tipoReserva})`,
@@ -182,8 +175,9 @@ exports.createReservaHabitacion = asyncHandler(async (req, res, next) => {
                   urlGestionReserva: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reservas/habitaciones/${reserva._id}`
                 });
                 
+                console.log(`>>> [ReservaHabitación] Intentando enviar notificación a admin: ${adminEmailArray.join(', ')}`);
                 await sendEmail({
-                  email: adminEmailArray, // <-- Pasar el array de emails
+                  email: adminEmailArray, 
                   subject: `Nueva Reserva Habitación #${reserva.numeroConfirmacion} (${reserva.tipoReserva})`,
                   html: htmlAdmin
                 });

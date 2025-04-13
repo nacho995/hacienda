@@ -215,6 +215,7 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
 
        if (emailCliente) {
           // Enviar correo de confirmación al cliente usando la nueva plantilla
+          console.log(`>>> [Evento] Intentando enviar confirmación a cliente: ${emailCliente}`);
           try {
             await enviarConfirmacionReservaEvento({
               email: emailCliente,
@@ -254,6 +255,7 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
               // Dividir por comas y eliminar espacios en blanco
               const adminEmails = adminEmailsString.split(',').map(email => email.trim());
               
+              console.log(`>>> [Evento] Intentando enviar notificación a admin: ${adminEmails}`);
               // Usar el template de notificación para admin
               await sendEmail({
                 email: adminEmails,

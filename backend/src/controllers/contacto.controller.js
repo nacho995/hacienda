@@ -35,6 +35,7 @@ exports.enviarFormularioContacto = asyncHandler(async (req, res) => {
       fechaContacto
     });
     
+    console.log(`>>> [Contacto] Intentando enviar email de confirmación a: ${email}`);
     await sendEmail({
       email,
       subject: 'Hemos recibido su mensaje - Hacienda San Carlos Borromeo',
@@ -69,6 +70,7 @@ exports.enviarFormularioContacto = asyncHandler(async (req, res) => {
           <p>${mensaje || 'Sin mensaje adicional'}</p>
         `;
         
+        console.log(`>>> [Contacto] Intentando enviar email de notificación a administradores: ${adminEmails}`);
         await sendEmail({
           email: adminEmails, // Pasamos el string o el array
           subject: `Nuevo contacto: ${nombreCompleto} - ${tipoEvento}`,
