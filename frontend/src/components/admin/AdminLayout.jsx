@@ -14,7 +14,8 @@ import {
   FaTimes,
   FaEye,
   FaUserShield,
-  FaChartPie
+  FaChartPie,
+  FaBookOpen
 } from 'react-icons/fa';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
@@ -113,6 +114,7 @@ export default function AdminLayout({ children }) {
     { name: 'Reservaciones', href: '/admin/reservaciones', icon: <FaCalendarAlt /> },
     { name: 'Habitaciones', href: '/admin/habitaciones', icon: <FaBed /> },
     { name: 'Usuarios', href: '/admin/usuarios', icon: <FaUsers /> },
+    { name: 'Manual de Instrucciones', href: '/admin/manual', icon: <FaBookOpen /> },
     { name: 'Configuración', href: '/admin/configuracion', icon: <FaCog /> },
   ];
 

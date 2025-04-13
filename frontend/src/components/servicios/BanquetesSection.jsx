@@ -4,6 +4,18 @@ import { motion } from 'framer-motion';
 import { FaUtensils, FaWineGlassAlt, FaCheck } from 'react-icons/fa';
 
 const BanquetesSection = () => {
+  // Definir el array de nuevas imágenes aquí, fuera del return
+  const galeriaBanqueteImages = [
+    '/aperitivomexicano.png',
+    '/aperitivomexicano1.png',
+    '/aperitivos.png',
+    '/botanadealtacocina.png',
+    '/botanasmexicanas.png',
+    '/camaron.png',
+    '/cocteldemariscosallimon.png',
+    '/coctelmaiz.png'
+  ];
+
   return (
     <div className="py-8">
       <div className="max-w-6xl mx-auto">
@@ -29,7 +41,7 @@ const BanquetesSection = () => {
             <div className="bg-white rounded-xl overflow-hidden shadow-lg">
               <div className="relative h-60">
                 <Image 
-                  src="/images/montaje-incluido.jpg" 
+                  src="/montajeincluido.png"
                   alt="Montaje Incluido" 
                   layout="fill"
                   objectFit="cover"
@@ -64,7 +76,7 @@ const BanquetesSection = () => {
             <div className="bg-white rounded-xl overflow-hidden shadow-lg">
               <div className="relative h-60">
                 <Image 
-                  src="/images/montaje-premium.jpg" 
+                  src="/montajepremium.png"
                   alt="Montaje Premium" 
                   layout="fill"
                   objectFit="cover"
@@ -153,7 +165,7 @@ const BanquetesSection = () => {
               </div>
               <div className="relative h-full min-h-[500px]">
                 <Image 
-                  src="/images/bebidas-barra.jpg" 
+                  src="/bebidasybarralibre.png"
                   alt="Bebidas y Barra Libre" 
                   layout="fill"
                   objectFit="cover"
@@ -170,11 +182,12 @@ const BanquetesSection = () => {
           </h3>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-              <div key={num} className="relative h-48 rounded-lg overflow-hidden">
+            {/* Mapear sobre el nuevo array de imágenes */}
+            {galeriaBanqueteImages.map((imageUrl, index) => (
+              <div key={index} className="relative h-48 rounded-lg overflow-hidden">
                 <Image 
-                  src={`/images/banquete-${num}.jpg`} 
-                  alt={`Banquete ejemplo ${num}`} 
+                  src={imageUrl} // Usar la URL del array
+                  alt={`Ejemplo de banquete ${index + 1}`} // Alt text actualizado
                   layout="fill"
                   objectFit="cover"
                   className="hover:scale-105 transition-transform duration-500"

@@ -481,7 +481,7 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
               Este email contiene información confidencial y está destinado únicamente para uso administrativo interno.
             </div>
           </footer>
-        </div>
+      </div>
     </div>
   </body>
   </html>

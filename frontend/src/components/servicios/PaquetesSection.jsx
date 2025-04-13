@@ -23,7 +23,7 @@ const PaquetesSection = () => {
           <div className="bg-white rounded-xl overflow-hidden shadow-lg">
             <div className="relative h-60">
               <Image 
-                src="/images/paquete-basico.jpg" 
+                src="/paquetebasico.png" 
                 alt="Paquete Básico" 
                 layout="fill"
                 objectFit="cover"
@@ -74,7 +74,7 @@ const PaquetesSection = () => {
           <div className="bg-white rounded-xl overflow-hidden shadow-lg">
             <div className="relative h-60">
               <Image 
-                src="/images/paquete-platinum.jpg" 
+                src="/paquetepremium.png" 
                 alt="Paquete Platinum" 
                 layout="fill"
                 objectFit="cover"
@@ -125,7 +125,7 @@ const PaquetesSection = () => {
           <div className="bg-white rounded-xl overflow-hidden shadow-lg">
             <div className="relative h-60">
               <Image 
-                src="/images/paquete-oro.jpg" 
+                src="/paqueteoro.png" 
                 alt="Paquete Oro" 
                 layout="fill"
                 objectFit="cover"

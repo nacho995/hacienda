@@ -4,6 +4,25 @@ import { motion } from 'framer-motion';
 import { FaCalendarAlt, FaGlassMartiniAlt, FaCoffee, FaUtensils, FaCheck } from 'react-icons/fa';
 
 const CoctelBrunchSection = () => {
+  // Definir array de imágenes para las opciones de cóctel
+  const coctelImages = [
+    '/fuentesfrutas.png', // Nueva imagen para Box Lunch (index 0)
+    '/margaritamojitos.jpg', // Actualizar imagen para Opción 1 (index 1)
+    '/canapesyquesos.jpg', // Actualizar imagen para Opción 2 (index 2)
+    '/pasta3quesos.jpg', // Actualizar imagen para Opción 3 (index 3)
+    '/cecinaenchilada.jpg', // Actualizar imagen para Opción 4 (index 4)
+    '/tacosalpastor.jpg', // Actualizar imagen para Opción 5 (index 5)
+    '/tacosalpastor1.jpg', // Actualizar imagen para Opción 6 (index 6)
+    '/pizza.png', // Actualizar imagen para Opción 7 (index 7)
+    '/chicharron-en-salsa-de-chile-morita.jpg' // Actualizar imagen para Opción 8 (index 8)
+  ];
+
+  // Definir array de imágenes para las opciones de brunch
+  const brunchImages = [
+    '/paquete1.png', // Nueva imagen para Paquete 1 (index 0)
+    '/paquete2.png' // Actualizar imagen para Paquete 2 (index 1)
+  ];
+
   return (
     <div className="py-8">
       <div className="max-w-6xl mx-auto">
@@ -39,10 +58,10 @@ const CoctelBrunchSection = () => {
               >
                 <div className="relative h-48">
                   <Image 
-                    src={`/images/coctel-${index + 1}.jpg`} 
+                    src={coctelImages[index] || '/images/default-coctel.jpg'} // Usar el array de imágenes
                     alt={`Opción de cóctel ${opcion.nombre}`} 
                     layout="fill"
-                    objectFit="cover"
+                    objectFit={index === 0 ? 'cover' : 'contain'}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
                     <div className="p-4 text-white">
@@ -85,12 +104,12 @@ const CoctelBrunchSection = () => {
                 viewport={{ once: true }}
                 className="bg-white rounded-xl overflow-hidden shadow-lg"
               >
-                <div className="relative h-60">
+                <div className="relative h-60 bg-black">
                   <Image 
-                    src={`/images/brunch-${index + 1}.jpg`} 
+                    src={brunchImages[index] || '/images/default-brunch.jpg'} 
                     alt={`Brunch ${opcion.nombre}`} 
                     layout="fill"
-                    objectFit="cover"
+                    objectFit={index === 0 ? 'cover' : 'contain'}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
                     <div className="p-6 text-white">

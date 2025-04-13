@@ -525,7 +525,7 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
               Este email contiene información confidencial. Si ha recibido este mensaje por error, por favor elimínelo y notifique al remitente.
             </div>
           </footer>
-        </div>
+      </div>
     </div>
   </body>
   </html>

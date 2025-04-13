@@ -143,8 +143,22 @@ const AdicionalesSection = () => {
     const fetchServicios = async () => {
       try {
         setLoading(true);
-        const data = await getAllServicios();
-        setServicios(data);
+        const response = await getAllServicios(); // Obtener la respuesta completa
+
+        // Verificar si la respuesta tiene la estructura esperada y extraer el array
+        let serviciosArray = []; 
+        if (response && response.success && Array.isArray(response.data)) {
+          serviciosArray = response.data;
+        } else if (Array.isArray(response)) { 
+          // Si la respuesta es directamente el array (menos común pero posible)
+          serviciosArray = response;
+        } else {
+          // Si no es un array o la estructura no es la esperada, lanzar un error o manejarlo
+          console.error('Respuesta inesperada de getAllServicios:', response);
+          throw new Error('Formato de datos inesperado al cargar servicios.');
+        }
+
+        setServicios(serviciosArray); // Guardar el array extraído
         
         // Agrupar servicios por categoría
         const serviciosAgrupados = {
@@ -157,7 +171,8 @@ const AdicionalesSection = () => {
           coordinacion: []
         };
         
-        data.forEach(servicio => {
+        // Iterar sobre el array extraído
+        serviciosArray.forEach(servicio => {
           if (servicio.categoria && serviciosAgrupados[servicio.categoria]) {
             serviciosAgrupados[servicio.categoria].push(servicio);
           }
@@ -174,6 +189,14 @@ const AdicionalesSection = () => {
 
     fetchServicios();
   }, []);
+
+  // Array de imágenes para la sección de entretenimiento
+  const entretenimientoImages = [
+    '/Mariachis.png', // Nueva imagen para Música en Vivo
+    '/pirotecnia.jpg', // Actualizar imagen para Pirotecnia
+    '/ludotecainfantil.jpeg' // Actualizar imagen para Entretenimiento Infantil
+  ];
+
   return (
     <div className="py-8">
       <div className="max-w-6xl mx-auto">
@@ -193,7 +216,7 @@ const AdicionalesSection = () => {
             <div className="grid grid-cols-1 md:grid-cols-2">
               <div className="relative h-full min-h-[300px]">
                 <Image 
-                  src="/images/servicio-dj.jpg" 
+                  src="/serviciodedj.jpg"
                   alt="Servicio de DJ" 
                   layout="fill"
                   objectFit="cover"
@@ -364,7 +387,7 @@ const AdicionalesSection = () => {
               <div key={index} className="relative rounded-lg overflow-hidden group">
                 <div className="relative h-64">
                   <Image 
-                    src={`/images/entretenimiento-${index + 1}.jpg`} 
+                    src={entretenimientoImages[index]} // Usar el array de imágenes
                     alt={opcion.nombre} 
                     layout="fill"
                     objectFit="cover"

@@ -108,6 +108,10 @@ router.delete('/eventos/:id/servicios/:servicioId', protectRoute, authorize('adm
 // ==========================
 // RUTA PARA ACTUALIZAR ESTADO (ADMIN)
 // ==========================
-router.put('/estado', protectRoute, authorize('admin'), reservaEstadoController.actualizarEstado);
+router.patch('/habitaciones/:id/estado', 
+  protectRoute, 
+  authorize('admin'), 
+  actualizarEstadoReservaHabitacion
+);
 
 module.exports = router;

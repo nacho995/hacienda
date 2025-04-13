@@ -23,22 +23,15 @@ const BodasSection = () => {
         </div>
 
         {/* Imagen principal con texto superpuesto */}
-        <div className="relative rounded-xl overflow-hidden mb-16 h-[500px]">
+        <div className="relative rounded-xl overflow-hidden mb-16 aspect-video max-w-md mx-auto lg:max-w-xl h-[500px]">
           <Image 
-            src="/images/boda-principal.jpg" 
+            src="/Bodashaciendasancarlos.png" 
             alt="Bodas en Hacienda San Carlos" 
             layout="fill"
             objectFit="cover"
             className="object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
-            <div className="p-8 text-white max-w-2xl">
-              <h3 className="text-3xl font-[var(--font-display)] mb-4">¿Deseas agregar detalles?</h3>
-              <p className="text-lg">
-                Contamos con los mejores servicios para que tu boda sea espectacular
-              </p>
-            </div>
-          </div>
+          
         </div>
 
         {/* Servicios incluidos */}
@@ -66,11 +59,11 @@ const BodasSection = () => {
 
         {/* Galería de imágenes */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-16">
-          {[1, 2, 3, 4, 5, 6].map((num) => (
-            <div key={num} className="relative h-80 rounded-lg overflow-hidden">
+          {galeriaImages.map((img, index) => (
+            <div key={index} className="relative h-80 rounded-lg overflow-hidden">
               <Image 
-                src={`/images/boda-galeria-${num}.jpg`} 
-                alt={`Boda en Hacienda San Carlos ${num}`} 
+                src={img.src} 
+                alt={img.alt} 
                 layout="fill"
                 objectFit="cover"
                 className="hover:scale-105 transition-transform duration-500"
@@ -117,6 +110,18 @@ const serviciosBoda = [
   "Coordinador de banquete",
   "Capitán de meseros",
   "Elaboración de lay out en base a las mesas elegidas"
+];
+
+// Galería de imágenes
+const galeriaImages = [
+  { src: "/Foto baile novios.png", alt: "Primer baile de novios con pirotecnia" },
+  { src: "/Foto evento 4.png", alt: "Vista aérea de recepción de boda en patio" },
+  { src: "/foto manos poniendo anillo de casados.png", alt: "Intercambio de anillos de boda" },
+  { src: "/Foto evento noche baile.png", alt: "Fiesta de boda por la noche con luces" },
+  { src: "/Foto novios espalda.png", alt: "Novios de espalda caminando hacia la recepción" },
+  { src: "/Foto vegetacion hacienda.png", alt: "Arco decorado con vegetación y macramé" },
+  { src: "/hombre montando a caballo por la hacienda muy chula.png", alt: "Charro a caballo en el patio de la hacienda" },
+  { src: "/Novios en pista de baile .png", alt: "Novios bailando en pista iluminada con invitados alrededor" },
 ];
 
 export default BodasSection;
