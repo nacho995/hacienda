@@ -362,9 +362,25 @@ const ReservaWizard = () => {
   const handleSubmit = async () => {
     setLoading(true);
     try {
+      // Asegurarse de que fechaInicio es un objeto Date antes de formatear
+      const fechaInicioDate = formData.fechaInicio instanceof Date 
+                              ? formData.fechaInicio 
+                              : (formData.fechaInicio ? new Date(formData.fechaInicio) : null);
+                              
+      const fechaISO = fechaInicioDate && !isNaN(fechaInicioDate) 
+                       ? fechaInicioDate.toISOString().split('T')[0] 
+                       : null;
+
+      if (!fechaISO) {
+        // Si después de intentar convertir sigue sin ser válida, lanzar error
+        toast.error('La fecha de inicio de la reserva no es válida.');
+        setLoading(false);
+        return; 
+      }
+                       
       const apiData = {
         tipo_evento: formData.tipoEvento, 
-        fecha: formData.fechaInicio ? formData.fechaInicio.toISOString().split('T')[0] : null,
+        fecha: fechaISO, // Usar la fecha formateada y validada
         nombre_contacto: formData.datosContacto?.nombre,
         apellidos_contacto: formData.datosContacto?.apellidos,
         email_contacto: formData.datosContacto?.email,
