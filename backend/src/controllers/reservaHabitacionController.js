@@ -312,27 +312,47 @@ const getReservasHabitacion = asyncHandler(async (req, res, next) => {
 // @route   GET /api/reservas/habitaciones/:id
 // @access  Private/Admin
 const getReservaHabitacionById = asyncHandler(async (req, res, next) => {
+  // Obtener la reserva básica, poblando solo lo que sí son referencias
   const reserva = await ReservaHabitacion.findById(req.params.id)
-    .populate('asignadoA', 'nombre apellidos email')
-    .populate('habitacion')
-    .populate('reservaEvento');
+    .populate('asignadoA', 'nombre apellidos email') 
+    // Quitar populates que no funcionan por schema String
+    // .populate({ path: 'habitacion', ... })
+    // .populate({ path: 'tipoHabitacion', ... })
+    .populate('reservaEvento')
+    .lean(); // Usar lean() para obtener un objeto JS plano
 
     if (!reserva) {
       return next(new ErrorResponse(`Reserva no encontrada con ID ${req.params.id}`, 404));
     }
 
-  // TODO: Revisar lógica de autorización.
-  // La comprobación original `reserva.usuario.toString() !== req.user.id` podría fallar
-  // si 'usuario' no está definido o no es lo que se espera.
-  // Considerar si la autorización debe basarse en `reserva.usuario` (creador) o `reserva.asignadoA`.
-  // Por ahora, se comenta para evitar errores si `reserva.usuario` es null.
-  /* 
-  if (reserva.usuario?.toString() !== req.user.id && req.user.role !== 'admin') {
-     return next(new ErrorResponse('No autorizado para acceder a esta reserva', 401));
-  }
-  */
+    // --- Inicio: Búsqueda manual de detalles de Habitación --- 
+    let habitacionDetalles = null;
+    if (reserva.habitacion && typeof reserva.habitacion === 'string') { // Si 'habitacion' es un string (como el ID)
+      try {
+        // Importar modelo Habitacion si no está ya importado arriba
+        const Habitacion = require('../models/Habitacion'); 
+        habitacionDetalles = await Habitacion.findById(reserva.habitacion)
+                                         .select('letra nombre tipo capacidad imagenes') // Campos necesarios
+                                         .lean(); // Objeto plano
+        console.log(`[getReservaHabitacionById ${req.params.id}] Detalles de habitación encontrados:`, habitacionDetalles);
+      } catch (err) {
+        console.error(`[getReservaHabitacionById ${req.params.id}] Error buscando detalles de habitación con ID ${reserva.habitacion}:`, err);
+        // No detener la ejecución, solo no tendremos los detalles
+      }
+    }
+    // --- Fin: Búsqueda manual --- 
 
-    res.status(200).json({ success: true, data: reserva });
+    // Crear el objeto final para la respuesta
+    const reservaParaEnviar = {
+      ...reserva, // Copiar datos de la reserva original
+      habitacion: habitacionDetalles // Reemplazar el ID string con el objeto de detalles (o null si no se encontró)
+      // tipoHabitacion ya viene como String desde la reserva, se queda así
+    };
+
+    // LOG para depurar el objeto reserva ANTES de enviar
+    console.log(`[getReservaHabitacionById ${req.params.id}] Reserva a enviar (con detalles manuales):`, JSON.stringify(reservaParaEnviar, null, 2));
+
+    res.status(200).json({ success: true, data: reservaParaEnviar });
 });
 
 // @desc    Actualizar una reserva de habitación

@@ -87,6 +87,14 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
       const precioTotalCalculado = precioBaseEvento + precioServicios;
       const totalHabitaciones = (modo_gestion_habitaciones === 'hacienda') ? 14 : (habitaciones?.length || 0);
 
+      // CORREGIDO: Mapear los servicios contratados a la nueva estructura del schema
+      const serviciosFormateados = Array.isArray(serviciosContratados) 
+        ? serviciosContratados.map(item => ({
+            servicio: item.id || item._id, // Asume que el frontend envía 'id' o '_id'
+            cantidad: item.cantidad || 1  // Asume que el frontend envía 'cantidad', default a 1 si no
+          })) 
+        : [];
+
       // --- Crear ReservaEvento DENTRO de la Transacción ---
       const reservaData = {
         ...(req.user && req.user.id ? { usuario: req.user.id } : {}),
@@ -108,7 +116,7 @@ const createReservaEvento = asyncHandler(async (req, res, next) => {
         modoGestionHabitaciones: modo_gestion_habitaciones || 'usuario',
         modoGestionServicios: modo_gestion_servicios || 'usuario',
         totalHabitaciones,
-        serviciosContratados: Array.isArray(serviciosContratados) ? serviciosContratados : [],
+        serviciosContratados: serviciosFormateados, // Usar el array formateado
         numeroConfirmacion: generarNumeroConfirmacion(),
         fechaHoraCreacion: new Date(),
       };
@@ -405,63 +413,117 @@ exports.obtenerReservasEvento = async (req, res) => {
  * @route   GET /api/reservas/eventos/:id
  * @access  Private
  */
-exports.obtenerReservaEvento = async (req, res) => {
+exports.obtenerReservaEvento = async (req, res, next) => {
+  console.log(`[obtenerReservaEvento ${req.params.id}] Iniciando obtención de detalles...`);
   try {
-    // Buscar la reserva de evento con los datos básicos populados
-    const reserva = await ReservaEvento.findById(req.params.id)
-      .select('+precio +nombreEvento +nombreContacto +apellidosContacto +emailContacto +telefonoContacto +fecha +horaInicio +horaFin +numeroInvitados +espacioSeleccionado +peticionesEspeciales +estadoReserva +numInvitados')
-      .populate({
-        path: 'usuario',
-        select: 'nombre apellidos email telefono',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'asignadoA',
-        select: 'nombre apellidos email',
-        strictPopulate: false
-      })
-      .populate({
-        path: 'tipoEvento',
-        strictPopulate: false
-      });
-      
+    let reserva = await ReservaEvento.findById(req.params.id)
+      .select('+precio +nombreEvento +nombreContacto +apellidosContacto +emailContacto +telefonoContacto +fecha +horaInicio +horaFin +numeroInvitados +espacioSeleccionado +peticionesEspeciales +estadoReserva +numInvitados +metodoPago +modoGestionServicios +serviciosContratados')
+      .populate({ path: 'usuario', select: 'nombre apellidos email telefono', strictPopulate: false })
+      .populate({ path: 'asignadoA', select: 'nombre apellidos email', strictPopulate: false })
+      .populate({ path: 'tipoEvento', strictPopulate: false });
+
     if (!reserva) {
-      return res.status(404).json({
-        success: false,
-        message: 'Reserva no encontrada'
-      });
+      console.log(`[obtenerReservaEvento ${req.params.id}] Reserva no encontrada.`);
+      return res.status(404).json({ success: false, message: 'Reserva no encontrada' });
     }
     
-    // --- NUEVO: Buscar y popular las habitaciones asociadas ---
-    const habitacionesAsociadas = await ReservaHabitacion.find({ reservaEvento: reserva._id })
-      .populate({
-        path: 'habitacion', // Popular la referencia a la habitación física
-        select: 'letra nombre tipo', // Seleccionar campos específicos si es necesario
-        strictPopulate: false
-      })
-      .populate({
-        path: 'tipoHabitacion', // Popular la referencia al tipo de habitación
-        strictPopulate: false
-      });
-      
-    // Convertir la reserva a un objeto plano para poder añadirle propiedades
-    const reservaObj = reserva.toObject();
-    // Añadir las habitaciones encontradas al objeto de respuesta
-    reservaObj.habitaciones = habitacionesAsociadas;
-    // --- FIN NUEVO ---
+    console.log(`[obtenerReservaEvento ${req.params.id}] Servicios ANTES de procesar:`, JSON.stringify(reserva.serviciosContratados, null, 2));
 
-    res.status(200).json({
-      success: true,
-      // Enviar el objeto modificado que incluye las habitaciones
-      data: reservaObj 
-    });
+    // --- INICIO: Procesamiento CORREGIDO de serviciosContratados ---
+    if (reserva.serviciosContratados && reserva.serviciosContratados.length > 0) {
+      const primerElemento = reserva.serviciosContratados[0];
+
+      // REESTRUCTURADO: Priorizar formato nuevo, luego tratar otros objetos como 'raro/antiguo'
+      if (typeof primerElemento === 'object' && primerElemento !== null && primerElemento.hasOwnProperty('servicio')) {
+         // --- Formato Nuevo --- 
+        console.log(`[obtenerReservaEvento ${reserva._id}] Detectado FORMATO NUEVO (Array de Objetos). Poblando 'servicio'...`);
+        console.log(`[obtenerReservaEvento ${reserva._id}] Servicios ANTES de poblar formato nuevo:`, JSON.stringify(reserva.serviciosContratados, null, 2));
+        await ReservaEvento.populate(reserva, { 
+            path: 'serviciosContratados.servicio', 
+            model: 'Servicio',
+            select: 'nombre precio'
+        });
+        console.log(`[obtenerReservaEvento ${reserva._id}] Servicios DESPUÉS de poblar formato nuevo:`, JSON.stringify(reserva.serviciosContratados, null, 2));
+
+      } else if (typeof primerElemento === 'object' && primerElemento !== null && primerElemento._id) {
+        // --- Formato Raro/Antiguo (Objeto SIN 'servicio', usar _id) ---
+        console.log(`[obtenerReservaEvento ${reserva._id}] Detectado FORMATO RARO/ANTIGUO (Objeto sin 'servicio'). Intentando usar _id como referencia...`);
+        // Asegurarse de que todos los elementos son objetos con _id
+        const sonTodosObjetosConId = reserva.serviciosContratados.every(item => typeof item === 'object' && item !== null && item._id);
+        
+        if (sonTodosObjetosConId) {
+            const idsServicios = reserva.serviciosContratados.map(item => item._id); 
+            console.log(`[obtenerReservaEvento ${reserva._id}] IDs a buscar (del formato raro):`, idsServicios);
+            
+            const serviciosPopulated = await Servicio.find({ _id: { $in: idsServicios } }).select('nombre precio').lean();
+            console.log(`[obtenerReservaEvento ${reserva._id}] Servicios encontrados en BD (para formato raro):`, JSON.stringify(serviciosPopulated, null, 2));
+            
+            const serviciosMap = serviciosPopulated.reduce((map, servicio) => {
+              map[servicio._id.toString()] = servicio;
+              return map;
+            }, {});
+            console.log(`[obtenerReservaEvento ${reserva._id}] Mapa de servicios construido (para formato raro).`);
+
+            const serviciosTransformados = reserva.serviciosContratados.map(item => {
+              const servicioData = serviciosMap[item._id.toString()]; 
+              console.log(`[obtenerReservaEvento ${reserva._id}] Mapeando item raro con _id ${item._id}: Servicio encontrado: ${!!servicioData}`);
+              return {
+                servicio: servicioData || null, 
+                cantidad: item.cantidad || 1 
+              };
+            });
+            reserva.serviciosContratados = serviciosTransformados;
+        } else {
+             console.warn(`[obtenerReservaEvento ${reserva._id}] Formato raro inconsistente detectado. No se pudo procesar.`);
+             // reserva.serviciosContratados = []; // Opcional: vaciar si es inconsistente
+        }
+
+      } else if (primerElemento instanceof mongoose.Types.ObjectId || typeof primerElemento === 'string') {
+        // --- Formato MUY Antiguo (Solo IDs) --- 
+        console.log(`[obtenerReservaEvento ${reserva._id}] Detectado FORMATO MUY ANTIGUO (Array de IDs).`);
+        const idsServicios = reserva.serviciosContratados;
+        console.log(`[obtenerReservaEvento ${reserva._id}] IDs a buscar:`, idsServicios);
+        const serviciosPopulated = await Servicio.find({ _id: { $in: idsServicios } }).select('nombre precio').lean();
+        console.log(`[obtenerReservaEvento ${reserva._id}] Servicios encontrados en BD:`, JSON.stringify(serviciosPopulated, null, 2));
+        const serviciosMap = serviciosPopulated.reduce((map, servicio) => {
+          map[servicio._id.toString()] = servicio;
+          return map;
+        }, {});
+        console.log(`[obtenerReservaEvento ${reserva._id}] Mapa de servicios construido.`);
+        const serviciosTransformados = idsServicios.map(id => {
+          const servicioData = serviciosMap[id.toString()];
+          console.log(`[obtenerReservaEvento ${reserva._id}] Mapeando ID ${id}: Servicio encontrado: ${!!servicioData}`);
+          return {
+            servicio: servicioData || null,
+            cantidad: 1 
+          };
+        });
+        reserva.serviciosContratados = serviciosTransformados;
+
+      } else {
+         // --- Formato Realmente Inesperado --- 
+         console.warn(`[obtenerReservaEvento ${reserva._id}] Formato realmente inesperado para serviciosContratados (ni objeto, ni ID/string):`, primerElemento);
+      }
+    }
+    // --- FIN: Procesamiento CORREGIDO de serviciosContratados ---
+
+    // LOG: Mostrar serviciosContratados DESPUÉS de procesar
+    console.log(`[obtenerReservaEvento ${req.params.id}] Servicios DESPUÉS de procesar:`, JSON.stringify(reserva.serviciosContratados, null, 2));
+
+    // --- Buscar y popular las habitaciones asociadas (se mantiene igual) ---
+    const habitacionesAsociadas = await ReservaHabitacion.find({ reservaEvento: reserva._id })
+      .populate({ path: 'habitacion', select: 'letra nombre tipo', strictPopulate: false })
+      .populate({ path: 'tipoHabitacion', strictPopulate: false });
+
+    const reservaObj = reserva.toObject ? reserva.toObject() : { ...reserva };
+    reservaObj.habitaciones = habitacionesAsociadas;
+    
+    console.log(`[obtenerReservaEvento ${req.params.id}] Enviando respuesta al frontend.`);
+    res.status(200).json({ success: true, data: reservaObj });
+
   } catch (error) {
-    console.error('Error al obtener reserva de evento:', error);
-    res.status(500).json({
-      success: false,
-      message: 'No se pudo obtener la reserva',
-      error: error.message
-    });
+    console.error(`[obtenerReservaEvento ${req.params.id}] Error:`, error);
+    res.status(500).json({ success: false, message: 'No se pudo obtener la reserva', error: error.message });
   }
 };
 
@@ -1438,7 +1500,7 @@ const getEventDatesInRange = asyncHandler(async (req, res, next) => {
   fin.setUTCHours(23, 59, 59, 999); // Asegurar fin del día en UTC
 
   if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
-    return next(new ErrorResponse('Formato de fecha inválido', 400));
+    return next(new ErrorResponse('Fechas inválidas.', 400));
   }
 
   // Buscar eventos cuya fecha única caiga dentro del rango.

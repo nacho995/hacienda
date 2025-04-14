@@ -133,10 +133,19 @@ const reservaEventoSchema = new mongoose.Schema({
     }]
   },
   
-  // Nuevo campo para IDs de servicios contratados
+  // CORREGIDO: Cambiar la estructura para guardar referencia y cantidad
   serviciosContratados: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Servicio' // Referencia al modelo Servicio
+    servicio: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Servicio',
+      required: true
+    },
+    cantidad: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 1
+    }
   }]
 }, {
   timestamps: true

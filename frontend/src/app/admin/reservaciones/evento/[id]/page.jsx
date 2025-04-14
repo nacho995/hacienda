@@ -50,7 +50,7 @@ export default function EventoReservationDetail({ params }) {
   const cargarUsuariosAdmin = useCallback(async () => {
     setLoadingUsuariosAdmin(true);
     try {
-      const response = await apiClient.get('/users');
+      const response = await apiClient.get('/users?from_admin=true');
       if (response?.data && Array.isArray(response.data)) {
         const admins = response.data.filter(u => u.role === 'admin');
         setUsuariosAdmin(admins);
@@ -444,15 +444,24 @@ export default function EventoReservationDetail({ params }) {
 
              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                  <h2 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Servicios Adicionales</h2>
-                 {reservation.serviciosAdicionales && reservation.serviciosAdicionales.length > 0 ? (
-                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-                      {reservation.serviciosAdicionales.map(servicio => (
-                        <li key={servicio._id || servicio.nombre}>{servicio.nombre} (Cantidad: {servicio.cantidad || 1}) - ${servicio.precio?.toFixed(2) || '0.00'}</li>
-                      ))}
-                    </ul>
-                 ) : (
-                     <p className="text-sm text-gray-500 italic">No se incluyeron servicios adicionales.</p>
-                 )}
+                 <dl className="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
+                   {reservation.serviciosContratados && reservation.serviciosContratados.length > 0 ? (
+                     <ul className="divide-y divide-gray-200 rounded-md border border-gray-200">
+                       {reservation.serviciosContratados.map((item, index) => (
+                         <li key={index} className="flex items-center justify-between py-3 pl-3 pr-4 text-sm">
+                           <div className="flex w-0 flex-1 items-center">
+                             <span className="ml-2 flex-1 w-0 truncate">{item.servicio?.nombre || 'Nombre no disponible'} (Cantidad: {item.cantidad})</span>
+                           </div>
+                           <div className="ml-4 flex-shrink-0">
+                             <span className="font-medium">{item.servicio?.precio ? `$${formatNumber(item.servicio.precio * item.cantidad)}` : 'Precio no disponible'}</span>
+                           </div>
+                         </li>
+                       ))}
+                     </ul>
+                   ) : (
+                     'No hay servicios adicionales contratados.'
+                   )}
+                 </dl>
              </div>
               
              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
