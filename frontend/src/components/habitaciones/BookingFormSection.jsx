@@ -399,36 +399,29 @@ function BookingFormSection({
     setReservationError(null);
     setMultipleReservationConfirmations([]); // Resetear confirmaciones previas
 
-    const reservacionesParaEnviar = selectedRooms.map(room => {
+    const formattedReservations = selectedRooms.map(room => {
       const fechas = fechasPorHabitacion[room.letra];
-      // Asegurarse que las fechas son objetos Date válidos antes de formatear
-      const fechaEntrada = fechas?.fechaEntrada instanceof Date ? fechas.fechaEntrada : null;
-      const fechaSalida = fechas?.fechaSalida instanceof Date ? fechas.fechaSalida : null;
-
-      if (!fechaEntrada || !fechaSalida) {
-        // Esto no debería ocurrir si la validación pasó, pero es una salvaguarda
-        throw new Error(`Fechas inválidas para la habitación ${room.letra}`); 
-      }
-
       return {
         habitacionLetra: room.letra,
         tipoHabitacion: room.tipo,
         precioPorNoche: room.precioPorNoche,
-        numHuespedes: formData.huespedes, // O tomarlo de room.capacidad si es variable?
-        fechaEntrada: fechaEntrada, // Enviar como objeto Date
-        fechaSalida: fechaSalida,   // Enviar como objeto Date
+        numHuespedes: formData[`numHuespedes_${room.letra}`] || 1,
+        fechaEntrada: formatApiDate(fechas.fechaEntrada),
+        fechaSalida: formatApiDate(fechas.fechaSalida),
         nombreContacto: formData.nombre,
         apellidosContacto: formData.apellidos,
         emailContacto: formData.email,
         telefonoContacto: formData.telefono,
-        metodoPago: metodoPago, // Añadir método de pago
-        // Incluir datos de tarjeta si el método es 'tarjeta' (simplificado, requiere manejo seguro real)
-        ...(metodoPago === 'tarjeta' && { datosTarjeta: datosTarjeta }) 
+        peticionesEspeciales: formData.peticionesEspeciales,
+        metodoPago: metodoPago,
+        estadoPago: metodoPago === 'tarjeta' ? 'procesando' : 'pendiente',
+        tipoReserva: 'hotel',
+        categoriaHabitacion: room.capacidad > 2 ? 'doble' : 'sencilla',
       };
     });
 
     // *** Verificación de disponibilidad ANTES de intentar crear ***
-    const availabilityCheckPassed = await runAvailabilityCheck(reservacionesParaEnviar);
+    const availabilityCheckPassed = await runAvailabilityCheck(formattedReservations);
     if (!availabilityCheckPassed) {
         setIsSubmitting(false); 
         // El modal de conflicto ya se muestra desde runAvailabilityCheck
@@ -439,12 +432,6 @@ function BookingFormSection({
     try {
       // Ajustar la llamada para enviar objetos Date directamente si el backend los maneja
       // o formatear aquí si el backend espera strings YYYY-MM-DD
-      const formattedReservations = reservacionesParaEnviar.map(r => ({
-        ...r,
-        fechaEntrada: formatApiDate(r.fechaEntrada),
-        fechaSalida: formatApiDate(r.fechaSalida)
-      }));
-
       let response;
       if (formattedReservations.length === 1) {
         // Llamar a la API para una sola habitación con el nombre correcto

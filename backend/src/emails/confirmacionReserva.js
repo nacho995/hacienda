@@ -1,4 +1,4 @@
-const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroConfirmacion, urlConfirmacion }) => {
+const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroConfirmacion, urlConfirmacion, detallesAdicionales }) => {
   // Paleta de colores sofisticada
   const colors = {
     gold: '#D4AF37',           // Dorado elegante
@@ -270,6 +270,29 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
           width: 50%;
         }
         
+        .details-item strong {
+          color: ${colors.primary};
+          width: 150px; /* Alinear etiquetas */
+          display: inline-block;
+          font-weight: 700;
+        }
+        
+        .details-item:last-child {
+          border-bottom: none;
+        }
+        
+        .important-note {
+          background-color: rgba(212, 175, 55, 0.1);
+          border-left: 3px solid ${colors.gold};
+          padding: 20px 25px;
+          margin: 30px 0;
+          line-height: 1.8;
+        }
+        
+        .important-note p {
+          margin: 0;
+        }
+        
         .cta-button {
           display: inline-block;
           background: linear-gradient(135deg, ${colors.gold} 0%, ${colors.goldDark} 100%);
@@ -465,35 +488,35 @@ const confirmacionReserva = ({ nombreCliente, tipoEvento, fechaEvento, numeroCon
             ${decorativeDivider}
             
             <div class="details-container">
-              <h3 class="details-title">Resumen de su Solicitud:</h3>
-              
+              <h3 class="details-title">Detalles de su Reserva</h3>
               <div class="details-item">
-                <div class="details-label">Tipo de Evento:</div>
-                <div class="details-value">${tipoEvento || 'No especificado'}</div>
+                <strong>Cliente:</strong> ${nombreCliente || 'Estimado Cliente'}
               </div>
-              
               <div class="details-item">
-                <div class="details-label">Fecha Solicitada:</div>
-                <div class="details-value">${fechaEvento || 'No especificada'}</div>
+                <strong>Reserva:</strong> ${tipoEvento || 'Evento/Estancia'}
               </div>
-              
               <div class="details-item">
-                <div class="details-label">Número de Confirmación:</div>
-                <div class="details-value">${numeroConfirmacion || 'Pendiente'}</div>
+                <strong>Fecha:</strong> ${fechaEvento || 'Por confirmar'}
               </div>
-              
-              <div class="details-item">
-                <div class="details-label">Estado Actual:</div>
-                <div class="details-value">Pendiente de Revisión</div>
-              </div>
-        </div>
-        
-            <div class="additional-info">
-              <p><strong>Información importante:</strong></p>
-              <p>• Uno de nuestros coordinadores de eventos se pondrá en contacto con usted en las próximas 48 horas para confirmar los detalles y responder cualquier pregunta que tenga.</p>
-              <p>• Para cualquier consulta inmediata, no dude en contactarnos a través de nuestros canales oficiales mencionados al pie de este correo.</p>
-              <p>• Este correo es generado automáticamente, por favor no responda a este mensaje.</p>
+              <!-- AÑADIR MÁS DETALLES SI SE PASAN EN detallesAdicionales -->
+              ${detallesAdicionales && typeof detallesAdicionales === 'object' ? 
+                Object.entries(detallesAdicionales).map(([key, value]) => {
+                  // Excluir la nota adicional si ya la mostramos abajo
+                  if (key === 'notaAdicional') return ''; 
+                  const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
+                  const formattedValue = value !== null && value !== undefined && value !== '' ? value : 'No especificado';
+                  return `<div class="details-item">
+                            <strong>${formattedKey}:</strong> ${formattedValue}
+                          </div>`;
+                }).join('') : ''
+              }
             </div>
+            
+            ${detallesAdicionales && detallesAdicionales.notaAdicional ? `
+            <div class="important-note">
+              <p><strong>Nota Importante:</strong> ${detallesAdicionales.notaAdicional}</p>
+            </div>
+            ` : ''}
             
             ${urlConfirmacion ? `
             <div style="text-align: center;">

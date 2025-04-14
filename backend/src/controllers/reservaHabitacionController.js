@@ -150,19 +150,22 @@ const createReservaHabitacion = asyncHandler(async (req, res, next) => {
                mensajeAdicionalCliente = '<p>Usted ha elegido pagar en efectivo al llegar. Por favor presente su número de confirmación en la recepción.</p>';
              } // No añadir mensaje para transferencia aquí, ya se envió el email específico
              
-             const confirmacionReserva = require('../emails/confirmacionReserva'); // Mover require aquí si solo se usa en este bloque
+             const confirmacionReserva = require('../emails/confirmacionReserva'); 
              const htmlCliente = confirmacionReserva({
-                // ... (parámetros existentes para confirmacionReserva)
+                // Pasar el objeto reserva completo (o los campos necesarios) a detallesAdicionales
                nombreCliente: `${reserva.nombreContacto || 'Cliente'} ${reserva.apellidosContacto || ''}`.trim(),
                tipoEvento: `Habitación ${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'})`,
                fechaEvento: `${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}`,
                numeroConfirmacion: reserva.numeroConfirmacion,
                detallesAdicionales: {
-                 precio: `${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}`,
-                 metodoPago: metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1),
-                 notaAdicional: mensajeAdicionalCliente.replace(/<\/?p>/g, '')
+                 // Incluir detalles relevantes aquí
+                 Precio: `${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}`,
+                 'Método de Pago': metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1),
+                 Huéspedes: reserva.numHuespedes || 'No especificado',
+                 // Mantener la nota específica del pago
+                 notaAdicional: mensajeAdicionalCliente.replace(/<\/?p>/g, '') 
                },
-               urlConfirmacion: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reserva/${reserva._id}` // <-- USAR RUTA PÚBLICA
+               urlConfirmacion: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reserva/${reserva._id}` 
              });
              
              console.log(`>>> [ReservaHabitación] Intentando enviar confirmación normal a cliente: ${clienteEmail}`);
@@ -192,11 +195,20 @@ const createReservaHabitacion = asyncHandler(async (req, res, next) => {
                     habitacion: `${reserva.habitacion} (${reserva.tipoHabitacion || 'No especificado'})`,
                     fechas: `${new Date(reserva.fechaEntrada).toLocaleDateString()} - ${new Date(reserva.fechaSalida).toLocaleDateString()}`,
                     precio: `${reserva.precio} ${reserva.tipoReserva === 'hotel' ? 'MXN' : '(Incluido en Evento)'}`,
+                    // Añadir explícitamente metodoPago y estadoPago/estadoReserva
                     metodoPago: metodoPagoSeleccionado.charAt(0).toUpperCase() + metodoPagoSeleccionado.slice(1),
-                    estado: reserva.estadoReserva || 'pendiente',
-                    notas: reserva.infoHuespedes?.detalles || 'Ninguna'
+                    estadoPago: reserva.estadoPago || 'No disponible', // Usar estadoPago si existe
+                    estadoReserva: reserva.estadoReserva || 'pendiente',
+                    huespedes: reserva.numHuespedes || 'No especificado',
+                    notas: reserva.peticionesEspeciales || reserva.infoHuespedes?.detalles || 'Ninguna'
                   },
-                  urlGestionReserva: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reservas/habitaciones/${reserva._id}`
+                  // Pasar tipo, asunto y mensaje para la plantilla admin
+                  tipo: 'Info', // O 'Success' si el pago está completo?
+                  asunto: `Nueva Reserva Habitación #${reserva.numeroConfirmacion} (${reserva.tipoReserva})`,
+                  mensaje: `Se ha creado una nueva reserva de habitación.`, // Mensaje genérico aquí, los detalles van en detallesAdicionales
+                  // Pasar enlace y texto para el botón
+                  enlaceAccion: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/reservas/habitaciones/${reserva._id}`,
+                  textoEnlace: 'Gestionar Reserva'
                 });
                 
                 console.log(`>>> [ReservaHabitación] Intentando enviar notificación a admin: ${adminEmailArray.join(', ')}`);

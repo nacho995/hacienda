@@ -1073,7 +1073,54 @@ const ReservaWizard = () => {
             }
           </div>
         );
+      
+      // --- NUEVO CASO PARA LA CONFIRMACIÓN FINAL MÁS ELEGANTE ---
+      case 8: // Asumiendo que el paso 8 es la confirmación final
+        return (
+          <div className="text-center max-w-lg mx-auto bg-gradient-to-br from-[#FDFBFB] to-[#EBEDEE]/80 backdrop-blur-sm p-8 md:p-12 rounded-xl shadow-xl border border-[#A5856A]/30">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-r from-green-400 to-teal-500 flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <FaCheck className="text-white text-4xl" />
+            </div>
+            <h3 className="text-3xl font-bold text-[#5D4B3A] mb-3 font-serif">
+              ¡Reserva Confirmada!
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Gracias por elegir Hacienda San Carlos Borromeo. Su reserva ha sido procesada exitosamente.
+            </p>
+            
+            {createdReservationId && (
+              <div className="mb-6 bg-[#F5F0E8] inline-block px-6 py-2 rounded-full border border-[#D1B59B]/50">
+                <p className="text-sm text-[#8A6E52]">Número de Confirmación:</p>
+                <p className="text-lg font-semibold text-[#5D4B3A]">{createdReservationId.slice(-10)}</p> 
+              </div>
+            )}
+            
+            <p className="text-sm text-gray-500 mb-8">
+              Hemos enviado un correo electrónico con todos los detalles de su reserva a la dirección proporcionada.
+              Si eligió pagar por transferencia, encontrará las instrucciones en el correo.
+            </p>
+            
+            <div className="flex justify-center space-x-4">
+              <button 
+                onClick={() => router.push('/')} // Asumiendo que tienes 'router' de useRouter
+                className="px-6 py-2 rounded-lg bg-[#A5856A] text-white font-medium hover:bg-[#8B6B4F] transition-colors duration-200 shadow-md"
+              >
+                Volver al Inicio
+              </button>
+              {/* Opcional: Botón a "Mis Reservas" si existe esa página 
+              <button 
+                onClick={() => router.push('/mis-reservas')} 
+                className="px-6 py-2 rounded-lg border border-[#A5856A] text-[#A5856A] font-medium hover:bg-[#A5856A]/10 transition-colors duration-200"
+              >
+                Ver Mis Reservas
+              </button>
+              */}
+            </div>
+          </div>
+        );
+        
       default:
+        // Mantener el default original por si acaso
         return <div>Paso desconocido</div>;
     }
   };

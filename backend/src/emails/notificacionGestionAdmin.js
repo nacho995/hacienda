@@ -3,7 +3,7 @@
  * Diseño premium y elegante
  */
 
-const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEnlace }) => {
+const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEnlace, detallesAdicionales }) => {
   // Paleta de colores sofisticada
   const colors = {
     gold: '#D4AF37',           // Dorado elegante
@@ -126,6 +126,79 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
     </div>
   `;
   
+  // Función para renderizar los detalles adicionales de forma segura
+  const renderDetallesAdicionales = () => {
+    if (!detallesAdicionales || typeof detallesAdicionales !== 'object' || Object.keys(detallesAdicionales).length === 0) {
+      return `<div style="background-color: ${colors.creamLight}; border-left: 5px solid ${colors.warning}; padding: 20px; margin-bottom: 30px; font-size: 14px;">
+                <p>No hay información adicional para esta notificación.</p>
+              </div>`;
+    }
+
+    let detailsHtml = '';
+    for (const [key, value] of Object.entries(detallesAdicionales)) {
+      // Capitalizar la clave y manejar valores por defecto
+      const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
+      const formattedValue = value !== null && value !== undefined && value !== '' ? value : 'No especificado';
+      
+      detailsHtml += `<div class="detail-item" style="margin-bottom: 8px;">
+                      <strong style="color: ${colors.primary}; min-width: 100px; display: inline-block;">${formattedKey}:</strong> ${formattedValue}
+                    </div>`;
+    }
+
+    return `<div class="details-section" style="background-color: ${colors.creamLight}; border-left: 5px solid ${colors.gold}; padding: 20px; margin-bottom: 30px; font-size: 14px; line-height: 1.7;">
+              <h4 class="details-title" style="font-weight: 700; color: ${colors.darkBrown}; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;">Detalles de la ${tipo || 'Notificación'}:</h4>
+              ${detailsHtml}
+            </div>`;
+  };
+
+  // NUEVO: Función para renderizar detalles de PAGO
+  const renderDetallesPago = () => {
+    const metodo = detallesAdicionales?.metodoPago || 'pendiente';
+    const estado = detallesAdicionales?.estadoPago || detallesAdicionales?.estadoReserva || 'pendiente';
+    let explicacion = '';
+    let estiloBorde = colors.warning; // Amarillo por defecto (pendiente)
+
+    switch (metodo) {
+      case 'transferencia':
+        explicacion = 'El cliente ha elegido pagar por transferencia. La reserva está pendiente hasta recibir el comprobante.';
+        estiloBorde = colors.warning;
+        break;
+      case 'tarjeta':
+        if (estado === 'pagado' || estado === 'completado') {
+          explicacion = 'El pago con tarjeta ha sido procesado exitosamente.';
+          estiloBorde = colors.success; // Verde
+        } else if (estado === 'procesando') {
+          explicacion = 'El pago con tarjeta está siendo procesado.';
+          estiloBorde = colors.info; // Azul
+        } else { // Pendiente, fallido, etc.
+          explicacion = 'El cliente eligió pagar con tarjeta, pero el pago aún no se ha completado o ha fallado.';
+          estiloBorde = colors.error; // Rojo
+        }
+        break;
+      case 'efectivo':
+        explicacion = 'El cliente ha elegido pagar en efectivo en la recepción. La reserva está pendiente de pago.';
+        estiloBorde = colors.warning;
+        break;
+      default: // pendiente o desconocido
+        explicacion = 'El método de pago aún no ha sido seleccionado o es desconocido.';
+        estiloBorde = colors.warning;
+    }
+
+    const metodoFormateado = metodo.charAt(0).toUpperCase() + metodo.slice(1);
+    const estadoFormateado = estado.charAt(0).toUpperCase() + estado.slice(1);
+
+    return `<div class="payment-details" style="background-color: ${colors.creamLight}; border-left: 5px solid ${estiloBorde}; padding: 20px; margin-bottom: 30px; font-size: 14px; line-height: 1.7;">
+              <h4 class="details-title" style="font-weight: 700; color: ${colors.darkBrown}; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;">Estado del Pago:</h4>
+              <div class="detail-item" style="margin-bottom: 8px;">
+                <strong style="color: ${colors.primary}; min-width: 120px; display: inline-block;">Método Elegido:</strong> ${metodoFormateado}
+              </div>
+              <div class="detail-item" style="margin-bottom: 8px;">
+                <strong style="color: ${colors.primary}; min-width: 120px; display: inline-block;">Estado Actual:</strong> ${estadoFormateado}
+              </div>
+              <p style="margin-top: 15px; font-style: italic;">${explicacion}</p>
+            </div>`;
+  };
+
   return `
   <!DOCTYPE html>
     <html>
@@ -441,7 +514,10 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
               ${mensaje || 'No hay información adicional para esta notificación.'}
         </div>
         
-            ${decorativeDivider}
+            ${renderDetallesAdicionales()}
+            
+            <!-- NUEVO: Añadir sección de detalles de pago -->
+            ${renderDetallesPago()}
             
             ${enlaceAccion ? `
             <div style="text-align: center;">
