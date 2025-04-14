@@ -8,7 +8,8 @@ const {
   confirmAccount,
   approveAccountWithRole,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  denyAccount
 } = require('../controllers/auth.controller');
 
 const { protectRoute, authorize, protectAdminPanel } = require('../middleware/auth');
@@ -22,6 +23,7 @@ router.get('/confirm/:token', confirmAccount);
 router.get('/approve/:token', approveAccountWithRole);
 router.post('/password/forgot', forgotPassword);
 router.put('/password/reset/:token', resetPassword);
+router.get('/deny/:token', denyAccount);
 
 // Rutas protegidas
 router.get('/me', protectRoute, getMe);

@@ -486,15 +486,14 @@ const adminApprovalRequestTemplate = ({ nuevoAdminNombre, nuevoAdminEmail, nuevo
             
             <div class="button-container">
               <a href="${baseURL}?role=admin" class="cta-button cta-button-admin">Aprobar como Administrador</a>
-              <a href="${baseURL}?role=editor" class="cta-button cta-button-editor">Aprobar como Editor</a>
-              <a href="${baseURL}?role=usuario" class="cta-button cta-button-user">Aprobar como Usuario</a>
+              <a href="${baseURL}?role=viewer" class="cta-button cta-button-user" style="background-color: #e0e0e0; color: #555; border-color: #bdbdbd;">Aprobar como Visor</a>
+              <a href="${process.env.API_BASE_URL || 'http://localhost:5000/api'}/auth/deny/${token}" class="cta-button" style="background-color: #f44336; color: white; border-color: #d32f2f;">Denegar Solicitud</a>
             </div>
             
             <div class="additional-info">
               <p><strong>Aviso importante:</strong></p>
               <p>• Aprobar como <strong>Administrador</strong> otorga permisos completos.</p>
-              <p>• Aprobar como <strong>Editor</strong> otorga permisos limitados de gestión de contenido.</p>
-              <p>• Aprobar como <strong>Usuario</strong> otorga permisos básicos de cliente.</p>
+              <p>• Aprobar como <strong>Visor</strong> otorga permisos de solo lectura.</p>
               <p>• Si usted no reconoce esta solicitud o no desea aprobarla, puede ignorar este correo electrónico de forma segura.</p>
               <p>• Si tiene alguna pregunta, contacte al administrador principal del sistema.</p>
             </div>

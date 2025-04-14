@@ -12,7 +12,7 @@ const passwordResetConfirmationTemplate = require('../emails/passwordResetConfir
 const adminApprovalRequestTemplate = require('../emails/adminApprovalRequest');
 const userAccountApprovedTemplate = require('../emails/userAccountApproved');
 
-// @desc    Registrar un usuario
+// @desc    Registrar un usuario (SOLICITUD DE ACCESO ADMIN)
 // @route   POST /api/auth/register
 // @access  Public
 exports.register = async (req, res) => {
@@ -22,62 +22,70 @@ exports.register = async (req, res) => {
     // Verificar que el email no existe ya en la base de datos
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      // Si ya existe Y está confirmado/activo, error normal
+      if (existingUser.confirmado || existingUser.role !== 'pendiente_admin') { 
+        return res.status(400).json({
+          success: false,
+          message: 'Este email ya está registrado o activo'
+        });
+      } 
+      // Si existe pero está pendiente, podríamos reenviar notificación (lógica opcional)
+      // Por ahora, lo tratamos como error para evitar duplicados pendientes
       return res.status(400).json({
         success: false,
-        message: 'Este email ya está registrado'
+        message: 'Ya existe una solicitud pendiente para este email.'
       });
     }
 
-    // Crear el usuario con role 'usuario' por defecto, sin confirmar
+    // Crear el usuario con role 'pendiente_admin', sin confirmar
     const user = await User.create({
       nombre,
       apellidos,
       email,
       password,
       telefono,
-      role: 'usuario',
-      confirmado: false // Requiere confirmación
+      role: 'pendiente_admin', // ROL CAMBIADO
+      confirmado: false 
     });
 
     // Generar token de confirmación
     const confirmToken = user.generateConfirmationToken();
     await user.save({ validateBeforeSave: false });
 
-    // Crear URL de confirmación
-    const confirmUrl = `${process.env.CLIENT_URL}/confirmar-cuenta/${confirmToken}`;
+    // Crear URL de APROBACIÓN para el admin
+    const approveUrl = `${process.env.ADMIN_PANEL_URL || (process.env.FRONTEND_URL || 'http://localhost:3000') + '/admin'}/aprobar-admin/${confirmToken}`; 
 
-    // --- Actualizar envío de email al admin --- (Manejar múltiples destinatarios)
+    // Enviar email de notificación al admin
     try {
       const adminEmailString = process.env.ADMIN_EMAIL;
       if (adminEmailString) {
-        const adminEmails = adminEmailString.split(',').map(email => email.trim()).filter(email => email); // Divide, limpia y filtra vacíos
+        const adminEmails = adminEmailString.split(',').map(email => email.trim()).filter(email => email); 
         
         if (adminEmails.length > 0) {
-            const htmlAdminApproval = `
-                <h1>Nueva solicitud de registro de Usuario</h1>
-                <p>Un nuevo usuario desea registrarse:</p>
-                <p><strong>Nombre:</strong> ${nombre} ${apellidos}</p>
-                <p><strong>Email:</strong> ${email}</p>
-                <p><strong>Teléfono:</strong> ${telefono || 'No especificado'}</p>
-                <p>Para aprobar este registro, haga clic en el siguiente enlace:</p>
-                <a href="${confirmUrl}" style="padding: 10px 15px; background-color: #800020; color: white; text-decoration: none; border-radius: 4px;">Aprobar Registro de Usuario</a>
-                <p>Si no reconoces esta solicitud, por favor ignórala.</p>
-              `;
+            // Usar la plantilla existente para aprobación de admin
+            const htmlAdminApproval = adminApprovalRequestTemplate({
+              nuevoAdminNombre: `${nombre} ${apellidos}`,
+              nuevoAdminEmail: email,
+              nuevoAdminTelefono: telefono || 'No especificado',
+              token: confirmToken
+            });
             
-            console.log(`>>> [Auth/Register] Intentando enviar solicitud de aprobación a admin: ${adminEmails}`);
+            console.log(`>>> [Auth/Register->AdminApproval] Intentando enviar solicitud de aprobación a admin: ${adminEmails}`);
             await sendEmail({
-              to: adminEmails, // Pasa la matriz de correos
-              subject: 'Nueva solicitud de registro de Usuario - Hacienda San Carlos Borromeo',
+              to: adminEmails, 
+              subject: 'Nueva solicitud de cuenta de Administrador - Hacienda San Carlos Borromeo', // Asunto claro
               html: htmlAdminApproval
             });
-            console.log(`Correo de solicitud de registro de usuario enviado a: ${adminEmails.join(', ')}`);
+            console.log(`Correo de solicitud de cuenta admin enviado a: ${adminEmails.join(', ')}`);
         } else {
-            console.warn("ADMIN_EMAIL (registro usuario) está configurado pero vacío o inválido.");
+            console.warn("ADMIN_EMAIL (registro admin) está configurado pero vacío o inválido.");
         }
       } else {
-          console.warn("ADMIN_EMAIL (registro usuario) no está configurado.");
+          console.warn("ADMIN_EMAIL (registro admin) no está configurado.");
       }
-
+      
+      // ELIMINADO: No enviar email de bienvenida/aprobación al usuario aquí
+      /*
       console.log(`>>> [Auth/Register] Intentando enviar bienvenida a: ${user.email}`);
       await sendEmail({
         to: user.email,
@@ -87,26 +95,28 @@ exports.register = async (req, res) => {
           loginUrl: `${process.env.CLIENT_URL}/login`
         })
       });
+      */
 
+      // Mensaje al usuario solicitante
       res.status(201).json({
         success: true,
-        message: 'Solicitud de registro enviada. Recibirás un correo cuando tu cuenta sea aprobada por un administrador.'
+        message: 'Solicitud de acceso enviada correctamente. Un administrador revisará tu petición.'
       });
 
     } catch (error) {
         console.error('Error durante envío de email de solicitud de registro al admin:', error);
+        // Informar al usuario que la solicitud se creó pero hubo un problema con la notificación
         res.status(201).json({
           success: true, 
-          message: 'Solicitud de registro creada, pero hubo un error al notificar al administrador. Por favor, contacte soporte si no recibe aprobación.'
+          message: 'Solicitud enviada, pero hubo un error al notificar al administrador. Por favor, contacte soporte si no recibe aprobación.'
         });
     }
-    // --- Fin Actualizar envío de email al admin ---
   } catch (error) {
-    console.error('Error al enviar email de solicitud de registro al admin:', error);
-    // Informar al usuario que la solicitud se creó pero hubo un problema con la notificación
-    res.status(201).json({
-      success: true, // La cuenta se creó, pendiente de aprobación manual
-      message: 'Solicitud de registro creada, pero hubo un error al notificar al administrador. Por favor, contacte soporte si no recibe aprobación.'
+    // Manejar error general de creación de usuario
+    console.error('Error al procesar la solicitud de registro:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error interno al procesar la solicitud.'
     });
   }
 };
@@ -583,13 +593,12 @@ exports.approveAccountWithRole = async (req, res, next) => {
     const { role: requestedRole } = req.query;
 
     // Validar que el rol solicitado sea uno de los permitidos
-    const allowedRoles = ['admin', 'editor', 'usuario'];
+    // SIMPLIFICADO: Solo permitir 'admin' y 'viewer'
+    const allowedRoles = ['admin', 'viewer']; 
     if (!requestedRole || !allowedRoles.includes(requestedRole)) {
       console.log(`Intento de aprobación con rol inválido: ${requestedRole}`);
-      return res.status(400).json({
-        success: false,
-        message: 'Rol especificado inválido o no proporcionado.'
-      });
+      const errorUrl = `${process.env.ADMIN_PANEL_URL || (process.env.FRONTEND_URL || 'http://localhost:3000') + '/admin'}/approval-result?success=false&message=${encodeURIComponent('Rol solicitado inválido')}`;
+      return res.redirect(errorUrl);
     }
 
     // Obtener el token hasheado
@@ -641,15 +650,9 @@ exports.approveAccountWithRole = async (req, res, next) => {
       // No fallar la operación principal si el correo no se envía, pero sí loggearlo
     }
 
-    // Redirigir al admin a una página de confirmación o mostrar mensaje
-    // Podríamos redirigir a una página simple en el frontend:
-    // res.redirect(`${process.env.CLIENT_URL}/admin/approval-success?user=${user.email}&role=${requestedRole}`);
-    
-    // O simplemente devolver un JSON de éxito
-    res.status(200).json({
-      success: true,
-      message: `Cuenta de ${user.email} aprobada exitosamente con el rol ${requestedRole}. Se envió notificación al usuario.`
-    });
+    // REDIRIGIR a una página de éxito en el frontend
+    const successUrl = `${process.env.ADMIN_PANEL_URL || (process.env.FRONTEND_URL || 'http://localhost:3000') + '/admin'}/approval-result?success=true&email=${encodeURIComponent(user.email)}&role=${requestedRole}`;
+    res.redirect(successUrl);
 
   } catch (error) {
     console.error('Error al aprobar la cuenta con rol:', error);
@@ -657,5 +660,64 @@ exports.approveAccountWithRole = async (req, res, next) => {
       success: false,
       message: 'Error interno al procesar la aprobación'
     });
+  }
+};
+
+// @desc    Denegar solicitud de cuenta (Nueva función)
+// @route   GET /api/auth/deny/:token 
+// @access  Public (enlace accedido por Admin, pero la lógica de protegerla estaría en middleware)
+exports.denyAccount = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+
+    // Obtener el token hasheado
+    const tokenConfirmacion = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    // Buscar usuario PENDIENTE con ese token (puede haber expirado o no)
+    const user = await User.findOne({
+      tokenConfirmacion,
+      role: 'pendiente_admin' // Asegurarnos que es una solicitud pendiente
+      // No filtramos por expiración, queremos poder denegar incluso si expiró
+    });
+
+    if (!user) {
+      console.log(`Intento de denegación con token inválido o usuario ya procesado: ${token}`);
+      // Podemos devolver un mensaje genérico o indicar que ya no es necesario
+      return res.status(404).json({
+        success: false,
+        message: 'Solicitud no encontrada o ya procesada.'
+      });
+    }
+
+    console.log(`Denegando solicitud de cuenta para ${user.email}`);
+
+    // Eliminar al usuario o marcarlo como denegado
+    // Eliminar es más limpio para no guardar datos innecesarios
+    await user.deleteOne(); 
+
+    // Opcional: Enviar notificación al admin que hizo clic confirmando la denegación?
+    // Opcional: Enviar email al usuario indicando que su solicitud fue rechazada?
+
+    // Redirigir al admin a una página de confirmación de denegación o mostrar mensaje
+    // res.redirect(`${process.env.CLIENT_URL}/admin/denial-success?user=${user.email}`);
+    
+    // REDIRIGIR a una página de éxito/resultado en el frontend
+    const denialUrl = `${process.env.ADMIN_PANEL_URL || (process.env.FRONTEND_URL || 'http://localhost:3000') + '/admin'}/approval-result?success=true&denied=true&email=${encodeURIComponent(user.email)}`;
+    res.redirect(denialUrl);
+
+  } catch (error) {
+    console.error('Error al denegar la solicitud de cuenta:', error);
+    // REDIRIGIR a una página de error en el frontend
+    const errorUrl = `${process.env.ADMIN_PANEL_URL || (process.env.FRONTEND_URL || 'http://localhost:3000') + '/admin'}/approval-result?success=false&message=${encodeURIComponent('Error interno al procesar la denegación')}`;
+    // Asegúrate de que la respuesta aún no se haya enviado
+    if (!res.headersSent) {
+       res.redirect(errorUrl);
+    } else {
+       // Si ya se envió, simplemente registra el error adicional
+       console.error("Encabezados ya enviados, no se puede redirigir en error de denegación.");
+    } 
   }
 }; 
