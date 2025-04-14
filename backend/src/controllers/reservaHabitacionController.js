@@ -117,27 +117,29 @@ const createReservaHabitacion = asyncHandler(async (req, res, next) => {
 
     }); // Fin de session.withTransaction
 
+    // Logs para depurar envío de email
     const reserva = req.reservaCreada;
     const metodoPagoSeleccionado = req.metodoPago;
-
-    console.log(`>>> [ReservaHabitación] Valor de 'reserva' antes del IF de email: ${reserva ? reserva._id : String(reserva)}`);
+    console.log(`[Email Debug Habitación ${reserva?._id}] Reserva Creada: ${!!reserva}. Método Pago Seleccionado: ${metodoPagoSeleccionado}. Estado Reserva: ${reserva?.estadoReserva}`);
 
     if (reserva) {
       try {
         const clienteEmail = reserva.emailContacto || (reserva.usuario?.email);
+        console.log(`[Email Debug Habitación ${reserva._id}] Email Cliente: ${clienteEmail}`);
         
         // --- ¿Enviar email de confirmación o instrucciones de transferencia? ---
         if (clienteEmail) {
+          // Log para ver si entra en la condición de transferencia
+          console.log(`[Email Debug Habitación ${reserva._id}] Verificando condiciones para transferencia: metodoPago=${reserva.metodoPago}, estadoReserva=${reserva.estadoReserva}`);
           if (reserva.metodoPago === 'transferencia' && reserva.estadoReserva === 'pendiente_pago') {
             // --- ENVIAR INSTRUCCIONES DE TRANSFERENCIA ---
-            console.log(`>>> [ReservaHabitación] Preparando envío de instrucciones de transferencia a: ${clienteEmail}`);
+            console.log(`>>> [Email Debug Habitación ${reserva._id}] INTENTANDO enviar instrucciones de transferencia a: ${clienteEmail}`);
             await sendBankTransferInstructions({
               email: clienteEmail,
               nombreCliente: `${reserva.nombreContacto || 'Cliente'} ${reserva.apellidosContacto || ''}`.trim(),
               numeroConfirmacion: reserva.numeroConfirmacion,
               montoTotal: reserva.precio
             });
-
           } else {
              // --- ENVIAR EMAIL DE CONFIRMACIÓN NORMAL (Para otros métodos o estados) ---
              let mensajeAdicionalCliente = '';
@@ -732,12 +734,14 @@ const verificarDisponibilidadRango = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    const habitacionesConflictivas = []; // Guardará { habitacionId, motivo }
+    const habitacionesConflictivas = [];
     let todasDisponibles = true;
+    console.log(`[Check Rango Debug] Iniciando verificación para ${checkRequests.length} solicitudes.`); // Log inicial
 
     // Iterar sobre cada solicitud de verificación individual
     for (const request of checkRequests) {
       const { habitacionId, fechaInicio, fechaFin } = request;
+      console.log(`[Check Rango Debug] Verificando Habitación: ${habitacionId}, Rango: ${fechaInicio} a ${fechaFin}`); // Log por solicitud
 
       const fechaInicioObj = new Date(fechaInicio);
       const fechaFinObj = new Date(fechaFin);
@@ -772,36 +776,36 @@ const verificarDisponibilidadRango = asyncHandler(async (req, res, next) => {
         habitacion: habitacionId 
       };
       const reservaHabitacionSolapada = await ReservaHabitacion.findOne(queryHabitacion).lean();
+      console.log(`[Check Rango Debug ${habitacionId}] Conflicto ReservaHabitacion encontrado:`, reservaHabitacionSolapada ? reservaHabitacionSolapada._id : 'Ninguno'); // Log resultado consulta
 
       if (reservaHabitacionSolapada) {
         todasDisponibles = false;
-        // Solo añadir si no está ya (por si otra comprobación la añadió)
         if (!habitacionesConflictivas.some(h => h.habitacionId === habitacionId)) {
             habitacionesConflictivas.push({ habitacionId, motivo: 'Reserva Habitación' });
         }
-        continue; // Conflicto encontrado, pasar a la siguiente solicitud
+        console.log(`[Check Rango Debug ${habitacionId}] Conflicto detectado (ReservaHabitacion). Pasando a siguiente.`); // Log conflicto
+        continue; 
       }
 
-      // 2. Buscar conflicto en ReservaEvento (si aplica)
-      // Asumiendo que los eventos bloquean TODAS las habitaciones en su fecha
+      // 2. Buscar conflicto en ReservaEvento
       const eventosSolapados = await ReservaEvento.find({
-          fecha: { $gte: fechaInicioObj, $lt: fechaFinObj }, // Evento ocurre DENTRO del rango solicitado
-          estadoReserva: { $in: ['pendiente', 'confirmada'] } // Evento activo
-          // Podríamos añadir un filtro para eventos que realmente bloqueen habitaciones
+          fecha: { $gte: fechaInicioObj, $lt: fechaFinObj }, 
+          estadoReserva: { $in: ['pendiente', 'confirmada'] } 
       }).select('fecha').lean(); 
+      console.log(`[Check Rango Debug ${habitacionId}] Eventos solapados encontrados: ${eventosSolapados.length}`); // Log resultado consulta eventos
 
       if (eventosSolapados.length > 0) {
           todasDisponibles = false;
           if (!habitacionesConflictivas.some(h => h.habitacionId === habitacionId)) {
-              // Indicar que el conflicto es por un evento en esas fechas
               const fechasEvento = eventosSolapados.map(e => format(new Date(e.fecha), 'dd/MM/yyyy')).join(', ');
               habitacionesConflictivas.push({ habitacionId, motivo: `Evento(s) en fecha(s): ${fechasEvento}` });
           }
-          // No necesitamos 'continue' aquí si queremos reportar conflictos de ambos tipos
+          console.log(`[Check Rango Debug ${habitacionId}] Conflicto detectado (ReservaEvento).`); // Log conflicto evento
       }
     }
 
     // Responder basado en el resultado final
+    console.log(`[Check Rango Debug] Verificación completada. Todas disponibles: ${todasDisponibles}. Conflictos:`, habitacionesConflictivas); // Log final
     if (todasDisponibles) {
       res.status(200).json({
         success: true,
