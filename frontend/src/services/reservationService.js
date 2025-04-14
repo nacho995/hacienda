@@ -236,7 +236,7 @@ export const createHabitacionReservation = async (reservationData) => {
       
       const requestData = {
         tipoHabitacion: tipoHabitacion,
-        habitacion: reservationData.habitacion || reservationData.nombre || 'Sin asignar',
+        habitacion: reservationData.habitacionLetra || reservationData.habitacion || reservationData.nombre || 'Sin asignar',
         fechaEntrada: fechaEntrada,
         fechaSalida: fechaSalida,
         precio: reservationData.precioTotal || reservationData.precio || 0,

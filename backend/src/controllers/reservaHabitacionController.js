@@ -100,6 +100,7 @@ const createReservaHabitacion = asyncHandler(async (req, res, next) => {
         letraHabitacion: letraHabitacion || habitacion, 
         metodoPago,
         estadoPago,
+        estadoReserva: metodoPago === 'transferencia' ? 'pendiente_pago' : 'pendiente'
       };
       
       if (!reservaData.tipoHabitacion || !reservaData.habitacion || reservaData.precio === undefined) { // Corrección: comparar con undefined

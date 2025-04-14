@@ -451,7 +451,7 @@ function BookingFormSection({
         response = await createHabitacionReservation(formattedReservations[0]);
       } else {
         // Llamar a la API para múltiples habitaciones (batch)
-        response = await createMultipleReservaciones({ reservas: formattedReservations }); 
+        response = await createMultipleReservaciones(formattedReservations);
       }
 
       if (response.success && response.data) {
