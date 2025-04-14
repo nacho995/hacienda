@@ -54,10 +54,10 @@ export default function AdminLayout({ children }) {
 
   // Efecto adicional para redirigir cuando no hay usuario después de cargar
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !authError && pathname !== '/admin/login' && pathname !== '/admin/registro') { // Evitar bucle si ya estamos en login/registro
       router.push('/admin/login');
     }
-  }, [loading, user, router]);
+  }, [loading, user, authError, router, pathname]); // Añadir authError y pathname
 
   // Función para cerrar sesión
   const handleLogout = async () => {
@@ -76,6 +76,14 @@ export default function AdminLayout({ children }) {
       // Forzar redirección a login en caso de error
       router.push('/admin/login');
     }
+  };
+
+  // NUEVA FUNCIÓN para manejar el botón "Ir a login" desde la pantalla de error
+  const handleGoToLogin = () => {
+    // Intentar limpiar la sesión (aunque el listener de 'auth-error' ya debería haberlo hecho)
+    logout().catch(err => console.error("Error menor durante logout en handleGoToLogin:", err)); 
+    // Forzar recarga a la página de login
+    window.location.href = '/admin/login';
   };
 
   // Si está cargando, mostrar pantalla de carga
@@ -98,11 +106,14 @@ export default function AdminLayout({ children }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-800">
         <div className="bg-slate-700 p-8 rounded-lg shadow-md text-white">
-          <h1 className="text-2xl font-bold mb-4">Redirigiendo...</h1>
-          <p>No se ha detectado una sesión activa</p>
-          <div className="mt-4 flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-          </div>
+          <h1 className="text-2xl font-bold mb-4 text-red-500">Error de autenticación</h1>
+          <p>{authError?.message || 'Se ha producido un error al verificar tu sesión'}</p>
+          <button 
+            onClick={handleGoToLogin} // Usar la nueva función
+            className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded text-white transition-colors"
+          >
+            Ir a login
+          </button>
         </div>
       </div>
     );
