@@ -18,7 +18,7 @@ export default function IntroSection() {
   // Estado para video y controles
   const [showControls, setShowControls] = useState(false);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
@@ -42,7 +42,7 @@ export default function IntroSection() {
             controls: 0,
             rel: 0,
             showinfo: 0,
-            mute: 1,
+            mute: 0,
             modestbranding: 1,
             enablejsapi: 1,
             origin: window.location.origin,
@@ -527,7 +527,7 @@ export default function IntroSection() {
         {/* Video de YouTube con controles personalizados */}
         <div className="my-16 sm:my-20 fade-in animate-delay-200">
           <div 
-            className="relative overflow-hidden rounded-lg shadow-2xl aspect-video cursor-pointer"
+            className="relative rounded-lg shadow-2xl aspect-video cursor-pointer"
             ref={playerContainerRef}
             onMouseEnter={() => setShowControls(true)}
             onMouseLeave={() => setShowControls(false)}
@@ -622,7 +622,7 @@ export default function IntroSection() {
                       {subtitlesEnabled ? <MdSubtitles className="w-3.5 h-3.5 sm:w-4 sm:w-4" /> : <MdSubtitlesOff className="w-3.5 h-3.5 sm:w-4 sm:w-4" />}
                     </button>
                     
-                    <div className="relative flex items-center">
+                    <div className="relative flex items-center overflow-visible">
                       <button
                         onClick={toggleVolumeSlider}
                         className="text-white hover:text-[var(--color-primary)] transition-colors p-1 sm:p-1.5"
@@ -631,10 +631,9 @@ export default function IntroSection() {
                         {isMuted ? <FaVolumeMute className="w-3.5 h-3.5 sm:w-4 sm:w-4" /> : <FaVolumeUp className="w-3.5 h-3.5 sm:w-4 sm:w-4" />}
                       </button>
                       
-                      {/* Slider de volumen */}
                       {showVolumeSlider && (
                         <div
-                          className="absolute bottom-full right-0 sm:left-0 mb-2 bg-black/80 p-2 rounded-lg w-20 sm:w-28"
+                          className="absolute bottom-full left-0 mb-1 bg-black/80 p-2 rounded-lg w-20 sm:w-28 z-30"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <input
