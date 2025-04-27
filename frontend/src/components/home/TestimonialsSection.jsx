@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { FaQuoteRight, FaStar, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import Link from 'next/link';
+import apiClient from '../../services/apiClient'; // Ajusta la ruta si es necesario
 
 // Datos de testimonios eliminados
 
@@ -21,49 +22,30 @@ export default function TestimonialsSection() {
     const fetchReviews = async () => {
       setIsLoading(true);
       setError(null);
-      console.log('[TestimonialsSection] Fetching approved reviews...');
+      console.log('[TestimonialsSection] Fetching approved reviews using apiClient...');
       try {
-        // --- CORREGIDO: Usar la URL completa del backend --- 
-        // Asumiendo que tu backend corre en localhost:3001
-        // Si tienes la URL base en una variable de entorno, úsala (ej: process.env.NEXT_PUBLIC_API_URL)
-        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'; 
-        const response = await fetch(`${backendUrl}/reviews/approved`); 
-        console.log('[TestimonialsSection] Response status:', response.status);
-
-        // Leer el cuerpo de la respuesta incluso si hay error, para más detalles
-        const responseBody = await response.text(); 
-
-        if (!response.ok) {
-            let errorMsg = `Error ${response.status}: Error al cargar las reseñas.`;
-            try {
-                // Intentar parsear como JSON por si el backend envía un error estructurado
-                const errorData = JSON.parse(responseBody);
-                errorMsg = errorData.message || errorMsg;
-            } catch (parseError) {
-                // Si no es JSON, usar el texto plano si es corto, o un mensaje genérico
-                if (responseBody.length < 200) { // Evitar mostrar HTML largo
-                   errorMsg += ` Detalles: ${responseBody}`; 
-                }
-            }
-            console.error('[TestimonialsSection] Fetch error:', errorMsg);
-            throw new Error(errorMsg);
-        }
-
-        // Si la respuesta es OK, parsear como JSON
-        const data = JSON.parse(responseBody);
+        // --- CAMBIADO: Usar apiClient y añadir /api explícitamente ---
+        const responseData = await apiClient.get('/api/reviews/approved');
+        console.log('[TestimonialsSection] apiClient response received:', responseData);
 
         // Verificar la estructura esperada { success: true, data: [...] }
-        if (data && data.success === true && Array.isArray(data.data)) {
-            setReviews(data.data);
-            console.log('[TestimonialsSection] Reviews loaded successfully:', data.count);
+        // La estructura puede variar dependiendo de tu interceptor de apiClient
+        // Ajusta según cómo tu interceptor devuelve los datos
+        if (responseData && responseData.success === true && Array.isArray(responseData.data)) {
+            setReviews(responseData.data);
+            console.log('[TestimonialsSection] Reviews loaded successfully via apiClient:', responseData.count);
+        } else if (Array.isArray(responseData)) { // Fallback si devuelve directamente el array
+             console.warn('[TestimonialsSection] apiClient devolvió un array directamente.');
+             setReviews(responseData);
         } else {
-            console.warn('[TestimonialsSection] Unexpected response format:', data);
+            console.warn('[TestimonialsSection] Unexpected response format via apiClient:', responseData);
             throw new Error('Formato de respuesta inesperado del servidor.');
         }
 
       } catch (err) {
-        // Capturar errores de red (como ERR_CONNECTION_REFUSED) o errores lanzados arriba
-        console.error("[TestimonialsSection] Error in fetchReviews catch block:", err);
+        // El interceptor de apiClient ya debería formatear el error
+        console.error("[TestimonialsSection] Error fetching reviews via apiClient:", err);
+        // Usar el mensaje del error formateado por el interceptor si existe
         setError(err.message || 'Ocurrió un error al obtener las reseñas.');
         setReviews([]); // Limpiar reseñas en caso de error
       } finally {

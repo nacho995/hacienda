@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'; // Importar hooks
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { FaCamera, FaVideo, FaCheck, FaStar } from 'react-icons/fa';
+import apiClient from '../../services/apiClient'; // Ajusta la ruta si es necesario
 
 const FotoVideoSection = () => {
   // Estado para los testimonios, carga y errores
@@ -11,41 +12,30 @@ const FotoVideoSection = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // useEffect para cargar los testimonios al montar el componente
+  // Fetch Reviews from API
   useEffect(() => {
     const fetchReviews = async () => {
       setLoading(true);
       setError(null);
       try {
-        // --- CORREGIDO: Construir URL completa del backend --- 
-        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'; // Asumiendo puerto 3001
-        
-        // Cambiado al endpoint correcto para reviews aprobadas
-        const response = await fetch(`${backendUrl}/reviews/approved`); 
-        if (!response.ok) {
-          // Leer el cuerpo de la respuesta para más detalles del error
-          const errorBody = await response.text();
-          let errorMsg = `Error ${response.status}: Error al cargar los testimonios.`;
-           try { 
-               const errorData = JSON.parse(errorBody);
-               errorMsg = errorData.message || errorMsg; 
-           } catch(e) { 
-               if(errorBody.length < 200) { errorMsg += ` Detalles: ${errorBody}`;} 
-           }
-          console.error("[FotoVideoSection] Fetch error:", errorMsg);
-          throw new Error(errorMsg);
+        // --- CAMBIADO: Usar apiClient y añadir /api explícitamente ---
+        const responseData = await apiClient.get('/api/reviews/approved');
+        console.log('[FotoVideoSection] apiClient response received:', responseData);
+
+        // Verificar estructura de respuesta (ajustar según interceptor)
+        if (responseData && responseData.success === true && Array.isArray(responseData.data)) {
+          setReviews(responseData.data);
+        } else if (Array.isArray(responseData)) {
+            console.warn('[FotoVideoSection] apiClient devolvió un array directamente.');
+            setReviews(responseData);
+        } else {
+           console.warn('[FotoVideoSection] Unexpected response format via apiClient:', responseData);
+           throw new Error('Formato de respuesta inesperado del servidor.');
         }
-        const data = await response.json();
-         // Verificar la estructura esperada { success: true, data: [...] }
-         if (data && data.success === true && Array.isArray(data.data)) {
-           setReviews(data.data);
-         } else {
-            console.warn('[FotoVideoSection] Unexpected response format:', data);
-            throw new Error('Formato de respuesta inesperado del servidor.');
-         }
       } catch (err) {
-        setError(err.message);
-        console.error("Error fetching reviews:", err);
+        // El interceptor de apiClient ya debería formatear el error
+        setError(err.message || 'Ocurrió un error al obtener los testimonios.');
+        console.error("Error fetching reviews via apiClient:", err);
         // Opcional: Mantener datos hardcodeados como fallback en caso de error
         // setReviews(fallbackTestimonios); 
       } finally {

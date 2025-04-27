@@ -38,6 +38,12 @@ const reservaEventoSchema = new mongoose.Schema({
     type: Date,
     required: [true, 'Por favor, seleccione una fecha']
   },
+  // Añadir fechaFin para eventos de varios días
+  fechaFin: {
+      type: Date,
+      // No requerido por defecto, pero necesario si el evento dura más de un día.
+      // Se puede añadir validación personalizada si es necesario.
+  },
   estadoReserva: {
     type: String,
     enum: ['pendiente', 'confirmada', 'pagada', 'cancelada', 'completada'],
@@ -104,7 +110,7 @@ const reservaEventoSchema = new mongoose.Schema({
   espacioSeleccionado: {
     type: String,
     enum: ['salon', 'jardin', 'terraza'],
-    required: [true, 'Por favor, seleccione un espacio']
+    required: false
   },
   modoGestionHabitaciones: {
     type: String,

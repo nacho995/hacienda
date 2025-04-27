@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation';
 import { 
   FaCalendarAlt, FaBed, FaUsers, FaClipboardList, FaGlassCheers, FaEye, 
+  FaCheckCircle,
   FaUserCircle, FaSync, FaSpinner, FaFilter, FaSearch, FaTimes, 
   FaChartLine, FaMoneyBillWave, FaMapMarkedAlt, FaChevronDown, 
   FaChevronRight, FaArrowUp, FaArrowDown, FaHotel, FaListAlt, FaChevronLeft, FaListUl
@@ -61,6 +62,30 @@ export default function AdminDashboard() {
     removeReservation,
     error: reservationError
   } = useReservation();
+  
+  // <<< INICIO LOG DATOS CONTEXTO DASHBOARD >>>
+  /* // <-- COMENTADO PARA EVITAR LOGS EXCESIVOS
+  useEffect(() => {
+    if (!reservationsLoading && (habitacionReservations?.length || eventoReservations?.length)) {
+      console.log('%c[Dashboard Context Check] Datos recibidos de useReservation:', 'color: green; font-weight: bold;', {
+        habitacionReservations: habitacionReservations ? JSON.parse(JSON.stringify(habitacionReservations.slice(0,5))) : [], // Primeros 5 para inspección
+        eventoReservations: eventoReservations ? JSON.parse(JSON.stringify(eventoReservations.slice(0,5))) : [], // Primeros 5
+      });
+       // Inspección específica de habitacionDetails en las primeras 5 habitaciones
+       if (habitacionReservations && habitacionReservations.length > 0) {
+           console.log('%c[Dashboard Context Check] Inspección habitacionDetails (primeras 5):', 'color: blue;', 
+               habitacionReservations.slice(0, 5).map(res => ({ 
+                   id: res._id, 
+                   habitacionDetails: res.habitacionDetails, 
+                   habitacionField: res.habitacion 
+               }))
+           );
+       }
+    }
+  }, [habitacionReservations, eventoReservations, reservationsLoading]);
+  */ // <-- FIN COMENTADO
+  // <<< FIN LOG DATOS CONTEXTO DASHBOARD >>>
+  
   const router = useRouter();
   const [stats, setStats] = useState({
     totalReservations: 0,
@@ -145,13 +170,18 @@ export default function AdminDashboard() {
     // Filtrar reservas de habitaciones
     if (Array.isArray(habitacionReservations)) {
       habitacionReservations.forEach(reserva => {
+        // <<< INICIO LOG DENTRO getReservationsForDay >>>
+        // console.log(`%c[getReservationsForDay - HAB] Procesando reserva ID: ${reserva._id}`, 'color: purple;', JSON.parse(JSON.stringify(reserva))); // <-- COMENTADO/ELIMINADO
+        // <<< FIN LOG DENTRO getReservationsForDay >>>
+        
         const fechaEntrada = reserva.fechaEntrada ? parseISO(reserva.fechaEntrada) : null;
         const fechaSalida = reserva.fechaSalida ? parseISO(reserva.fechaSalida) : null;
+        
         if (isValid(fechaEntrada) && isValid(fechaSalida) && reserva.estado?.toLowerCase() !== 'cancelada') {
-          // La reserva solapa con el rango si: reserva.entrada < filtro.fin Y reserva.salida > filtro.inicio
-          if (fechaEntrada < fechaFinFiltro && fechaSalida > fechaInicioFiltro) {
-            reservasFiltradas.push({ ...reserva, tipo: 'habitacion' });
-          }
+           // La reserva solapa con el rango si: reserva.entrada < filtro.fin Y reserva.salida > filtro.inicio
+           if (fechaEntrada < fechaFinFiltro && fechaSalida > fechaInicioFiltro) {
+             reservasFiltradas.push({ ...reserva, tipo: 'habitacion' });
+           }
         }
       });
     }
@@ -197,205 +227,240 @@ export default function AdminDashboard() {
       setRefreshing(true);
       setError(null);
       
-      console.log('Iniciando carga de datos del dashboard');
+      // console.log('Iniciando carga de datos del dashboard');
       
       // Cargar usuarios primero
       await loadUsers();
 
-      // Cargar todas las reservas
+      // Cargar todas las reservas (usará el contexto)
       await loadAllReservations(false);
       
-      console.log('Datos de reservas disponibles:', { 
-        reservations: reservations?.length || 0,
-        habitacionReservations: habitacionReservations?.length || 0, 
-        eventoReservations: eventoReservations?.length || 0 
-      });
-      
-      // Calcular estadísticas usando los datos del contexto
-      let totalReservations = 0;
-      let pendingReservations = 0;
-      let confirmedReservations = 0;
-      let cancelledReservations = 0;
-      
-      // Procesar reservas de eventos
-      if (Array.isArray(eventoReservations)) {
-        totalReservations += eventoReservations.length;
-        
-        // ---> DEBUG: Log de eventos antes de contar <---
-        console.log('[loadDashboardData] EventoReservations para contar:', eventoReservations.map(r => ({ id: r._id, estado: r.estadoReserva || r.estado })));
-
-        eventoReservations.forEach(reserva => {
-          const estado = (reserva.estadoReserva || reserva.estado)?.toLowerCase() || ''; // Usar estadoReserva primero
-          if (estado === 'pendiente') pendingReservations++;
-          else if (estado === 'confirmada') confirmedReservations++;
-          else if (estado === 'cancelada') cancelledReservations++;
-        });
-
-        // ---> DEBUG: Log del resultado del conteo <---
-        console.log('[loadDashboardData] Conteo de pendientes (eventos): ', pendingReservations);
-
-      }
-      
-      // Procesar reservas de habitaciones independientes (que no pertenecen a eventos)
-      if (Array.isArray(habitacionReservations)) {
-        const habitacionesIndependientes = habitacionReservations.filter(
-          hab => !hab.eventoId && !hab.reservaEvento
-        );
-        
-        totalReservations += habitacionesIndependientes.length;
-        
-        habitacionesIndependientes.forEach(reserva => {
-          const estado = reserva.estado?.toLowerCase() || '';
-          if (estado === 'pendiente') pendingReservations++;
-          else if (estado === 'confirmada') confirmedReservations++;
-          else if (estado === 'cancelada') cancelledReservations++;
-        });
-      }
-      
-      // Obtener el número real de habitaciones físicas
-      let totalPhysicalRooms = 14; // Valor por defecto
+      // ---> NUEVO: Cargar habitaciones para obtener el total dinámico <---
+      let allHabitaciones = [];
       try {
-        const habitacionesData = await obtenerHabitaciones(); // Usa la función del servicio
-        if (habitacionesData && Array.isArray(habitacionesData.data)) {
-            totalPhysicalRooms = habitacionesData.data.length > 0 ? habitacionesData.data.length : 14;
-        } else if (habitacionesData && typeof habitacionesData.count === 'number') {
-            totalPhysicalRooms = habitacionesData.count > 0 ? habitacionesData.count : 14;
-        } else {
-           console.warn("No se pudo determinar el número total de habitaciones físicas desde la API.");
-        }
-      } catch (err) {
-        console.error('Error al obtener el número total de habitaciones físicas:', err);
+         const habResponse = await obtenerHabitaciones();
+         if (habResponse && habResponse.success && Array.isArray(habResponse.data)) {
+             allHabitaciones = habResponse.data;
+             // console.log(`[Dashboard] Total habitaciones obtenidas: ${allHabitaciones.length}`);
+         } else if (Array.isArray(habResponse)) { // Fallback si la API devuelve array directo
+             allHabitaciones = habResponse;
+             console.warn(`[Dashboard] Total habitaciones obtenidas (formato directo): ${allHabitaciones.length}`);
+         }
+      } catch (habError) {
+        console.error("[Dashboard] Error cargando habitaciones para estadísticas:", habError);
+        toast.error("No se pudo obtener el total de habitaciones para las estadísticas.");
+        // Continuaremos con el valor por defecto si falla
       }
+      const totalRoomsDynamic = allHabitaciones.length > 0 ? allHabitaciones.length : 14; // Usar dinámico o fallback
+
+      // --- Inicio Cálculo de Estadísticas ---
       
-      // Calcular habitaciones ocupadas HOY
-      const today = new Date();
-      const startOfToday = startOfDay(today);
-      const endOfToday = endOfDay(today); // Considerar hasta el final del día
-
-      let occupiedTodayCount = 0;
-      if (Array.isArray(habitacionReservations)) {
-        const uniqueOccupiedRoomsToday = new Set(); // Para no contar la misma habitación dos veces si tiene múltiples reservas hoy
-
-        habitacionReservations.forEach(h => {
-          // Asegurarse de que las fechas son válidas
-          const fechaEntrada = h.fechaEntrada ? parseISO(h.fechaEntrada) : null;
-          const fechaSalida = h.fechaSalida ? parseISO(h.fechaSalida) : null;
-
-          if (isValid(fechaEntrada) && isValid(fechaSalida) && h.estado?.toLowerCase() !== 'cancelada') {
-            // Una habitación está ocupada hoy si la fecha de hoy está entre la entrada (inclusive) y la salida (exclusive)
-            if (startOfToday < fechaSalida && endOfToday >= fechaEntrada) {
-               // Usar letraHabitacion o _id como identificador único de la habitación física
-               const habitacionIdentifier = h.letraHabitacion || h.habitacion || h._id;
-               uniqueOccupiedRoomsToday.add(habitacionIdentifier);
-            }
-          }
-        });
-        occupiedTodayCount = uniqueOccupiedRoomsToday.size;
-      }
+      // console.log('[loadDashboardData] Datos del contexto para calcular stats:', { 
+      //   habitacionReservations: habitacionReservations ? habitacionReservations.length : 'N/A', 
+      //   eventoReservations: eventoReservations ? eventoReservations.length : 'N/A' 
+      // });
       
-      // Calcular ocupación PRÓXIMOS 7 DÍAS (desde mañana)
-      const startOfNext7Days = startOfDay(addDays(today, 1));
-      const endOfNext7Days = endOfDay(addDays(today, 7));
-      const uniqueOccupiedRoomsNext7Days = new Set();
-      if (Array.isArray(habitacionReservations)) {
-        habitacionReservations.forEach(h => {
-          const fechaEntrada = h.fechaEntrada ? parseISO(h.fechaEntrada) : null;
-          const fechaSalida = h.fechaSalida ? parseISO(h.fechaSalida) : null;
-          if (isValid(fechaEntrada) && isValid(fechaSalida) && h.estado?.toLowerCase() !== 'cancelada') {
-            // Solapa si: reserva.entrada < periodo.fin Y reserva.salida > periodo.inicio
-            if (fechaEntrada < endOfNext7Days && fechaSalida > startOfNext7Days) {
-              const idHab = h.letraHabitacion || h.habitacion || h._id;
-              uniqueOccupiedRoomsNext7Days.add(idHab);
-            }
-          }
-        });
-      }
-      const occupiedNext7DaysCount = uniqueOccupiedRoomsNext7Days.size;
+      // Asegurarnos que los arrays existen antes de iterar
+      const currentHabitacionReservations = Array.isArray(habitacionReservations) ? habitacionReservations : [];
+      const currentEventoReservations = Array.isArray(eventoReservations) ? eventoReservations : [];
 
-      // Calcular ocupación PRÓXIMOS 30 DÍAS (desde mañana)
-      const startOfNext30Days = startOfDay(addDays(today, 1));
-      const endOfNext30Days = endOfDay(addDays(today, 30));
-      const uniqueOccupiedRoomsNext30Days = new Set();
-      if (Array.isArray(habitacionReservations)) {
-        habitacionReservations.forEach(h => {
-          const fechaEntrada = h.fechaEntrada ? parseISO(h.fechaEntrada) : null;
-          const fechaSalida = h.fechaSalida ? parseISO(h.fechaSalida) : null;
-          if (isValid(fechaEntrada) && isValid(fechaSalida) && h.estado?.toLowerCase() !== 'cancelada') {
-            if (fechaEntrada < endOfNext30Days && fechaSalida > startOfNext30Days) {
-              const idHab = h.letraHabitacion || h.habitacion || h._id;
-              uniqueOccupiedRoomsNext30Days.add(idHab);
-            }
-          }
-        });
-      }
-      const occupiedNext30DaysCount = uniqueOccupiedRoomsNext30Days.size;
-      
-      // Calcular recuentos de EVENTOS
+      let totalReservationsCount = 0;
+      let pendingReservationsCount = 0;
+      let confirmedReservationsCount = 0;
+      let cancelledReservationsCount = 0;
       let eventosHoyCount = 0;
       let eventosNext7DaysCount = 0;
       let eventosNext30DaysCount = 0;
+      
+      const hoy = startOfDay(new Date());
+      const manana = startOfDay(addDays(hoy, 1));
+      const fin7Days = endOfDay(addDays(hoy, 7));
+      const fin30Days = endOfDay(addDays(hoy, 30));
+      const activeReservationStates = ['confirmada', 'pendiente_pago', 'check_in', 'pago_parcial', 'pendiente']; // Incluir 'pendiente' general
 
-      if (Array.isArray(eventoReservations)) {
-        eventoReservations.forEach(e => {
-          const fechaEvento = e.fecha ? parseISO(e.fecha) : null;
-          if (isValid(fechaEvento) && e.estado?.toLowerCase() !== 'cancelada') {
-            const startOfFechaEvento = startOfDay(fechaEvento);
-            
-            // Evento Hoy?
-            if (isSameDay(today, fechaEvento)) {
-              eventosHoyCount++;
+      // Procesar reservas de eventos
+      currentEventoReservations.forEach(reserva => {
+        const estado = (reserva.estadoReserva || reserva.estado)?.toLowerCase() || '';
+        const fechaEvento = reserva.fecha ? parseISO(reserva.fecha) : null;
+
+        if (estado !== 'cancelada') {
+            totalReservationsCount++; // Contar evento como reserva general si no está cancelado
+            if (estado === 'pendiente') pendingReservationsCount++;
+            else if (activeReservationStates.includes(estado)) confirmedReservationsCount++; // Contar como 'confirmada' para stats generales si está activa
+
+            // Contar eventos por fecha
+            if (isValid(fechaEvento)) {
+                if (isSameDay(fechaEvento, hoy)) eventosHoyCount++;
+                if (isWithinInterval(fechaEvento, { start: manana, end: fin7Days })) eventosNext7DaysCount++;
+                if (isWithinInterval(fechaEvento, { start: manana, end: fin30Days })) eventosNext30DaysCount++;
             }
-            // Evento Próx 7 días? (entre mañana y +7d)
-            if (startOfFechaEvento >= startOfNext7Days && startOfFechaEvento <= endOfNext7Days) {
-              eventosNext7DaysCount++;
-            }
-             // Evento Próx 30 días? (entre mañana y +30d)
-            if (startOfFechaEvento >= startOfNext30Days && startOfFechaEvento <= endOfNext30Days) {
-              eventosNext30DaysCount++;
+        } else {
+             cancelledReservationsCount++;
+        }
+      });
+
+      // Procesar reservas de habitaciones (contar solo independientes para reservas generales)
+      currentHabitacionReservations.forEach(reserva => {
+         const estado = (reserva.estadoReserva || reserva.estado)?.toLowerCase() || '';
+         // Solo contar como reserva general si es de tipo 'hotel' (o no tiene tipoReserva)
+         if (!reserva.tipoReserva || reserva.tipoReserva === 'hotel') { 
+             if (estado !== 'cancelada') {
+                 totalReservationsCount++;
+                 if (estado === 'pendiente') pendingReservationsCount++;
+                 else if (activeReservationStates.includes(estado)) confirmedReservationsCount++;
+        } else {
+                 cancelledReservationsCount++;
+             }
+         }
+      });
+
+      // --- Inicio Cálculo de Ocupación de Habitaciones (Lógica Corregida v2: Iteración Diaria) ---
+      let maxOccupancyNext7Days = 0;
+      let maxOccupancyNext30Days = 0;
+      const dailyOccupancyToday = new Set();
+
+      // Bucle para Hoy (solo para occupiedRoomsToday)
+      const endHoy = endOfDay(hoy);
+      
+      // Habitaciones directas hoy
+      currentHabitacionReservations.forEach(reserva => {
+          const estado = (reserva.estadoReserva || reserva.estado)?.toLowerCase() || '';
+          if (!activeReservationStates.includes(estado)) return;
+          const fechaEntrada = reserva.fechaEntrada ? parseISO(reserva.fechaEntrada) : null;
+          const fechaSalida = reserva.fechaSalida ? parseISO(reserva.fechaSalida) : null;
+          const roomId = reserva.habitacion?.letra || reserva.letraHabitacion || reserva.habitacion;
+          if (isValid(fechaEntrada) && isValid(fechaSalida) && roomId) {
+              if (fechaEntrada < endHoy && fechaSalida > hoy) {
+                  dailyOccupancyToday.add(roomId);
             }
           }
         });
+      // Eventos hoy
+      currentEventoReservations.forEach(evento => {
+          const estado = (evento.estadoReserva || evento.estado)?.toLowerCase() || '';
+          if (!activeReservationStates.includes(estado)) return;
+          const fechaEvento = evento.fecha ? parseISO(evento.fecha) : null;
+          if (isValid(fechaEvento) && isSameDay(fechaEvento, hoy)) {
+              let habitacionesDelEventoIds = [];
+              if (evento.modoGestionHabitaciones === 'hacienda') {
+                  habitacionesDelEventoIds = allHabitaciones.map(h => h.letra || h._id);
+              } else if (Array.isArray(evento.serviciosAdicionales?.habitaciones)) {
+                  habitacionesDelEventoIds = evento.serviciosAdicionales.habitaciones
+                      .map(habRef => habRef.reservaHabitacionId?.habitacion?.letra || habRef.reservaHabitacionId?.letraHabitacion || habRef.reservaHabitacionId?.habitacion)
+                      .filter(id => id);
+              } else if (Array.isArray(evento.habitacionesReservadas)) {
+                   habitacionesDelEventoIds = evento.habitacionesReservadas.map(hab => hab.letra || hab._id).filter(id => id);
+              }
+              habitacionesDelEventoIds.forEach(id => dailyOccupancyToday.add(id));
+          }
+      });
+      const occupiedRoomsTodayCount = dailyOccupancyToday.size;
+      const availableRoomsTodayCount = totalRoomsDynamic - occupiedRoomsTodayCount;
+
+      // Bucle para los próximos 30 días (desde mañana)
+      for (let d = manana; d <= fin30Days; d = addDays(d, 1)) {
+          const currentDayStart = startOfDay(d);
+          const currentDayEnd = endOfDay(d);
+          const dailyOccupancySet = new Set();
+
+          // 1. Habitaciones directas ocupadas en el día `d`
+          currentHabitacionReservations.forEach(reserva => {
+              const estado = (reserva.estadoReserva || reserva.estado)?.toLowerCase() || '';
+              if (!activeReservationStates.includes(estado)) return;
+              const fechaEntrada = reserva.fechaEntrada ? parseISO(reserva.fechaEntrada) : null;
+              const fechaSalida = reserva.fechaSalida ? parseISO(reserva.fechaSalida) : null;
+              const roomId = reserva.habitacion?.letra || reserva.letraHabitacion || reserva.habitacion;
+              if (isValid(fechaEntrada) && isValid(fechaSalida) && roomId) {
+                  // Ocupada si el día d está dentro del intervalo de la reserva
+                  if (fechaEntrada < currentDayEnd && fechaSalida > currentDayStart) {
+                      dailyOccupancySet.add(roomId);
+            }
+          }
+        });
+
+          // 2. Habitaciones de eventos ocupadas en el día `d`
+          currentEventoReservations.forEach(evento => {
+              const estado = (evento.estadoReserva || evento.estado)?.toLowerCase() || '';
+              if (!activeReservationStates.includes(estado)) return;
+              const fechaEvento = evento.fecha ? parseISO(evento.fecha) : null;
+              
+              // Si el evento ocurre en el día `d`
+              if (isValid(fechaEvento) && isSameDay(fechaEvento, d)) {
+                  let habitacionesDelEventoIds = [];
+                  if (evento.modoGestionHabitaciones === 'hacienda') {
+                      habitacionesDelEventoIds = allHabitaciones.map(h => h.letra || h._id);
+                  } else if (Array.isArray(evento.serviciosAdicionales?.habitaciones)) {
+                      habitacionesDelEventoIds = evento.serviciosAdicionales.habitaciones
+                          .map(habRef => habRef.reservaHabitacionId?.habitacion?.letra || habRef.reservaHabitacionId?.letraHabitacion || habRef.reservaHabitacionId?.habitacion)
+                          .filter(id => id);
+                  } else if (Array.isArray(evento.habitacionesReservadas)) {
+                      habitacionesDelEventoIds = evento.habitacionesReservadas.map(hab => hab.letra || hab._id).filter(id => id);
+                  }
+                  // Añadir las habitaciones del evento al set de ocupación diaria
+                  habitacionesDelEventoIds.forEach(id => dailyOccupancySet.add(id));
+              }
+          });
+
+          // Actualizar la ocupación máxima encontrada hasta ahora
+          const currentDailyOccupancy = dailyOccupancySet.size;
+          
+          // Para los próximos 30 días
+          if (currentDailyOccupancy > maxOccupancyNext30Days) {
+              maxOccupancyNext30Days = currentDailyOccupancy;
+          }
+          
+          // Para los próximos 7 días (si el día `d` está dentro de los primeros 7)
+          const fin7Days = endOfDay(addDays(hoy, 7));
+          if (d <= fin7Days) {
+            if (currentDailyOccupancy > maxOccupancyNext7Days) {
+               maxOccupancyNext7Days = currentDailyOccupancy;
+            }
+          }
       }
 
-      // Actualizar estadísticas
-      const newStats = {
-        totalReservations,
-        pendingReservations,
-        confirmedReservations,
-        cancelledReservations,
-        totalRooms: totalPhysicalRooms, 
-        occupiedRoomsToday: occupiedTodayCount, 
-        availableRoomsToday: totalPhysicalRooms - occupiedTodayCount, 
-        occupiedRoomsNext7Days: occupiedNext7DaysCount,
-        availableRoomsNext7Days: totalPhysicalRooms - occupiedNext7DaysCount,
-        occupiedRoomsNext30Days: occupiedNext30DaysCount,
-        availableRoomsNext30Days: totalPhysicalRooms - occupiedNext30DaysCount,
-        totalUsers: usuarios?.length || 0,
+      // Calcular disponibilidad mínima usando la ocupación máxima encontrada
+      const availableRoomsNext7DaysCount = totalRoomsDynamic - maxOccupancyNext7Days;
+      const availableRoomsNext30DaysCount = totalRoomsDynamic - maxOccupancyNext30Days;
+      
+      // --- Fin Cálculo de Ocupación --- 
+
+      // Actualizar el estado de las estadísticas
+      setStats({
+        totalReservations: totalReservationsCount,
+        pendingReservations: pendingReservationsCount,
+        confirmedReservations: confirmedReservationsCount,
+        cancelledReservations: cancelledReservationsCount,
+        totalRooms: totalRoomsDynamic, // Usar valor dinámico
+        occupiedRoomsToday: occupiedRoomsTodayCount,
+        availableRoomsToday: availableRoomsTodayCount, // Correcto
+        // Nota: Podríamos mostrar maxOccupancyNext7Days y maxOccupancyNext30Days si fuera útil
+        occupiedRoomsNext7Days: maxOccupancyNext7Days, // Opcional: Mostrar máxima ocupación
+        availableRoomsNext7Days: availableRoomsNext7DaysCount, // Mínima disponibilidad en 7d
+        occupiedRoomsNext30Days: maxOccupancyNext30Days, // Opcional: Mostrar máxima ocupación
+        availableRoomsNext30Days: availableRoomsNext30DaysCount, // Mínima disponibilidad en 30d
+        totalUsers: usuarios.length, // Usar usuarios cargados
         eventosHoy: eventosHoyCount,
         eventosNext7Days: eventosNext7DaysCount,
-        eventosNext30Days: eventosNext30DaysCount
-      };
+        eventosNext30Days: eventosNext30DaysCount,
+      });
       
-      console.log('Estadísticas calculadas:', newStats);
-      setStats(newStats);
+      // --- Fin Cálculo de Estadísticas ---
       
       setLastUpdate(new Date());
-      
       if (showToast) {
-        toast.success('Dashboard actualizado correctamente');
+        toast.success('Datos del dashboard actualizados.');
       }
-    } catch (error) {
-      console.error('Error al cargar datos del dashboard:', error);
-      setError('Error al cargar los datos del dashboard');
-      if (showToast) {
-        toast.error('Error al cargar los datos del dashboard');
-      }
+
+    } catch (err) {
+      console.error('Error al cargar datos del dashboard:', err);
+      setError(err.message || 'Error cargando datos.');
+      toast.error(err.message || 'Error cargando datos del dashboard.');
     } finally {
-      setRefreshing(false);
       setIsLoading(false);
+      setRefreshing(false);
       setInitialLoadDone(true);
     }
-  }, [authLoading, isAuthenticated, loadAllReservations, loadUsers, usuarios?.length, eventoReservations, habitacionReservations]);
+  }, [isAuthenticated, authLoading, loadUsers, loadAllReservations, habitacionReservations, eventoReservations, usuarios]); // Añadir dependencias
 
   // Efecto para cargar datos iniciales
   useEffect(() => {
@@ -756,6 +821,10 @@ export default function AdminDashboard() {
     // Revisar reservas de habitaciones
     if (Array.isArray(habitacionReservations)) {
       habitacionReservations.forEach(reserva => {
+        // <<< INICIO LOG DENTRO getReservationsForDay >>>
+        // console.log(`%c[getReservationsForDay - HAB] Procesando reserva ID: ${reserva._id}`, 'color: purple;', JSON.parse(JSON.stringify(reserva))); // <-- COMENTADO/ELIMINADO
+        // <<< FIN LOG DENTRO getReservationsForDay >>>
+        
         const fechaEntrada = reserva.fechaEntrada ? parseISO(reserva.fechaEntrada) : null;
         const fechaSalida = reserva.fechaSalida ? parseISO(reserva.fechaSalida) : null;
         
@@ -783,53 +852,58 @@ export default function AdminDashboard() {
     return dayReservations;
   };
   
-  // Renderizar letra de habitación o indicador de evento (MODIFICADO)
+  // Renderizar letra de habitación o indicador de evento (MODIFICADO v3)
   const renderReservationIndicator = (reserva) => {
+    // ---> DEBUG: Loguear el objeto reserva que se intenta renderizar
+    // console.log('[RenderIndicator] Recibido:', JSON.stringify(reserva, null, 2)); // Stringify para ver bien el objeto
+    // <<< INICIO LOG DETALLADO RENDER INDICATOR >>>
+    // console.log('%c[RenderIndicator] Recibido para renderizar:', 'color: magenta;', JSON.parse(JSON.stringify(reserva))); // <-- COMENTADO
+    // <<< FIN LOG DETALLADO RENDER INDICATOR >>>
+    
     const idReserva = reserva._id || 'temp-' + Math.random();
     let indicator = null; // Por defecto, no renderizar nada
+    // ---> MODIFICACIÓN: Apuntar a la página general de reservaciones <-----
+    let targetUrl = `/admin/reservaciones?highlightId=${idReserva}`;
+    let tooltipText = 'Ver en lista'; // Tooltip por defecto
 
-    // --- 1. Mostrar Indicador de EVENTO ---
+    // --- 1. Determinar Tooltip según el tipo --- <<< MODIFICACIÓN: SOLO TOOLTIP
     if (reserva.tipo === 'evento') {
-      const nombreEvento = reserva.nombreEvento || 'Evento';
-      const tooltipText = `Evento: ${nombreEvento} (${reserva.nombreContacto || 'Cliente Desc.'})`;
-      indicator = (
-        <div
-          key={`event-${idReserva}`}
-          className="relative group cursor-pointer my-1 flex-shrink-0 w-full" // Ocupa ancho
-          title={tooltipText} // Tooltip básico del navegador
-        >
-          {/* Estilo más prominente para eventos */}
-          <div className={`p-1.5 rounded ${COLORES_PASTEL_PIEDRA.estadoConfirmado} text-center shadow-sm border ${COLORES_PASTEL_PIEDRA.borde}`}>
-            <FaGlassCheers className="inline-block mr-1" size={10}/>
-            <span className="font-semibold text-[10px] leading-tight">{nombreEvento}</span>
-          </div>
-          {/* Tooltip detallado (opcional, si se mantiene el estilo anterior) */}
-          {/* <div className="absolute ...">{tooltipText}</div> */}
-        </div>
-      );
+        const displayNombre = reserva.tipoEventoDetails?.titulo || reserva.nombreEvento || 'Evento';
+        tooltipText = `Evento: ${displayNombre} (${reserva.nombreContacto || 'Cliente Desc.'}) - Ver en lista`;
     }
-    // --- 2. Mostrar Indicador de Habitación de HOTEL (Independiente) ---
-    else if (reserva.tipo === 'habitacion' && !reserva.reservaEvento) {
-        const letraHabitacion = reserva.letraHabitacion || reserva.habitacion || '?';
-        const tooltipText = `Hab. Hotel ${letraHabitacion}: ${reserva.nombreContacto || 'Sin contacto'}`;
-        indicator = (
-          <div
-            key={`room-${idReserva}`}
-            className="relative group cursor-pointer m-0.5 flex-shrink-0"
-            title={tooltipText}
-          >
-            {/* Estilo diferente y más grande para habitaciones de hotel */}
-            <span
-              className={`w-7 h-7 rounded ${COLORES_PASTEL_PIEDRA.letraHabitacion} flex items-center justify-center text-xs font-bold shadow border ${COLORES_PASTEL_PIEDRA.borde}`}
-            >
-              {letraHabitacion}
-            </span>
-             {/* Tooltip detallado (opcional) */}
-            {/* <div className="absolute ...">{tooltipText}</div> */}
-          </div>
-        );
+    // --- 2. Mostrar Indicador de Habitación (SOLO si es de HOTEL independiente) --- <<< MODIFICACIÓN: SOLO TOOLTIP
+    else if (reserva.tipo === 'habitacion' && !reserva.reservaEvento) { 
+        let letraHabitacion = reserva.habitacionDetails?.letra || reserva.habitacion?.letra || '?';
+        if (letraHabitacion === 'Sin asignar') { letraHabitacion = '?'; }
+        tooltipText = `Hab. Hotel ${letraHabitacion}: ${reserva.nombreContacto || 'Sin contacto'} - Ver en lista`;
     }
     // --- 3. Habitaciones de Evento: No se renderizan (indicator sigue siendo null) ---
+    else {
+      // No hacer nada para habitaciones asociadas a evento en el calendario principal
+      return null; 
+    }
+
+    // --- 4. Renderizar el Link si hay URL válida (Evento o Habitación Hotel) --- <<< MODIFICACIÓN: Usar targetUrl
+    if (targetUrl) { // Siempre habrá URL si pasó el filtro anterior
+      indicator = (
+        <Link href={targetUrl} key={`${reserva.tipo}-${idReserva}`} className="block w-full cursor-pointer group relative" title={tooltipText}>
+          {reserva.tipo === 'evento' ? (
+            // Estilo Evento
+            <div className={`p-1.5 rounded ${COLORES_PASTEL_PIEDRA.estadoConfirmado} text-center shadow-sm border ${COLORES_PASTEL_PIEDRA.borde} hover:opacity-80 transition-opacity`}>
+              <FaGlassCheers className="inline-block mr-1" size={10}/>
+              <span className="font-semibold text-[10px] leading-tight">{reserva.tipoEventoDetails?.titulo || reserva.nombreEvento || 'Evento'}</span>
+            </div>
+          ) : (
+            // Estilo Habitación Hotel
+            <div className="m-0.5 flex-shrink-0 inline-block"> {/* Usar inline-block para que tome el ancho del span */} 
+              <span className={`w-7 h-7 rounded ${COLORES_PASTEL_PIEDRA.letraHabitacion} flex items-center justify-center text-xs font-bold shadow border ${COLORES_PASTEL_PIEDRA.borde} hover:opacity-80 transition-opacity`}>
+                {reserva.habitacionDetails?.letra || reserva.habitacion?.letra || '?'} 
+              </span>
+            </div>
+          )}
+        </Link>
+      );
+    }
 
     return indicator;
   };
@@ -1002,9 +1076,12 @@ export default function AdminDashboard() {
                   <tbody className="bg-white divide-y divide-gray-100">
                     {eventoReservations.slice(0, 5).map((reserva) => {
                       const fecha = reserva.fechaEvento || reserva.fecha;
-                      const nombreEvento = typeof reserva.tipoEvento === 'object' 
-                        ? (reserva.tipoEvento?.nombre || reserva.tipoEvento?.titulo || 'Evento') 
-                        : (reserva.tipoEvento || 'Evento');
+                      // --- Lógica corregida para obtener el nombre a mostrar ---
+                      const nombreMostrar = reserva.nombreEvento || 
+                                            reserva.tipoEventoDetails?.titulo || 
+                                            (typeof reserva.tipoEvento === 'object' ? (reserva.tipoEvento?.nombre || reserva.tipoEvento?.titulo) : reserva.tipoEvento) || 
+                                            'Evento sin nombre';
+                      // --- Fin lógica corregida ---
                       
                       return (
                         <tr key={reserva._id || reserva.id} className="hover:bg-gray-50 transition-all">
@@ -1014,12 +1091,17 @@ export default function AdminDashboard() {
                                 <FaGlassCheers />
                               </div>
                               <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">{nombreEvento}</div>
+                                <div className="text-sm font-medium text-gray-900">{nombreMostrar}</div>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{format(new Date(fecha), 'dd MMM yyyy', { locale: es })}</div>
+                            {/* Añadir verificación de fecha válida antes de formatear */}
+                            <div className="text-sm text-gray-900">
+                              {fecha && isValid(new Date(fecha)) 
+                                ? format(new Date(fecha), 'dd MMM yyyy', { locale: es })
+                                : 'Fecha inválida'}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
@@ -1176,10 +1258,14 @@ export default function AdminDashboard() {
                     </div>
                     <div className={`mt-1 text-xs ${COLORES_PASTEL_PIEDRA.textoSecundario} flex items-center gap-1`}>
                       <FaCalendarAlt size={10}/> 
-                      <span>{isValid(fechaInicio) ? format(fechaInicio, 'dd MMM', { locale: es }) : '--'}</span>
-                      {isValid(fechaFin) && !isSameDay(fechaInicio, fechaFin) && (
+                      {/* Renderizar fecha de inicio solo si es válida */}
+                      <span>{isValid(fechaInicio) ? format(fechaInicio, 'dd MMM', { locale: es }) : 'Fecha inválida'}</span>
+                      {/* Renderizar fecha de fin solo si AMBAS son válidas y distintas */}
+                      {isValid(fechaInicio) && isValid(fechaFin) && !isSameDay(fechaInicio, fechaFin) && (
                          <><span>-</span> <span>{format(fechaFin, 'dd MMM', { locale: es })}</span></>
                       )}
+                      {/* Opcional: Mostrar algo si la fecha de fin es inválida pero la de inicio no lo era */}
+                      {/* {isValid(fechaInicio) && !isValid(fechaFin) && <span> (Fin inválido)</span>} */}
                     </div>
                   </Link>
                 );
@@ -1240,74 +1326,47 @@ export default function AdminDashboard() {
 }
 
 function DashboardStats({ stats, COLORES_PASTEL_PIEDRA }) {
-  const StatCard = ({ icon: Icon, title, value, colorClass }) => (
-    <div className={`${COLORES_PASTEL_PIEDRA.fondoContenedor} rounded-xl shadow p-4 flex items-center space-x-4 ${COLORES_PASTEL_PIEDRA.borde} border`}>
-      <div className={`p-3 rounded-full ${colorClass}`}>
-        <Icon className="h-6 w-6 text-white" />
+  const StatCard = ({ icon: Icon, title, value, colorClass = COLORES_PASTEL_PIEDRA.textoPrincipal }) => (
+    <div className={`${COLORES_PASTEL_PIEDRA.fondoContenedor} p-4 rounded-lg shadow-sm border ${COLORES_PASTEL_PIEDRA.borde}`}>
+      <div className="flex items-center">
+        <div className={`p-2 rounded-full mr-3 ${COLORES_PASTEL_PIEDRA.resaltado}`}>
+           <Icon className={`w-5 h-5 ${colorClass}`} />
       </div>
       <div>
         <p className={`text-sm font-medium ${COLORES_PASTEL_PIEDRA.textoSecundario}`}>{title}</p>
-        <p className={`text-2xl font-semibold ${COLORES_PASTEL_PIEDRA.textoPrincipal}`}>{value ?? 'N/A'}</p>
+          {/* Asegurar que value sea un número antes de aplicar toLocaleString */}
+          <p className={`text-xl font-semibold ${colorClass}`}>
+              {typeof value === 'number' ? value.toLocaleString('es-MX') : value}
+          </p>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-      <StatCard 
-        icon={FaHotel} 
-        title="Hab. Disponibles Hoy" 
-        value={stats.availableRoomsToday} 
-        colorClass="bg-green-500" 
-      />
-      <StatCard 
-        icon={FaHotel}
-        title="Hab. Disponibles Próx. 7d" 
-        value={stats.availableRoomsNext7Days} 
-        colorClass="bg-teal-500"
-      />
-       <StatCard 
-        icon={FaHotel}
-        title="Hab. Disponibles Próx. 30d" 
-        value={stats.availableRoomsNext30Days} 
-        colorClass="bg-cyan-500"
-      />
-      <StatCard 
-        icon={FaBed} 
-        title="Hab. Ocupadas Hoy" 
-        value={stats.occupiedRoomsToday} 
-        colorClass="bg-orange-500" 
-      />
-      <StatCard 
-        icon={FaBed}
-        title="Hab. Ocupadas Próx. 7d" 
-        value={stats.occupiedRoomsNext7Days}
-        colorClass="bg-red-500"
-      />
-      <StatCard 
-        icon={FaBed}
-        title="Hab. Ocupadas Próx. 30d" 
-        value={stats.occupiedRoomsNext30Days}
-        colorClass="bg-pink-500"
-      />
-      <StatCard 
-        icon={FaGlassCheers}
-        title="Eventos Hoy" 
-        value={stats.eventosHoy}
-        colorClass="bg-indigo-500"
-      />
-      <StatCard 
-        icon={FaGlassCheers}
-        title="Eventos Próx. 7d" 
-        value={stats.eventosNext7Days}
-        colorClass="bg-purple-500"
-      />
-      <StatCard 
-        icon={FaGlassCheers}
-        title="Eventos Próx. 30d" 
-        value={stats.eventosNext30Days}
-        colorClass="bg-fuchsia-500"
-      />
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+      {/* Reservas */}
+      <StatCard icon={FaClipboardList} title="Reservas Totales" value={stats.totalReservations} />
+      <StatCard icon={FaSpinner} title="Pendientes" value={stats.pendingReservations} colorClass="text-yellow-600" />
+      <StatCard icon={FaCheckCircle} title="Confirmadas" value={stats.confirmedReservations} colorClass="text-green-600" />
+      <StatCard icon={FaTimes} title="Canceladas" value={stats.cancelledReservations} colorClass="text-red-600" />
+      
+      {/* Habitaciones */}
+      <StatCard icon={FaHotel} title="Habitaciones Totales" value={stats.totalRooms} />
+      {/* <StatCard icon={FaBed} title="Ocupadas Hoy" value={stats.occupiedRoomsToday} /> */}
+      <StatCard icon={FaBed} title="Disponibles Hoy" value={stats.availableRoomsToday} colorClass={stats.availableRoomsToday > 0 ? 'text-green-600' : 'text-red-600'} />
+      {/* <StatCard icon={FaBed} title="Ocupadas Próx. 7d" value={stats.occupiedRoomsNext7Days} /> */}
+      <StatCard icon={FaCalendarAlt} title="Hab. Disponibles Próx. 7d" value={stats.availableRoomsNext7Days} />
+      {/* <StatCard icon={FaBed} title="Ocupadas Próx. 30d" value={stats.occupiedRoomsNext30Days} /> */}
+      <StatCard icon={FaCalendarAlt} title="Hab. Disponibles Próx. 30d" value={stats.availableRoomsNext30Days} colorClass={stats.availableRoomsNext30Days >= 0 ? COLORES_PASTEL_PIEDRA.textoPrincipal : 'text-red-600 font-bold'} /> {/* <-- Valor corregido */}
+      
+      {/* Eventos */}
+      <StatCard icon={FaGlassCheers} title="Eventos Hoy" value={stats.eventosHoy} />
+      <StatCard icon={FaGlassCheers} title="Eventos Próx. 7d" value={stats.eventosNext7Days} />
+      <StatCard icon={FaGlassCheers} title="Eventos Próx. 30d" value={stats.eventosNext30Days} />
+
+      {/* Usuarios */}
+      <StatCard icon={FaUsers} title="Usuarios Registrados" value={stats.totalUsers} />
     </div>
   );
 }

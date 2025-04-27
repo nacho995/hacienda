@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle, FaUsers, FaUserCog, FaCreditCard, FaUniversity, FaMoneyBillWave } from 'react-icons/fa';
+import { FaCalendarAlt, FaBed, FaUtensils, FaUser, FaCheck, FaChevronLeft, FaChevronRight, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaInfoCircle, FaUsers, FaUserCog, FaCreditCard, FaUniversity, FaMoneyBillWave, FaSpinner } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@/context/AuthContext'; 
@@ -10,10 +10,11 @@ import { useReservation } from '@/context/ReservationContext';
 import { getTiposEvento } from '@/services/tiposEvento.service';
 import { 
     createEventoReservation, 
-    getFechasOcupadasGlobales,
     seleccionarMetodoPago,
     createEventoPaymentIntent
 } from '@/services/reservationService'; 
+import { obtenerFechasBloqueadasGlobales } from '@/services/disponibilidadService';
+import { isSameDay, startOfDay, endOfDay, isValid } from 'date-fns';
 
 import ModoSeleccionEvento from '@/components/reservas/ModoSeleccionEvento';
 import ModoGestionServicios from '@/components/reservas/ModoGestionServicios';
@@ -113,41 +114,57 @@ const ReservaWizard = () => {
   const wizardContentRef = useRef(null);
   const [createdReservationId, setCreatedReservationId] = useState(null);
   
-  // --- Estados para fechas ocupadas globales --- 
-  const [occupiedDates, setOccupiedDates] = useState([]); // Almacena objetos Date
-  const [loadingOccupiedDates, setLoadingOccupiedDates] = useState(false);
+  // --- Estados para fechas bloqueadas (MODIFICADO) --- 
+  // const [fechasBloqueadasAplanadas, setFechasBloqueadasAplanadas] = useState([]); // ELIMINADO
+  const [occupiedDateRangesState, setOccupiedDateRangesState] = useState([]); // NUEVO: Guarda los rangos
+  const [loadingFechasBloqueadas, setLoadingFechasBloqueadas] = useState(false);
   const [stripeClientSecret, setStripeClientSecret] = useState('');
   const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // --- Función para cargar fechas ocupadas GLOBALES --- 
-  const fetchGlobalOccupiedDates = useCallback(async (fechaInicioVisible, fechaFinVisible) => {
-    setLoadingOccupiedDates(true);
+  // --- Función para cargar fechas bloqueadas GLOBALES (MODIFICADA) --- 
+  const cargarFechasBloqueadas = useCallback(async () => {
+    setLoadingFechasBloqueadas(true);
     try {
-      const inicioStr = formatApiDate(fechaInicioVisible);
-      const finStr = formatApiDate(fechaFinVisible);
-      
-      // Llamar al nuevo servicio global
-      const globalOccupiedDates = await getFechasOcupadasGlobales(inicioStr, finStr); 
-      
-      setOccupiedDates(globalOccupiedDates || []); // El servicio ya devuelve objetos Date
+      // 1. Obtener los RANGOS bloqueados
+      const blockedRanges = await obtenerFechasBloqueadasGlobales();
+
+      // 2. VALIDAR y almacenar los rangos DIRECTAMENTE
+      const validRanges = blockedRanges
+        .map(range => {
+          // Convertir a Date y validar
+          const inicio = new Date(range.inicio);
+          const fin = new Date(range.fin);
+          if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+            console.warn("[ReservaWizard] Rango inválido recibido:", range);
+            return null;
+          }
+          // Asegurarse que inicio <= fin (opcional, pero bueno)
+          if (inicio > fin) {
+              console.warn("[ReservaWizard] Rango con inicio > fin recibido:", range);
+              return null;
+          }
+          return { ...range, inicio, fin }; // Devolver con objetos Date
+        })
+        .filter(Boolean); // Filtrar nulos
+
+      console.log("[ReservaWizard] Rangos de Fechas Bloqueadas recibidos:", validRanges);
+      setOccupiedDateRangesState(validRanges || []); // Guardar los rangos válidos
       
     } catch (error) {
-      console.error('Excepción al obtener fechas ocupadas globales:', error);
+      console.error('Error cargando fechas bloqueadas globales:', error);
       toast.error('Error al cargar la disponibilidad del calendario.');
-      setOccupiedDates([]); // Resetear en caso de error
+      setOccupiedDateRangesState([]); // Resetear en caso de error
     } finally {
-      setLoadingOccupiedDates(false);
+      setLoadingFechasBloqueadas(false);
     }
-  }, []); // Dependencia vacía
+  // Asegúrate que obtenerFechasBloqueadasGlobales sea estable o quita la dependencia si es importado directamente
+  }, []); // Quitar dependencia si obtenerFechasBloqueadasGlobales es un import estático
 
-  // --- Efecto para cargar fechas ocupadas al inicio --- 
+  // --- Efecto para cargar fechas bloqueadas al inicio --- 
   useEffect(() => {
-    // Cargar fechas para los próximos 6 meses por defecto
-    const hoy = new Date();
-    const seisMesesDespues = new Date(hoy.getFullYear(), hoy.getMonth() + 6, hoy.getDate());
-    fetchGlobalOccupiedDates(hoy, seisMesesDespues);
-  }, [fetchGlobalOccupiedDates]); // Ejecutar al montar y si la función cambia (poco probable)
+    cargarFechasBloqueadas();
+  }, [cargarFechasBloqueadas]); // Ejecutar al montar
 
   // AÑADIDO: useEffect para resetear el formulario al montar el componente
   useEffect(() => {
@@ -214,51 +231,43 @@ const ReservaWizard = () => {
       return;
     }
     
-    // MODIFICADO: Validar rango de fechas contra fechas ocupadas GLOBALES
+    // MODIFICADO: Validar rango de fechas contra fechas bloqueadas GLOBALES
     if (currentStep === 2) {
       if (!formData.fechaInicio || !formData.fechaFin) {
         toast.error('Por favor, seleccione un rango de fechas para su evento');
         return;
       }
+      
+      // *** VALIDACIÓN CON RANGOS ***
+      const selectedStart = startOfDay(new Date(formData.fechaInicio + 'T00:00:00'));
+      const selectedEnd = endOfDay(new Date(formData.fechaFin + 'T00:00:00')); // Usar fin del día para incluirlo
+      
+      let isBlocked = false;
+      for (const blockedRange of occupiedDateRangesState) {
+          // Asegurar que tenemos fechas válidas en el rango bloqueado
+          const blockedStart = startOfDay(blockedRange.inicio);
+          const blockedEnd = endOfDay(blockedRange.fin);
+          if (!isValid(blockedStart) || !isValid(blockedEnd)) continue; // Saltar rango inválido
 
-      // Crear un set de fechas ocupadas GLOBALES (en formato YYYY-MM-DD para comparación fácil)
-      const occupiedSet = new Set(
-        occupiedDates.map(date => {
-          // Asegurarse de que 'date' sea un objeto Date válido
-          if (date instanceof Date && !isNaN(date.getTime())) {
-            return formatApiDate(date); // Usar helper
+          // Comprobar solapamiento: (StartA <= EndB) and (EndA >= StartB)
+          if (selectedStart <= blockedEnd && selectedEnd >= blockedStart) {
+              isBlocked = true;
+              const formattedBlockedStart = blockedStart.toLocaleDateString('es-ES');
+              const formattedBlockedEnd = blockedEnd.toLocaleDateString('es-ES');
+              toast.error(`El rango seleccionado (${selectedStart.toLocaleDateString('es-ES')} - ${selectedEnd.toLocaleDateString('es-ES')}) incluye fechas ya ocupadas (${formattedBlockedStart} - ${formattedBlockedEnd}).`);
+              break; // Salir del bucle si se encuentra un conflicto
           }
-          return null; // Ignorar fechas inválidas
-        }).filter(Boolean) // Filtrar nulos
-      );
-
-      // Iterar sobre el rango seleccionado por el usuario
-      let currentDate = new Date(formData.fechaInicio);
-      const endDate = new Date(formData.fechaFin);
-      currentDate.setHours(0, 0, 0, 0); // Normalizar hora para la comparación
-      endDate.setHours(0, 0, 0, 0); // Normalizar hora
-
-      let conflictFound = false;
-      while (currentDate <= endDate) {
-        const dateString = formatApiDate(currentDate);
-
-        if (occupiedSet.has(dateString)) {
-          toast.error(`Conflicto de fechas: El día ${dateString} no está disponible. Por favor, elija otro rango.`);
-          conflictFound = true;
-          break; // Salir del bucle al encontrar el primer conflicto
-        }
-        currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      if (conflictFound) {
-        return; // Detener si se encontró conflicto
+      if (isBlocked) {
+          return; // Detener si hay conflicto
       }
       
-      // Resto de validaciones del paso 2 (ej. número de habitaciones si aplica)
-      // if (!formData.numeroHabitaciones || formData.numeroHabitaciones < 1) {
-      //   toast.error('Por favor, indique el número de habitaciones');
-      //   return;
-      // }
+      // Si pasa la validación de fechas, continuar...
+      if (!formData.numeroHabitaciones || formData.numeroHabitaciones < 1) {
+        toast.error('Por favor, especifique el número de habitaciones (mínimo 1)');
+        return;
+      }  
     }
 
     // AÑADIDO: Validación para asegurar que se elija un modo en paso 3 antes de avanzar con 'Siguiente'
@@ -269,7 +278,7 @@ const ReservaWizard = () => {
     
     // Validación si modo organizador está seleccionado en paso 3 (Podrías añadir más validaciones aquí si ModoGestionHabitaciones lo requiere)
     if (currentStep === 3 && formData.modoGestionHabitaciones === 'usuario' && (!formData.habitacionesSeleccionadas || formData.habitacionesSeleccionadas.length === 0)) {
-       toast.warn('Se recomienda seleccionar al menos una habitación si gestiona usted mismo.');
+       toast.warning('Se recomienda seleccionar al menos una habitación si gestiona usted mismo.');
        // Permitimos avanzar pero con aviso, o podrías poner return; si es obligatorio.
     }
     
@@ -281,7 +290,7 @@ const ReservaWizard = () => {
 
     // Validación si modo organizador está seleccionado en paso 4
     if (currentStep === 4 && formData.modoGestionServicios === 'usuario' && (!formData.serviciosSeleccionados || formData.serviciosSeleccionados.length === 0)) {
-      toast.warn('No ha seleccionado ningún servicio adicional.');
+      toast.warning('No ha seleccionado ningún servicio adicional.');
       // Permitimos avanzar pero con aviso.
     }
     
@@ -323,16 +332,31 @@ const ReservaWizard = () => {
 
   // Añadido: Manejador para el cambio de rango de fechas
   const handleDateRangeChange = (dates) => {
-    console.log("[handleDateRangeChange] Fechas recibidas:", dates);
     const [start, end] = dates;
-    // Asegurarse de que las fechas sean válidas antes de actualizar
-    const startDate = start instanceof Date && !isNaN(start) ? start : null;
-    const endDate = end instanceof Date && !isNaN(end) ? end : null;
+    // Validar si el rango seleccionado contiene alguna fecha bloqueada
+    if (start && end) {
+      let current = new Date(start);
+      let conflict = false;
+      while (current <= end) {
+        if (occupiedDateRangesState.some(range => isSameDay(current, range.inicio) || isSameDay(current, range.fin))) {
+          conflict = true;
+          break;
+        }
+        current.setDate(current.getDate() + 1);
+      }
+      
+      if (conflict) {
+        toast.error('El rango seleccionado incluye días no disponibles. Por favor, elija otras fechas.');
+        // Opcional: resetear fechas si hay conflicto
+        // updateFormSection('fechaInicio', null);
+        // updateFormSection('fechaFin', null);
+        return; // No actualizar si hay conflicto
+      }
+    }
     
-    console.log("[handleDateRangeChange] Actualizando estado con:", { startDate, endDate });
-
-    updateFormSection('fechaInicio', startDate);
-    updateFormSection('fechaFin', endDate);
+    // Actualizar fechas en el contexto/estado global si no hay conflicto
+    updateFormSection('fechaInicio', start ? formatApiDate(start) : null);
+    updateFormSection('fechaFin', end ? formatApiDate(end) : null);
   };
 
   const handleServicesSelect = (servicios) => {
@@ -466,56 +490,41 @@ const ReservaWizard = () => {
       
       case 2:
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-            {/* Columna Izquierda: Calendario */}
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-[#D1B59B]">
-              <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Seleccione las fechas</h3>
-              <p className="text-[#8A6E52] mb-6 italic">Elija la fecha de inicio y fin de su evento.</p>
-              <CalendarioReserva 
-                occupiedDates={occupiedDates} // Pasar fechas ocupadas GLOBALES
-                loadingDates={loadingOccupiedDates} // Pasar estado de carga
-                onChange={handleDateRangeChange} // <- Nombre correcto
-                startDate={formData.fechaInicio} // <- Cambiado de initialStartDate
-                endDate={formData.fechaFin}       // <- Cambiado de initialEndDate
-                onMonthChange={(startDate, endDate) => fetchGlobalOccupiedDates(startDate, endDate)} // Recargar fechas globales al cambiar mes
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-800">Selecciona Fecha y Habitaciones</h3>
+            {/* Componente Calendario */}
+            <div>
+              <label htmlFor="date-range" className="block text-sm font-medium text-gray-700 mb-1">
+                Fecha del Evento
+              </label>
+              <CalendarioReserva
+                // Usar new Date() para asegurar que pasamos objetos Date
+                // Añadir T00:00:00 para evitar problemas de zona horaria al crear Date
+                startDate={formData.fechaInicio ? new Date(formData.fechaInicio + 'T00:00:00') : null}
+                endDate={formData.fechaFin ? new Date(formData.fechaFin + 'T00:00:00') : null}
+                onChange={handleDateRangeChange} // Usar el handler actualizado
+                occupiedDateRanges={occupiedDateRangesState} // <<< PROP CORRECTA CON RANGOS
+                loadingOccupiedDates={loadingFechasBloqueadas} // <<< Pasar el estado de carga
+                placeholderText="Seleccione inicio y fin del evento"
+                // No necesitamos onMonthChange aquí si no hacemos carga dinámica por mes
               />
-              {loadingOccupiedDates && <p className="text-sm text-gray-500 mt-2">Cargando disponibilidad...</p>}
-              {!loadingOccupiedDates && occupiedDates.length > 0 && 
-                <p className="text-sm text-gray-500 mt-2 italic">Los días marcados pueden no estar disponibles.</p>
-              }
             </div>
-            
-            {/* Columna Derecha: Input Número de Habitaciones */}
-            <div className="bg-white/80 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-[#D1B59B]">
-               <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">Número de Habitaciones</h3>
-               <p className="text-[#8A6E52] mb-6 italic">Indique cuántas habitaciones estima necesitar (7-14).</p>
-               <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <FaBed className="text-[#A5856A]" />
-                  </div>
-                  <input 
-                    type="number"
-                    min="7"
-                    max="14" // Límite máximo según la descripción
-                    value={formData.numeroHabitaciones || ''} 
-                    onChange={(e) => {
-                       const value = parseInt(e.target.value, 10);
-                       if (!isNaN(value) && value >= 1 && value <= 14) { // Validar rango aquí también
-                         updateFormSection('numeroHabitaciones', value);
-                       } else if (e.target.value === '') { // Permitir borrar
-                         updateFormSection('numeroHabitaciones', '');
-                       }
-                    }}
-                    className="w-full pl-10 p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm hover:shadow"
-                    placeholder="Ej. 10"
-                    required
-                  />
-               </div>
-               <p className="text-xs text-gray-500 mt-2">Se reservarán hasta 14 habitaciones estándar si selecciona la gestión por la Hacienda.</p>
-               {/* Mensaje de error si el número está fuera de rango */}
-               {(formData.numeroHabitaciones !== '' && (formData.numeroHabitaciones < 7 || formData.numeroHabitaciones > 14)) && (
-                 <p className="text-red-500 text-sm mt-2">Por favor, introduzca un número entre 7 y 14.</p>
-               )}
+            {/* Input Número de Habitaciones */}
+            <div>
+              <label htmlFor="numeroHabitaciones" className="block text-sm font-medium text-gray-700 mb-1">
+                Número de Habitaciones Estimadas
+              </label>
+              <input
+                type="number"
+                id="numeroHabitaciones"
+                name="numeroHabitaciones"
+                min="1" // Mínimo 1 habitación
+                value={formData.numeroHabitaciones || ''}
+                onChange={(e) => updateFormSection('numeroHabitaciones', parseInt(e.target.value, 10) || 1)} // Asegurar mínimo 1
+                className="w-full p-3 bg-white/80 backdrop-blur-sm border border-[#D1B59B] rounded-lg focus:ring-2 focus:ring-[#A5856A] focus:border-transparent transition-all duration-300 shadow-sm"
+                placeholder="Ej: 7"
+              />
+              <p className="text-xs text-gray-500 mt-1">Mínimo 7 habitaciones para reservar el salón. Puedes ajustar esto más tarde.</p>
             </div>
           </div>
         );

@@ -6,15 +6,15 @@ import apiClient from './apiClient';
  */
 export const getAllServicios = async () => {
   try {
-    const response = await apiClient.get('/servicios');
-    console.log('Respuesta API /servicios:', response); // Log para depurar
+    const response = await apiClient.get('/api/servicios');
+    console.log('Respuesta API /api/servicios:', response); // Log para depurar
 
     // El interceptor de apiClient usualmente ya devuelve { success, data } o lanza error
     // Si la respuesta directa del interceptor es lo que necesitamos:
     if (response && typeof response.success === 'boolean') {
        // Asegurarse de que data sea un array
        if (!Array.isArray(response.data)) {
-          console.warn('La propiedad data no es un array en la respuesta de /servicios:', response);
+          console.warn('La propiedad data no es un array en la respuesta de /api/servicios:', response);
           return { success: false, data: [], message: 'Formato de datos inesperado.' };
        }
        return response; // Devolver el objeto { success, data } directamente
@@ -22,11 +22,11 @@ export const getAllServicios = async () => {
     
     // Fallback por si la respuesta no viene formateada por el interceptor
     if (Array.isArray(response)) {
-      console.log('Respuesta de /servicios es un array, envolviendo...');
+      console.log('Respuesta de /api/servicios es un array, envolviendo...');
       return { success: true, data: response };
     }
 
-    console.warn('Formato de respuesta inesperado de /servicios:', response);
+    console.warn('Formato de respuesta inesperado de /api/servicios:', response);
     return { success: false, data: [], message: 'Formato de respuesta inesperado.' };
 
   } catch (error) {
@@ -47,11 +47,11 @@ export const getAllServicios = async () => {
  */
 export const getServicioById = async (id) => {
   try {
-    const response = await apiClient.get(`/servicios/${id}`);
+    const response = await apiClient.get(`/api/servicios/${id}`);
     if (response && typeof response.success === 'boolean') {
       return response; // Asumiendo que apiClient devuelve { success, data: objeto }
     }
-     console.warn(`Formato de respuesta inesperado para /servicios/${id}:`, response);
+     console.warn(`Formato de respuesta inesperado para /api/servicios/${id}:`, response);
      return { success: false, data: null, message: 'Formato de respuesta inesperado.' };
   } catch (error) {
     console.error(`Error en getServicioById ${id}:`, error.response || error);
@@ -70,10 +70,10 @@ export const getServicioById = async (id) => {
  */
 export const getServiciosPorEvento = async (tipoEvento) => {
   try {
-    const response = await apiClient.get(`/servicios/por-evento/${tipoEvento}`);
+    const response = await apiClient.get(`/api/servicios/por-evento/${tipoEvento}`);
      if (response && typeof response.success === 'boolean') {
         if (!Array.isArray(response.data)) {
-          console.warn('La propiedad data no es un array en la respuesta de /servicios/por-evento:', response);
+          console.warn('La propiedad data no es un array en la respuesta de /api/servicios/por-evento:', response);
           return { success: false, data: [], message: 'Formato de datos inesperado.' };
        }
        return response;
@@ -81,7 +81,7 @@ export const getServiciosPorEvento = async (tipoEvento) => {
      if (Array.isArray(response)) {
       return { success: true, data: response };
     }
-    console.warn(`Formato de respuesta inesperado para /servicios/por-evento/${tipoEvento}:`, response);
+    console.warn(`Formato de respuesta inesperado para /api/servicios/por-evento/${tipoEvento}:`, response);
     return { success: false, data: [], message: 'Formato de respuesta inesperado.' };
   } catch (error) {
     console.error(`Error en getServiciosPorEvento ${tipoEvento}:`, error.response || error);

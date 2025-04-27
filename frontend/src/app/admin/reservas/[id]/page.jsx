@@ -23,14 +23,19 @@ export default function DetalleReservaPage() {
       const response = await obtenerReservaEvento(id);
       console.log('[cargarReserva] Respuesta de obtenerReservaEvento:', response);
 
-      if (response.success && response.data) {
-        console.log("[cargarReserva] Datos recibidos (stringify):", JSON.stringify(response.data, null, 2));
-        console.log("[cargarReserva] Datos recibidos (objeto):", response.data);
-        setReserva(response.data);
-        setEditedReserva(response.data);
+      console.log('[cargarReserva] Respuesta de apiClient.get /api/reservas/habitaciones/:', response);
+
+      const reservaData = response?.data?.data || response?.data;
+      const success = response?.data?.success !== undefined ? response.data.success : (response.status >= 200 && response.status < 300);
+
+      if (success && reservaData) {
+        console.log("[cargarReserva] Datos recibidos (stringify):", JSON.stringify(reservaData, null, 2));
+        console.log("[cargarReserva] Datos recibidos (objeto):", reservaData);
+        setReserva(reservaData);
+        setEditedReserva(reservaData);
         console.log('[cargarReserva] Estado "reserva" y "editedReserva" establecidos.');
       } else {
-        const errorMessage = response.data?.message || response.message || 'No se pudo obtener la reserva o faltan datos.';
+        const errorMessage = reservaData?.message || response.message || 'No se pudo obtener la reserva o faltan datos.';
         toast.error('Error al cargar la reserva', {
           description: errorMessage
         });

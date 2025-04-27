@@ -11,7 +11,7 @@ const userService = {
   getAllUsers: async () => {
     try {
       // No se puede usar la cabecera Referer porque los navegadores no permiten modificarla manualmente
-      const response = await apiClient.get('/users', {
+      const response = await apiClient.get('/api/users', {
         params: {
           from_admin: true
         }
@@ -30,7 +30,7 @@ const userService = {
    */
   getSingleUser: async (id) => {
     try {
-      const response = await apiClient.get(`/users/${id}`, {
+      const response = await apiClient.get(`/api/users/${id}`, {
         params: {
           from_admin: true
         }
@@ -48,7 +48,7 @@ const userService = {
    */
   getMe: async () => {
     try {
-      const response = await apiClient.get('/users/me');
+      const response = await apiClient.get('/api/users/me');
       return response;
     } catch (error) {
       console.error('Error obteniendo perfil:', error);
@@ -64,7 +64,7 @@ const userService = {
    */
   updateUser: async (id, userData) => {
     try {
-      const response = await apiClient.put(`/users/${id}`, userData);
+      const response = await apiClient.put(`/api/users/${id}`, userData);
       return response;
     } catch (error) {
       console.error('Error al actualizar usuario:', error);
@@ -79,7 +79,7 @@ const userService = {
    */
   deleteUser: async (id) => {
     try {
-      const response = await apiClient.delete(`/users/${id}`, {
+      const response = await apiClient.delete(`/api/users/${id}`, {
         params: {
           from_admin: true
         }
@@ -94,7 +94,7 @@ const userService = {
   // Crear un nuevo usuario
   createUser: async (userData) => {
     try {
-      const response = await apiClient.post('/users', {
+      const response = await apiClient.post('/api/users', {
         ...userData,
         from_admin: true
       });
@@ -109,7 +109,7 @@ const userService = {
   updatePassword: async (userId, passwordData) => {
     try {
       const response = await apiClient.put(
-        `/users/${userId}/password`,
+        `/api/users/${userId}/password`,
         passwordData
       );
       return response;
@@ -122,7 +122,7 @@ const userService = {
   // Obtener un usuario específico
   getUser: async (userId) => {
     try {
-      const response = await apiClient.get(`/users/${userId}`, {
+      const response = await apiClient.get(`/api/users/${userId}`, {
         params: {
           from_admin: true
         }

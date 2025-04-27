@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useReservation } from '@/context/ReservationContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FaSpinner, FaSearch, FaFilter, FaCalendarAlt, FaExclamationTriangle, FaUserCircle } from 'react-icons/fa';
 import { toast } from 'sonner';
 import TablaReservaciones from '@/components/admin/TablaReservaciones';
@@ -66,7 +66,10 @@ const getLetraHabitacion = (reserva) => {
 // <<< FIN FUNCION getLetraHabitacion MOVIDA AFUERA >>>
 
 export default function ReservacionesPage() {
+  console.log('%c[ReservacionesPage] Component Mounted/Re-rendered', 'color: green; font-weight: bold;');
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get('highlightId');
   const { isAuthenticated, isAdmin, loading: authLoading, user } = useAuth();
   const { 
     reservations,
@@ -87,6 +90,18 @@ export default function ReservacionesPage() {
           loading: reservationsLoading,
           error
         });
+        // <<< INICIO LOG DETALLADO habitacionReservations >>>
+        if (habitacionReservations && habitacionReservations.length > 0) {
+            console.log('%c[ReservacionesPage] Inspección detallada habitacionReservations (primeras 5):', 'color: cyan;', 
+                habitacionReservations.slice(0, 5).map(res => ({ 
+                    id: res._id, 
+                    habitacionField: res.habitacion, // Valor original del campo habitacion
+                    habitacionDetails: res.habitacionDetails, // Detalles poblados
+                    letraHabitacionField: res.letraHabitacion // Campo directo si existe
+                }))
+            );
+        }
+        // <<< FIN LOG DETALLADO habitacionReservations >>>
     }
   }, [habitacionReservations, eventoReservations, reservationsLoading, error]);
 
@@ -127,7 +142,7 @@ export default function ReservacionesPage() {
 
     // --- Log para inspeccionar eventoReservations y sus servicios --- 
     if (eventoReservations && eventoReservations.length > 0) {
-      console.log('[Debug Filtro] Primer evento:', eventoReservations[0]);
+      console.log('[Debug Filtro] Primer elemento en lista de eventos (antes de combinar):', eventoReservations[0]);
       if (eventoReservations[0].serviciosAdicionales && eventoReservations[0].serviciosAdicionales.length > 0) {
         console.log('[Debug Filtro] Primer servicio del primer evento:', eventoReservations[0].serviciosAdicionales[0]);
       }
@@ -144,81 +159,84 @@ export default function ReservacionesPage() {
     // Combinar eventos y TODAS las habitaciones
     const allReservations = [
       ...eventoReservations.map(res => {
+        // <<< Añadir verificación si tipoEventoDetails existe >>>
+        const nombreTipoEvento = res.tipoEventoDetails?.titulo || 'Tipo Desconocido';
+        const nombreFinalEvento = nombreTipoEvento || res.nombreEvento || 'Evento Desconocido';
+        const nombreCliente = `${res.nombreContacto || ''} ${res.apellidosContacto || ''}`.trim() || res.usuario?.nombre || 'No especificado';
+
         return {
           ...res,
           tipo: 'evento',
-          fechaMostrada: res.fecha,
-          clientePrincipal: res.nombreContacto || res.usuario?.nombre || 'No especificado',
-          nombreMostrado: `Evento: ${res.nombreEvento || 'Sin nombre'}`,
+          fechaMostrada: res.fecha, // Usar fecha del evento
+          clientePrincipal: nombreCliente, // Cliente del evento
+          nombreMostrado: `Evento: ${nombreFinalEvento}`, // Nombre del evento/tipo
           uniqueId: `evento_${res._id || res.id}`,
         };
       }),
       ...habitacionReservations.map(res => {
         const habId = (res._id || res.id)?.toString();
+        // <<< INICIO LOG DENTRO DEL MAP >>>
+        console.log(`%c[applyFilters-Hab MAP] Procesando reserva ID: ${habId}`, 'color: orange;', JSON.parse(JSON.stringify(res))); 
+        // <<< FIN LOG DENTRO DEL MAP >>>
+
         let asociada = false;
         let eventoEncontrado = null;
         
-        // LOG: Verificar si la habitación tiene referencia a evento
-        console.log(`[applyFilters-Hab] Habitación ID: ${habId}, reservaEvento ID: ${res.reservaEvento}`);
-        
         if (res.reservaEvento) { 
-           // --- CORREGIDO: Extraer ID si res.reservaEvento es un objeto --- 
            const eventoIdDeHabitacion = typeof res.reservaEvento === 'object' && res.reservaEvento !== null
              ? String(res.reservaEvento._id || res.reservaEvento.id)
              : String(res.reservaEvento);
-           // -------------------------------------------------------------
-
            eventoEncontrado = eventoReservations.find(evento => 
-                // Comparar IDs como strings
                 String(evento._id || evento.id) === eventoIdDeHabitacion
            );
            asociada = !!eventoEncontrado;
-           // LOG: Resultado de la búsqueda del evento asociado
-           if (asociada) {
-               console.log(`[applyFilters-Hab] Evento asociado ENCONTRADO para hab ${habId}:`, eventoEncontrado);
-           } else {
-               // --- LOG MEJORADO: Mostrar el ID que se buscó --- 
-               console.warn(`[applyFilters-Hab] Evento asociado NO ENCONTRADO para hab ${habId} con ID evento buscado: ${eventoIdDeHabitacion}`);
-               // ---------------------------------------------
-           }
-        } else {
-            // LOG: No hay referencia a evento
-            console.log(`[applyFilters-Hab] Habitación ID: ${habId} no tiene reservaEvento.`);
         }
         
-        const letra = getLetraHabitacion(res);
-        // <<< INICIO LOG ASIGNADOA HABITACION >>>
-        console.log(`[applyFilters-Hab] Procesando hab ${habId}, Asociada: ${asociada}, Asignado a (raw):`, res.asignadoA);
-        // <<< FIN LOG ASIGNADOA HABITACION >>>
-        const letraMostrada = letra === '?' ? 'N/A' : letra;
-        const primerHuesped = res.infoHuespedes?.nombres?.[0] || res.nombreHuespedes || res.huesped?.nombre;
-        const clienteFinal = primerHuesped || res.huesped?.email || res.email || 'No especificado';
-        let nombreTipo = `Habitación ${letraMostrada}`;
+        // --- Lógica Corregida para obtener la letra --- 
+        // Priorizar los detalles poblados por el backend/servicio
+        let letra = res.habitacionDetails?.letra || '?'; 
+        // <<< LOG VALOR INICIAL LETRA >>>
+        console.log(`[applyFilters-Hab LETRA ${habId}] Letra inicial (de habitacionDetails): ${letra}`);
+
+        // Si no hay detalles o letra en detalles, intentar con el helper como fallback (aunque no debería ser necesario)
+        if (letra === '?') {
+            let letraFallback = getLetraHabitacion(res); // Fallback a la función original
+            // <<< LOG VALOR FALLBACK LETRA >>>
+            console.log(`[applyFilters-Hab LETRA ${habId}] Letra fallback (de getLetraHabitacion): ${letraFallback}`);
+            letra = letraFallback;
+        }
+        // --- Fin Lógica Corregida ---
         
-        // LOG: Antes de añadir nombre de evento
-        console.log(`[applyFilters-Hab] Nombre base para hab ${habId}: ${nombreTipo}, asociada: ${asociada}`);
+        const letraMostrada = letra === '?' ? 'N/A' : letra.toUpperCase(); // Asegurar mayúscula
+        // <<< LOG LETRA FINAL >>>
+        console.log(`[applyFilters-Hab LETRA ${habId}] Letra final a mostrar (después de N/A): ${letraMostrada}`);
+
+        const clienteFinal = `${res.nombreContacto || ''} ${res.apellidosContacto || ''}`.trim() || 
+                             (res.huesped ? `${res.huesped.nombre || ''} ${res.huesped.apellidos || ''}`.trim() : '') || 
+                             'No especificado';
+        let nombreTipo = `Habitación ${letraMostrada}`;
         
         if (asociada && eventoEncontrado) {
           const nombreEventoAsociado = eventoEncontrado.nombreEvento || 'Sin nombre';
           nombreTipo += ` (Evento: ${nombreEventoAsociado})`;
-          // LOG: Nombre final con evento
-          console.log(`[applyFilters-Hab] Nombre final para hab ${habId}: ${nombreTipo}`);
         }
         
         return {
           ...res,
           tipo: 'habitacion',
-          fechaMostrada: res.fechaEntrada,
-          clientePrincipal: clienteFinal,
-          nombreMostrado: nombreTipo,
-          asociadaAEvento: asociada,
-          letraHabitacionReal: letra,
+          fechaMostrada: res.fechaEntrada, 
+          clientePrincipal: clienteFinal, 
+          nombreMostrado: nombreTipo, // Usar el nombre calculado con la letra correcta
+          asociadaAEvento: asociada, 
+          letraHabitacionReal: letra, // Guardar la letra encontrada
           uniqueId: `habitacion_${habId}`,
-          // Pasar el nombre del evento asociado si se encontró
-          nombreEventoAsociado: asociada && eventoEncontrado ? (eventoEncontrado.nombreEvento || 'Sin nombre') : null
+          nombreEventoAsociado: asociada && eventoEncontrado ? (eventoEncontrado.nombreEvento || 'Sin nombre') : null 
         };
       })
     ];
+
+    // <<< LOG 1: Después de combinar >>>
+    console.log('[applyFiltersAndSort] Reservas combinadas (primeros 5):', allReservations.slice(0, 5));
 
     console.log('Reservas combinadas:', allReservations.length);
 
@@ -288,6 +306,9 @@ export default function ReservacionesPage() {
 
       return sortConfig.direction === 'asc' ? comparison : comparison * -1;
     });
+
+    // <<< LOG 2: Antes de setFilteredReservations >>>
+    console.log('[applyFiltersAndSort] Reservas filtradas y ordenadas FINAL (primeros 5):', filtered.slice(0, 5));
 
     setFilteredReservations(filtered);
     console.log('Reservaciones filtradas y ordenadas:', filtered.length);
@@ -448,30 +469,57 @@ export default function ReservacionesPage() {
   // Efecto para cargar datos iniciales
   useEffect(() => {
     const initializeData = async () => {
-      if (!authLoading && isAuthenticated && !initialLoadDone) {
-        try {
-          setIsLoading(true);
-          await loadAllReservations();
+      console.log('%c[ReservacionesPage] InitializeData START', 'color: orange;');
+      setIsLoading(true);
+      try {
+        // Forzar recarga completa al montar si no se ha hecho
+        if (!initialLoadDone) {
+          await loadAllReservations(true); 
           await loadUsers();
-          setInitialLoadDone(true);
-        } catch (error) {
-          console.error('Error al cargar las reservaciones:', error);
-          toast.error('Error al cargar las reservaciones');
-        } finally {
-          setIsLoading(false);
+          setInitialLoadDone(true); // Marcar como hecho
+        } else {
+          // Si ya se hizo la carga inicial, solo aplicar filtros
+          applyFiltersAndSort(); 
         }
+        console.log('%c[ReservacionesPage] InitializeData END - Success', 'color: orange;');
+      } catch (err) {
+        console.error('Error en InitializeData:', err);
+        setError(err.message || 'Error cargando datos iniciales.'); // Usar setError del contexto
+        toast.error('Error cargando datos iniciales.');
+        console.log('%c[ReservacionesPage] InitializeData END - Error', 'color: red;');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    initializeData();
-  }, [authLoading, isAuthenticated, initialLoadDone, loadAllReservations, loadUsers]);
+    if (!authLoading && isAuthenticated && isAdmin) {
+      console.log('%c[ReservacionesPage] Auth ready, calling InitializeData...', 'color: orange;');
+      initializeData();
+    } else if (!authLoading && !isAuthenticated) {
+      console.log('%c[ReservacionesPage] Not authenticated, redirecting to login', 'color: orange;');
+      router.push('/admin/login');
+    }
+    // Dependencias: authLoading, isAuthenticated, isAdmin, loadAllReservations, loadUsers, applyFiltersAndSort, initialLoadDone
+  }, [authLoading, isAuthenticated, isAdmin, loadAllReservations, loadUsers, router, applyFiltersAndSort, initialLoadDone]); // <-- Añadir dependencias
 
-  // Efecto para aplicar filtros cuando cambian los datos o los filtros
+  // Efecto para aplicar filtros cuando cambian las dependencias
   useEffect(() => {
-    if (initialLoadDone) {
+    // Solo aplicar si la carga inicial ya terminó
+    if (initialLoadDone && !reservationsLoading) {
+      console.log('%c[ReservacionesPage] Dependencies changed, applying filters...', 'color: purple;');
       applyFiltersAndSort();
     }
-  }, [initialLoadDone, habitacionReservations, eventoReservations, searchTerm, filterStatus, filterType, filterUsuario, sortConfig, applyFiltersAndSort]);
+  }, [
+    reservations, // <- Usar la lista combinada del contexto
+    searchTerm,
+    filterStatus,
+    filterType,
+    filterUsuario,
+    sortConfig,
+    initialLoadDone, 
+    reservationsLoading, // Añadir para evitar aplicar filtros mientras carga
+    applyFiltersAndSort // Incluir la función de filtrado como dependencia
+  ]);
 
   // Efecto para redirigir si no está autenticado
   useEffect(() => {
@@ -498,10 +546,11 @@ export default function ReservacionesPage() {
   };
 
   const handleSort = (key) => {
-    setSortConfig(prevConfig => ({
-      key,
-      direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
-    }));
+    let direction = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
   };
 
   // --- INICIO: Funciones Handler para acciones --- 
@@ -543,8 +592,8 @@ export default function ReservacionesPage() {
     });
   }, [loadAllReservations, showConfirmation]);
 
-  const handleChangeReservationStatus = useCallback((tipo, id, newStatus) => {
-    if (!id || !newStatus) {
+  const handleChangeReservationStatus = useCallback((id, nuevoEstado, tipo) => {
+    if (!id || !nuevoEstado) {
       toast.error('Datos inválidos para actualizar estado.');
       return;
     }
@@ -557,9 +606,9 @@ export default function ReservacionesPage() {
       // Añadir otros estados si es necesario
     };
     
-    const config = statusConfig[newStatus.toLowerCase()];
+    const config = statusConfig[nuevoEstado.toLowerCase()];
     if (!config) {
-        toast.error(`Estado objetivo desconocido: ${newStatus}`);
+        toast.error(`Estado objetivo desconocido: ${nuevoEstado}`);
         return;
     }
 
@@ -572,16 +621,16 @@ export default function ReservacionesPage() {
         setIsLoading(true);
         try {
           let response;
-          const payload = { estadoReserva: newStatus.toLowerCase() };
+          const data = { estadoReserva: nuevoEstado };
           
           if (tipo === 'evento') {
-            response = await updateEventoReservation(id, payload);
+            response = await updateEventoReservation(id, data);
           } else { // tipo === 'habitacion'
-            response = await updateHabitacionReservation(id, payload);
+            response = await updateHabitacionReservation(id, data);
           }
 
           if (response && response.success) {
-            toast.success(`Estado de la reserva actualizado a ${newStatus}`);
+            toast.success(`Estado de la reserva actualizado a ${nuevoEstado}`);
             await loadAllReservations();
           } else {
             throw new Error(response?.message || 'Error al actualizar estado'); 
@@ -597,6 +646,63 @@ export default function ReservacionesPage() {
   }, [loadAllReservations, showConfirmation]);
 
   // --- FIN: Nuevas funciones Handler para acciones ---
+
+  // --- NUEVAS FUNCIONES HANDLER PARA ESTADOS ---
+  const handleUpdateStatus = useCallback(async (id, tipo, nuevoEstado) => {
+    console.log(`Intentando actualizar estado a ${nuevoEstado} para ${tipo} ID: ${id}`);
+    const esEvento = tipo === 'evento';
+    const updateFunction = esEvento ? updateEventoReservation : updateHabitacionReservation;
+    const successMessage = `Reserva (${tipo}) ${id} actualizada a ${nuevoEstado}.`;
+    const errorMessage = `Error al actualizar estado de reserva (${tipo}) ${id} a ${nuevoEstado}.`;
+
+    try {
+      setIsLoading(true); // Indicar carga durante la actualización
+      const response = await updateFunction(id, { estadoReserva: nuevoEstado });
+      if (response && (response.success || response.data)) { // Verificar éxito
+        toast.success(successMessage);
+        await loadAllReservations(true); // Recargar datos forzando refresh
+      } else {
+        throw new Error(response?.message || errorMessage);
+      }
+    } catch (error) {
+      console.error(errorMessage, error);
+      toast.error(`${errorMessage}: ${error.message || 'Error desconocido'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [loadAllReservations]);
+
+  const handleConfirmarReserva = useCallback((id, tipo) => {
+    showConfirmation({
+      title: `Confirmar Reserva (${tipo})`,
+      message: `¿Estás seguro de que quieres marcar esta reserva (${tipo} ID: ${id}) como confirmada?`,
+      iconType: 'confirm',
+      confirmText: 'Sí, confirmar',
+      onConfirm: () => handleUpdateStatus(id, tipo, 'confirmada'),
+    });
+  }, [showConfirmation, handleUpdateStatus]);
+
+  const handleCancelarReserva = useCallback((id, tipo) => {
+    showConfirmation({
+      title: `Cancelar Reserva (${tipo})`,
+      message: `¿Estás seguro de que quieres cancelar esta reserva (${tipo} ID: ${id})? Esta acción podría ser irreversible.`,
+      iconType: 'danger',
+      confirmText: 'Sí, cancelar',
+      onConfirm: () => handleUpdateStatus(id, tipo, 'cancelada'),
+    });
+  }, [showConfirmation, handleUpdateStatus]);
+
+  const handleMarcarPendiente = useCallback((id, tipo) => {
+    showConfirmation({
+      title: `Marcar Pendiente (${tipo})`,
+      message: `¿Estás seguro de que quieres marcar esta reserva (${tipo} ID: ${id}) como pendiente?`,
+      iconType: 'info',
+      confirmText: 'Sí, marcar pendiente',
+      onConfirm: () => handleUpdateStatus(id, tipo, 'pendiente'),
+    });
+  }, [showConfirmation, handleUpdateStatus]);
+
+  // --- FIN NUEVAS FUNCIONES HANDLER ---
 
   // Manejo de estados de carga
   if (authLoading || (isLoading && !initialLoadDone)) {
@@ -696,6 +802,10 @@ export default function ReservacionesPage() {
         </div>
 
         {/* Tabla de reservaciones */}
+        {/* Log General */}
+        {console.log('[ReservacionesPage RENDER] Pasando filteredReservations a TablaReservaciones (primeros 5 generales):', filteredReservations.slice(0, 5).map(r => ({ id: r?._id, uniqueId: r?.uniqueId, tipo: r?.tipo })))} 
+        {/* Log Específico Habitaciones */}
+        {console.log('%c[ReservacionesPage RENDER] Verificando IDs de HABITACIONES pasadas a Tabla (primeras 5):', 'color: purple; font-weight: bold;', filteredReservations.filter(r => r.tipo === 'habitacion').slice(0, 5).map(r => ({ id: r?._id, uniqueId: r?.uniqueId, tipo: r?.tipo, fecha: r?.fechaMostrada, cliente: r?.clientePrincipal })))} 
         <TablaReservaciones
           reservations={filteredReservations}
           onSort={handleSort}
@@ -703,9 +813,13 @@ export default function ReservacionesPage() {
           isLoading={isLoading || reservationsLoading}
           usuarios={usuarios}
           onDelete={handleDeleteReservation}
-          onChangeStatus={handleChangeReservationStatus}
+          onConfirmar={handleConfirmarReserva}
+          onCancelar={handleCancelarReserva}
+          onMarcarPendiente={handleMarcarPendiente}
           onAssign={handleAsignar}
           onUnassign={handleDesasignar}
+          user={user}
+          highlightId={highlightId}
         />
 
         {/* Mensaje cuando no hay resultados para los filtros aplicados */}

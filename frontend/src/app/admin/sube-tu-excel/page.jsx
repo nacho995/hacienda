@@ -3,6 +3,7 @@
 import { useState } from 'react';
 // Importar la librería para leer Excel
 import * as XLSX from 'xlsx'; 
+import { useAuth } from '@/context/AuthContext';
 
 // Componente para mostrar la tabla de errores
 function ErrorTable({ errors, type }) {
@@ -54,17 +55,22 @@ function ErrorTable({ errors, type }) {
 }
 
 export default function SubeTuExcelPage() {
+  const { token } = useAuth();
   const [selectedFile, setSelectedFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [uploadResult, setUploadResult] = useState(null); // Para guardar el resumen y errores
-  const [currentTask, setCurrentTask] = useState(''); // Para mostrar qué se está haciendo
+  const [uploadResult, setUploadResult] = useState(null);
+  const [currentTask, setCurrentTask] = useState('');
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalErrorData, setModalErrorData] = useState([]);
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
     setMessage('');
-    setUploadResult(null); // Limpiar resultados anteriores
+    setUploadResult(null);
     setCurrentTask('');
+    setShowErrorModal(false);
+    setModalErrorData([]);
   };
 
   const handleUpload = async () => {
@@ -77,6 +83,8 @@ export default function SubeTuExcelPage() {
     setIsLoading(true);
     setUploadResult(null);
     setMessage('');
+    setShowErrorModal(false);
+    setModalErrorData([]);
 
     try {
       setCurrentTask('Leyendo archivo Excel...');
@@ -87,26 +95,40 @@ export default function SubeTuExcelPage() {
       const result = await sendDataToBackend(data);
       console.log('Respuesta del servidor:', result);
       
-      setUploadResult(result); // Guardar resultado para mostrar resumen/errores
+      setUploadResult(result);
 
-      // Determinar mensaje final basado en errores
-      if (result.errors?.rooms?.length > 0 || result.errors?.events?.length > 0) {
-          setMessage('Proceso completado con errores. Revisa los detalles abajo.');
+      // Combinar errores para el modal
+      const allErrors = [];
+      if (result.errors?.rooms?.length > 0) {
+        result.errors.rooms.forEach(err => allErrors.push({ ...err, type: 'Habitación' }));
+      }
+      if (result.errors?.events?.length > 0) {
+         result.errors.events.forEach(err => allErrors.push({ ...err, type: 'Evento' }));
+      }
+
+      // Determinar mensaje final y mostrar modal si hay errores
+      if (allErrors.length > 0) {
+          setMessage(`Error: Se encontraron ${allErrors.length} errores durante la importación. Ningún dato fue guardado.`);
+          setModalErrorData(allErrors);
+          setShowErrorModal(true);
       } else {
           setMessage('¡Archivo procesado y datos subidos con éxito!');
       }
       
-      setSelectedFile(null); // Opcional: Limpiar selección después de procesar
+      setSelectedFile(null);
 
     } catch (error) {
       console.error('Error en el proceso de carga:', error);
-      // Si el error viene del fetch y tiene una estructura específica
-      if (error.responseJson && error.responseJson.message) {
-        setMessage(`Error: ${error.responseJson.message}`);
-        setUploadResult(error.responseJson); // Mostrar resumen/errores aunque falle la transacción
+      if (error.responseJson && (error.responseJson.errors?.rooms?.length > 0 || error.responseJson.errors?.events?.length > 0)) {
+          const allErrors = [];
+          error.responseJson.errors.rooms?.forEach(err => allErrors.push({ ...err, type: 'Habitación' }));
+          error.responseJson.errors.events?.forEach(err => allErrors.push({ ...err, type: 'Evento' }));
+          setModalErrorData(allErrors);
+          setShowErrorModal(true);
+          setMessage(`Error: ${error.responseJson.message || 'Ocurrió un error con errores detallados.'}`);
       } else {
-        setMessage(`Error: ${error.message || 'Ocurrió un error inesperado.'}`);
-        setUploadResult(null);
+          setMessage(`Error: ${error.message || 'Ocurrió un error inesperado.'}`);
+          setUploadResult(null);
       }
     } finally {
       setIsLoading(false);
@@ -177,14 +199,18 @@ export default function SubeTuExcelPage() {
 
   // Función para enviar datos al backend
   const sendDataToBackend = async (data) => {
+    if (!token) {
+      throw new Error('No estás autenticado. Por favor, inicia sesión.');
+    }
     try {
-      const response = await fetch('/api/admin/bulk-upload', { 
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}` 
+      };
+
+      const response = await fetch('http://localhost:3001/api/admin/bulk-upload', { 
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Incluir token de autorización si es necesario
-          // 'Authorization': `Bearer ${your_auth_token}` 
-        },
+        headers: headers,
         body: JSON.stringify(data),
       });
 
@@ -216,9 +242,14 @@ export default function SubeTuExcelPage() {
       <h1 className="text-3xl font-bold mb-6 text-[var(--color-brown-dark)]">Subir Datos de Reservas desde Excel</h1>
       
       <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
-        <p className="mb-4 text-gray-700">
-          Selecciona un archivo Excel (.xlsx, .xls) que contenga las hojas 'Habitaciones' y 'Eventos' con los datos de las reservas.
+        <p className="mb-4 text-gray-700 text-sm leading-relaxed">
+          Selecciona un archivo Excel (.xlsx, .xls) con dos hojas obligatorias: <strong>'Habitaciones'</strong> y <strong>'Eventos'</strong>.
         </p>
+        <ul className="list-disc list-inside space-y-2 mb-4 text-sm text-gray-600">
+            <li>La hoja <strong>'Habitaciones'</strong> debe contener únicamente reservas de habitaciones de hotel <strong>independientes</strong> (que NO forman parte de un evento listado en la otra hoja).</li>
+            <li>La hoja <strong>'Eventos'</strong> es para registrar los eventos principales. Si un evento incluye habitaciones reservadas como parte del paquete (ej: habitaciones 7 a 14 para una boda), debes especificar las letras de esas habitaciones en la columna <strong>'Habitación'</strong> de la fila del evento correspondiente (separadas por comas si son varias, ej: "F, G, H"). <strong>No añadas estas habitaciones de evento a la hoja 'Habitaciones'.</strong></li>
+            <li>El sistema creará automáticamente las reservas para las habitaciones especificadas en la hoja 'Eventos' y las <strong>enlazará</strong> al evento principal. Esto permite gestionarlas conjuntamente (ej: asignar el evento completo a un administrador).</li>
+        </ul>
         
         <div className="mb-4">
           <label htmlFor="excel-upload" className="block text-sm font-medium text-gray-700 mb-2">
@@ -300,105 +331,140 @@ export default function SubeTuExcelPage() {
           </>
       )}
 
-      {/* Instrucciones Actualizadas */} 
+      {/* Instrucciones Simplificadas */} 
       <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 shadow-sm">
-        {/* === INICIO NUEVO TEXTO INSTRUCCIONES === */}
-        <h2 className="font-semibold mb-3 text-lg text-blue-900">¡Prepara tu Archivo Excel Fácilmente!</h2>
+        <h2 className="font-semibold mb-3 text-lg text-blue-900">Cómo Preparar tu Excel para Subirlo</h2>
 
-        <p className="mb-4 text-sm">Sigue estos pasos para asegurarte de que tu archivo Excel se cargue sin problemas:</p>
+        <p className="mb-4 text-sm">Sigue estos 3 pasos clave para que tu archivo Excel funcione aquí:</p>
 
-        <div className="space-y-4 text-sm">
+        <div className="space-y-5 text-sm">
+          {/* PASO 1: Nombres de Hojas */}
           <div>
-            <strong className="text-blue-800">1. Dos Hojas Obligatorias:</strong>
-            <ul className="list-disc list-inside ml-4 mt-1">
-              <li>Tu archivo Excel debe tener exactamente dos hojas.</li>
-              <li>La primera hoja DEBE llamarse <code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Habitaciones</code> (¡con la H mayúscula!).</li>
-              <li>La segunda hoja DEBE llamarse <code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Eventos</code> (¡con la E mayúscula!).</li>
+            <strong className="text-blue-800 block mb-1"><span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-full w-5 h-5 mr-2 text-xs font-bold">1</span>Nombres de las Hojas:</strong>
+            <p className="ml-7">Tu archivo Excel DEBE tener exactamente dos hojas. Ni más, ni menos.</p>
+            <ul className="list-none ml-7 mt-1 space-y-1">
+              <li>➡️ La primera hoja tiene que llamarse <strong className="font-semibold">Habitaciones</strong> (¡Ojo con la H mayúscula!)</li>
+              <li>➡️ La segunda hoja tiene que llamarse <strong className="font-semibold">Eventos</strong> (¡Ojo con la E mayúscula!)</li>
             </ul>
+             <p className="ml-7 mt-1 text-xs text-gray-600">Si los nombres no son EXACTOS, no funcionará.</p>
           </div>
 
+          {/* PASO 2: Encabezados */}
           <div>
-            <strong className="text-blue-800">2. Encabezados Exactos (¡Muy Importante!):</strong>
-            <p className="mt-1">La primera fila de cada hoja debe tener los títulos de columna EXACTAMENTE como se muestran a continuación. Copia y pega si es necesario. El orden no importa, pero los nombres sí.</p>
+            <strong className="text-blue-800 block mb-1"><span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-full w-5 h-5 mr-2 text-xs font-bold">2</span>Títulos de Columna (Encabezados):</strong>
+            <p className="ml-7">La <strong className="font-semibold">primera fila</strong> de cada hoja debe contener los títulos EXACTOS de las columnas que te indicamos abajo. ¡No cambies ni una letra!</p>
+            <p className="ml-7 mt-1 text-xs text-gray-600">Puedes copiar y pegar los nombres para no equivocarte. El orden de las columnas no importa.</p>
           </div>
 
+          {/* PASO 3: Contenido */}
           <div>
-            <strong className="text-blue-800">3. Columnas para la Hoja "Habitaciones":</strong>
-            <ul className="list-disc list-inside ml-4 mt-1 columns-1 sm:columns-2 gap-x-6">
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Habitación</code> (Texto, ej: "Doble 1") - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Tipo Habitación</code> (Texto, ej: "Doble Estándar") - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Fecha Entrada</code> (Fecha, ej: 01/12/2024) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Fecha Salida</code> (Fecha, posterior a Entrada) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Precio Total</code> (Número, ej: 250.50) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Nombre Contacto</code> (Texto) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Apellidos Contacto</code> (Texto) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Email Contacto</code> (Email) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Teléfono Contacto</code> (Texto/Número) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Fecha Reserva</code> (Fecha) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Método Pago</code> (Texto: 'efectivo', 'tarjeta', 'transferencia', 'pendiente') - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Estado Pago</code> (Texto: 'pendiente', 'procesando', 'completado', 'fallido', 'reembolsado') - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Estado Reserva</code> (Texto: 'pendiente', 'confirmada', 'cancelada', 'completada') - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Tipo Reserva</code> (Texto: 'hotel' o 'evento') - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Categoría</code> (Texto: 'sencilla' o 'doble') - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Num Hab</code> (Número &ge; 1) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Huéspedes</code> (Número &ge; 1) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Nombre Huéspedes</code> (Texto) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Notas</code> (Texto) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Precio Noche</code> (Número) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Letra Hab</code> (Texto) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Num Confirmación Hab</code> (Texto) - Opcional</li>
-            </ul>
-            <p className="mt-1 text-xs text-gray-600">Las columnas marcadas como <span className="font-semibold">Requerido</span> deben tener SIEMPRE un valor en cada fila.</p>
+             <strong className="text-blue-800 block mb-1"><span className="inline-flex items-center justify-center bg-blue-600 text-white rounded-full w-5 h-5 mr-2 text-xs font-bold">3</span>Contenido de las Columnas:</strong>
+             <div className="ml-7 mt-2 space-y-4">
+                {/* Habitaciones */}
+                <div>
+                    <p className="font-medium text-blue-700 mb-1">Hoja "Habitaciones":</p>
+                    {/* Usar columns-1 sm:columns-2 para mejor distribución en pantallas anchas */}
+                    <ul className="list-disc list-inside space-y-1 columns-1 sm:columns-2 gap-x-6">
+                      {/* Obligatorios */}
+                      <li><strong className="font-semibold">Habitación</strong> (Texto - La LETRA exacta: A, B, K, etc.) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                      <li><strong className="font-semibold">Tipo Habitación</strong> (Texto - Nombre descriptivo, ej: "Sencilla", "Doble", "Doble con balcón") - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                      <li><strong className="font-semibold">Fecha Entrada</strong> (Fecha - ej: 01/12/2024) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                      <li><strong className="font-semibold">Fecha Salida</strong> (Fecha - posterior a Entrada) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                      <li><strong className="font-semibold">Precio Total</strong> (Número - ej: 250.50) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                      {/* Opcionales */}
+                      <li>Nombre Contacto (Texto) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Apellidos Contacto (Texto) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Email Contacto (Email - ej: mail@ejemplo.com) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Teléfono Contacto (Texto o Número) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Fecha Reserva (Fecha) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Método Pago (Texto - 'efectivo', 'tarjeta', etc.) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Estado Pago (Texto - 'pendiente', 'completado', etc.) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Estado Reserva (Texto - 'pendiente', 'confirmada', etc.) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Categoría (Texto - 'sencilla' o 'doble'. Usado para filtros internos) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Huéspedes (Número - ej: 2) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Nombre Huéspedes (Texto - nombres completos) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Notas (Texto - cualquier detalle extra) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Precio Noche (Número - ej: 120.50) - <span className="text-gray-500">Opcional</span></li>
+                      <li>Num Confirmación Hab (Texto - código de confirmación) - <span className="text-gray-500">Opcional</span></li>
+                    </ul>
+                    <p className="mt-1 text-xs text-gray-600">(<span className="text-red-600 font-medium">Obligatorio</span> significa que la casilla NO puede estar vacía).</p>
+                </div>
+                {/* Eventos */}
+                <div>
+                    <p className="font-medium text-blue-700 mb-1">Hoja "Eventos":</p>
+                    {/* Usar columns-1 sm:columns-2 para mejor distribución */}
+                     <ul className="list-disc list-inside space-y-1 columns-1 sm:columns-2 gap-x-6">
+                        {/* Obligatorios */}
+                        <li><strong className="font-semibold">Nombre Contacto</strong> (Texto) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Apellidos Contacto</strong> (Texto) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Email Contacto</strong> (Email - ej: mail@ejemplo.com) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Teléfono Contacto</strong> (Texto o Número) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Fecha Evento</strong> (Fecha - ej: 05/10/2024) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Precio Evento</strong> (Número - ej: 1500) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">ID o Nombre Tipo Evento</strong> (Texto - ej: "Boda", "Aniversario", "Evento Corporativo", "Ceremonia Religiosa", "Cumpleaños" o el ID) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Nombre Evento</strong> (Texto - ej: "Boda Juan y María") - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Hora Inicio</strong> (Hora - formato HH:MM, ej: 09:30) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Hora Fin</strong> (Hora - HH:MM, posterior a inicio) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Num Invitados</strong> (Número - ej: 50) - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        <li><strong className="font-semibold">Habitación</strong> (Texto - Letras de habitaciones incluidas en el evento, separadas por coma si son varias, ej: "F, G, H") - <span className="text-red-600 font-medium">Obligatorio</span></li>
+                        {/* Mover Habitación aquí */}
+                        {/* Opcionales */}
+                        <li>Estado Reserva Evento (Texto - 'pendiente', 'confirmada', etc.) - <span className="text-gray-500">Opcional</span></li>
+                        <li>Método Pago Evento (Texto - 'tarjeta', 'transferencia', etc.) - <span className="text-gray-500">Opcional</span></li>
+                        <li>Adelanto Evento (Número - ej: 500) - <span className="text-gray-500">Opcional</span></li>
+                        <li>Peticiones Evento (Texto - detalles especiales) - <span className="text-gray-500">Opcional</span></li>
+                        <li>Num Confirmación Evento (Texto - código de confirmación) - <span className="text-gray-500">Opcional</span></li>
+                    </ul>
+                    <p className="mt-1 text-xs text-gray-600">(<span className="text-red-600 font-medium">Obligatorio</span> significa que la casilla NO puede estar vacía).</p>
+                </div>
+                 {/* Formato Datos */}
+                 <div>
+                    <p className="font-medium text-blue-700 mb-1">Formato de los Datos:</p>
+                     <ul className="list-disc list-inside ml-4 mt-1">
+                        <li><span className="font-semibold">Fechas:</span> Normal, como DD/MM/AAAA o AAAA-MM-DD.</li>
+                        <li><span className="font-semibold">Horas:</span> Siempre dos dígitos para hora y minutos, con dos puntos en medio (HH:MM), como 14:00 o 08:30.</li>
+                        <li><span className="font-semibold">Números:</span> Solo el número, sin símbolos (€, $, etc.). Para decimales, usa punto (.) como en 99.95.</li>
+                        <li><span className="font-semibold">Textos específicos</span> (como Método Pago, Estado): Escribe exactamente una de las opciones permitidas (en minúsculas si se indica).</li>
+                     </ul>
+                </div>
+             </div>
           </div>
 
-           <div>
-            <strong className="text-blue-800">4. Columnas para la Hoja "Eventos":</strong>
-             <ul className="list-disc list-inside ml-4 mt-1 columns-1 sm:columns-2 gap-x-6">
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Nombre Contacto</code> (Texto) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Apellidos Contacto</code> (Texto) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Email Contacto</code> (Email) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Teléfono Contacto</code> (Texto/Número) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Fecha Evento</code> (Fecha) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Precio Evento</code> (Número) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">ID o Nombre Tipo Evento</code> (Texto ID o Nombre) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Nombre Evento</code> (Texto) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Hora Inicio</code> (Texto HH:MM) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Hora Fin</code> (Texto HH:MM, posterior a Inicio) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Num Invitados</code> (Número &ge; 1) - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Espacio</code> (Texto: 'salon', 'jardin', 'terraza') - <span className="font-semibold">Requerido</span></li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Estado Reserva Evento</code> (Texto: 'pendiente', 'confirmada', 'pagada', 'cancelada', 'completada') - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Método Pago Evento</code> (Texto: 'tarjeta', 'transferencia', 'efectivo', 'pendiente') - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Adelanto Evento</code> (Número) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Peticiones Evento</code> (Texto) - Opcional</li>
-              <li className="mb-1"><code className="bg-blue-100 px-1 rounded text-blue-900 font-mono">Num Confirmación Evento</code> (Texto) - Opcional</li>
-            </ul>
-             <p className="mt-1 text-xs text-gray-600">Las columnas marcadas como <span className="font-semibold">Requerido</span> deben tener SIEMPRE un valor en cada fila.</p>
-          </div>
-
+          {/* CONSEJO */}
           <div>
-            <strong className="text-blue-800">5. Formato de Datos:</strong>
-             <ul className="list-disc list-inside ml-4 mt-1">
-                <li><span className="font-semibold">Fechas:</span> Usa un formato claro como DD/MM/AAAA o AAAA-MM-DD. Excel debería reconocerlo.</li>
-                <li><span className="font-semibold">Horas:</span> Usa SIEMPRE el formato HH:MM (ej: 09:30, 14:00).</li>
-                <li><span className="font-semibold">Números:</span> Escribe solo el número, sin símbolos (€, $, etc.). Usa el punto (.) para decimales si es necesario (ej: 125.50).</li>
-                <li><span className="font-semibold">Textos con Opciones Fijas:</span> Para columnas como 'Método Pago', 'Estado Reserva', 'Espacio', etc., escribe EXACTAMENTE una de las opciones permitidas (en minúsculas).</li>
-                <li><span className="font-semibold">ID o Nombre Tipo Evento:</span> Si conoces el ID interno del tipo de evento (es una cadena larga de letras y números), ponlo aquí. Si no, escribe el nombre COMPLETO y EXACTO del tipo de evento (ej: "Boda Civil", "Bautizo"). El sistema intentará encontrarlo.</li>
-             </ul>
+            <strong className="text-blue-800 block mb-1">⭐ Consejo Extra:</strong>
+            <p className="ml-7">Si es la primera vez o tienes muchas filas, <strong className="font-semibold">prueba subiendo un archivo con solo 2 o 3 filas</strong> en cada hoja para ver si funciona bien antes de subir el archivo completo.</p>
           </div>
-
-          <div>
-            <strong className="text-blue-800">6. ¡Sin Filas Vacías Raras!:</strong>
-            <p className="mt-1">Asegúrate de que no haya filas completamente vacías entre tus datos.</p>
-          </div>
-
-          <div>
-            <strong className="text-blue-800">Consejo Final:</strong>
-            <p className="mt-1">Si tienes dudas, empieza con un archivo pequeño (2-3 filas por hoja) para probar que todo funciona antes de subir un archivo grande.</p>
-          </div>
-
         </div>
-         {/* === FIN NUEVO TEXTO INSTRUCCIONES === */}
       </div>
+
+      {/* Modal de Errores */}
+      {showErrorModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                 <h2 className="text-xl font-semibold text-red-700">Errores Encontrados en el Archivo</h2>
+                 <button 
+                   onClick={() => setShowErrorModal(false)}
+                   className="text-gray-400 hover:text-gray-600 text-2xl"
+                 >
+                   &times; {/* Símbolo de cierre */}
+                 </button>
+             </div>
+            {/* Reutilizamos ErrorTable aquí, pasando los errores combinados */}
+            {/* Pasamos un 'type' genérico o podríamos adaptar ErrorTable */} 
+            <ErrorTable errors={modalErrorData} type="combined" /> 
+            <div className="mt-6 text-right">
+                <button 
+                  onClick={() => setShowErrorModal(false)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Cerrar
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

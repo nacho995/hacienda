@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
 import { FaEdit, FaTrash, FaBed, FaUserFriends, FaCalendarAlt, FaSpinner, FaEye, 
          FaSync, FaUserPlus, FaUserMinus, FaUserCheck, FaFilter, FaSort, FaSearch,
-         FaTimes, FaChevronDown, FaChevronRight, FaMapMarkerAlt, FaEuroSign, FaArrowUp, FaArrowDown, FaEllipsisV, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
-import { assignHabitacionReservation, unassignHabitacionReservation } from '@/services/reservationService';
+         FaTimes, FaChevronDown, FaChevronRight, FaMapMarkerAlt, FaEuroSign, FaArrowUp, FaArrowDown, FaEllipsisV, FaCheck, FaExclamationTriangle, FaUserCircle, FaClock } from 'react-icons/fa';
+import { assignEventoReservation, unassignEventoReservation } from '@/services/reservationService';
 import { useAuth } from '@/context/AuthContext';
 import { useReservation } from '@/context/ReservationContext';
 import { useRouter } from 'next/navigation';
@@ -12,11 +12,12 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import apiClient from '@/services/apiClient';
 import { useConfirmationModal } from '@/hooks/useConfirmationModal';
+import userService from '@/services/userService';
 
 export default function AdminEventRooms() {
   const router = useRouter();
   const { isAuthenticated, isAdmin, user, loading: authLoading } = useAuth();
-  const { loadAllReservations, habitacionReservations } = useReservation();
+  const { loadAllReservations, eventoReservations } = useReservation();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -30,7 +31,7 @@ export default function AdminEventRooms() {
   const [sortBy, setSortBy] = useState('fecha');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedPiso, setSelectedPiso] = useState('todos');
+  const [selectedUsuarioId, setSelectedUsuarioId] = useState('todos');
   const [expandedRoom, setExpandedRoom] = useState(null);
   const [showDropdownFilter, setShowDropdownFilter] = useState(false);
   const [showDropdownSort, setShowDropdownSort] = useState(false);
@@ -41,12 +42,12 @@ export default function AdminEventRooms() {
   const cargarUsuarios = useCallback(async () => {
     try {
       setLoadingUsuarios(true);
-      const response = await apiClient.get('/users');
+      const response = await userService.getAllUsers();
       
-      if (response && response.data && Array.isArray(response.data)) {
+      if (response?.success && Array.isArray(response.data)) {
         setUsuarios(response.data);
       } else {
-        // console.log('No se recibieron datos válidos de usuarios o la API no está disponible');
+        console.warn('Respuesta inesperada o sin éxito al cargar usuarios:', response);
         setUsuarios([]);
       }
     } catch (error) {
@@ -97,59 +98,70 @@ export default function AdminEventRooms() {
     }
   }, [authLoading, isAuthenticated, isAdmin, router]);
 
-  const handleAsignarHabitacion = async (reservaId, usuarioId) => {
+  const handleAsignarHabitacion = async (item, usuarioId) => {
+    const eventoOriginalId = item.eventoOriginalId;
+    const usuarioSeleccionado = usuarios.find(u => u._id === usuarioId);
+    const nombreUsuario = usuarioSeleccionado ? `${usuarioSeleccionado.nombre} ${usuarioSeleccionado.apellidos || ''}`.trim() : 'este usuario';
+
+    if (!eventoOriginalId || !usuarioId) {
+      toast.error("Faltan datos para asignar el evento.");
+      return;
+    }
+
+    setIsAsignando(true);
     try {
-      setIsAsignando(true);
-      if (!reservaId || !usuarioId) {
-        toast.error('Datos incompletos para la asignación.'); return;
-      }
-      const response = await assignHabitacionReservation(reservaId, usuarioId);
-      if (response.success) {
-        toast.success('Reserva de evento asignada correctamente');
+      const response = await assignEventoReservation(eventoOriginalId, usuarioId);
+      if (response && response.success) {
+        toast.success(`Evento ${item.tipoEvento || ''} asignado a ${nombreUsuario}`);
+        setShowAsignarModal(false);
+        setSelectedReserva(null);
         loadAllReservations(false);
       } else {
-        toast.error(response.message || 'Error al asignar la reserva del evento');
+        throw new Error(response?.message || 'Error al asignar el evento');
       }
     } catch (error) {
-      console.error('Error asignando reserva de evento:', error);
-      toast.error('No se pudo asignar la reserva del evento');
+      console.error(`Error asignando evento ${eventoOriginalId} a usuario ${usuarioId}:`, error);
+      toast.error('Error al asignar evento: ' + (error.message || 'Error desconocido'));
     } finally {
       setIsAsignando(false);
-      setShowAsignarModal(false);
-      setOpenActionMenu(null);
     }
   };
 
-  const handleDesasignarHabitacion = (reservaId) => {
-    setOpenActionMenu(null); // Cerrar menú antes de mostrar modal
+  const handleDesasignarHabitacion = (item) => {
+    const eventoOriginalId = item.eventoOriginalId;
+    const nombreAsignado = getNombreUsuarioAsignado(item);
+    if (!eventoOriginalId || !item.asignadoA) {
+      toast.warn("Este evento no está asignado actualmente.");
+      return;
+    }
+    setOpenActionMenu(null);
     showConfirmation({
-      title: 'Desasignar Habitación de Evento',
-      message: '¿Estás seguro de que quieres desasignar esta habitación del evento? El usuario asignado dejará de estar asociado.',
+      title: 'Desasignar Evento',
+      message: `¿Estás seguro de que quieres desasignar el evento ${item.tipoEvento || ''} de ${nombreAsignado}?`,
       iconType: 'warning',
       confirmText: 'Sí, desasignar',
       onConfirm: async () => {
-        // La lógica original de desasignar va aquí
-        setIsAsignando(true); 
+        setIsLoading(true);
         try {
-          const response = await unassignHabitacionReservation(reservaId);
-          if (response.success) {
-            toast.success('Habitación desasignada del evento');
+          const response = await unassignEventoReservation(eventoOriginalId);
+          if (response && response.success) {
+            toast.success(`Evento ${item.tipoEvento || ''} desasignado correctamente.`);
             loadAllReservations(false);
           } else {
-            toast.error(response.message || 'Error al desasignar la habitación del evento');
+            throw new Error(response?.message || 'Error al desasignar el evento');
           }
         } catch (error) {
-          console.error('[handleDesasignar HabitaciónEvento] Error en catch:', error);
-          toast.error('No se pudo desasignar la habitación del evento');
+          console.error(`Error desasignando evento ${eventoOriginalId}:`, error);
+          toast.error('Error al desasignar evento: ' + (error.message || 'Error desconocido'));
         } finally {
-          setIsAsignando(false); 
+          setIsLoading(false);
         }
       }
     });
   };
 
-  const abrirModalAsignar = (reservaHabitacion) => {
-    setSelectedReserva(reservaHabitacion);
+  const abrirModalAsignar = (item) => {
+    setSelectedReserva(item);
     setShowAsignarModal(true);
   };
 
@@ -191,117 +203,151 @@ export default function AdminEventRooms() {
     catch (e) { console.error("Error formateando fecha:", fecha, e); return String(fecha); }
   };
 
-  const getLetraHabitacion = (reserva) => {
-    // 1. Priorizar letraHabitacion si existe
-    if (reserva?.letraHabitacion) {
-      return reserva.letraHabitacion;
-    }
-
-    // 2. Comprobar el campo 'habitacion' - solo si parece una letra
-    if (reserva?.habitacion && typeof reserva.habitacion === 'string') {
-        // Verificar si es una sola letra mayúscula (o minúscula)
-        if (reserva.habitacion.length === 1 && /^[A-Z]$/i.test(reserva.habitacion)) {
-            return reserva.habitacion.toUpperCase();
-        }
-        // Podría ser un ID o un nombre más largo, lo ignoramos por ahora
-    }
-
-    // 3. Intentar con el campo 'letra' (si existe en algún caso)
-    if (reserva?.letra) {
-      return reserva.letra;
-    }
-    
-    // 4. Intentar obtener de un objeto habitacion populado (caso menos probable aquí)
-    if (reserva?.habitacion && typeof reserva.habitacion === 'object' && reserva.habitacion !== null) {
-      if (reserva.habitacion.letra) {
-        return reserva.habitacion.letra;
-      }
-    }
-
-    // 5. Fallback final
-    console.warn('[getLetraHabitacion] No se pudo determinar la letra para la reserva:', reserva);
-    return '?';
-  };
-
-  const pisosDisponibles = useMemo(() => {
-    const pisos = [...new Set(habitacionReservations
-      .filter(r => r.tipoReserva === 'evento')
-      .map(r => {
-        const letra = getLetraHabitacion(r);
-        if (!letra || letra === '?') return null;
-        return (['A', 'B', 'C', 'D', 'E', 'F'].includes(letra.toUpperCase())) ? 'baja' : 'alta';
-      })
-      .filter(p => p !== null)
-    )];
-    pisos.sort((a, b) => a === 'baja' ? -1 : (b === 'baja' ? 1 : 0));
-    return ['todos', ...pisos];
-  }, [habitacionReservations]);
-
-  const filteredAndSortedReservations = useMemo(() => {
-    let currentList = habitacionReservations.filter(r => r.tipoReserva === 'evento'); 
-
-    if (searchTerm) {
-      const lowerSearch = searchTerm.toLowerCase();
-      currentList = currentList.filter(r =>
-        r.nombreContacto?.toLowerCase().includes(lowerSearch) ||
-        r.apellidosContacto?.toLowerCase().includes(lowerSearch) ||
-        r.emailContacto?.toLowerCase().includes(lowerSearch) ||
-        r.telefonoContacto?.includes(lowerSearch) ||
-        getLetraHabitacion(r)?.toLowerCase().includes(lowerSearch) ||
-        getNombreUsuarioAsignado(r)?.toLowerCase().includes(lowerSearch)
-      );
-    }
-
-    if (filterEstado !== 'todos') {
-      currentList = currentList.filter(r => r.estadoReserva === filterEstado);
-    }
-    
-    if (selectedPiso !== 'todos') {
-      currentList = currentList.filter(r => {
-        const letra = getLetraHabitacion(r);
-        if (!letra) return false;
-        const piso = (['A', 'B', 'C', 'D', 'E', 'F'].includes(letra.toUpperCase())) ? 'baja' : 'alta';
-        return piso === selectedPiso;
+  const usuariosFiltroOptions = useMemo(() => {
+    const options = [
+      { value: 'todos', label: 'Todos los usuarios' },
+      { value: 'sinAsignar', label: 'Sin asignar' },
+    ];
+    const usuariosParaFiltrar = usuarios;
+    usuariosParaFiltrar.forEach(u => {
+      options.push({
+        value: u._id,
+        label: `${u.nombre} ${u.apellidos || ''}`.trim() || u.email
       });
-    }
+    });
+    return options;
+  }, [usuarios]);
+
+  const filteredAndSortedHabitaciones = useMemo(() => {
+    const habitacionesAplanadas = eventoReservations.flatMap(evento => {
+      const habitacionesPobladas = evento.serviciosAdicionales?.habitaciones || [];
+
+      let nombreTipoEventoDelPadre = 'Evento';
+      if (evento.tipoEventoDetails) {
+        nombreTipoEventoDelPadre = evento.tipoEventoDetails.titulo || evento.tipoEventoDetails.nombre || String(evento.tipoEventoDetails._id) || '[Objeto Evento]';
+      } else if (evento.tipoEvento) {
+         if (typeof evento.tipoEvento === 'object' && evento.tipoEvento !== null) {
+           nombreTipoEventoDelPadre = String(evento.tipoEvento._id) || '[Objeto Evento sin ID]';
+         } else {
+           nombreTipoEventoDelPadre = String(evento.tipoEvento);
+         }
+      }
+
+      if (habitacionesPobladas.length === 0) {
+        return [{
+          ...evento,
+          habitacionData: null,
+          letraHabitacion: '-',
+          id: `${evento._id}-no-room`,
+          eventoOriginalId: evento._id,
+          tipoEvento: nombreTipoEventoDelPadre,
+          fechaEntrada: null,
+          fechaSalida: null
+        }];
+      }
+
+      return habitacionesPobladas.map((habRef, habIndex) => {
+        const habitacionPoblada = (habRef.reservaHabitacionDetails && typeof habRef.reservaHabitacionDetails === 'object') 
+                                  ? habRef.reservaHabitacionDetails 
+                                  : null;
+
+        const letraHabitacion = habitacionPoblada?.letraHabitacion || habRef.letraHabitacion || '?';
+        const habitacionData = habitacionPoblada;
+        const estadoReserva = habitacionPoblada?.estadoReserva || evento.estadoReserva || 'pendiente';
+        const fechaEntrada = habitacionPoblada?.fechaEntrada;
+        const fechaSalida = habitacionPoblada?.fechaSalida;
+
+        const generatedId = habitacionPoblada?._id ? habitacionPoblada._id.toString()
+                           : (typeof habRef.reservaHabitacionId === 'string' ? `${evento._id}-${habRef.reservaHabitacionId}-${habIndex}`
+                             : `${evento._id}-${letraHabitacion}-${habIndex}`);
+
+        return {
+          ...evento,
+          habitacionData: habitacionData,
+          letraHabitacion: letraHabitacion,
+          id: generatedId,
+          eventoOriginalId: evento._id,
+          tipoEvento: nombreTipoEventoDelPadre,
+          estadoReserva: estadoReserva,
+          fechaEntrada: fechaEntrada,
+          fechaSalida: fechaSalida,
+        };
+      });
+    });
+
+    let currentList = habitacionesAplanadas.filter(item => {
+      const lowerSearch = searchTerm.toLowerCase();
+      const matchesSearch = !searchTerm || 
+        item.nombreContacto?.toLowerCase().includes(lowerSearch) ||
+        item.apellidosContacto?.toLowerCase().includes(lowerSearch) ||
+        item.emailContacto?.toLowerCase().includes(lowerSearch) ||
+        item.telefonoContacto?.includes(searchTerm) ||
+        item.letraHabitacion?.toLowerCase().includes(lowerSearch) ||
+        item.tipoEvento?.toLowerCase().includes(lowerSearch) ||
+        item.estadoReserva?.toLowerCase().includes(lowerSearch);
+
+      const matchesEstado = filterEstado === 'todos' || item.estadoReserva?.toLowerCase() === filterEstado;
+
+      let matchesUsuario = selectedUsuarioId === 'todos';
+      if (selectedUsuarioId === 'sinAsignar') {
+        matchesUsuario = !item.asignadoA;
+      } else if (selectedUsuarioId !== 'todos') {
+        matchesUsuario = typeof item.asignadoA === 'string' ? item.asignadoA === selectedUsuarioId :
+                         typeof item.asignadoA === 'object' && item.asignadoA !== null ? item.asignadoA._id === selectedUsuarioId :
+                         false;
+      }
+
+      const result = matchesSearch && matchesEstado && matchesUsuario;
+      return result;
+    });
 
     currentList.sort((a, b) => {
       let valA, valB;
+
       switch (sortBy) {
         case 'letra':
-          valA = getLetraHabitacion(a) || '';
-          valB = getLetraHabitacion(b) || '';
+          valA = a.letraHabitacion;
+          valB = b.letraHabitacion;
           break;
-        case 'fecha':
-          valA = a.fechaEntrada || a.fecha ? new Date(a.fechaEntrada || a.fecha).getTime() : 0;
-          valB = b.fechaEntrada || b.fecha ? new Date(b.fechaEntrada || b.fecha).getTime() : 0;
+        case 'tipoEvento':
+          valA = a.tipoEvento;
+          valB = b.tipoEvento;
           break;
         case 'nombre':
           valA = `${a.nombreContacto || ''} ${a.apellidosContacto || ''}`.trim().toLowerCase();
           valB = `${b.nombreContacto || ''} ${b.apellidosContacto || ''}`.trim().toLowerCase();
           break;
+        case 'fecha':
+          valA = new Date(a.fechaEntrada || a.fecha).getTime();
+          valB = new Date(b.fechaEntrada || b.fecha).getTime();
+          if (isNaN(valA)) valA = sortOrder === 'asc' ? Infinity : -Infinity;
+          if (isNaN(valB)) valB = sortOrder === 'asc' ? Infinity : -Infinity;
+          break;
         case 'estado':
-          valA = a.estadoReserva || '';
-          valB = b.estadoReserva || '';
+          valA = a.estadoReserva;
+          valB = b.estadoReserva;
           break;
         case 'asignado':
-           valA = getNombreUsuarioAsignado(a)?.toLowerCase() || '';
-           valB = getNombreUsuarioAsignado(b)?.toLowerCase() || '';
-           break;
+          valA = getNombreUsuarioAsignado(a);
+          valB = getNombreUsuarioAsignado(b);
+          if (valA === 'Sin asignar') valA = sortOrder === 'asc' ? '' : 'zzzz'; 
+          if (valB === 'Sin asignar') valB = sortOrder === 'asc' ? '' : 'zzzz';
+          break;
         default:
-          valA = a.fechaEntrada || a.fecha ? new Date(a.fechaEntrada || a.fecha).getTime() : 0;
-          valB = b.fechaEntrada || b.fecha ? new Date(b.fechaEntrada || b.fecha).getTime() : 0;
-          if (valA < valB) return sortOrder === 'asc' ? 1 : -1;
-          if (valA > valB) return sortOrder === 'asc' ? -1 : 1;
           return 0;
       }
-      if (valA < valB || valA === undefined || valA === null || valA === '') return sortOrder === 'asc' ? -1 : 1;
-      if (valA > valB || valB === undefined || valB === null || valB === '') return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+
+      let comparison = 0;
+      if (valA > valB) {
+        comparison = 1;
+      } else if (valA < valB) {
+        comparison = -1;
+      }
+      return sortOrder === 'desc' ? (comparison * -1) : comparison;
     });
 
     return currentList;
-  }, [habitacionReservations, searchTerm, filterEstado, selectedPiso, sortBy, sortOrder, usuarios, loadingUsuarios]);
+  }, [eventoReservations, searchTerm, filterEstado, selectedUsuarioId, usuarios, sortBy, sortOrder]);
 
   const handleRetry = () => {
     loadInitialData();
@@ -323,29 +369,35 @@ export default function AdminEventRooms() {
     return sortOrder === 'asc' ? <FaArrowUp className="ml-1 inline-block w-3 h-3" /> : <FaArrowDown className="ml-1 inline-block w-3 h-3" />;
   };
 
-  const handleConfirmarReserva = (reservaId) => {
-    if (!reservaId) return;
-    setOpenActionMenu(null); // Cerrar menú antes de mostrar modal
+  const handleConfirmarReserva = (item) => {
+    const habitacionId = item.habitacionData?._id;
+    const letraHabitacion = item.letraHabitacion || 'esta habitación';
+    if (!habitacionId) {
+        toast.error('No se encontró ID para esta habitación.');
+        console.error('Error: item.habitacionData._id no encontrado en handleConfirmarReserva', item);
+        return;
+    }
+    setOpenActionMenu(null);
     showConfirmation({
-      title: 'Confirmar Reserva',
-      message: '¿Estás seguro de que quieres marcar esta reserva como confirmada?',
+      title: `Confirmar Habitación ${letraHabitacion}`,
+      message: `¿Estás seguro de que quieres marcar la reserva de la habitación ${letraHabitacion} como confirmada?`,
       iconType: 'confirm',
-      confirmText: 'Sí, confirmar',
+      confirmText: 'Sí, confirmar habitación',
       onConfirm: async () => {
         setIsLoading(true);
         try {
-          const url = `/reservas/habitaciones/${reservaId}/estado`;
+          const url = `/api/reservas/habitaciones/${habitacionId}/estado`; 
           const response = await apiClient.patch(url, { estado: 'confirmada' });
           if (response && response.success === true) {
-            toast.success('Reserva confirmada correctamente');
-            loadAllReservations(false);
+            toast.success(`Habitación ${letraHabitacion} confirmada`);
+            await loadAllReservations(false);
           } else {
-            throw new Error(response?.message || 'Error al confirmar la reserva');
+            throw new Error(response?.message || 'Error al confirmar la habitación');
           }
         } catch (error) {
-          console.error('Error confirmando reserva (evento):', error);
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          toast.error('Error al confirmar reserva: ' + errorMessage);
+          console.error(`Error confirmando habitación ${letraHabitacion} (ID: ${habitacionId}):`, error.response?.data || error.message || error);
+          const errorMessage = error.response?.data?.message || error.message || 'Error desconocido';
+          toast.error('Error al confirmar habitación: ' + errorMessage);
         } finally {
           setIsLoading(false);
         }
@@ -353,29 +405,35 @@ export default function AdminEventRooms() {
     });
   };
 
-  const handleCancelarReserva = (reservaId) => {
-    if (!reservaId) return;
+  const handleCancelarReserva = (item) => {
+    const habitacionId = item.habitacionData?._id;
+    const letraHabitacion = item.letraHabitacion || 'esta habitación';
+    if (!habitacionId) {
+        toast.error('No se encontró ID para esta habitación.');
+        console.error('Error: item.habitacionData._id no encontrado en handleCancelarReserva', item);
+        return;
+    }
     setOpenActionMenu(null);
     showConfirmation({
-      title: 'Cancelar Reserva',
-      message: '¿Estás seguro de que quieres cancelar esta reserva? Esta acción podría ser irreversible.',
+      title: `Cancelar Habitación ${letraHabitacion}`,
+      message: `¿Estás seguro de que quieres cancelar la reserva de la habitación ${letraHabitacion}? Esta acción podría ser irreversible.`,
       iconType: 'danger',
-      confirmText: 'Sí, cancelar reserva',
+      confirmText: 'Sí, cancelar habitación',
       onConfirm: async () => {
         setIsLoading(true);
         try {
-          const url = `/reservas/habitaciones/${reservaId}/estado`;
+          const url = `/api/reservas/habitaciones/${habitacionId}/estado`; 
           const response = await apiClient.patch(url, { estado: 'cancelada' });
           if (response && response.success === true) {
-            toast.success('Reserva cancelada correctamente');
+            toast.success(`Habitación ${letraHabitacion} cancelada`);
             loadAllReservations(false);
           } else {
-            throw new Error(response?.message || 'Error al cancelar la reserva');
+            throw new Error(response?.message || 'Error al cancelar la habitación');
           }
         } catch (error) {
-          console.error('Error cancelando reserva (evento):', error);
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          toast.error('Error al cancelar reserva: ' + errorMessage);
+          console.error(`Error cancelando habitación ${letraHabitacion} (ID: ${habitacionId}):`, error.response?.data || error.message || error);
+          const errorMessage = error.response?.data?.message || error.message || 'Error desconocido';
+          toast.error('Error al cancelar habitación: ' + errorMessage);
         } finally {
           setIsLoading(false);
         }
@@ -383,28 +441,34 @@ export default function AdminEventRooms() {
     });
   };
   
-  const handleMarcarPendiente = (reservaId) => {
-    if (!reservaId) return;
+  const handleMarcarPendiente = (item) => {
+    const habitacionId = item.habitacionData?._id;
+    const letraHabitacion = item.letraHabitacion || 'esta habitación';
+    if (!habitacionId) {
+        toast.error('No se encontró ID para esta habitación.');
+        console.error('Error: item.habitacionData._id no encontrado en handleMarcarPendiente', item);
+        return;
+    }
     setOpenActionMenu(null);
     showConfirmation({
-      title: 'Marcar como Pendiente',
-      message: '¿Estás seguro de que quieres marcar esta reserva como pendiente?',
+      title: `Marcar Habitación ${letraHabitacion} Pendiente`,
+      message: `¿Estás seguro de que quieres marcar la reserva de la habitación ${letraHabitacion} como pendiente?`,
       iconType: 'info',
       confirmText: 'Sí, marcar pendiente',
       onConfirm: async () => {
         setIsLoading(true);
         try {
-          const url = `/reservas/habitaciones/${reservaId}/estado`;
+          const url = `/api/reservas/habitaciones/${habitacionId}/estado`; 
           const response = await apiClient.patch(url, { estado: 'pendiente' });
           if (response && response.success === true) {
-            toast.success('Reserva marcada como pendiente');
+            toast.success(`Habitación ${letraHabitacion} marcada como pendiente`);
             loadAllReservations(false);
           } else {
             throw new Error(response?.message || 'Error al marcar como pendiente');
           }
         } catch (error) {
-          console.error('Error marcando pendiente reserva (evento):', error);
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`Error marcando pendiente habitación ${letraHabitacion} (ID: ${habitacionId}):`, error.response?.data || error.message || error);
+          const errorMessage = error.response?.data?.message || error.message || 'Error desconocido';
           toast.error('Error al marcar pendiente: ' + errorMessage);
         } finally {
           setIsLoading(false);
@@ -413,37 +477,33 @@ export default function AdminEventRooms() {
     });
   };
 
-  const handleEliminarReserva = (reservaId) => {
-    if (!reservaId) {
-      toast.error('ID inválido para eliminar.');
+  const handleEliminarReserva = (item) => {
+    const eventoOriginalId = item.eventoOriginalId;
+    if (!eventoOriginalId) {
+      toast.error('ID de evento inválido para eliminar.');
       return;
     }
     setOpenActionMenu(null);
     showConfirmation({
-      title: 'Eliminar Reserva',
-      message: '¿Estás absolutamente seguro de que quieres eliminar esta reserva de habitación? Esta acción no se puede deshacer.',
+      title: 'Eliminar Reserva de Evento',
+      message: `¿Estás absolutamente seguro de que quieres eliminar la reserva completa del evento ${item.tipoEvento || ''} (${formatearFecha(item.fechaInicio)} - ${formatearFecha(item.fechaFin)})? Esta acción eliminará todas sus habitaciones asociadas y no se puede deshacer.`,
       iconType: 'danger',
       confirmText: 'Sí, eliminar permanentemente',
       onConfirm: async () => {
         setIsLoading(true);
         try {
-          const url = `/reservas/habitaciones/${reservaId}`;
+          const url = `/api/reservas/eventos/${eventoOriginalId}`; 
           const response = await apiClient.delete(url);
           if (response && response.success) {
-            toast.success('Reserva eliminada con éxito');
+            toast.success(`Evento ${item.tipoEvento || ''} eliminado con éxito`);
             loadAllReservations(false);
           } else {
-            // Si el delete falla pero devuelve un mensaje (ej. por estar asociada a evento)
-            if (response?.message) {
-              toast.error(response.message);
-            } else {
-              throw new Error(response?.message || 'Error al eliminar');
-            }
+            throw new Error(response?.message || 'Error al eliminar el evento');
           }
         } catch (error) {
-          console.error('Error eliminando reserva (evento):', error);
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          toast.error('Error al eliminar: ' + errorMessage);
+          console.error('Error eliminando reserva de evento:', error.response?.data || error.message || error);
+          const errorMessage = error.response?.data?.message || error.message || 'Error desconocido';
+          toast.error('Error al eliminar evento: ' + errorMessage);
         } finally {
           setIsLoading(false);
         }
@@ -580,16 +640,16 @@ export default function AdminEventRooms() {
             </div>
 
             <div>
-              <label htmlFor="filter-piso" className="block text-sm font-medium text-gray-700 mb-1">Piso</label>
+              <label htmlFor="filter-usuario" className="block text-sm font-medium text-gray-700 mb-1">Usuario Asignado</label>
               <select
-                 id="filter-piso"
-                 value={selectedPiso}
-                 onChange={(e) => setSelectedPiso(e.target.value)}
+                 id="filter-usuario"
+                 value={selectedUsuarioId}
+                 onChange={(e) => setSelectedUsuarioId(e.target.value)}
                  className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 shadow-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
               >
-                {pisosDisponibles.map(piso => (
-                  <option key={piso} value={piso}>
-                    {piso === 'todos' ? 'Todos los pisos' : (piso === 'baja' ? 'Planta Baja' : 'Planta Alta')}
+                {usuariosFiltroOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -609,7 +669,9 @@ export default function AdminEventRooms() {
                    sortBy === 'fecha' ? 'Fecha Entrada' :
                    sortBy === 'nombre' ? 'Nombre Contacto' :
                    sortBy === 'estado' ? 'Estado Reserva' :
-                   sortBy === 'asignado' ? 'Admin Asignado' : 'Fecha Entrada'}
+                   sortBy === 'asignado' ? 'Admin Asignado' :
+                   sortBy === 'tipoEvento' ? 'Tipo Evento' :
+                   'Fecha Entrada'}
                   {renderSortIcon(sortBy)}
                 </span>
                  <FaChevronDown className={`text-gray-400 transition-transform ${showDropdownSort ? 'rotate-180' : ''}`} />
@@ -619,6 +681,7 @@ export default function AdminEventRooms() {
                   {[
                     { value: 'fecha', label: 'Fecha Entrada' },
                     { value: 'letra', label: 'Letra Hab.' },
+                    { value: 'tipoEvento', label: 'Tipo Evento' },
                     { value: 'nombre', label: 'Nombre Contacto' },
                     { value: 'estado', label: 'Estado Reserva' },
                     { value: 'asignado', label: 'Admin Asignado' },
@@ -640,13 +703,13 @@ export default function AdminEventRooms() {
           </div>
         )}
 
-        {(searchTerm || filterEstado !== 'todos' || selectedPiso !== 'todos') && showFilters && (
+        {(searchTerm || filterEstado !== 'todos' || selectedUsuarioId !== 'todos') && showFilters && (
           <div className="mt-4 pt-4 border-t border-gray-200 flex justify-start">
              <button
               onClick={() => {
                 setSearchTerm('');
                 setFilterEstado('todos');
-                setSelectedPiso('todos');
+                setSelectedUsuarioId('todos');
               }}
               className="text-sm text-purple-600 hover:text-purple-800 flex items-center"
             >
@@ -659,7 +722,7 @@ export default function AdminEventRooms() {
 
       {isLoading && !initialLoadDone ? (
            <div className="text-center py-10 text-gray-500">Cargando...</div>
-      ) : filteredAndSortedReservations.length === 0 ? (
+      ) : filteredAndSortedHabitaciones.length === 0 ? (
         <div className="text-center py-10 bg-white rounded-lg shadow border border-gray-200">
           <FaBed className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">No se encontraron reservas de eventos</h3>
@@ -669,10 +732,9 @@ export default function AdminEventRooms() {
         </div>
       ) : (
          <RoomTableView
-           habitaciones={filteredAndSortedReservations}
+           habitaciones={filteredAndSortedHabitaciones}
            getStatusText={getStatusText}
            getStatusColor={getStatusColor}
-           getLetraHabitacion={getLetraHabitacion}
            formatearFecha={formatearFecha}
            user={user}
            usuarios={usuarios}
@@ -683,7 +745,7 @@ export default function AdminEventRooms() {
            renderSortIcon={renderSortIcon}
            sortBy={sortBy}
            sortOrder={sortOrder}
-           totalReservationsCount={habitacionReservations.length}
+           totalReservationsCount={eventoReservations.length}
            loadingUsuarios={loadingUsuarios}
            openActionMenu={openActionMenu}
            setOpenActionMenu={setOpenActionMenu}
@@ -701,7 +763,7 @@ export default function AdminEventRooms() {
           <div className="bg-white rounded-lg shadow-xl p-5 max-w-lg w-full mx-auto">
              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
                  <h3 className="text-lg font-semibold text-gray-800">
-                    Asignar Reserva Evento (Hab. {getLetraHabitacion(selectedReserva)})
+                    Asignar Reserva Evento (Hab. {selectedReserva.letraHabitacion})
                  </h3>
                  <button onClick={() => setShowAsignarModal(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
              </div>
@@ -718,7 +780,7 @@ export default function AdminEventRooms() {
                         {usuarios.filter(u => u.role === 'admin').map(u => (
                             <button
                                 key={u._id}
-                                onClick={() => handleAsignarHabitacion(selectedReserva._id, u._id)}
+                                onClick={() => handleAsignarHabitacion(selectedReserva, u._id)}
                                 disabled={isAsignando}
                                 className={`w-full p-3 border rounded-lg text-left flex items-center gap-3 transition duration-150 ${
                                     isAsignando ? 'bg-gray-100 cursor-not-allowed' : 'hover:bg-purple-50 hover:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1'
@@ -760,7 +822,6 @@ function RoomTableView({
   habitaciones,
   getStatusText,
   getStatusColor,
-  getLetraHabitacion,
   formatearFecha,
   user,
   usuarios,
@@ -782,14 +843,13 @@ function RoomTableView({
   onAsignarReserva,
   onDesasignarReserva
 }) {
-  const handleToggleMenu = (reservaId) => {
-    setOpenActionMenu(prev => (prev === reservaId ? null : reservaId));
+  const handleToggleMenu = (itemId) => {
+    setOpenActionMenu(prev => (prev === itemId ? null : itemId));
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
+    <div className="overflow-x-auto bg-white rounded-lg shadow ring-1 ring-black ring-opacity-5">
+      <table className="min-w-full divide-y divide-gray-300">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-2 py-3 w-10"></th>
@@ -799,13 +859,18 @@ function RoomTableView({
                  </button>
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button onClick={() => handleSortChange('tipoEvento')} className="flex items-center hover:text-gray-700">
+                     Evento {renderSortIcon('tipoEvento')}
+                  </button>
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button onClick={() => handleSortChange('nombre')} className="flex items-center hover:text-gray-700">
                      Contacto {renderSortIcon('nombre')}
                   </button>
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button onClick={() => handleSortChange('fecha')} className="flex items-center hover:text-gray-700">
-                     Fechas {renderSortIcon('fecha')}
+                     Fechas Habitación {renderSortIcon('fecha')}
                   </button>
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -822,40 +887,43 @@ function RoomTableView({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
-            {habitaciones.map((reserva) => {
-              const reservaId = reserva._id;
-              const isExpanded = expandedRoom === reservaId;
-              const statusColorClass = getStatusColor(reserva);
-              const statusText = getStatusText(reserva);
-              const letraHabitacion = getLetraHabitacion(reserva);
-              const nombreAsignado = getNombreUsuarioAsignado(reserva);
+          {habitaciones.map((item, index) => {
+            try {
+                const uniqueKey = item.id;
+              const itemId = item.id;
+              const isExpanded = expandedRoom === itemId;
+              const statusColorClass = getStatusColor(item);
+              const statusText = getStatusText(item);
+              const letraHabitacion = item.letraHabitacion;
+              const nombreAsignado = getNombreUsuarioAsignado(item);
               const estaAsignada = nombreAsignado !== 'Sin asignar' && nombreAsignado !== 'Cargando...';
               const asignadaAlUsuarioActual = estaAsignada && (
-                  (typeof reserva.asignadoA === 'object' && reserva.asignadoA?._id === user?.id) ||
-                  (typeof reserva.asignadoA === 'string' && reserva.asignadoA === user?.id)
+                  (typeof item.asignadoA === 'object' && item.asignadoA?._id === user?.id) ||
+                  (typeof item.asignadoA === 'string' && item.asignadoA === user?.id)
               );
-              const isMenuOpen = openActionMenu === reservaId;
-              const canPerformCriticalActions = asignadaAlUsuarioActual || !estaAsignada;
+              const isMenuOpen = openActionMenu === itemId;
 
-              // Datos para el log
-              const reservaIdForLog = reserva._id || reserva.id || 'ID_DESCONOCIDO';
-              // console.log(`[Render HabitaciónEvento] Reserva ${reservaIdForLog}: asignadoA =`, reserva.asignadoA);
+              const eventoOriginalId = item.eventoOriginalId;
+              const habitacionData = item.habitacionData;
+              const habitacionId = habitacionData?._id;
 
-              const eventoId = reserva.eventoId?._id || reserva.eventoId || (typeof reserva.reservaEvento === 'object' ? reserva.reservaEvento?._id : reserva.reservaEvento);
-              const detalleUrl = eventoId ? `/admin/reservaciones/evento/${eventoId}` : '#';
-              const canViewDetails = eventoId;
-              const canConfirm = reserva.estadoReserva !== 'confirmada' && reserva.estadoReserva !== 'completada';
-              const canCancel = reserva.estadoReserva !== 'cancelada' && reserva.estadoReserva !== 'completada';
-              const canDelete = true;
-              const canAssign = reserva.estadoReserva !== 'cancelada';
-              const canMarkPending = reserva.estadoReserva !== 'pendiente' && reserva.estadoReserva !== 'completada';
+              const detalleUrl = eventoOriginalId ? `/admin/reservaciones/evento/${eventoOriginalId}` : '#';
+              const canViewEventDetails = !!eventoOriginalId;
+
+              const hasValidRoomData = !!item.habitacionData?._id;
+
+              const canConfirm = hasValidRoomData && item.estadoReserva === 'pendiente';
+              const canCancel = hasValidRoomData && item.estadoReserva !== 'cancelada' && item.estadoReserva !== 'completada';
+              const canDelete = true; // Permitir eliminar el evento completo
+              const canAssign = true; // Permitir asignar/desasignar el evento
+              const canMarkPending = hasValidRoomData && item.estadoReserva !== 'pendiente' && item.estadoReserva !== 'completada';
 
               return (
-                <Fragment key={reservaId}>
-                  <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-gray-50' : ''}`}>
+                  <Fragment key={uniqueKey}>
+                  <tr className={`hover:bg-gray-50 ${isExpanded ? 'bg-purple-50' : ''}`}>
                     <td className="px-2 py-2 whitespace-nowrap text-center">
                        <button
-                         onClick={() => toggleRoomExpand(reservaId)}
+                         onClick={() => toggleRoomExpand(itemId)}
                          className={`text-gray-400 hover:text-purple-600 p-1 rounded ${isExpanded ? 'bg-purple-100 text-purple-700' : ''}`}
                          title={isExpanded ? "Ocultar detalles" : "Mostrar detalles"}
                          aria-expanded={isExpanded}
@@ -865,37 +933,40 @@ function RoomTableView({
                     </td>
                      <td className="px-4 py-3 whitespace-nowrap">
                        <div className="flex items-center">
-                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${statusColorClass.replace('text-', 'bg-').split(' ')[0].replace('bg-opacity-50','')} bg-opacity-20 mr-3 flex-shrink-0`}>
-                            <span className={`font-bold text-sm ${statusColorClass.split(' ')[1]}`}>{letraHabitacion}</span>
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs ${statusColorClass.replace('text-', 'bg-').split(' ')[0].replace('bg-opacity-50','')} bg-opacity-20 mr-3 flex-shrink-0 ${statusColorClass.split(' ')[1]}`}>
+                            {letraHabitacion}
                          </div>
                        </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                       <div className="text-sm font-medium text-gray-900">{reserva.nombreContacto} {reserva.apellidosContacto}</div>
-                       <div className="text-xs text-gray-500">{reserva.emailContacto}</div>
-                       <div className="text-xs text-gray-500">{reserva.telefonoContacto}</div>
+                       <div className="text-sm font-medium text-gray-700">
+                         {item.tipoEvento || 'Evento'}
+                       </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                       <div className="text-sm font-medium text-gray-900">{item.nombreContacto} {item.apellidosContacto}</div>
+                       <div className="text-xs text-gray-500 truncate max-w-[150px]" title={item.emailContacto}>{item.emailContacto}</div>
+                       <div className="text-xs text-gray-500">{item.telefonoContacto}</div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        <div>Ent: {formatearFecha(reserva.fechaEntrada)}</div>
-                        <div>Sal: {formatearFecha(reserva.fechaSalida)}</div>
+                          <div><span className="font-medium text-gray-500 text-xs">Ent:</span> {formatearFecha(item.fechaEntrada)}</div>
+                          <div><span className="font-medium text-gray-500 text-xs">Sal:</span> {formatearFecha(item.fechaSalida)}</div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColorClass}`}>
                          {statusText}
                        </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        <span className={`${!estaAsignada ? 'italic text-gray-400' : ''}`}>
-                           {nombreAsignado}
-                        </span>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                         {nombreAsignado}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                        <div className="relative inline-block text-left">
                           <button
-                             onClick={() => handleToggleMenu(reservaId)}
+                             onClick={() => handleToggleMenu(itemId)}
                              type="button"
                              className="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-2 py-1 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-purple-500"
-                             id={`menu-button-${reservaId}`}
+                             id={`menu-button-${itemId}`}
                              aria-expanded={isMenuOpen}
                              aria-haspopup="true"
                           >
@@ -904,108 +975,120 @@ function RoomTableView({
 
                          {isMenuOpen && (
                            <div
-                              className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10 focus:outline-none"
+                              className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 focus:outline-none"
                               role="menu"
                               aria-orientation="vertical"
-                              aria-labelledby={`menu-button-${reservaId}`}
+                              aria-labelledby={`menu-button-${itemId}`}
                               tabIndex="-1"
                            >
                              <div className="py-1" role="none">
-                                {canViewDetails && (
-                                    <Link 
-                                        href={detalleUrl} 
-                                        role="menuitem" 
-                                        tabIndex="-1" 
+                                {canViewEventDetails ? (
+                                    // Usamos Link de Next.js para la navegación (sin legacyBehavior)
+                                    <Link
+                                        href={detalleUrl}
+                                        role="menuitem" // Mover props al Link
+                                        tabIndex="-1"
                                         className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center"
-                                        onClick={() => setOpenActionMenu(null)}
+                                        onClick={() => setOpenActionMenu(null)} // Mover onClick al Link
+                                        passHref={false} // Ya no es necesario con App Router
                                     >
+                                        {/* El contenido va directamente dentro de Link */}
                                         <FaEye className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
-                                        Ver Detalles
+                                        Ver Detalles de Evento
                                     </Link>
+                                ) : (
+                                    <span className="text-gray-400 block px-4 py-2 text-sm w-full text-left flex items-center cursor-not-allowed">
+                                        <FaEye className="mr-3 h-4 w-4" aria-hidden="true" />
+                                            Ver Detalles de Evento
+                                    </span>
                                 )}
-                                {canConfirm && (
+                                <div className="border-t border-gray-100 my-1"></div>
+                                {canConfirm ? (
                                     <button
-                                        onClick={() => onConfirmarReserva(reservaId)}
+                                        onClick={() => { onConfirmarReserva(item); setOpenActionMenu(null); }}
                                         className="text-green-700 block px-4 py-2 text-sm hover:bg-green-50 hover:text-green-900 w-full text-left flex items-center"
                                         role="menuitem"
                                         tabIndex="-1"
                                     >
                                         <FaCheck className="mr-3 h-4 w-4" aria-hidden="true" />
-                                        Confirmar
+                                            Confirmar Reserva Hab.
                                     </button>
+                                ) : (
+                                    <span className="text-gray-400 block px-4 py-2 text-sm w-full text-left flex items-center cursor-not-allowed">
+                                        <FaCheck className="mr-3 h-4 w-4" aria-hidden="true" />
+                                            Confirmar Reserva Hab.
+                                    </span>
                                 )}
-                                {canCancel && (
+                                {canMarkPending ? (
                                     <button
-                                        onClick={() => onCancelarReserva(reservaId)}
+                                        onClick={() => { onMarcarPendiente(item); setOpenActionMenu(null); }}
+                                        className="text-yellow-700 block px-4 py-2 text-sm hover:bg-yellow-50 hover:text-yellow-900 w-full text-left flex items-center"
+                                        role="menuitem"
+                                        tabIndex="-1"
+                                    >
+                                        <FaClock className="mr-3 h-4 w-4" aria-hidden="true" />
+                                            Marcar Pendiente Hab.
+                                    </button>
+                                ) : (
+                                    <span className="text-gray-400 block px-4 py-2 text-sm w-full text-left flex items-center cursor-not-allowed">
+                                        <FaClock className="mr-3 h-4 w-4" aria-hidden="true" />
+                                            Marcar Pendiente Hab.
+                                    </span>
+                                )}
+                                {canCancel ? (
+                                    <button
+                                        onClick={() => { onCancelarReserva(item); setOpenActionMenu(null); }}
                                         className="text-red-700 block px-4 py-2 text-sm hover:bg-red-50 hover:text-red-900 w-full text-left flex items-center"
                                         role="menuitem"
                                         tabIndex="-1"
                                     >
-                                        <FaTimes className="mr-3 h-4 w-4" aria-hidden="true" />
-                                        Cancelar
+                                        <FaExclamationTriangle className="mr-3 h-4 w-4" aria-hidden="true" />
+                                            Cancelar Reserva Hab.
                                     </button>
+                                ) : (
+                                    <span className="text-gray-400 block px-4 py-2 text-sm w-full text-left flex items-center cursor-not-allowed">
+                                        <FaExclamationTriangle className="mr-3 h-4 w-4" aria-hidden="true" />
+                                            Cancelar Reserva Hab.
+                                    </span>
                                 )}
-                                {canDelete && (
-                                    <button
-                                        onClick={() => onEliminarReserva(reservaId)}
-                                        className="text-red-700 block px-4 py-2 text-sm hover:bg-red-50 hover:text-red-900 w-full text-left flex items-center"
-                                        role="menuitem"
-                                        tabIndex="-1"
-                                    >
-                                         <FaTrash className="mr-3 h-4 w-4" aria-hidden="true" />
-                                         Eliminar
-                                    </button>
-                                )}
-                                {canMarkPending && (
-                                     <button
-                                         onClick={() => {
-                                             onMarcarPendiente(reservaId);
-                                         }}
-                                         className="text-yellow-700 block px-4 py-2 text-sm hover:bg-yellow-50 hover:text-yellow-900 w-full text-left flex items-center"
-                                         role="menuitem"
-                                         tabIndex="-1"
-                                     >
-                                          <FaExclamationTriangle className="mr-3 h-4 w-4" aria-hidden="true" />
-                                          Marcar Pendiente
-                                     </button>
+
+                                {canAssign && (
+                                   <>
+                                     <div className="border-t border-gray-100 my-1"></div>
+                                     {estaAsignada ? (
+                                         <button
+                                             onClick={() => { onDesasignarReserva(item); setOpenActionMenu(null); }}
+                                             className="block px-4 py-2 text-sm w-full text-left flex items-center text-orange-700 hover:bg-orange-50"
+                                             role="menuitem"
+                                             tabIndex="-1"
+                                         >
+                                             <FaUserMinus className="mr-3 h-4 w-4" aria-hidden="true" />
+                                             Desasignar Evento
+                                         </button>
+                                     ) : (
+                                         <button
+                                             onClick={() => { onAsignarReserva(item); setOpenActionMenu(null); }}
+                                             className="text-blue-700 block px-4 py-2 text-sm hover:bg-blue-50 hover:text-blue-900 w-full text-left flex items-center"
+                                             role="menuitem"
+                                             tabIndex="-1"
+                                         >
+                                             <FaUserPlus className="mr-3 h-4 w-4" aria-hidden="true" />
+                                             Asignar Evento a...
+                                         </button>
+                                     )}
+                                   </>
                                 )}
                                 <div className="border-t border-gray-100 my-1"></div>
-                                {canAssign && (
-                                    <>
-                                        {!estaAsignada ? (
-                                            <button
-                                                onClick={() => { onAsignarReserva(reserva); setOpenActionMenu(null); }}
-                                                disabled={loadingUsuarios}
-                                                className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center disabled:opacity-50"
-                                                role="menuitem"
-                                                tabIndex="-1"
-                                            >
-                                                 <FaUserPlus className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
-                                                 Asignar Admin
-                                            </button>
-                                        ) : asignadaAlUsuarioActual ? (
-                                            <button
-                                                onClick={() => { onDesasignarReserva(reservaId); setOpenActionMenu(null); }}
-                                                className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center"
-                                                role="menuitem"
-                                                tabIndex="-1"
-                                            >
-                                                <FaUserMinus className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
-                                                Desasignarme
-                                            </button>
-                                        ) : (
-                                            <button
-                                                onClick={() => { onAsignarReserva(reserva); setOpenActionMenu(null); }}
-                                                disabled={loadingUsuarios}
-                                                className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center disabled:opacity-50"
-                                                role="menuitem"
-                                                tabIndex="-1"
-                                            >
-                                                <FaUserCheck className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
-                                                Reasignar Admin
-                                            </button>
-                                        )}
-                                    </>
+                                {canDelete && (
+                                    <button
+                                        onClick={() => { onEliminarReserva(item); setOpenActionMenu(null); }}
+                                        className="text-red-700 block px-4 py-2 text-sm hover:bg-red-50 hover:text-red-900 w-full text-left flex items-center"
+                                        role="menuitem"
+                                        tabIndex="-1"
+                                    >
+                                        <FaTrash className="mr-3 h-4 w-4" aria-hidden="true" />
+                                            Eliminar Evento Completo
+                                    </button>
                                 )}
                              </div>
                            </div>
@@ -1013,61 +1096,22 @@ function RoomTableView({
                        </div>
                     </td>
                   </tr>
-
-                  {isExpanded && (
-                    <tr className="bg-white border-l-4 border-purple-200">
-                      <td colSpan="7" className="px-4 py-3">
-                         <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-3 text-xs p-2">
-                            <div>
-                               <h4 className="font-semibold text-gray-600 mb-1">Detalles Contacto</h4>
-                               <p><span className="text-gray-500">Nombre:</span> {reserva.nombreContacto} {reserva.apellidosContacto}</p>
-                               <p><span className="text-gray-500">Email:</span> {reserva.emailContacto || 'N/A'}</p>
-                               <p><span className="text-gray-500">Teléfono:</span> {reserva.telefonoContacto || 'N/A'}</p>
-                               {reserva.dniContacto && <p><span className="text-gray-500">DNI:</span> {reserva.dniContacto}</p>}
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-gray-600 mb-1">Detalles Reserva</h4>
-                                <p><span className="text-gray-500">ID Reserva:</span> <span className="font-mono text-[11px]">{reserva._id}</span></p>
-                                <p><span className="text-gray-500">Tipo:</span> {reserva.tipoReserva}</p>
-                                <p><span className="text-gray-500">Estado:</span> {reserva.estadoReserva}</p>
-                                <p><span className="text-gray-500">Fecha Creación:</span> {formatearFecha(reserva.createdAt)}</p>
-                                <p><span className="text-gray-500">Num Huéspedes:</span> {reserva.numHuespedes || 'N/A'}</p>
-                                {typeof reserva.precioTotal === 'number' && <p><span className="text-gray-500">Precio:</span> {reserva.precioTotal.toFixed(2)} €</p>}
-                            </div>
-                            {eventoId && reserva.eventoId && (
-                                <div>
-                                     <h4 className="font-semibold text-gray-600 mb-1">Evento Asociado</h4>
-                                     <p><span className="text-gray-500">ID Evento:</span> <span className="font-mono text-[11px]">{eventoId}</span></p>
-                                     {typeof reserva.eventoId === 'object' && reserva.eventoId !== null ? (
-                                         <>
-                                             <p><span className="text-gray-500">Nombre Evento:</span> {reserva.eventoId.nombreEvento || 'N/A'}</p>
-                                             <p><span className="text-gray-500">Fecha Evento:</span> {formatearFecha(reserva.eventoId.fechaEvento)}</p>
-                                             <p><span className="text-gray-500">Tipo Evento:</span> {reserva.eventoId.tipoEvento || 'N/A'}</p>
-                                             <Link href={`/admin/reservaciones/evento/${eventoId}`} legacyBehavior>
-                                                 <a className="text-blue-600 hover:underline text-xs mt-1 inline-block">Ver detalles del evento &rarr;</a>
-                                             </Link>
-                                         </>
-                                     ) : (
-                                          <Link href={`/admin/reservaciones/evento/${eventoId}`} legacyBehavior>
-                                              <a className="text-blue-600 hover:underline text-xs mt-1 inline-block">Ver detalles del evento &rarr;</a>
-                                          </Link>
-                                     )}
-                                </div>
-                            )}
-                         </div>
-                      </td>
-                    </tr>
-                  )}
                 </Fragment>
               );
+            } catch (error) {
+                console.error(`Error al procesar item ${index + 1}:`, error);
+                // Renderizar una fila de error o simplemente devolver null para omitirla
+                return (
+                    <tr key={`error-${index}`}>
+                        <td colSpan={8} className="px-4 py-3 text-center text-red-600 text-sm">
+                            Error al renderizar esta fila. Detalles en la consola.
+                        </td>
+                    </tr>
+                );
+            }
             })}
           </tbody>
         </table>
-      </div>
-       <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-500">
-            Mostrando {habitaciones.length} reservas de eventos
-            {totalReservationsCount > habitaciones.length && ` (filtradas de ${totalReservationsCount} total)`}
-        </div>
     </div>
   );
 } 

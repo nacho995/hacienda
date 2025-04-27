@@ -6,8 +6,8 @@ class AuthService {
     try {
       console.log('Intentando iniciar sesión con:', { email });
       
-      // Utilizamos la ruta sin el prefijo /api
-      const response = await apiClient.post('/auth/login', { email, password });
+      // Corregir ruta añadiendo /api
+      const response = await apiClient.post('/api/auth/login', { email, password });
       console.log('Respuesta de login exitosa:', response);
 
       if (response.success && response.token) {
@@ -56,7 +56,8 @@ class AuthService {
   // Registrar nuevo usuario
   async register(userData) {
     try {
-      const response = await apiClient.post('/auth/register', userData);
+      // Corregir ruta añadiendo /api
+      const response = await apiClient.post('/api/auth/register', userData);
       return response;
     } catch (error) {
       console.error('Error al registrar usuario:', error.message || error);
@@ -75,7 +76,8 @@ class AuthService {
       localStorage.removeItem('user');
       
       try {
-        await apiClient.get('/auth/logout');
+        // Corregir ruta añadiendo /api
+        await apiClient.get('/api/auth/logout');
       } catch (error) {
         console.error('Error al cerrar sesión en el servidor:', error.message || error);
       }
@@ -158,7 +160,8 @@ class AuthService {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
       
       try {
-        const response = await apiClient.get('/auth/me', { signal: controller.signal });
+        // Corregir ruta añadiendo /api
+        const response = await apiClient.get('/api/auth/me', { signal: controller.signal });
         clearTimeout(timeoutId);
         
         if (response.success && response.data) {
@@ -201,7 +204,8 @@ class AuthService {
     try {
       console.log('Solicitando restablecimiento de contraseña para:', email);
       
-      const response = await apiClient.post('/auth/password/forgot', { email });
+      // Corregir ruta añadiendo /api
+      const response = await apiClient.post('/api/auth/password/forgot', { email });
       
       if (response.success) {
         return {
@@ -228,7 +232,8 @@ class AuthService {
     try {
       console.log('Restableciendo contraseña con token');
       
-      const response = await apiClient.put(`/auth/password/reset/${token}`, { password });
+      // Corregir ruta añadiendo /api
+      const response = await apiClient.put(`/api/auth/password/reset/${token}`, { password });
       
       if (response.success) {
         return {

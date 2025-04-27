@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useAuth } from './AuthContext';
 import { getAllReservationsForDashboard } from '../services/reservationService';
 import { toast } from 'sonner';
+import { obtenerTodasLasReservas } from '@/services/disponibilidadService';
 
 const ReservationContext = createContext();
 
@@ -85,9 +86,24 @@ export const ReservationProvider = ({ children }) => {
   // Normalizar IDs para evitar problemas de comparación
   const normalizeId = (obj) => {
     if (!obj) return null;
-    if (obj.id && !obj._id) obj._id = obj.id;
-    if (obj._id && !obj.id) obj.id = obj._id;
-    return obj;
+    
+    // Crear una copia asegurando que 'tipo' se incluye desde el inicio
+    const normalizedObj = { 
+      ...obj,
+      tipo: obj.tipo // Copiar explícitamente el tipo aquí
+    }; 
+    
+    // Normalizar IDs en la copia
+    if (normalizedObj.id && !normalizedObj._id) normalizedObj._id = normalizedObj.id;
+    if (normalizedObj._id && !normalizedObj.id) normalizedObj.id = normalizedObj._id;
+    
+    // La condición explícita de 'tipo' ya no es necesaria aquí,
+    // porque se incluyó en el spread inicial.
+    // if (obj.tipo) {
+    //  normalizedObj.tipo = obj.tipo;
+    // }
+
+    return normalizedObj; // Devolver la copia normalizada
   };
 
   // Cargar todas las reservaciones
@@ -98,15 +114,54 @@ export const ReservationProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const allReservations = await getAllReservationsForDashboard();
+      const allReservationsResponse = await getAllReservationsForDashboard();
       // <<< LOG 5: Datos recibidos del backend >>>
-      // console.log('[ReservationContext] Datos recibidos de getAllReservationsForDashboard:', JSON.stringify(allReservations)); // Stringify para ver todo
+      // console.log('[ReservationContext] Datos recibidos de getAllReservationsForDashboard:', JSON.stringify(allReservationsResponse)); // Stringify para ver todo
 
-      const normalizedReservations = allReservations.map(normalizeId);
+      // --- CORRECCIÓN: Extraer la lista COMBINADA del backend --- 
+      const combinedReservationsFromBackend = allReservationsResponse?.data || [];
+
+      // <<< NUEVO LOG: Verificar datos CRUDOS antes de normalizar >>>
+      console.log('[ReservationContext] Datos CRUDOS RECIBIDOS (primeros 5):',
+        combinedReservationsFromBackend.slice(0, 5).map(r => ({ 
+          _id: r._id, 
+          tipo: r.tipo, 
+          nombreContacto: r.nombreContacto,
+          apellidosContacto: r.apellidosContacto,
+          usuario: r.usuario,
+          huesped: r.huesped
+        }))
+      );
+      // <<< FIN NUEVO LOG >>>
+
+      // Verificar si combinedReservationsFromBackend es realmente un array antes de mapear
+      if (!Array.isArray(combinedReservationsFromBackend)) {
+        console.error('[ReservationContext] Error: La respuesta del backend no contiene un array de datos válidos:', combinedReservationsFromBackend);
+        setError('Error inesperado al procesar las reservaciones.');
+        setLoading(false);
+        return; // Detener ejecución si los datos no son válidos
+      }
+
+      // Normalizar IDs para todos los elementos
+      const normalizedReservations = combinedReservationsFromBackend.map(normalizeId);
       
+      // <<< NUEVO LOG: Verificar los primeros elementos ANTES de filtrar (log directo) >>>
+      console.log('[ReservationContext] Primeros 5 elementos normalizados ANTES de filtrar por tipo (directo):');
+      console.dir(normalizedReservations.slice(0, 5)); // Usar console.dir para intentar mostrar el objeto completo
+      // <<< FIN NUEVO LOG >>>
+
+      // --- CORRECCIÓN: Filtrar la lista NORMALIZADA usando el campo 'tipo' --- 
       const habitaciones = normalizedReservations.filter(r => r.tipo === 'habitacion');
       const eventos = normalizedReservations.filter(r => r.tipo === 'evento');
+      // -------------------------------------------------------------------------
       
+      // <<< NUEVO LOG: Verificar los primeros elementos DESPUÉS de filtrar (log directo) >>>
+      console.log('[ReservationContext] Primeros 5 elementos en lista \'habitaciones\' DESPUÉS de filtrar (directo):');
+      console.dir(habitaciones.slice(0, 5)); // Usar console.dir
+      console.log('[ReservationContext] Primeros 5 elementos en lista \'eventos\' DESPUÉS de filtrar (directo):');
+      console.dir(eventos.slice(0, 5)); // Usar console.dir
+      // <<< FIN NUEVO LOG >>>
+
       // Crear mapa de eventos
       const eventosMap = new Map();
       eventos.forEach(evento => {

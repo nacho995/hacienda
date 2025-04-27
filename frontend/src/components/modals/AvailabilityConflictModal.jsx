@@ -5,7 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FaExclamationTriangle } from 'react-icons/fa';
 
 const AvailabilityConflictModal = ({ isOpen, onClose, message }) => {
-  if (!isOpen) return null;
+  console.log(`Rendering AvailabilityConflictModal. isOpen: ${isOpen}`);
+  
+  // if (!isOpen) return null;
 
   return (
     <AnimatePresence>

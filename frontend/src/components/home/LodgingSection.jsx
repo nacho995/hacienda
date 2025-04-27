@@ -55,7 +55,7 @@ export default function LodgingSection() {
       setLoading(true);
       setError(null);
       try {
-        const data = await apiClient.get('/tipos-habitacion');
+        const data = await apiClient.get('/api/tipos-habitacion');
         
         // Mapeo flexible de datos
         const formattedData = data.data.map((room, index) => {

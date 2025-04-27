@@ -11,6 +11,8 @@ import {
     seleccionarMetodoPagoHabitacion
 } from '@/services/reservationService';
 import { FaCreditCard, FaUniversity, FaMoneyBillWave } from 'react-icons/fa';
+// Importar el nuevo servicio de disponibilidad
+import { verificarDisponibilidadHabitacion, obtenerFechasOcupadas } from '@/services/disponibilidadService';
 
 // Importar componentes de layout
 const Navbar = dynamic(() => import('@/components/layout/Navbar'), { ssr: false });
@@ -85,6 +87,22 @@ export default function HotelPage() {
       console.log('New selectedRoomIds:', newSelectedIds); // Log updated state
       return newSelectedIds;
     });
+  };
+
+  // Modificada: Función para verificar disponibilidad usando nuestro nuevo servicio
+  const verificarDisponibilidad = async (habitacionId, fechas) => {
+    if (!fechas || !fechas.fechaInicio || !fechas.fechaFin) return false;
+    
+    try {
+      return await verificarDisponibilidadHabitacion(
+        habitacionId,
+        fechas.fechaInicio,
+        fechas.fechaFin
+      );
+    } catch (error) {
+      console.error('Error al verificar disponibilidad:', error);
+      return false;
+    }
   };
 
   // Function to set all rooms info when loaded by the map component
@@ -182,7 +200,10 @@ export default function HotelPage() {
   };
   // ---------------------------------------
 
-  console.log(`[HotelPage] Rendering...`); // Simplified log
+  // console.log('[HotelPage] Rendering...'); // <<< ELIMINADO O COMENTADO
+
+  const [stripePromise, setStripePromise] = useState(null);
+
   return (
     <>
       <Navbar />

@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   getEventoReservation, 
   updateEventoReservation, 
   deleteEventoReservation, 
   getEventoHabitaciones,
   updateReservaHabitacionHuespedes,
-  assignEventoAdmin
+  asignarEventoAdmin
 } from '@/services/reservationService';
 import apiClient from '@/services/apiClient';
 import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaGlassCheers, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaUtensils, FaBed, FaSave, FaPlus, FaTrash, FaUserShield } from 'react-icons/fa';
@@ -20,7 +20,9 @@ import ConfirmationModal from '@/components/modals/ConfirmationModal';
 
 export default function EventoReservationDetail({ params }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = React.use(params).id;
+  const isHighlighted = searchParams.get('highlighted') === 'true';
   const { user } = useAuth();
   
   const [reservation, setReservation] = useState(null);
@@ -50,7 +52,7 @@ export default function EventoReservationDetail({ params }) {
   const cargarUsuariosAdmin = useCallback(async () => {
     setLoadingUsuariosAdmin(true);
     try {
-      const response = await apiClient.get('/users?from_admin=true');
+      const response = await apiClient.get('/api/users?from_admin=true');
       if (response?.data && Array.isArray(response.data)) {
         const admins = response.data.filter(u => u.role === 'admin');
         setUsuariosAdmin(admins);
@@ -88,6 +90,7 @@ export default function EventoReservationDetail({ params }) {
           try {
             const responseHabitaciones = await getEventoHabitaciones(id);
             if (responseHabitaciones && responseHabitaciones.success && Array.isArray(responseHabitaciones.data?.habitaciones)) {
+              console.log('[EventoDetail Page] useEffect - Received habitaciones:', JSON.stringify(responseHabitaciones.data.habitaciones, null, 2));
               setHabitacionesEvento(responseHabitaciones.data.habitaciones);
               const initialEdits = {};
               responseHabitaciones.data.habitaciones.forEach(hab => {
@@ -260,29 +263,43 @@ export default function EventoReservationDetail({ params }) {
   };
   
   const abrirModalAsignarAdmin = () => {
-    if (!reservation) return;
-    cargarUsuariosAdmin();
+    if (usuariosAdmin.length === 0 && !loadingUsuariosAdmin) {
+      cargarUsuariosAdmin();
+    }
     setShowAsignarAdminModal(true);
   };
-
+  
   const handleAsignarAdmin = async (adminId) => {
-    if (!reservation || !adminId) {
-      toast.error('Faltan datos para asignar.');
+    if (!adminId) {
+      toast.warning("Por favor, seleccione un administrador.");
       return;
     }
+    if (!reservation || !reservation._id) {
+      toast.error("No se pudo obtener el ID de la reserva actual.");
+      return;
+    }
+    
     setIsAsignandoAdmin(true);
     try {
-      const response = await assignEventoAdmin(reservation._id, adminId);
-      if (response.success) {
-        toast.success('Reserva de evento asignada al administrador correctamente.');
-        setReservation(prev => ({ ...prev, asignadoA: usuariosAdmin.find(u => u._id === adminId) }));
+      console.log(`>>> Componente: Intentando asignar evento ${reservation._id} a admin ${adminId}`);
+      const response = await asignarEventoAdmin(reservation._id, adminId); 
+      
+      console.log('<<< Componente: Respuesta de asignación:', response);
+      
+      if (response && response.success) {
+        toast.success('Evento asignado correctamente al administrador.');
+        const adminAsignado = usuariosAdmin.find(u => u._id === adminId);
+        setReservation(prev => ({
+          ...prev,
+          asignadoA: adminAsignado || { _id: adminId }
+        }));
         setShowAsignarAdminModal(false);
       } else {
-        toast.error(response.message || 'Error al asignar la reserva de evento.');
+        toast.error(response?.message || 'Error al asignar el administrador.');
       }
     } catch (error) {
-      console.error('Error asignando reserva de evento a admin:', error);
-      toast.error('Error de red al asignar la reserva de evento.');
+      console.error('>>> Componente: Error CATCH en handleAsignarAdmin:', error);
+      toast.error(error?.message || 'Error inesperado al asignar administrador.');
     } finally {
       setIsAsignandoAdmin(false);
     }
@@ -351,7 +368,7 @@ export default function EventoReservationDetail({ params }) {
         </Link>
       </div>
 
-      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+      <div className={`bg-white shadow-lg rounded-lg overflow-hidden transition-all duration-300 ${isHighlighted ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}>
         <div className="bg-gradient-to-r from-purple-800 to-indigo-800 text-white p-6 flex justify-between items-center">
               <div>
             <h1 className="text-2xl md:text-3xl font-semibold mb-1">Detalle de Reserva de Evento</h1>
@@ -397,47 +414,61 @@ export default function EventoReservationDetail({ params }) {
              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                <h2 className="text-lg font-semibold text-gray-800 mb-4 border-b pb-2">Habitaciones Incluidas</h2>
           {loadingHabitaciones ? (
-                 <div className="text-center py-4"><FaSpinner className="animate-spin mx-auto text-gray-500" /></div>
+                 <div className="text-center py-4"><FaSpinner className="animate-spin mx-auto text-gray-500" /> Cargando habitaciones...</div>
           ) : errorHabitaciones ? (
-                 <p className="text-red-600 text-sm">{errorHabitaciones}</p>
+                 <div className="text-center py-4 text-red-600">{errorHabitaciones}</div>
                ) : habitacionesEvento.length > 0 ? (
-                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                   {habitacionesEvento.map(hab => (
-                     <div key={hab._id} className="p-3 border rounded-md bg-white shadow-sm">
-                       <div className="flex justify-between items-start mb-2">
-                         <h3 className="font-medium text-gray-700">Habitación {hab.habitacion || '?'} ({hab.tipoHabitacion || 'Estándar'})</h3>
-                         <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusStyles(hab.estadoReserva)}`}>{hab.estadoReserva || 'Pendiente'}</span>
-              </div>
-                       <div className="text-xs text-gray-600 mb-2">
-                         <p><strong>Fechas:</strong> {formatDate(hab.fechaEntrada)} - {formatDate(hab.fechaSalida)}</p>
-                  </div>
-                       <div>
-                         <p className="text-xs font-medium text-gray-500 mb-1">Huéspedes ({huespedesEditados[hab._id]?.nombres?.length || 0})</p>
-                         <ul className="list-disc list-inside mb-1 text-xs text-gray-600 pl-4">
-                           {(huespedesEditados[hab._id]?.nombres?.length > 0) ? 
-                             huespedesEditados[hab._id].nombres.map((nombre, index) => (
-                               <li key={index} className="flex justify-between items-center">
-                            <span>{nombre}</span>
-                                 <button onClick={() => handleRemoveGuest(hab._id, index)} className="text-red-400 hover:text-red-600 p-0.5"><FaTrash size={10} /></button>
-                          </li>
-                             )) : <li className="text-gray-400 italic text-xs">No registrados</li>}
-                      </ul>
-                         <div className="flex gap-1 mt-1">
-                          <input 
-                              type="text"
-                             placeholder="Añadir huésped..."
-                              value={huespedesEditados[hab._id]?.currentGuestName || ''}
-                              onChange={(e) => handleHuespedChange(hab._id, 'currentGuestName', e.target.value)}
-                             className="flex-grow px-2 py-1 border border-gray-300 rounded-md text-xs"
-                           />
-                           <button onClick={() => handleAddGuest(hab._id)} className="bg-blue-500 text-white px-2 py-1 rounded-md text-xs"><FaPlus /></button>
-                           <button onClick={() => handleGuardarHuespedes(hab._id)} disabled={updating} className="bg-green-500 text-white px-2 py-1 rounded-md text-xs"><FaSave /></button>
-                      </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
+                 <div className="space-y-4">
+                   {habitacionesEvento.map((habitacion) => {
+                     console.log('[EventoDetail Page] map - Rendering habitacion:', JSON.stringify(habitacion, null, 2));
+                     return (
+                       <div key={habitacion._id} className="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row justify-between items-start gap-4 relative">
+                         {/* Columna principal de info */}
+                         <div className="flex-grow space-y-2">
+                           <h4 className="text-md font-semibold text-gray-800">
+                             Habitación {habitacion.habitacionDetails?.letra || 'N/A'} ({habitacion.categoria?.nombre || 'Estándar'})
+                           </h4>
+                           <p className="text-xs text-gray-600">
+                             <span className="font-medium">Fechas:</span> {formatDate(habitacion.fechaEntrada)} - {formatDate(habitacion.fechaSalida)}
+                           </p>
+                           {/* Sección Huéspedes */}
+                           <div>
+                             <p className="text-xs font-medium text-gray-500 mb-1">Huéspedes ({huespedesEditados[habitacion._id]?.nombres?.length || 0})</p>
+                             <ul className="list-disc list-inside mb-1 text-xs text-gray-600 pl-4">
+                               {(huespedesEditados[habitacion._id]?.nombres?.length > 0) ?
+                                 huespedesEditados[habitacion._id].nombres.map((nombre, index) => (
+                                   <li key={index} className="flex justify-between items-center">
+                                     <span>{nombre}</span>
+                                     <button onClick={() => handleRemoveGuest(habitacion._id, index)} className="text-red-400 hover:text-red-600 p-0.5"><FaTrash size={10} /></button>
+                                   </li>
+                                 )) : <li className="text-gray-400 italic text-xs">No registrados</li>}
+                             </ul>
+                             <div className="flex gap-1 mt-1">
+                               <input
+                                 type="text"
+                                 placeholder="Añadir huésped..."
+                                 value={huespedesEditados[habitacion._id]?.currentGuestName || ''}
+                                 onChange={(e) => handleHuespedChange(habitacion._id, 'currentGuestName', e.target.value)}
+                                 className="flex-grow px-2 py-1 border border-gray-300 rounded-md text-xs"
+                               />
+                               <button onClick={() => handleAddGuest(habitacion._id)} className="bg-blue-500 text-white px-2 py-1 rounded-md text-xs"><FaPlus /></button>
+                               <button onClick={() => handleGuardarHuespedes(habitacion._id)} disabled={updating} className="bg-green-500 text-white px-2 py-1 rounded-md text-xs"><FaSave /></button>
+                             </div>
+                           </div>
+                         </div>
+
+                         {/* Columna de Estado y Acciones */}
+                         <div className="flex-shrink-0 flex flex-col items-end space-y-2 md:space-y-1">
+                            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusStyles(habitacion.estadoReserva)}`}>
+                              {habitacion.estadoReserva ? habitacion.estadoReserva.charAt(0).toUpperCase() + habitacion.estadoReserva.slice(1) : 'Pendiente'}
+                            </span>
+                           {/* Podríamos añadir botones de acción específicos para la habitación aquí si fuera necesario */}
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               ) : (
                  <p className="text-sm text-gray-500 italic">No hay habitaciones asignadas a este evento.</p>
                )}
              </div>

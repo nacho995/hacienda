@@ -3,15 +3,14 @@ const mongoose = require('mongoose');
 // Definir el esquema de ReservaHabitacion directamente en lugar de extender de un base schema
 const ReservaHabitacionSchema = new mongoose.Schema({
   habitacion: {
-    type: String,
-    required: [true, 'Por favor, proporcione la letra de la habitación'],
-    trim: true,
-    description: 'Letra identificadora de la habitación (A, B, C, etc.)'
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Habitacion',
+    required: [true, 'Por favor, seleccione la habitación'],
   },
   tipoHabitacion: {
-    type: String,
-    required: [true, 'Por favor, proporcione el tipo de habitación'],
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TipoHabitacion',
+    required: [true, 'Por favor, seleccione el tipo de habitación']
   },
   fechaEntrada: {
     type: Date,
@@ -86,7 +85,7 @@ const ReservaHabitacionSchema = new mongoose.Schema({
   },
   estadoReserva: {
     type: String,
-    enum: ['pendiente', 'confirmada', 'cancelada', 'completada'],
+    enum: ['pendiente', 'confirmada', 'cancelada', 'completada', 'pendiente_pago'],
     default: 'pendiente'
   },
   fechaReserva: {

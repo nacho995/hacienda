@@ -19,7 +19,7 @@ const EditReviewModal = ({ review, onClose, onSave }) => {
     setError(null);
     try {
       // Usar apiClient en lugar de fetch
-      const response = await apiClient.put(`/reviews/admin/${review._id}`, { 
+      const response = await apiClient.put(`/api/reviews/admin/${review._id}`, { 
           name, 
           rating, 
           comment 
@@ -214,9 +214,9 @@ export default function ManageReviews() {
     
     setIsLoading(true);
     setError(null);
-    console.log('[ManageReviews] fetchReviews: Intentando con apiClient a /reviews/admin/all');
+    console.log('[ManageReviews] fetchReviews: Intentando con apiClient a /api/reviews/admin/all');
     try {
-      const response = await apiClient.get('/reviews/admin/all');
+      const response = await apiClient.get('/api/reviews/admin/all');
       console.log('[ManageReviews] fetchReviews: Respuesta apiClient recibida');
 
       // --- CORREGIDO: Verificar la estructura de la respuesta del backend --- 
@@ -261,7 +261,7 @@ export default function ManageReviews() {
     // Ya no necesitamos verificar token si apiClient lo hace
     try {
       // Usar apiClient
-      await apiClient.patch(`/reviews/admin/${id}/status`, { status });
+      await apiClient.patch(`/api/reviews/admin/${id}/status`, { status });
       
       // Actualizar estado local
       setReviews(prevReviews => 
@@ -281,7 +281,7 @@ export default function ManageReviews() {
     }
     try {
       // Usar apiClient
-      await apiClient.delete(`/reviews/admin/${id}`);
+      await apiClient.delete(`/api/reviews/admin/${id}`);
       
       // Actualizar estado local
       setReviews(prevReviews => prevReviews.filter(r => r._id !== id));

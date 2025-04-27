@@ -10,13 +10,15 @@ export * from './authService';
 // Servicios de reservas
 export * from './reservationService';
 
+// NUEVO: Servicios de disponibilidad (preferir estos para verificación de disponibilidad)
+export * from './disponibilidadService';
+
 // Servicios de habitaciones
 export * from './habitaciones.service';
 export { default as habitacionService } from './habitaciones.service';
 
 // Servicios de eventos
-export * from './eventoService';
-export { default as eventoService } from './eventoService';
+export * from './eventos.service';
 
 // Servicios de usuarios
 export * from './userService';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   getHabitacionReservation,
   updateHabitacionReservation,
@@ -21,7 +21,10 @@ import { FaChevronDown, FaUserCheck } from 'react-icons/fa'; // Para Dropdown y 
 
 export default function HabitacionReservationDetail({ params }) {
   const router = useRouter();
-  const id = React.use(params).id; // Corrección para obtener ID
+  const searchParams = useSearchParams(); // <<< Obtener searchParams
+  const id = React.use(params).id; // <<< USAR React.use(params).id para seguir recomendación Next.js
+  const isHighlighted = searchParams.get('highlighted') === 'true'; // <<< Comprobar si se debe resaltar
+
   const { user } = useAuth();
 
   const [reservation, setReservation] = useState(null);
@@ -48,14 +51,18 @@ export default function HabitacionReservationDetail({ params }) {
   });
 
   const cargarReserva = useCallback(async () => {
-    if (!id) return;
+    if (!id) return; // <<< USAR la variable id aquí
 
     setLoading(true);
     setError(null);
     try {
-      const response = await getHabitacionReservation(id); // Llama al servicio
+      const response = await getHabitacionReservation(id); // <<< USAR la variable id aquí
        // Verifica la estructura de la respuesta del servicio
       if (response && response.success && response.data) {
+         // console.log('Datos recibidos de getHabitacionReservation:', response.data);
+         // Log más detallado:
+         // console.log('Datos DETALLADOS recibidos (habitacion):', JSON.stringify(response.data.habitacion, null, 2));
+         // console.log('Datos DETALLADOS recibidos (tipoHabitacion):', JSON.stringify(response.data.tipoHabitacion, null, 2));
          setReservation(response.data);
          // Inicializar estado de edición con datos de la reserva
          setEditedData({
@@ -316,20 +323,35 @@ export default function HabitacionReservationDetail({ params }) {
       </div>
 
       {/* Contenedor principal de detalles */}
-      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+      <div className={`bg-white shadow-lg rounded-lg overflow-hidden transition-all duration-300 ${isHighlighted ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}>
         {/* Cabecera */}
         <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white p-6 flex justify-between items-center">
           <div>
             <h1 className="text-2xl md:text-3xl font-semibold mb-1">Detalle de Reserva de Habitación</h1>
             <p className="text-sm opacity-90">Número de Confirmación: <span className="font-mono bg-white bg-opacity-20 px-2 py-1 rounded">{reservation?.numeroConfirmacion || 'N/A'}</span></p>
           </div>
-          <button
-            onClick={handleEditToggle}
-            disabled={updating}
-            className={`px-4 py-2 rounded-md flex items-center transition-colors ${isEditing ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white disabled:opacity-50`}
-          >
-            {isEditing ? <><FaTimes className="mr-2" /> Cancelar Edición</> : <><FaEdit className="mr-2" /> Editar Reserva</>}
-          </button>
+          {/* Grupo de botones Editar/Guardar/Cancelar */} 
+          <div className="flex items-center gap-2">
+              {/* Botón Guardar (visible solo en modo edición) */} 
+              {isEditing && (
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={updating}
+                  className={`px-4 py-2 rounded-md flex items-center transition-colors bg-green-500 hover:bg-green-600 text-white disabled:opacity-50`}
+                >
+                  {updating ? <FaSpinner className="animate-spin mr-2" /> : <FaSave className="mr-2" />}
+                  Guardar Cambios
+                </button>
+              )}
+              {/* Botón Editar/Cancelar Edición */} 
+              <button
+                onClick={handleEditToggle} // Siempre llama a handleEditToggle
+                disabled={updating && !isEditing} // Deshabilitado si se está actualizando ALGO y NO estamos editando
+                className={`px-4 py-2 rounded-md flex items-center transition-colors ${isEditing ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white disabled:opacity-50`}
+              >
+                {isEditing ? <><FaTimes className="mr-2" /> Cancelar</> : <><FaEdit className="mr-2" /> Editar Reserva</>}
+              </button>
+          </div>
         </div>
 
          {/* Contenido */}
@@ -337,66 +359,37 @@ export default function HabitacionReservationDetail({ params }) {
           {/* Grid de detalles */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
 
-            {/* Columna Izquierda: Habitación y Estancia */}
+            {/* Columna Izquierda: Detalles de la Habitación */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-600 border-b pb-2">Habitación y Estancia</h3>
+              <h3 className="text-lg font-semibold text-gray-700 border-b pb-2 mb-4 flex items-center"><FaBed className="mr-2 text-purple-600"/> Habitación y Estancia</h3>
+              <DetailItem icon={FaBed} label="Habitación">
+                {isEditing ? (
+                  <span className="text-gray-500 italic">No editable aquí</span>
+                ) : (
+                  reservation?.letraHabitacion || reservation?.habitacion?.letra || reservation?.habitacion?.nombre || 'N/A'
+                )}
+              </DetailItem>
 
-              {isEditing ? (
-                <>
-                  {/* Campos de Edición Fechas */}
-                   <div className="flex items-center space-x-4">
-                      <div className="flex-1">
-                          <label htmlFor="fechaEntrada" className="block text-sm font-medium text-gray-700 mb-1">Fecha Entrada</label>
-                          <input
-                            type="date"
-                            name="fechaEntrada"
-                            id="fechaEntrada"
-                            value={editedData.fechaEntrada}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          />
-                      </div>
-                       <div className="flex-1">
-                           <label htmlFor="fechaSalida" className="block text-sm font-medium text-gray-700 mb-1">Fecha Salida</label>
-                          <input
-                            type="date"
-                            name="fechaSalida"
-                            id="fechaSalida"
-                            value={editedData.fechaSalida}
-                            onChange={handleInputChange}
-                            className="w-full px-3 py-1.5 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                          />
-                      </div>
-                   </div>
-                </>
-              ) : (
-                <>
-                  {/* Vista Normal Fechas y Habitación */}
-                  <DetailItem icon={FaBed} label="Habitación">
-                    {reservation?.habitacion ?
-                      `${reservation.habitacion.letra || ''} ${reservation.habitacion.nombre || ''}`.trim() || 'Detalles no disponibles'
-                      : 'N/A'
-                    }
-                  </DetailItem>
-                  <DetailItem icon={FaTag} label="Categoría">
-                    {reservation?.categoriaHabitacion || 'N/A'}
-                  </DetailItem>
-                   <DetailItem icon={FaCalendarAlt} label="Estancia">
-                    {formatDate(reservation?.fechaEntrada)} - {formatDate(reservation?.fechaSalida)}
-                  </DetailItem>
-                  {/* Añadir si se conoce la duración */}
-                   {/* <DetailItem icon={FaClock} label="Duración">{calcularDuracion(reservation?.fechaEntrada, reservation?.fechaSalida)}</DetailItem> */}
-                </>
-              )}
+              <DetailItem icon={FaTag} label="Categoría">
+                {isEditing ? (
+                  <span className="text-gray-500 italic">No editable aquí</span>
+                ) : (
+                  reservation?.tipoHabitacion?.nombre || 'No especificada'
+                )}
+              </DetailItem>
 
-               <DetailItem icon={FaDollarSign} label="Precio Total">
+              <DetailItem icon={FaCalendarAlt} label="Estancia">
+                {formatDate(reservation?.fechaEntrada)} - {formatDate(reservation?.fechaSalida)}
+              </DetailItem>
+
+              <DetailItem icon={FaDollarSign} label="Precio Total">
                 {reservation?.precio?.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' }) || 'N/A'}
               </DetailItem>
               <DetailItem icon={FaMoneyBillWave} label="Método Pago">
                 {reservation?.metodoPago || 'N/A'}
               </DetailItem>
 
-               {/* Mostrar detalles del evento si está asociado */}
+              {/* Mostrar detalles del evento si está asociado */}
               {reservation?.reservaEvento && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                       <h4 className="text-md font-semibold text-gray-600 mb-2">Vinculada a Evento</h4>

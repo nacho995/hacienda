@@ -45,7 +45,11 @@ export default function AdminHotelReservations() {
   const cargarUsuarios = useCallback(async () => {
     try {
       setLoadingUsuarios(true);
-      const response = await apiClient.get('/users');
+      const response = await apiClient.get('/api/users', {
+        params: {
+          from_admin: true
+        }
+      });
       if (response && response.data && Array.isArray(response.data)) {
         setUsuarios(response.data);
       } else {
@@ -165,47 +169,71 @@ export default function AdminHotelReservations() {
 
   // Definir getLetraHabitacion aquí o importarlo
   const getLetraHabitacion = (reserva) => {
-    // Prioridad 1: Campo directo en la reserva (ej. si se denormaliza al crear la reserva)
-    if (reserva?.letraHabitacion) return reserva.letraHabitacion.toUpperCase();
+    // console.log("getLetraHabitacion called for reserva:", reserva?._id, reserva); // Debugging log
+
+    // Prioridad 1: Objeto 'habitacionDetails' populado (nueva prioridad añadida)
+    if (reserva?.habitacionDetails?.letra && reserva.habitacionDetails.letra !== '?') { 
+        // console.log("getLetraHabitacion: Found in habitacionDetails.letra");
+        return reserva.habitacionDetails.letra.toUpperCase();
+    }
   
-    // Prioridad 2: Objeto 'habitacion' populado
+    // Prioridad 2: Campo directo en la reserva (ej. si se denormaliza al crear la reserva)
+    if (reserva?.letraHabitacion) {
+        // console.log("getLetraHabitacion: Found in letraHabitacion field");
+        return reserva.letraHabitacion.toUpperCase();
+    }
+  
+    // Prioridad 3: Objeto 'habitacion' populado (si la estructura fuera diferente)
     if (typeof reserva?.habitacion === 'object' && reserva.habitacion?.letra) {
+        // console.log("getLetraHabitacion: Found in habitacion.letra");
       return reserva.habitacion.letra.toUpperCase();
     }
   
-    // Prioridad 3: Objeto 'habitacionId' populado (nombre común para referencias)
+    // Prioridad 4: Objeto 'habitacionId' populado (nombre común para referencias)
     if (typeof reserva?.habitacionId === 'object' && reserva.habitacionId?.letra) {
+        // console.log("getLetraHabitacion: Found in habitacionId.letra");
       return reserva.habitacionId.letra.toUpperCase();
     }
     
-    // Prioridad 4: Objeto 'habitacion_id' populado (otra convención)
+    // Prioridad 5: Objeto 'habitacion_id' populado (otra convención)
     if (typeof reserva?.habitacion_id === 'object' && reserva.habitacion_id?.letra) {
+        // console.log("getLetraHabitacion: Found in habitacion_id.letra");
         return reserva.habitacion_id.letra.toUpperCase();
     }
   
-    // Fallback 1: Si 'habitacion' es una string, verificar si es una letra válida
+    // Fallback 1: Si 'habitacion' es una string, verificar si es una letra válida (para imports Excel)
     if (typeof reserva?.habitacion === 'string') {
         const habString = reserva.habitacion.trim().toUpperCase();
+        // console.log("getLetraHabitacion: Checking if habitacion string is a letter:", habString);
         // Check if it's a single uppercase letter A-O (typical room letters)
         if (habString.length === 1 && habString >= 'A' && habString <= 'O') { 
+            // console.log("getLetraHabitacion: Determined letter from habitacion string");
             return habString;
         }
-        // If not a letter, it might be an ID, return '?'
+        // If not a letter, it might be an ID, continue to fallback
+        // console.log("getLetraHabitacion: habitacion string is not a valid letter");
     }
     
-    // Fallback 2: Si 'habitacionId' es un string (probablemente ID)
+    // Fallback 2: Si 'habitacionId' es un string (probablemente ID, no podemos sacar la letra)
     if (typeof reserva?.habitacionId === 'string') {
-      // No podemos obtener la letra solo del ID aquí, devolvemos '?'
+      // console.log("getLetraHabitacion: habitacionId is a string, cannot determine letter");
     }
     
     // Fallback final si no se encontró nada
-    // console.warn(`getLetraHabitacion: No se pudo determinar la letra para la reserva ID: ${reserva?._id}`);
+    // console.warn(`getLetraHabitacion: Could not determine letter for reserva ID: ${reserva?._id}. Returning '?'`);
     return '?'; 
   };
 
+  // <<< AÑADIR ESTE CONSOLE LOG >>>
+  console.log('[AdminHotelReservations] Raw habitacionReservations from context:', habitacionReservations);
 
   const filteredAndSortedReservations = useMemo(() => {
+    // <<< LOG EXISTENTE >>>
+    // console.log('[AdminHotelReservations] Raw habitacionReservations inside useMemo:', habitacionReservations);
+    
+    // Filtro inicial: Asegurarse de que esto funciona como se espera
     let currentList = habitacionReservations.filter(r => r.tipoReserva === 'hotel' || !r.tipoReserva);
+    console.log('[AdminHotelReservations] After initial filter (hotel only):', currentList);
 
     if (searchTerm) {
        const lowerSearch = searchTerm.toLowerCase();
@@ -323,12 +351,21 @@ export default function AdminHotelReservations() {
     showConfirmation({
       title: 'Confirmar Reserva',
       message: '¿Estás seguro de que quieres marcar esta reserva como confirmada?',
-      iconType: 'success', // Usar icono de éxito
-      confirmText: 'Confirmar',
-      onConfirm: async () => { // La lógica de la API va aquí
-        await apiClient.patch(`/reservas/habitaciones/${reservaId}/estado`, { estado: 'confirmada' });
-        toast.success('Reserva confirmada exitosamente.'); // Mover toast aquí
-        loadAllReservations(false);
+      iconType: 'success',
+      confirmText: 'Sí, confirmar',
+      onConfirm: async () => {
+        try {
+          const response = await apiClient.patch(`/api/reservas/habitaciones/${reservaId}/estado`, { estado: 'confirmada' });
+          if (response.success) {
+            toast.success('Reserva confirmada');
+            loadAllReservations(false);
+          } else {
+            toast.error(response.message || 'Error al confirmar');
+          }
+        } catch (error) {
+          console.error('Error confirmando:', error);
+          toast.error('Error confirmando reserva');
+        }
       }
     });
   };
@@ -336,27 +373,45 @@ export default function AdminHotelReservations() {
   const handleCancelarReserva = (reservaId) => {
     showConfirmation({
       title: 'Cancelar Reserva',
-      message: '¿Estás seguro de que quieres cancelar esta reserva?',
-      iconType: 'warning', // Usar icono de advertencia
+      message: '¿Estás seguro de que quieres cancelar esta reserva? Esta acción podría ser irreversible.',
+      iconType: 'warning',
       confirmText: 'Sí, cancelar',
       onConfirm: async () => {
-        await apiClient.patch(`/reservas/habitaciones/${reservaId}/estado`, { estado: 'cancelada' });
-        toast.success('Reserva cancelada exitosamente.');
-        loadAllReservations(false);
+        try {
+          const response = await apiClient.patch(`/api/reservas/habitaciones/${reservaId}/estado`, { estado: 'cancelada' });
+          if (response.success) {
+            toast.success('Reserva cancelada');
+            loadAllReservations(false);
+          } else {
+            toast.error(response.message || 'Error al cancelar');
+          }
+        } catch (error) {
+          console.error('Error cancelando:', error);
+          toast.error('Error cancelando reserva');
+        }
       }
     });
   };
 
   const handleEliminarReserva = (reservaId) => {
     showConfirmation({
-      title: 'Eliminar Reserva Permanentemente',
-      message: 'Esta acción no se puede deshacer. ¿Estás seguro de eliminar esta reserva?',
-      iconType: 'delete', // Usar icono de eliminar
+      title: 'Eliminar Reserva',
+      message: '¿Estás seguro de que quieres eliminar permanentemente esta reserva? No podrás recuperarla.',
+      iconType: 'danger',
       confirmText: 'Sí, eliminar',
       onConfirm: async () => {
-        await deleteHabitacionReservation(reservaId); // Usa tu función de servicio
-        toast.success('Reserva eliminada permanentemente.');
-        loadAllReservations(false);
+        try {
+          const response = await deleteHabitacionReservation(reservaId);
+          if (response.success) {
+            toast.success('Reserva eliminada');
+            loadAllReservations(false);
+          } else {
+             toast.error(response.message || 'Error al eliminar');
+          }
+        } catch (error) {
+           console.error('Error eliminando:', error);
+           toast.error(error.message || 'Error eliminando reserva');
+        }
       }
     });
   };
@@ -365,12 +420,21 @@ export default function AdminHotelReservations() {
     showConfirmation({
       title: 'Marcar como Pendiente',
       message: '¿Estás seguro de que quieres marcar esta reserva como pendiente?',
-      iconType: 'warning',
-      confirmText: 'Sí, marcar',
+      iconType: 'info',
+      confirmText: 'Sí, marcar pendiente',
       onConfirm: async () => {
-        await apiClient.patch(`/reservas/habitaciones/${reservaId}/estado`, { estado: 'pendiente' });
-        toast.success('Reserva marcada como pendiente.');
-        loadAllReservations(false);
+        try {
+          const response = await apiClient.patch(`/api/reservas/habitaciones/${reservaId}/estado`, { estado: 'pendiente' });
+          if (response.success) {
+            toast.success('Reserva marcada como pendiente');
+            loadAllReservations(false);
+          } else {
+            toast.error(response.message || 'Error al marcar como pendiente');
+          }
+        } catch (error) {
+           console.error('Error marcando pendiente:', error);
+           toast.error('Error marcando reserva como pendiente');
+        }
       }
     });
   };
@@ -609,7 +673,7 @@ function RoomTableView({
               const isMenuOpen = openActionMenu === reservaId;
 
               // URL de detalle específica para reservas de hotel
-              const detalleUrl = `/admin/reservas-hotel/${reservaId}`; // Asumiendo esta ruta
+              const detalleUrl = `/admin/reservaciones/habitacion/${reservaId}`;
               const canViewDetails = true; // Asumiendo que siempre se pueden ver
               
               // Lógica de botones ajustada
@@ -699,7 +763,6 @@ function RoomTableView({
                                        role="menuitem"
                                        tabIndex="-1"
                                        className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left flex items-center"
-                                       onClick={() => setOpenActionMenu(null)}
                                    >
                                        <FaEye className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
                                        Ver Detalles

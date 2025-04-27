@@ -351,3 +351,14 @@
   font-style: normal;
 }
 */ 
+
+/* --- Resaltado Degradado para Tablas --- */
+.highlight-gradient-row {
+  background: linear-gradient(to right, var(--color-primary-lighter), var(--color-primary));
+  color: #374151; /* text-gray-700 */
+}
+
+.highlight-gradient-row td {
+  /* Asegura que las celdas individuales no sobreescriban el fondo */
+  background: transparent;
+} 

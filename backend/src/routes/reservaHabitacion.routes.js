@@ -1,42 +1,43 @@
 const express = require('express');
 const router = express.Router();
-const {
-    createReservaHabitacion,
-    getReservaHabitacionById,
-    updateReservaHabitacion,
-    deleteReservaHabitacion,
-    getHabitacionOccupiedDates,
-    verificarDisponibilidadHabitaciones,
-    getReservasHabitacionUsuario,
-    cancelarReservaHabitacionUsuario,
-    createMultipleReservacionesHabitacion,
-    getGlobalOccupiedDates
-} = require('../controllers/reservaHabitacionController');
-const { protectRoute } = require('../middleware/auth');
+// Importar el objeto controlador completo
+const reservaHabitacionController = require('../controllers/reservaHabitacionController');
+const { protectRoute, authorize } = require('../middleware/auth');
+// const advancedResults = require('../middleware/advancedResults');
+const ReservaHabitacion = require('../models/ReservaHabitacion');
 
-// Nueva ruta pública para obtener fechas ocupadas globalmente
-router.get('/habitaciones/fechas-ocupadas-global', getGlobalOccupiedDates);
+// --- Public Routes --- (Prefixed with /api/reservas/habitaciones in app.js)
+router.get('/fechas-ocupadas-global', reservaHabitacionController.getGlobalOccupiedDates);
+router.get('/fechas-ocupadas', reservaHabitacionController.getHabitacionOccupiedDates);
+router.post('/verificar-disponibilidad', reservaHabitacionController.checkHabitacionAvailability);
+router.route('/public/fechas-ocupadas-habitaciones')
+    .get(reservaHabitacionController.getPublicOccupiedRoomDates);
 
-// Ruta para obtener fechas ocupadas de una habitación específica
-router.get('/habitaciones/fechas-ocupadas', getHabitacionOccupiedDates);
+// --- User-Specific Protected Routes --- (Prefixed with /api/reservas/habitaciones in app.js)
+router.get('/usuario', protectRoute, reservaHabitacionController.getReservasHabitacionUsuario);
+router.post('/usuario/:id/cancelar', protectRoute, reservaHabitacionController.cancelarReservaHabitacionUsuario);
 
-// Ruta para verificar disponibilidad antes de reservar
-router.post('/habitaciones/verificar-disponibilidad', verificarDisponibilidadHabitaciones);
+// --- Batch Creation Route --- (Mounted at /api/reservas/habitaciones/batch)
+router.post('/batch', protectRoute, authorize('admin'), reservaHabitacionController.createMultipleReservacionesHabitacion);
 
-// --- NUEVA RUTA PARA CREACIÓN MÚLTIPLE ---
-router.post('/reservas/habitaciones/batch', createMultipleReservacionesHabitacion);
+// --- Specific Actions on ID --- (ANTES de la ruta genérica /:id)
+router.put('/:id/asignar', protectRoute, authorize('admin'), reservaHabitacionController.asignarReservaHabitacion);
+router.put('/:id/desasignar', protectRoute, authorize('admin'), reservaHabitacionController.desasignarReservaHabitacion);
+router.patch('/:id/estado', protectRoute, authorize('admin'), reservaHabitacionController.actualizarEstadoReservaHabitacion);
+router.put('/:id/huespedes', protectRoute, authorize('admin'), reservaHabitacionController.updateReservaHabitacionHuespedes);
+router.post('/:id/create-payment-intent', protectRoute, reservaHabitacionController.createHabitacionPaymentIntent);
+router.put('/:id/seleccionar-pago', protectRoute, reservaHabitacionController.seleccionarMetodoPagoHabitacion);
+router.get('/:habitacionId/fechas-ocupadas', protectRoute, reservaHabitacionController.getOccupiedDatesForRoomById); // Usamos :habitacionId aquí y separamos el .get
 
-// --- RUTA SINGULAR ---
-router.post('/reservas/habitaciones', createReservaHabitacion);
+// --- Routes for Specific ID --- (DESPUÉS de las rutas específicas)
+router.route('/:id')
+  .get(protectRoute, authorize('admin', 'recepcionista', 'cliente'), reservaHabitacionController.getReservaHabitacionById)
+  .put(protectRoute, authorize('admin', 'recepcionista'), reservaHabitacionController.updateReservaHabitacion)
+  .delete(protectRoute, authorize('admin'), reservaHabitacionController.deleteReservaHabitacion);
 
-// --- RUTAS PROTEGIDAS PARA USUARIOS LOGUEADOS ---
-// (Las rutas GET /usuario, POST /usuario/:id/cancelar deben seguir protegidas)
-router.get('/reservas/habitaciones/usuario', protectRoute, getReservasHabitacionUsuario);
-router.post('/reservas/habitaciones/usuario/:id/cancelar', protectRoute, cancelarReservaHabitacionUsuario);
-
-// --- OTRAS RUTAS (Revisar si necesitan protección) ---
-router.get('/reservas/habitaciones/:id', getReservaHabitacionById); // ¿Debería ser pública o protegida?
-router.put('/reservas/habitaciones/:id', protectRoute, updateReservaHabitacion); // Probablemente protegida (Admin?)
-router.delete('/reservas/habitaciones/:id', protectRoute, deleteReservaHabitacion); // Probablemente protegida (Admin?)
+// --- Base Routes for / --- (Mounted at /api/reservas/habitaciones)
+router.route('/')
+  .get(protectRoute, authorize('admin', 'recepcionista'), reservaHabitacionController.getAllReservasHabitacion)
+  .post(protectRoute, reservaHabitacionController.createReservaHabitacion);
 
 module.exports = router; 

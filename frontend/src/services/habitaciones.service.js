@@ -28,8 +28,8 @@ const getAuthHeaders = () => {
 // Obtener todas las habitaciones
 export const obtenerHabitaciones = async () => {
   try {
-    const response = await apiClient.get('/habitaciones');
-    console.log('Respuesta de habitaciones:', response);
+    const response = await apiClient.get('/api/habitaciones');
+    // console.log('Respuesta de habitaciones:', response);
     return response;
   } catch (error) {
     console.error('Error al obtener habitaciones:', error);
@@ -46,7 +46,7 @@ export const obtenerHabitaciones = async () => {
 // Obtener todas las habitaciones por planta
 export const obtenerHabitacionesPorPlanta = async (planta) => {
   try {
-    const response = await apiClient.get(`/habitaciones/planta/${planta}`);
+    const response = await apiClient.get(`/api/habitaciones/planta/${planta}`);
     return response;
   } catch (error) {
     console.error('Error al obtener las habitaciones por planta:', error);
@@ -60,7 +60,7 @@ export const obtenerHabitacionesConReservas = async () => {
     console.log('Iniciando obtención de habitaciones con reservas');
     
     // Obtener todas las habitaciones usando el cliente API que maneja automáticamente el token
-    const habitacionesResponse = await apiClient.get('/habitaciones');
+    const habitacionesResponse = await apiClient.get('/api/habitaciones');
     console.log('Respuesta de habitaciones:', habitacionesResponse);
 
     // Asegurarnos de tener un array de habitaciones válido
@@ -90,7 +90,7 @@ export const obtenerHabitacionesConReservas = async () => {
     }
     
     // Obtener todas las reservas usando el mismo cliente API
-    const reservasResponse = await apiClient.get('/reservas/habitaciones');
+    const reservasResponse = await apiClient.get('/api/reservas/habitaciones');
     console.log('Respuesta de reservas:', reservasResponse);
 
     // Verificar la respuesta de reservas
@@ -197,7 +197,7 @@ export const obtenerHabitacionesDisponibles = async (fechaInicio, fechaFin, plan
       fechaFin,
       planta
     };
-    const response = await apiClient.get('/habitaciones/disponibles', { params });
+    const response = await apiClient.get('/api/habitaciones/disponibles', { params });
     return response;
   } catch (error) {
     console.error('Error al obtener las habitaciones disponibles:', error);
@@ -208,7 +208,7 @@ export const obtenerHabitacionesDisponibles = async (fechaInicio, fechaFin, plan
 // Obtener una habitación por ID o letra
 export const obtenerHabitacion = async (id) => {
   try {
-    const response = await apiClient.get(`/habitaciones/${id}`);
+    const response = await apiClient.get(`/api/habitaciones/${id}`);
     return response;
   } catch (error) {
     console.error('Error al obtener la habitación:', error);

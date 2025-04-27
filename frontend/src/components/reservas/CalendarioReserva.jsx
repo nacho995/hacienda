@@ -5,6 +5,8 @@ import React, { useState, useEffect } from 'react';
 import DatePicker, { registerLocale, setDefaultLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import es from 'date-fns/locale/es';
+// AÑADIDO: Funciones de date-fns para manejo de rangos
+import { isWithinInterval, startOfDay, endOfDay, isValid } from 'date-fns'; 
 import { FaCalendarAlt, FaSpinner } from 'react-icons/fa';
 
 // Registrar el locale español
@@ -18,21 +20,36 @@ const CalendarioReserva = ({
   startDate, // Fecha de inicio seleccionada
   endDate,   // Fecha de fin seleccionada
   onChange,  // Espera una función que recibe el array [startDate, endDate]
-  occupiedDates = [], 
+  occupiedDateRanges = [], // <-- Renombrado para claridad, espera [{inicio, fin, tipo?}]
   loadingOccupiedDates = false, 
   placeholderText = "Seleccione un rango de fechas", // Placeholder actualizado
   onMonthChange // Prop para manejar cambio de mes (pasarla si existe)
 }) => {
 
   // Función para determinar si una fecha debe estar deshabilitada
-  const isDateOccupied = (date) => {
-    // Normalizar la fecha a medianoche UTC para comparación consistente
-    const dateOnly = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    return occupiedDates.some(occupied => {
-      // Asegurarse que occupied es un objeto Date válido
-      if (!(occupied instanceof Date) || isNaN(occupied.getTime())) return false;
-      const occupiedOnly = new Date(Date.UTC(occupied.getFullYear(), occupied.getMonth(), occupied.getDate()));
-      return occupiedOnly.getTime() === dateOnly.getTime();
+  const isDateDisabled = (date) => {
+    const today = startOfDay(new Date()); // Obtener inicio del día actual
+    const currentDate = startOfDay(date); // Normalizar fecha a evaluar
+
+    // Deshabilitar fechas pasadas
+    if (currentDate < today) {
+      return true;
+    }
+
+    // Verificar si la fecha cae dentro de alguno de los rangos ocupados
+    return occupiedDateRanges.some(range => {
+      // Asegurarse que el rango y sus fechas son válidos
+      if (!range || !range.inicio || !range.fin) return false;
+      const start = startOfDay(new Date(range.inicio));
+      const end = endOfDay(new Date(range.fin)); // Usar fin del día para incluir el último día del rango
+      
+      if (!isValid(start) || !isValid(end)) {
+        console.warn("Rango de fechas ocupadas inválido detectado:", range);
+        return false; 
+      }
+      
+      // Verificar si la fecha está dentro del intervalo
+      return isWithinInterval(currentDate, { start, end });
     });
   };
   
@@ -56,8 +73,9 @@ const CalendarioReserva = ({
         startDate={startDate} // <-- Pasar fecha de inicio
         endDate={endDate}     // <-- Pasar fecha de fin
         onChange={onChange}   // <-- Pasar la función que recibe el array [start, end]
-        filterDate={date => !isDateOccupied(date)} // Deshabilitar fechas ocupadas
-        minDate={new Date()} // No permitir fechas pasadas
+        filterDate={date => !isDateDisabled(date)} // <-- Usar la nueva lógica de deshabilitación
+        // excludeDates={occupiedDates} // <<< ELIMINADO: No funciona bien con rangos
+        minDate={new Date()} // No permitir fechas pasadas (redundante con isDateDisabled pero no daña)
         locale="es" // Usar español
         dateFormat="dd/MM/yyyy" // Formato de fecha
         placeholderText={placeholderText} // Texto de ayuda actualizado
@@ -65,8 +83,8 @@ const CalendarioReserva = ({
         wrapperClassName="w-full" 
         calendarClassName="border-[#D1B59B] shadow-lg rounded-lg"
         dayClassName={date => 
-          isDateOccupied(date) ? 'react-datepicker__day--disabled occupied-date' : undefined
-        } 
+          isDateDisabled(date) ? 'react-datepicker__day--disabled occupied-date' : undefined
+        } // <-- Usar la nueva lógica para estilizar
         popperPlacement="bottom-start"
         monthsShown={1} // Mostrar un mes a la vez por defecto
         shouldCloseOnSelect={false} // <-- IMPORTANTE: No cerrar al seleccionar la primera fecha del rango

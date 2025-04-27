@@ -23,7 +23,7 @@ const apiClient = axios.create({
 });
 
 // Verificar la configuración de la instancia
-console.log('apiClient baseURL configurada:', apiClient.defaults.baseURL);
+// console.log('apiClient baseURL configurada:', apiClient.defaults.baseURL);
 
 // Función para decodificar un token Base64 de forma segura
 const safelyDecodeToken = (token) => {
@@ -70,27 +70,27 @@ const isPublicRoute = (url) => {
 // Interceptor para manejar tokens en las peticiones
 apiClient.interceptors.request.use(
   (config) => {
-    console.log('Realizando petición a:', config.url);
-    console.log('URL completa:', `${config.baseURL}${config.url}`);
-    console.log('Método:', config.method?.toUpperCase());
+    // console.log('Realizando petición a:', config.url);
+    // console.log('URL completa:', `${config.baseURL}${config.url}`);
+    // console.log('Método:', config.method?.toUpperCase());
     
     // Si es una ruta pública, no es necesario el token
     if (isPublicRoute(config.url)) {
-      console.log('Ruta pública, no se requiere token');
+      // console.log('Ruta pública, no se requiere token');
       return config;
     }
     
     // Obtener token JWT desde localStorage
     const token = localStorage.getItem('authToken');
-    console.log('Token encontrado:', token ? 'Sí' : 'No');
+    // console.log('Token encontrado:', token ? 'Sí' : 'No');
     
     if (token) {
       // Verificar si el token es válido decodificándolo
       const tokenData = safelyDecodeToken(token);
-      console.log('Token decodificado:', tokenData ? 'Válido' : 'Inválido');
+      // console.log('Token decodificado:', tokenData ? 'Válido' : 'Inválido');
       
       if (!tokenData) {
-        console.log('Token inválido, limpiando localStorage');
+        // console.log('Token inválido, limpiando localStorage');
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         if (!isPublicRoute(config.url)) {
@@ -100,7 +100,7 @@ apiClient.interceptors.request.use(
           window.dispatchEvent(authErrorEvent);
         }
       } else if (tokenData.exp && tokenData.exp < Math.floor(Date.now() / 1000)) {
-        console.log('Token expirado, limpiando localStorage');
+        // console.log('Token expirado, limpiando localStorage');
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         if (!isPublicRoute(config.url)) {
@@ -110,7 +110,7 @@ apiClient.interceptors.request.use(
           window.dispatchEvent(authErrorEvent);
         }
       } else {
-        console.log('>>> INTERCEPTOR: Token válido y no expirado. Añadiendo cabecera Authorization...'); 
+        // console.log('>>> INTERCEPTOR: Token válido y no expirado. Añadiendo cabecera Authorization...'); 
         config.headers.Authorization = `Bearer ${token}`;
       }
     } else if (!isPublicRoute(config.url)) {
@@ -128,8 +128,8 @@ apiClient.interceptors.request.use(
 // Configurar interceptor de respuesta para manejar transformación de datos y errores
 apiClient.interceptors.response.use(
   (response) => {
-    console.log('Respuesta exitosa de:', response.config.url);
-    console.log('Datos:', response.data);
+    // console.log('Respuesta exitosa de:', response.config.url);
+    // console.log('Datos:', response.data);
     
     // Mantener la estructura original de la respuesta
     if (response.data && typeof response.data === 'object') {
@@ -166,9 +166,9 @@ apiClient.interceptors.response.use(
       // Solo mostrar errores en la consola si no deben ser silenciados
       if (!shouldSilence) {
         console.error(`Error ${error.response.status} en petición a: ${error.config?.url}`);
-        console.error('Detalles del error:', error.response.data);
-        console.error('Headers de la solicitud:', error.config?.headers);
-        console.error('Datos enviados:', error.config?.data);
+        // console.error('Detalles del error:', error.response.data);
+        // console.error('Headers de la solicitud:', error.config?.headers);
+        // console.error('Datos enviados:', error.config?.data);
       }
       
       // Manejo específico por código de error
@@ -176,18 +176,18 @@ apiClient.interceptors.response.use(
         case 400:
           if (!shouldSilence) {
             console.error('Error 400 - Datos inválidos:', error.config?.data);
-            try {
-              const sentData = JSON.parse(error.config.data);
-              console.log('Datos enviados en detalle:', sentData);
-            } catch (e) {
-              console.error('No se pudo parsear los datos enviados:', e);
-            }
+            // try {
+            //   const sentData = JSON.parse(error.config.data);
+            //   console.log('Datos enviados en detalle:', sentData);
+            // } catch (e) {
+            //   console.error('No se pudo parsear los datos enviados:', e);
+            // }
           }
           break;
           
         case 401:
           if (!error.config?.url || !isPublicRoute(error.config.url)) {
-            console.log('Error de autenticación, limpiando localStorage');
+            // console.log('Error de autenticación, limpiando localStorage');
             localStorage.removeItem('authToken');
             localStorage.removeItem('user');
             
@@ -219,9 +219,9 @@ apiClient.interceptors.response.use(
           if (!shouldSilence) {
             console.error('Error 500 - Error del servidor:', error.response?.data);
             // Mostrar detalles adicionales si están disponibles
-            if (error.response?.data?.error) {
-              console.error('Detalles técnicos del error:', error.response.data.error);
-            }
+            // if (error.response?.data?.error) {
+            //   console.error('Detalles técnicos del error:', error.response.data.error);
+            // }
           }
           errorResponse.message = 'Error interno del servidor. Por favor, contacte al administrador.';
           if (error.response?.data?.error) {
@@ -239,7 +239,7 @@ apiClient.interceptors.response.use(
       console.error('Timeout en la petición:', error);
     } else {
       console.error('Error de red:', error.message);
-      console.error('Error completo:', error);
+      // console.error('Error completo:', error);
     }
     
     return Promise.reject(errorResponse);

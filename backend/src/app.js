@@ -22,6 +22,7 @@ const adminRoutes = require('./routes/admin.routes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const contactoRoutes = require('./routes/contacto.routes');
 const publicRoutes = require('./routes/public.routes');
+const reservaHabitacionRoutes = require('./routes/reservaHabitacion.routes.js');
 
 // Importar controlador de webhook
 const { handleStripeWebhook } = require('./controllers/webhook.controller');
@@ -73,26 +74,43 @@ app.use(helmet());
 // Prevent XSS attacks
 app.use(xss());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 mins
-  max: 100
-});
-app.use(limiter);
-
 // Prevent http param pollution
 app.use(hpp());
+
+/* // --- RUTA DE PRUEBA DIRECTA --- // COMENTADA/ELIMINADA
+app.get('/api/admin/test', (req, res) => {
+  console.log(">>> Petición GET recibida en /api/admin/test (DEFINIDA DIRECTAMENTE EN APP.JS)");
+  res.status(200).json({ success: true, message: "Ruta directa en app.js funciona!" });
+});
+*/ // -----------------------------
+
+// --- MOVER AQUÍ EL MONTAJE DE ADMIN ROUTES --- 
+console.log(">>> app.js - Montando adminRoutes en /api/admin (TEMPRANO):", typeof adminRoutes);
+app.use('/api/admin', adminRoutes); // <-- DESCOMENTADO
+// ---------------------------------------------
+
+// Rate limiting - SOLO EN PRODUCCIÓN/OTROS ENTORNOS
+if (process.env.NODE_ENV !== 'development') {
+  console.log('Aplicando rate limiting para entorno:', process.env.NODE_ENV);
+  const limiter = rateLimit({
+    windowMs: 10 * 60 * 1000, // 10 mins
+    max: 100 // Ajustar si es necesario para producción
+  });
+  app.use(limiter);
+} else {
+  console.log('Rate limiting desactivado para entorno de desarrollo.');
+}
 
 // Rutas API
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tipos-evento', tipoEventoRoutes);
+app.use('/api/reservas/habitaciones', reservaHabitacionRoutes);
 app.use('/api/reservas', reservaRoutes);
 app.use('/api/habitaciones', habitacionRoutes);
 app.use('/api/tipos-habitacion', tipoHabitacionRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/servicios', servicioRoutes);
-app.use('/api/admin', adminRoutes);
 app.use('/api/contacto', contactoRoutes);
 app.use('/api/public', publicRoutes);
 

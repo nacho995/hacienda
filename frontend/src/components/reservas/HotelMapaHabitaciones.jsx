@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from
 import { FaPlus, FaTrash, FaUserFriends, FaBed, FaList, FaMapMarkedAlt, FaCheckCircle, FaCalendarAlt } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { obtenerHabitaciones } from '../../services/habitaciones.service';
+import { obtenerTodasLasReservas, obtenerFechasOcupadas } from '../../services/disponibilidadService';
 import './EventoMapaHabitaciones.css';
 import { debounce } from 'lodash';
 
@@ -29,6 +30,7 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
   const [showMap, setShowMap] = useState(true);
   const [habitaciones, setHabitaciones] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [fechasOcupadasPorHabitacion, setFechasOcupadasPorHabitacion] = useState({});
   const mapRef = useRef(null);
   const imgRef = useRef(null);
   const [originalImageSize, setOriginalImageSize] = useState({ width: 0, height: 0 });
@@ -39,13 +41,13 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
 
   // Cargar habitaciones desde la API
   useEffect(() => {
-    console.log("[HotelMapa] useEffect for loading rooms running..."); // Log effect start
+    // console.log("[HotelMapa] Mount Effect - Running cargarHabitaciones..."); // <-- Log añadido
     const cargarHabitaciones = async () => {
       let loadedHabitaciones = []; // Store loaded rooms temporarily
       try {
         setIsLoading(true);
         const response = await obtenerHabitaciones();
-        console.log('[HotelMapa] Habitaciones obtenidas:', response);
+        // console.log('[HotelMapa] Habitaciones obtenidas:', response);
 
         let habitacionesData = [];
         if (response && response.success && Array.isArray(response.data)) {
@@ -82,9 +84,12 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
                area: areasSeleccionables[letra] || { coords: '0,0,0,0', shape: 'rect', direction: 'bottom' }
              };
            });
-           console.log('[HotelMapa] Habitaciones procesadas:', habitacionesProcesadas);
+           // console.log('[HotelMapa] Habitaciones procesadas:', habitacionesProcesadas);
            setHabitaciones(habitacionesProcesadas);
            loadedHabitaciones = habitacionesProcesadas; // Update temporary list
+           
+           // Cargar fechas ocupadas para cada habitación
+           cargarFechasOcupadas(habitacionesProcesadas);
         }
       } catch (error) {
         console.error('[HotelMapa] Error al cargar habitaciones:', error);
@@ -92,13 +97,13 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
         toast.error('Error cargando habitaciones. Intente más tarde.');
       } finally {
         setIsLoading(false);
-        console.log('[HotelMapa] Carga finalizada.');
+        // console.log('[HotelMapa] Carga finalizada.');
         // Call onHabitacionesLoad regardless of success or failure, passing what was loaded
         if (typeof onHabitacionesLoad === 'function') {
-          console.log('[HotelMapa] Attempting to call onHabitacionesLoad in finally...'); // Log before calling prop
-          console.log('[HotelMapa] Calling onHabitacionesLoad in finally block with:', loadedHabitaciones);
-          onHabitacionesLoad(loadedHabitaciones); 
-          console.log('[HotelMapa] onHabitacionesLoad called successfully.'); // Log after calling prop
+          // console.log('[HotelMapa] Attempting to call onHabitacionesLoad in finally...'); // Log before calling prop
+          // console.log('[HotelMapa] Calling onHabitacionesLoad in finally block with:', loadedHabitaciones);
+          onHabitacionesLoad(loadedHabitaciones);
+          // console.log('[HotelMapa] onHabitacionesLoad called successfully.'); // Log after calling prop
         } else {
            console.warn("[HotelMapa] onHabitacionesLoad is not a function in finally block.");
         }
@@ -110,6 +115,73 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
   // If onHabitacionesLoad could change, add it here, but it's unlikely needed
   }, []); // Changed dependency to [] to ensure it runs once on mount
 
+  // Nueva función para cargar fechas ocupadas (OPTIMIZADA)
+  const cargarFechasOcupadas = async (habitacionesParaCargar) => {
+    if (!habitacionesParaCargar || habitacionesParaCargar.length === 0) {
+        // console.log('[HotelMapa] No hay habitaciones para cargar fechas ocupadas.');
+        return;
+    }
+    try {
+        // console.log('[HotelMapa] Iniciando carga optimizada de fechas ocupadas...');
+        // 1. Llamar a la función que obtiene AMBAS reservas
+        const todasLasReservas = await obtenerTodasLasReservas();
+        // console.log('[HotelMapa] Datos RECIBIDOS del servicio:', todasLasReservas); // <-- LOG AÑADIDO
+
+        // 2. Extraer los datos de la respuesta, accediendo a .data para el array real
+        //    y proveyendo fallback a array vacío
+        const arrayReservasHabitacion = todasLasReservas?.reservasHabitacion?.data || [];
+        const arrayReservasEvento = todasLasReservas?.reservasEvento?.data || [];
+        // console.log('[HotelMapa] Arrays EXTRAÍDOS:', { arrayReservasHabitacion, arrayReservasEvento }); // <-- LOG AÑADIDO
+
+        // 3. Filtrar las reservas (ahora sí sobre los arrays)
+        const habitacionReservations = arrayReservasHabitacion.filter(r => r.estadoReserva !== 'cancelada');
+        const eventoReservations = arrayReservasEvento.filter(r => r.estadoReserva !== 'cancelada');
+
+
+        const ocupacionPorHabitacion = {};
+
+        // 4. Procesar las reservas para cada habitación
+        for (const habitacion of habitacionesParaCargar) {
+            if (!habitacion._id) {
+                console.warn(`[HotelMapa] Habitación sin _id encontrada: ${habitacion.letra || 'ID Desconocido'}, omitiendo.`);
+                continue; // Omitir si no hay ID
+            }
+
+            // Filtrar reservas directas para esta habitación (usando los arrays filtrados)
+            const reservasDirectas = habitacionReservations
+                .filter(r => r.habitacion && r.habitacion._id === habitacion._id) // <-- Asumiendo que `r.habitacion` tiene `._id`
+                .map(r => ({
+                    inicio: new Date(r.fechaEntrada || r.fechaInicio), // Usar fechaEntrada o fechaInicio si existe
+                    fin: new Date(r.fechaSalida || r.fechaFin), // Usar fechaSalida o fechaFin si existe
+                    tipo: 'habitacion'
+                }));
+
+            // Filtrar reservas por eventos que incluyen esta habitación (usando los arrays filtrados)
+            const reservasPorEvento = eventoReservations
+                .filter(e => 
+                    e.habitacionesReservadas && 
+                    e.habitacionesReservadas.some(h => h._id === habitacion._id)
+                )
+                .map(e => ({
+                    inicio: new Date(e.fecha || e.fechaInicio), // Usar fecha o fechaInicio
+                    fin: new Date(e.fechaFin || e.fecha), // Usar fechaFin o fecha
+                    tipo: 'evento',
+                    nombreEvento: e.tipoEvento || 'Evento'
+                }));
+
+            // Combinar ambos tipos de reservas para la habitación actual
+            ocupacionPorHabitacion[habitacion._id] = [...reservasDirectas, ...reservasPorEvento];
+        }
+
+        setFechasOcupadasPorHabitacion(ocupacionPorHabitacion);
+        // console.log('[HotelMapa] Estado FINAL fechasOcupadasPorHabitacion:', ocupacionPorHabitacion); // <-- CORREGIDO (quitado el apóstrofe simple)
+
+    } catch (error) {
+        console.error('[HotelMapa] Error al cargar fechas ocupadas (optimizado):', error);
+        toast.error('Error al verificar ocupación de habitaciones.');
+    }
+};
+
   // Verificar si una habitación está seleccionada usando selectedRoomIds
   const isSelected = useCallback((roomId) => {
     // console.log(`[HotelMapa] Checking selection for ${roomId}. Selected IDs:`, selectedRoomIds);
@@ -118,14 +190,14 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
 
   // Simplified click handler: Call the parent's toggle function
   const handleRoomClick = useCallback((habitacion) => {
-    console.log('[HotelMapa] handleRoomClick for:', habitacion);
+    // console.log('[HotelMapa] handleRoomClick for:', habitacion);
     if (!habitacion || !habitacion.id) {
         console.error('[HotelMapa] Invalid habitacion object in handleRoomClick:', habitacion);
         toast.error("Error interno al seleccionar habitación.");
         return;
     }
     if (typeof onToggleRoom === 'function') {
-      console.log(`[HotelMapa] Calling onToggleRoom with ID: ${habitacion.id}`);
+      // console.log(`[HotelMapa] Calling onToggleRoom with ID: ${habitacion.id}`);
       onToggleRoom(habitacion.id);
       // Toast messages are now handled by the parent or can be added here based on isSelected status BEFORE toggle
       // Example:
@@ -147,7 +219,7 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
         width: imgRef.current.naturalWidth,
         height: imgRef.current.naturalHeight,
       });
-      console.log(`[HotelMapa handleImageLoad] Natural dimensions set: ${imgRef.current.naturalWidth}x${imgRef.current.naturalHeight}`);
+      // console.log(`[HotelMapa handleImageLoad] Natural dimensions set: ${imgRef.current.naturalWidth}x${imgRef.current.naturalHeight}`);
     }
   }, []); // Dependencia vacía, solo usa ref
 
@@ -155,7 +227,7 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
   const calculateCoords = useCallback((currentImg, originalSize) => {
     // baseAreas ahora es la constante global areasSeleccionables
     if (!currentImg || !originalSize.width || !originalSize.height) {
-      console.log("[HotelMapa calculateCoords] Skipping: Missing refs or original size.");
+      // console.log("[HotelMapa calculateCoords] Skipping: Missing refs or original size.");
       return null; // Devuelve null si no se puede calcular
     }
     const currentWidth = currentImg.offsetWidth;
@@ -163,17 +235,17 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
     const naturalWidth = originalSize.width;
     const naturalHeight = originalSize.height;
 
-    console.log(`[HotelMapa calculateCoords] Natural W: ${naturalWidth}, Natural H: ${naturalHeight}`);
-    console.log(`[HotelMapa calculateCoords] Offset W: ${currentWidth}, Offset H: ${currentHeight}`);
+    // console.log(`[HotelMapa calculateCoords] Natural W: ${naturalWidth}, Natural H: ${naturalHeight}`);
+    // console.log(`[HotelMapa calculateCoords] Offset W: ${currentWidth}, Offset H: ${currentHeight}`);
 
     if (naturalWidth === 0 || naturalHeight === 0 || currentWidth === 0 || currentHeight === 0) {
-       console.log("[HotelMapa calculateCoords] Skipping: Zero dimension detected.");
+       // console.log("[HotelMapa calculateCoords] Skipping: Zero dimension detected.");
        return null;
     }
 
     const scaleX = currentWidth / naturalWidth;
     const scaleY = currentHeight / naturalHeight;
-    console.log(`[HotelMapa calculateCoords] Scale X: ${scaleX.toFixed(4)}, Scale Y: ${scaleY.toFixed(4)}`);
+    // console.log(`[HotelMapa calculateCoords] Scale X: ${scaleX.toFixed(4)}, Scale Y: ${scaleY.toFixed(4)}`);
 
     const newCoords = {};
     for (const letra in areasSeleccionables) {
@@ -187,9 +259,9 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
       ].join(',');
       newCoords[letra] = { ...area, coords: scaled };
 
-      if (letra === 'A') {
-        console.log(`[HotelMapa calculateCoords] Room A - Original: ${area.coords} -> Scaled: ${scaled}`);
-      }
+      // if (letra === 'A') {
+      //   console.log(`[HotelMapa calculateCoords] Room A - Original: ${area.coords} -> Scaled: ${scaled}`);
+      // }
     }
     return newCoords; // Devuelve el objeto calculado
   // Ya no necesita depender de areasSeleccionables aquí explícitamente
@@ -202,7 +274,7 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
     if (originalImageSize.width > 0 && originalImageSize.height > 0 && imgRef.current) {
 
       // Cálculo inicial
-      console.log("[HotelMapa useLayoutEffect] Calculating initial coords...");
+      // console.log("[HotelMapa useLayoutEffect] Calculating initial coords...");
       const initialCoords = calculateCoords(imgRef.current, originalImageSize);
       if (initialCoords) {
         setScaledCoords(initialCoords);
@@ -210,7 +282,7 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
 
       // Función que se ejecutará en cada resize (debounced)
       const handleResize = () => {
-        console.log("[HotelMapa handleResize] Fired!");
+        // console.log("[HotelMapa handleResize] Fired!");
         const newCoords = calculateCoords(imgRef.current, originalImageSize);
         if (newCoords) {
           setScaledCoords(newCoords);
@@ -222,13 +294,13 @@ const HotelMapaHabitaciones = ({ selectedRoomIds = [], onToggleRoom, onHabitacio
 
       // Añadir listener
       window.addEventListener('resize', debouncedResizeHandler);
-      console.log("[HotelMapa useLayoutEffect] Resize listener added.");
+      // console.log("[HotelMapa useLayoutEffect] Resize listener added.");
 
       // Función de limpieza
       return () => {
         window.removeEventListener('resize', debouncedResizeHandler);
         debouncedResizeHandler.cancel(); // Cancelar ejecuciones pendientes
-        console.log("[HotelMapa useLayoutEffect] Resize listener removed.");
+        // console.log("[HotelMapa useLayoutEffect] Resize listener removed.");
       };
     }
     // Dependencia estricta de originalImageSize para configurar/reconfigurar
