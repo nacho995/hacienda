@@ -173,7 +173,7 @@ apiClient.interceptors.response.use(
       
       // Solo mostrar errores en la consola si no deben ser silenciados
       if (!shouldSilence) {
-        console.error(`Error ${error.response.status} en petición a: ${error.config?.url}`);
+        console.error(`Error ${error.response.status} en petición a: ${error.config?.baseURL}${error.config?.url}`);
         // console.error('Detalles del error:', error.response.data);
         // console.error('Headers de la solicitud:', error.config?.headers);
         // console.error('Datos enviados:', error.config?.data);
@@ -244,7 +244,7 @@ apiClient.interceptors.response.use(
       }
     } else if (error.code === 'ECONNABORTED') {
       errorResponse.message = 'La petición ha tardado demasiado tiempo. Por favor, inténtelo de nuevo.';
-      console.error('Timeout en la petición:', error);
+      console.error(`Timeout en la petición a: ${error.config?.baseURL}${error.config?.url}`, error);
     } else {
       console.error('Error de red:', error.message);
       // console.error('Error completo:', error);
