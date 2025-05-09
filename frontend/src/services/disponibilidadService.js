@@ -157,7 +157,7 @@ export const obtenerFechasOcupadas = async (habitacionLetra) => {
 export const obtenerHabitacionesDisponibles = async (fechaInicio, fechaFin) => {
   try {
     // Obtener todas las habitaciones físicas (usando apiClient)
-    const resHabitacionesAPI = await apiClient.get(`/api/habitaciones`);
+    const resHabitacionesAPI = await apiClient.get(`/habitaciones`);
     const todasHabitaciones = Array.isArray(resHabitacionesAPI?.data?.data) 
                               ? resHabitacionesAPI.data.data 
                               : []; // Asegurar que sea un array

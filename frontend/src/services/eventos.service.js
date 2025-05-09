@@ -3,7 +3,7 @@ import apiClient from './apiClient';
 // Obtener todos los tipos de eventos
 export const obtenerTiposEventos = async () => {
   try {
-    const response = await apiClient.get('/api/tipos-evento');
+    const response = await apiClient.get('/tipos-evento');
     return response;
   } catch (error) {
     console.error('Error al obtener tipos de eventos:', error);
