@@ -26,7 +26,7 @@ const getAuthHeaders = () => {
 };
 
 // Obtener todas las habitaciones
-export const getAllHabitaciones = async () => {
+export const obtenerHabitaciones = async () => {
   try {
     const response = await apiClient.get('/habitaciones');
     // console.log('Respuesta de habitaciones:', response);
@@ -44,7 +44,7 @@ export const getAllHabitaciones = async () => {
 };
 
 // Obtener todas las habitaciones por planta
-export const getHabitacionesPorPlanta = async (planta) => {
+export const obtenerHabitacionesPorPlanta = async (planta) => {
   try {
     const response = await apiClient.get(`/habitaciones/planta/${planta}`);
     return response;
@@ -190,7 +190,7 @@ export const obtenerHabitacionesConReservas = async () => {
 };
 
 // Obtener habitaciones disponibles para un evento
-export const getAvailableHabitaciones = async (params) => {
+export const obtenerHabitacionesDisponibles = async (params) => {
   try {
     const response = await apiClient.get('/habitaciones/disponibles', { params });
     return response.data; // Asumiendo que el backend devuelve { success: true, data: [...] }
@@ -201,7 +201,7 @@ export const getAvailableHabitaciones = async (params) => {
 };
 
 // Obtener una habitación por ID o letra
-export const getHabitacionById = async (id) => {
+export const obtenerHabitacion = async (id) => {
   try {
     const response = await apiClient.get(`/habitaciones/${id}`);
     return response;
