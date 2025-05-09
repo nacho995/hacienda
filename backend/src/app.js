@@ -127,6 +127,11 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// Ruta para health check de Elastic Beanstalk
+app.get('/api/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Middleware para rutas no encontradas
 app.use((req, res, next) => {
   const error = new Error(`Ruta no encontrada - ${req.originalUrl}`);

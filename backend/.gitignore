@@ -43,3 +43,7 @@ Thumbs.db
 # Archivos específicos de desarrollo
 .nodemon.json
 nodemon-debug.log 
+# Elastic Beanstalk Files
+.elasticbeanstalk/*
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
