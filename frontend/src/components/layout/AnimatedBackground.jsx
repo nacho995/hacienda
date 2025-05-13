@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 export default function AnimatedBackground() {
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [windowSize, setWindowSize] = useState({
+  // Use a ref for mouse position instead of state to avoid re-renders on every mouse move
+  const mousePositionRef = useRef({ x: 0, y: 0 });
+  const windowSizeRef = useRef({
     width: 0,
     height: 0,
   });
@@ -12,44 +13,7 @@ export default function AnimatedBackground() {
   // Referencias para los elementos animados
   const elementsRef = useRef([]);
   
-  // Inicializar valores en el cliente
-  useEffect(() => {
-    setWindowSize({
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
-  }, []);
-  
-  // Actualizar posición del ratón y tamaño de ventana
-  useEffect(() => {
-    // Manejar evento de movimiento del ratón
-    const handleMouseMove = (e) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-    
-    // Manejar evento de cambio de tamaño de ventana
-    const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-    
-    // Escuchar eventos
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('resize', handleResize);
-    
-    // Ejecutar handler de resize inmediatamente
-    handleResize();
-    
-    // Limpiar event listeners
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
-  
-  // Configuración de los elementos decorativos - AUMENTADOS EN NÚMERO, TAMAÑO Y OPACIDAD
+  // Configuración de los elementos decorativos
   const decorativeElements = [
     // Sellos decorativos
     {
@@ -107,7 +71,6 @@ export default function AnimatedBackground() {
       color: 'var(--color-primary)',
       opacity: 0.08
     },
-    
     // Rectángulos (invitaciones/sobres)
     {
       type: 'rect',
@@ -157,7 +120,6 @@ export default function AnimatedBackground() {
       opacity: 0.11,
       border: true
     },
-    
     // Círculos decorativos
     {
       type: 'circle',
@@ -199,7 +161,6 @@ export default function AnimatedBackground() {
       opacity: 0.075,
       dashed: true
     },
-    
     // Elementos de diamante
     {
       type: 'diamond',
@@ -233,40 +194,73 @@ export default function AnimatedBackground() {
     }
   ];
   
-  // Efecto para animar los elementos
+  // Inicializar valores en el cliente
   useEffect(() => {
-    if (elementsRef.current.length === 0) return;
+    windowSizeRef.current = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+  }, []);
+  
+  // Define handlers with useCallback to prevent recreating functions on each render
+  const handleMouseMove = useCallback((e) => {
+    // Update ref instead of state - no re-render triggered
+    mousePositionRef.current = { x: e.clientX, y: e.clientY };
     
-    decorativeElements.forEach((element, index) => {
-      const el = elementsRef.current[index];
-      if (!el) return;
-      
-      // Calcular movimiento basado en la posición del ratón
-      const moveX = mousePosition.x * element.moveFactorX;
-      const moveY = mousePosition.y * element.moveFactorY;
-      
-      // Aplicar transformación
-      let transform = `translate(${moveX}px, ${moveY}px)`;
-      
-      // Añadir rotación si está habilitada
-      if (element.rotateOnMove) {
-        const rotateAmount = (moveX * 0.05);
-        transform += ` rotate(${element.rotation + rotateAmount}deg)`;
-      } else {
-        transform += ` rotate(${element.rotation || 0}deg)`;
+    // Apply the movement effect directly to elements
+    elementsRef.current.forEach((el, index) => {
+      if (el && decorativeElements[index]) {
+        const element = decorativeElements[index];
+        const moveX = (mousePositionRef.current.x - (windowSizeRef.current.width / 2)) * element.moveFactorX;
+        const moveY = (mousePositionRef.current.y - (windowSizeRef.current.height / 2)) * element.moveFactorY;
+        
+        let rotation = element.rotation || 0;
+        if (element.rotateOnMove) {
+          rotation += (moveX + moveY) * 0.05;
+        }
+        
+        el.style.transform = `translate(${moveX}px, ${moveY}px) rotate(${rotation}deg)`;
       }
-      
-      el.style.transform = transform;
     });
-  }, [mousePosition, decorativeElements]);
+  }, []);
+  
+  // Handle resize event
+  const handleResize = useCallback(() => {
+    windowSizeRef.current = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+  }, []);
+  
+  // Setup event listeners
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('resize', handleResize);
+    
+    // Execute resize handler immediately
+    handleResize();
+    
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [handleMouseMove, handleResize]);
   
   // Renderizar elementos decorativos
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-[-1]">
+    <div className="fixed inset-0 w-full h-full z-[-1] pointer-events-none overflow-hidden">
       {decorativeElements.map((element, index) => {
-        // Posiciones en píxeles (convertir desde porcentajes)
-        const x = (parseFloat(element.position.x) / 100) * windowSize.width;
-        const y = (parseFloat(element.position.y) / 100) * windowSize.height;
+        // Calcular posición base en porcentajes (solo la posición inicial)
+        const baseX = parseFloat(element.position.x) / 100 * windowSizeRef.current.width;
+        const baseY = parseFloat(element.position.y) / 100 * windowSizeRef.current.height;
+        
+        // Posición inicial (el movimiento será aplicado por el event handler)
+        const x = `${baseX}px`;
+        const y = `${baseY}px`;
+        
+        // Rotación inicial (el movimiento de rotación será aplicado por el event handler si es necesario)
+        const initialRotation = element.rotation || 0;
         
         if (element.type === 'selo') {
           return (
@@ -279,7 +273,7 @@ export default function AnimatedBackground() {
                 top: y,
                 width: element.size,
                 height: element.size,
-                transform: `rotate(${element.rotation}deg)`,
+                transform: `rotate(${initialRotation}deg)`,
               }}
             >
               <svg viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
@@ -332,7 +326,7 @@ export default function AnimatedBackground() {
                 top: y,
                 width: element.width,
                 height: element.height,
-                transform: `rotate(${element.rotation}deg)`,
+                transform: `rotate(${initialRotation}deg)`,
               }}
             >
               <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
@@ -370,7 +364,7 @@ export default function AnimatedBackground() {
                 top: y,
                 width: element.size,
                 height: element.size,
-                transform: `rotate(${element.rotation || 0}deg)`,
+                transform: `rotate(${initialRotation}deg)`,
               }}
             >
               <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
@@ -410,7 +404,7 @@ export default function AnimatedBackground() {
                 top: y,
                 width: element.size,
                 height: element.size,
-                transform: `rotate(${element.rotation}deg)`,
+                transform: `rotate(${initialRotation}deg)`,
               }}
             >
               <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
@@ -445,4 +439,4 @@ export default function AnimatedBackground() {
       })}
     </div>
   );
-} 
+}

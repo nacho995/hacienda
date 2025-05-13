@@ -728,14 +728,15 @@ module.exports = function({
             </div>
             <div class="footer-content">
               <p class="footer-logo">Hacienda San Carlos Borromeo</p>
-              <p class="footer-info">Calle Ejemplo, 123 - 28001 Madrid</p>
-              <p class="footer-info">Teléfono: +34 91 234 56 78</p>
-              <p class="footer-info">Email: info@hacienda-bodas.com</p>
-              <div class="footer-social">
-                <a href="#" class="social-icon">FB</a>
-                <a href="#" class="social-icon">IG</a>
-                <a href="#" class="social-icon">TW</a>
-              </div>
+              <p class="footer-info">Email: eventos@haciendasancarlos.com</p>
+              <p class="footer-info">Teléfono: 735 1556114 / 5529199212</p>
+              <p class="footer-info">Hacienda San Carlos - Todos los derechos reservados &copy; ${new Date().getFullYear()}</p>
+              <p class="footer-text">Síguenos en nuestras redes:</p>
+              <p class="social-links">
+                <a href="https://www.facebook.com/HaciendaSanCarlos" class="social-link">Facebook</a> |
+                <a href="https://www.instagram.com/hdasancarlos/" class="social-link">Instagram</a> |
+                <a href="#" class="social-link">Twitter</a>
+              </p>
             </div>
           </div>
         </div>

@@ -215,8 +215,8 @@ export default function ContactForm() {
               </div>
               <div>
                 <p className="font-medium text-lg text-[var(--color-accent)]">Teléfono</p>
-                <p className="mt-1 text-gray-600">+52 (777) 123-4567</p>
-                <p className="text-gray-600">+52 (777) 765-4321</p>
+                <p className="mt-1 text-gray-600">735 1556114</p>
+                <p className="text-gray-600">5529199212</p>
               </div>
             </motion.li>
             
@@ -237,8 +237,8 @@ export default function ContactForm() {
               </div>
               <div>
                 <p className="font-medium text-lg text-[var(--color-accent)]">Ubicación</p>
-                <p className="mt-1 text-gray-600">Camino a la Hacienda #123</p>
-                <p className="text-gray-600">Cuernavaca, Morelos, México</p>
+                <p className="mt-1 text-gray-600">carretera federal Cuernavaca Cuautla km32.</p>
+                <p className="text-gray-600">Localidad Los Arcos, Yautepec, Morelos</p>
               </div>
             </motion.li>
             
@@ -254,20 +254,14 @@ export default function ContactForm() {
             </motion.li>
           </ul>
           
-          <motion.div 
-            variants={itemAnimation}
-            className="mt-12 border-t border-gray-200 pt-8"
-          >
+          <motion.div variants={itemAnimation} className="mt-10 pt-8 border-t border-gray-200">
             <p className="font-medium text-lg text-[var(--color-accent)] mb-4">Síguenos</p>
             <div className="flex space-x-4">
-              <a href="#" className="bg-[var(--color-accent)] text-white p-3 rounded-full hover:bg-[var(--color-primary)] transition-colors duration-300">
-                <FaFacebookF />
+              <a href="https://www.facebook.com/Hacienda San Carlos" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[var(--color-accent)] transition-colors">
+                <FaFacebookF size={22} />
               </a>
-              <a href="#" className="bg-[var(--color-accent)] text-white p-3 rounded-full hover:bg-[var(--color-primary)] transition-colors duration-300">
-                <FaInstagram />
-              </a>
-              <a href="#" className="bg-[var(--color-accent)] text-white p-3 rounded-full hover:bg-[var(--color-primary)] transition-colors duration-300">
-                <FaPinterestP />
+              <a href="https://www.instagram.com/hdasancarlos" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[var(--color-accent)] transition-colors">
+                <FaInstagram size={22} />
               </a>
             </div>
           </motion.div>

@@ -526,8 +526,9 @@ module.exports = function({
             <div class="additional-info">
               <p><strong>Información importante:</strong></p>
               <p>• Nuestro equipo revisa todas las consultas en un plazo de 24-48 horas laborables.</p>
-              <p>• Si su consulta es urgente, puede contactarnos directamente al teléfono +34 91 875 43 21.</p>
-              <p>• Este email es generado automáticamente, por favor no responda a este mensaje.</p>
+              <p>• Revise su bandeja de spam si no ve nuestra respuesta en su bandeja de entrada principal en las próximas 24-48 horas.</p>
+              <p>• Si su consulta es urgente, puede contactarnos directamente al teléfono 735 1556114.</p>
+              <p>¡Gracias por su interés en Hacienda San Carlos!</p>
             </div>
             
             <div style="text-align: center;">
@@ -550,9 +551,9 @@ module.exports = function({
               Tel: <a href="tel:+34918754321">+34 91 875 43 21</a> | Email: <a href="mailto:info@hacienda-bodas.com">info@hacienda-bodas.com</a>
             </div>
             <div class="social-links">
-              <a href="https://facebook.com/haciendabodas" class="social-link">Facebook</a> |
-              <a href="https://instagram.com/haciendabodas" class="social-link">Instagram</a> |
-              <a href="https://twitter.com/haciendabodas" class="social-link">Twitter</a>
+              <a href="https://www.facebook.com/HaciendaSanCarlos" class="social-link">Facebook</a> |
+              <a href="https://www.instagram.com/hdasancarlos/" class="social-link">Instagram</a> |
+              <a href="#" class="social-link">Twitter</a>
             </div>
             <div class="fine-print">
               Este email contiene información confidencial. Si ha recibido este mensaje por error, por favor elimínelo y notifique al remitente.

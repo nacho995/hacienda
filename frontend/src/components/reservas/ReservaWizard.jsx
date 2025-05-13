@@ -8,6 +8,8 @@ import ModoSeleccionEvento from './ModoSeleccionEvento';
 import ModoGestionServicios from './ModoGestionServicios';
 import EventoMapaHabitacionesNuevo from './EventoMapaHabitacionesNuevo';
 import EventDateSelector from './EventDateSelector';
+// El componente PrecioSubtotalFloating ha sido reemplazado por ReciboReservaGlobal a nivel global
+import ResumenReserva from './ResumenReserva';
 import { toast } from 'sonner';
 import { crearReservaEvento } from '@/services/reservas.service';
 import { crearReservaHacienda } from '@/services/gestionHacienda.service';
@@ -183,14 +185,15 @@ const ReservaWizard = () => {
           />
         );
       case 6:
-        return <div>Componente de Confirmación</div>;
+        return <ResumenReserva onConfirm={handleSubmit} loading={loading} />;
       default:
         return null;
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8 relative">
+      {/* El componente de Subtotal Flotante ahora está a nivel global */}
       {/* Progress bar */}
       <div className="mb-8">
         <div className="flex justify-between">

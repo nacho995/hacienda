@@ -6,6 +6,8 @@ import { useReservation } from '@/context/ReservationContext';
 import { obtenerHabitaciones, obtenerHabitacionesDisponibles } from '@/services/habitaciones.service';
 import { toast } from 'sonner';
 import EventoMapaHabitaciones from './EventoMapaHabitacionesNuevo';
+import HabitacionesPrecioResumen from './HabitacionesPrecioResumen';
+import HabitacionPrecioFloating from '../habitaciones/HabitacionPrecioFloating';
 
 const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
   const { formData, updateFormSection } = useReservation();
@@ -240,7 +242,7 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
       {showErrorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full">
@@ -515,8 +517,8 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
                         <span className="font-medium">{habitacion.capacidad || 2} personas</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Precio:</span>
-                        <span className="font-medium">{habitacion.precioPorNoche || habitacion.precio || '2400€/noche'}</span>
+                        <span>Tipo:</span>
+                        <span className="font-medium">{habitacion.tipo || 'Estándar'}</span>
                       </div>
                       {habitacion.descripcion && (
                         <div className="mt-2 text-xs text-gray-500">
@@ -550,6 +552,18 @@ const ModoGestionHabitaciones = ({ onModeSelect, numeroHabitaciones = 7 }) => {
           <FaChevronRight />
         </button>
       </div>
+
+      {/* Componente de resumen de precios de habitaciones estático - siempre visible */}
+      <HabitacionesPrecioResumen />
+      
+      {/* Componente flotante tipo recibo que se actualiza en tiempo real */}
+      {formData.habitacionesSeleccionadas && formData.habitacionesSeleccionadas.length > 0 && (
+        <HabitacionPrecioFloating 
+          selectedRooms={formData.habitacionesSeleccionadas} 
+          fechasPorHabitacion={formData.fechasPorHabitacion || {}} 
+          isVisible={true} 
+        />
+      )}
     </div>
   );
 };

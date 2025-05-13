@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { FaCalendarAlt, FaWifi, FaUserFriends, FaEnvelope, FaPhone, FaSpinner, FaBed, FaEuroSign, FaBuilding, FaCreditCard, FaUniversity, FaMoneyBillWave } from 'react-icons/fa';
+import HabitacionPrecioFloating from './HabitacionPrecioFloating';
 import { toast } from 'sonner';
 import { 
   createMultipleReservaciones, 
@@ -593,9 +594,9 @@ function BookingFormSection({
                                  <div className="flex items-center text-sm text-gray-600 mb-1">
                                    <FaUserFriends className="mr-2 text-[var(--color-primary)]"/> Capacidad: {room.capacidad || 'N/A'} personas
                                  </div>
-                                 <div className="flex items-center text-sm text-gray-600 mb-3">
-                                   <FaEuroSign className="mr-2 text-green-600"/> Precio por noche: ${room.precioPorNoche ? room.precioPorNoche.toFixed(2) : 'N/A'} MXN
-                                 </div>
+                                  <div className="flex items-center text-sm text-gray-600 mb-3">
+                                    <FaBed className="mr-2 text-[#8A6E52]"/> Habitación {room.tipo || 'Estándar'}
+                                  </div>
 
                                 {/* DatePicker específico para esta habitación */}
                                 <div className="mb-3">
@@ -783,23 +784,103 @@ function BookingFormSection({
                        </AnimatePresence>
                    </motion.div>
 
-                  {/* Tarjeta "Resumen" */}
+                  {/* Tarjeta "Resumen" - Mejorada con información gradual de precio */}
                   <motion.div 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, delay: 0.2 }}
-                      className="bg-white p-6 rounded-md shadow-md border border-gray-200 h-fit" // añadido h-fit para que no se estire innecesariamente
+                      className="bg-white p-6 rounded-md shadow-md border border-[#E6DCC6] h-fit" // Cambiado para usar colores de marca
                   >
-                      <h3 className="text-xl font-semibold text-[var(--color-brown-dark)] mb-4 border-b pb-2">Resumen</h3>
-                      {selectedRooms.map(room => (
-                          <div key={room.letra} className="text-sm mb-2 flex justify-between">
-                              <span>Habitación {room.letra} ({fechasPorHabitacion[room.letra]?.fechaEntrada ? formatApiDate(fechasPorHabitacion[room.letra].fechaEntrada) : 'N/A'} - {fechasPorHabitacion[room.letra]?.fechaSalida ? formatApiDate(fechasPorHabitacion[room.letra].fechaSalida) : 'N/A'})</span>
-                              {/* Podríamos calcular el precio por habitación aquí si es necesario */}
+                      <div className="flex justify-between items-center">
+                          <h3 className="text-xl font-semibold text-[#6D4C41] mb-4 border-b pb-2">Resumen</h3>
+                          {selectedRooms.length > 0 && (
+                              <span className="bg-gradient-to-r from-[#E6DCC6] to-[#D1B59B] text-[#6D4C41] text-xs font-medium px-2 py-1 rounded-full">
+                                  {selectedRooms.length} {selectedRooms.length === 1 ? 'habitación' : 'habitaciones'}
+                              </span>
+                          )}
+                      </div>
+                      
+                      {/* Lista de habitaciones seleccionadas con más detalles */}
+                      {selectedRooms.map(room => {
+                          // Calcular días de estancia por habitación
+                          const fechaInicio = fechasPorHabitacion[room.letra]?.fechaEntrada ? new Date(fechasPorHabitacion[room.letra].fechaEntrada) : null;
+                          const fechaFin = fechasPorHabitacion[room.letra]?.fechaSalida ? new Date(fechasPorHabitacion[room.letra].fechaSalida) : null;
+                          const diasEstancia = (fechaInicio && fechaFin) 
+                              ? Math.max(1, Math.ceil((fechaFin - fechaInicio) / (1000 * 60 * 60 * 24)))
+                              : 1;
+                          
+                          // Precio por noche para esta habitación
+                          const precioPorNoche = room.precio || room.precioPorNoche || 2450;
+                          
+                          // Precio total para esta habitación
+                          const precioHabitacion = precioPorNoche * diasEstancia;
+                          
+                          return (
+                              <div key={room.letra} className="mb-4 p-3 bg-[#F8F5F0] rounded-lg border border-[#E6DCC6]">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <span className="font-medium text-[#8A6E52]">Habitación {room.letra}</span>
+                                      <span className="text-xs font-medium text-[#6D4C41] bg-[#E6DCC6] px-2 py-0.5 rounded-full">{room.tipo || 'Estándar'}</span>
+                                  </div>
+                                  <div className="text-sm text-gray-700 mb-1">
+                                      {fechaInicio ? (
+                                          <span className="flex items-center">
+                                              <span className="inline-block w-20">Llegada:</span> 
+                                              <span className="font-medium">{formatApiDate(fechasPorHabitacion[room.letra].fechaEntrada)}</span>
+                                          </span>
+                                      ) : 'Fechas no seleccionadas'}
+                                  </div>
+                                  {fechaFin && (
+                                      <div className="text-sm text-gray-700 mb-1">
+                                          <span className="flex items-center">
+                                              <span className="inline-block w-20">Salida:</span> 
+                                              <span className="font-medium">{formatApiDate(fechasPorHabitacion[room.letra].fechaSalida)}</span>
+                                          </span>
+                                      </div>
+                                  )}
+                                  {(fechaInicio && fechaFin) && (
+                                      <div className="text-sm text-gray-700 mb-1">
+                                          <span className="flex items-center">
+                                              <span className="inline-block w-20">Estancia:</span> 
+                                              <span className="font-medium">{diasEstancia} {diasEstancia === 1 ? 'noche' : 'noches'}</span>
+                                          </span>
+                                      </div>
+                                  )}
+                                  {(fechaInicio && fechaFin) && (
+                                      <div className="mt-2 pt-2 border-t border-[#E6DCC6] flex justify-between text-sm font-medium">
+                                          <span>Subtotal:</span>
+                                          <span>${precioHabitacion.toLocaleString('es-MX')} MXN</span>
+                                      </div>
+                                  )}
+                              </div>
+                          );
+                      })}
+                      
+                      {/* Resumen de precios con mejoras visuales */}
+                      <div className="mt-4 pt-4 border-t border-[#D1B59B]">
+                          {selectedRooms.length > 0 && (
+                              <div className="flex justify-between items-center mb-2 text-sm text-gray-700">
+                                  <span>Subtotal habitaciones:</span>
+                                  <span>${formData.precioTotal ? formData.precioTotal.toLocaleString('es-MX') : '0.00'} MXN</span>
+                              </div>
+                          )}
+                          
+                          {/* Podríamos añadir aquí más líneas como impuestos, descuentos, etc. */}
+                          
+                          <div className="flex justify-between items-center font-bold text-[#6D4C41] text-lg mt-2 pt-2 border-t border-gray-200">
+                              <span>Total Estimado:</span>
+                              <span>${formData.precioTotal ? formData.precioTotal.toLocaleString('es-MX') : '0.00'} MXN</span>
                           </div>
-                      ))}
-                      <div className="text-lg font-bold text-[var(--color-brown-dark)] mt-4 pt-4 border-t flex justify-between items-center">
-                          <span>Total Estimado:</span>
-                          <span>${formData.precioTotal ? formData.precioTotal.toFixed(2) : '0.00'} MXN</span>
+                          
+                          {/* Mensaje contextual que explica la naturaleza del precio */}
+                          <div className="mt-3 text-xs text-gray-500 flex items-start p-2 bg-gray-50 rounded-md border border-gray-200">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#8A6E52] mr-1 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>
+                                  Los precios mostrados son estimaciones basadas en las fechas seleccionadas.
+                                  {selectedRooms.length > 0 && ' El precio final puede variar según la temporada y disponibilidad.'}
+                              </span>
+                          </div>
                       </div>
                       
                       {reservationError && (
@@ -829,6 +910,15 @@ function BookingFormSection({
           {/* Mostrar el Box de Confirmación si HAY detalles */} 
           {reservaConfirmadaDetalles && (
             <ReservaConfirmacionBox reservations={reservaConfirmadaDetalles} />
+          )}
+          
+          {/* Componente flotante tipo recibo que se actualiza en tiempo real */}
+          {!reservaConfirmadaDetalles && (
+            <HabitacionPrecioFloating 
+              selectedRooms={selectedRooms} 
+              fechasPorHabitacion={fechasPorHabitacion || {}} 
+              isVisible={true} 
+            />
           )}
         </>
       ) : (

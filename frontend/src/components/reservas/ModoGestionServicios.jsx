@@ -496,7 +496,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -553,7 +552,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -610,7 +608,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -667,7 +664,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -724,7 +720,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -781,7 +776,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -838,7 +832,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold">{servicio.nombre}</h3>
-                        <p className="text-sm font-medium text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                       </div>
                       <div className="ml-auto">
                         <button 
@@ -1013,7 +1006,6 @@ const ModoGestionServicios = ({ onServicesSelect, tipoEvento }) => {
                   </div>
                   <div>
                     <p className="font-medium text-[#5D4B3A]">{servicio.nombre}</p>
-                    <p className="text-xs text-[#8A6E52]">{formatPrice(servicio.precio)}</p>
                   </div>
                 </div>
                 <button 

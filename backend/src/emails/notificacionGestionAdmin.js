@@ -549,9 +549,9 @@ const notificacionGestionAdmin = ({ tipo, asunto, mensaje, enlaceAccion, textoEn
               Tel: <a href="tel:+34918754321">+34 91 875 43 21</a> | Email: <a href="mailto:admin@hacienda-bodas.com">admin@hacienda-bodas.com</a>
             </div>
             <div class="social-links">
-              <a href="https://facebook.com/haciendabodas" class="social-link">Facebook</a> |
-              <a href="https://instagram.com/haciendabodas" class="social-link">Instagram</a> |
-              <a href="https://twitter.com/haciendabodas" class="social-link">Twitter</a>
+              <a href="https://www.facebook.com/HaciendaSanCarlos" class="social-link">Facebook</a> |
+              <a href="https://www.instagram.com/hdasancarlos/" class="social-link">Instagram</a> |
+              <a href="#" class="social-link">Twitter</a>
             </div>
             <div class="fine-print">
               Este email contiene información confidencial y está destinado únicamente para uso administrativo interno.

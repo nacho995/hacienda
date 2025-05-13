@@ -95,8 +95,7 @@ const MapaHabitaciones = ({ habitacionesSeleccionadas = [], onSelectHabitacion, 
                 <div>
                   <h4 className="font-semibold">Habitación {habitacion.letra}</h4>
                   <p className="text-sm text-gray-600">
-                    {habitacion.tipo} • {habitacion.ubicacion} • 
-                    {habitacion.tipo === 'Sencilla' ? '$2,400/noche' : '$2,450/noche'}
+                    {habitacion.tipo} • {habitacion.ubicacion}
                   </p>
                 </div>
                 {isSelected(habitacion.letra) && (
@@ -128,7 +127,7 @@ const MapaHabitaciones = ({ habitacionesSeleccionadas = [], onSelectHabitacion, 
                   <div>
                     <span className="text-gray-700">{tipoHab}</span>
                     <p className="text-xs text-gray-500">
-                      {tipoHab === 'Sencilla' ? '$2,400/noche' : '$2,450/noche'}
+                      Habitación seleccionada
                     </p>
                   </div>
                 </li>

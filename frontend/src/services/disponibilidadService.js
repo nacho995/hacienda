@@ -19,7 +19,7 @@ export const obtenerTodasLasReservas = async () => {
     // Llamar a los NUEVOS endpoints PÚBLICOS 
     // *** CORRIGIENDO RUTA ***
     const [respHabPublic, respEvPublic] = await Promise.all([
-      apiClient.get('/reservas/public/fechas-ocupadas-habitaciones'), 
+      apiClient.get('/reservas/habitaciones/public/fechas-ocupadas-habitaciones'), 
       apiClient.get('/reservas/eventos/public/fechas-ocupadas-eventos')    
     ]);
     

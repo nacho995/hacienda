@@ -60,8 +60,8 @@ export default function Footer() {
                   <FaMapMarkerAlt className="text-white text-sm" />
                 </div>
                 <div className="group-hover:translate-x-1 transition-transform duration-300">
-                  <p className="text-white/90 font-medium">Camino a la Hacienda 123</p>
-                  <p className="text-white/80">Cuernavaca, Morelos, México</p>
+                  <p className="text-white/90 font-medium">carretera federal Cuernavaca Cuautla km32.</p>
+                  <p className="text-white/80">Localidad Los Arcos, Yautepec, Morelos</p>
                 </div>
               </div>
               
@@ -69,7 +69,7 @@ export default function Footer() {
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-lg ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
                   <FaPhone className="text-white text-sm" />
                 </div>
-                <p className="text-white/90 font-medium group-hover:translate-x-1 transition-transform duration-300">+52 (777) 123-4567</p>
+                <p className="text-white/90 font-medium group-hover:translate-x-1 transition-transform duration-300">735 1556114 / 5529199212</p>
               </div>
               
               <div className="flex items-center space-x-4 group">
@@ -81,17 +81,11 @@ export default function Footer() {
             </div>
             
             <div className="flex space-x-4 mt-8">
-              <a href="#" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
+              <a href="https://www.facebook.com/Hacienda San Carlos" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
                 <FaFacebookF />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
+              <a href="https://www.instagram.com/hdasancarlos" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
                 <FaInstagram />
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
-                <FaPinterestP />
-              </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center text-white hover:from-[var(--color-primary-light)] hover:to-[var(--color-primary)] transition-all duration-300 shadow-lg transform hover:scale-110 ring-1 ring-white/10 hover:ring-white/30">
-                <FaTwitter />
               </a>
             </div>
           </div>

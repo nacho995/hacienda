@@ -66,8 +66,8 @@ export default function AvisoLegalPage() {
               <ul>
                 <li>Denominación social: Hacienda San Carlos S.A. de C.V.</li>
                 <li>CIF/NIF: [Número fiscal]</li>
-                <li>Domicilio social: [Dirección completa]</li>
-                <li>Teléfono: [Número de teléfono]</li>
+                <li>Domicilio social: carretera federal Cuernavaca Cuautla km32. Localidad Los Arcos, Yautepec, Morelos</li>
+                <li>Teléfono: 735 1556114 / 5529199212</li>
                 <li>Email: info@haciendasancarlos.com</li>
                 <li>Datos de inscripción en el Registro Mercantil: [Datos de registro]</li>
               </ul>

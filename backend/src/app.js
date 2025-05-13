@@ -29,6 +29,10 @@ const { handleStripeWebhook } = require('./controllers/webhook.controller');
 
 const app = express();
 
+// Confiar en el proxy para obtener la IP real del cliente (importante para rate limiting y logs en producción)
+// Esto es especialmente importante para Elastic Beanstalk
+app.set('trust proxy', 1); 
+
 // Middleware para parsear el body
 app.use(express.json());
 
@@ -59,6 +63,11 @@ app.use(cors(corsOptions));
 
 // Webhook Route (ANTES de express.json())
 app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), handleStripeWebhook);
+
+// Ruta para health check de Elastic Beanstalk (MOVIDA AQUÍ, ANTES DE RATE LIMITING Y OTROS MIDDLEWARES GENERALES)
+app.get('/api/health', (req, res) => {
+  res.status(200).send('OK - healthy'); // Modificado para diferenciar de un posible OK por defecto
+});
 
 // Logging en desarrollo
 if (process.env.NODE_ENV === 'development') {
@@ -125,11 +134,6 @@ app.get('/api/status', (req, res) => {
     message: 'API funcionando correctamente',
     timestamp: new Date()
   });
-});
-
-// Ruta para health check de Elastic Beanstalk
-app.get('/api/health', (req, res) => {
-  res.status(200).send('OK');
 });
 
 // Middleware para rutas no encontradas

@@ -23,6 +23,7 @@ import ModalModoGestionHabitaciones from '@/components/reservas/ModalModoGestion
 import CalendarioReserva from '@/components/reservas/CalendarioReserva';
 import NavbarReservar from '@/components/layout/NavbarReservar';
 import Footer from '@/components/layout/Footer';
+import ReciboReservaGlobal from '@/components/reservas/ReciboReservaGlobal';
 import { Elements } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import CheckoutForm from '@/components/reservas/CheckoutForm';
@@ -53,6 +54,7 @@ const ReservarPage = () => {
     <div className="min-h-screen bg-gray-100">
       {/* Envolver el Wizard con Elements */}
       <Elements stripe={stripePromise} options={options}>
+        <ReciboReservaGlobal />
         <ReservaWizard />
       </Elements>
     </div>
