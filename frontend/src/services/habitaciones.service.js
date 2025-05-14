@@ -28,7 +28,7 @@ const getAuthHeaders = () => {
 // Obtener todas las habitaciones
 export const obtenerHabitaciones = async () => {
   try {
-    const response = await apiClient.get('/habitaciones');
+    const response = await apiClient.get('/api/habitaciones');
     // console.log('Respuesta de habitaciones:', response);
     return response;
   } catch (error) {
@@ -46,7 +46,7 @@ export const obtenerHabitaciones = async () => {
 // Obtener todas las habitaciones por planta
 export const obtenerHabitacionesPorPlanta = async (planta) => {
   try {
-    const response = await apiClient.get(`/habitaciones/planta/${planta}`);
+    const response = await apiClient.get(`/api/habitaciones/planta/${planta}`);
     return response;
   } catch (error) {
     console.error('Error al obtener las habitaciones por planta:', error);
@@ -60,7 +60,7 @@ export const obtenerHabitacionesConReservas = async () => {
     console.log('Iniciando obtención de habitaciones con reservas');
     
     // Obtener todas las habitaciones usando el cliente API que maneja automáticamente el token
-    const habitacionesResponse = await apiClient.get('/habitaciones');
+    const habitacionesResponse = await apiClient.get('/api/habitaciones');
     console.log('Respuesta de habitaciones:', habitacionesResponse);
 
     // Asegurarnos de tener un array de habitaciones válido
@@ -90,7 +90,7 @@ export const obtenerHabitacionesConReservas = async () => {
     }
     
     // Obtener todas las reservas usando el mismo cliente API
-    const reservasResponse = await apiClient.get('/reservas/habitaciones');
+    const reservasResponse = await apiClient.get('/api/reservas/habitaciones');
     console.log('Respuesta de reservas:', reservasResponse);
 
     // Verificar la respuesta de reservas
@@ -192,7 +192,7 @@ export const obtenerHabitacionesConReservas = async () => {
 // Obtener habitaciones disponibles para un evento
 export const obtenerHabitacionesDisponibles = async (params) => {
   try {
-    const response = await apiClient.get('/habitaciones/disponibles', { params });
+    const response = await apiClient.get('/api/habitaciones/disponibles', { params });
     return response.data; // Asumiendo que el backend devuelve { success: true, data: [...] }
   } catch (error) {
     console.error('Error al obtener las habitaciones disponibles:', error);
@@ -203,7 +203,7 @@ export const obtenerHabitacionesDisponibles = async (params) => {
 // Obtener una habitación por ID o letra
 export const obtenerHabitacion = async (id) => {
   try {
-    const response = await apiClient.get(`/habitaciones/${id}`);
+    const response = await apiClient.get(`/api/habitaciones/${id}`);
     return response;
   } catch (error) {
     console.error('Error al obtener la habitación:', error);
@@ -214,7 +214,7 @@ export const obtenerHabitacion = async (id) => {
 // Crear una nueva habitación
 export const crearHabitacion = async (datos) => {
   try {
-    const response = await apiClient.post('/habitaciones', datos);
+    const response = await apiClient.post('/api/habitaciones', datos);
     return response;
   } catch (error) {
     console.error('Error al crear habitación:', error);
@@ -231,7 +231,7 @@ export const crearHabitacion = async (datos) => {
 // Actualizar una habitación
 export const actualizarHabitacion = async (id, datos) => {
   try {
-    const response = await apiClient.put(`/habitaciones/${id}`, datos);
+    const response = await apiClient.put(`/api/habitaciones/${id}`, datos);
     return response;
   } catch (error) {
     console.error('Error al actualizar habitación:', error);
@@ -248,7 +248,7 @@ export const actualizarHabitacion = async (id, datos) => {
 // Eliminar una habitación
 export const eliminarHabitacion = async (id) => {
   try {
-    const response = await apiClient.delete(`/habitaciones/${id}`);
+    const response = await apiClient.delete(`/api/habitaciones/${id}`);
     return response;
   } catch (error) {
     console.error('Error al eliminar habitación:', error);
@@ -266,7 +266,7 @@ export const eliminarHabitacion = async (id) => {
 export const gestionarHabitacionesReserva = async (reservaId, datosHabitaciones) => {
   try {
     const response = await apiClient.put(
-      `/reservas/${reservaId}/habitaciones`,
+      `/api/reservas/${reservaId}/habitaciones`,
       datosHabitaciones
     );
     

@@ -1,0 +1,16 @@
+# Robots.txt para Hacienda San Carlos Borromeo
+User-agent: *
+Allow: /
+
+# Proteger áreas administrativas y privadas
+Disallow: /admin/
+Disallow: /admin/*
+Disallow: /*?preview=true
+Disallow: /recuperar-contrasena/
+Disallow: /restablecer-contrasena/
+
+# Rutas de APIs que no deben indexarse
+Disallow: /api/
+
+# Permitir a todos los robots rastrear el sitemap
+Sitemap: https://www.hdasancarlosborromeo.com/sitemap.xml

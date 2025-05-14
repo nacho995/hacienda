@@ -1,0 +1,46 @@
+/* Estilos personalizados para el DatePicker del sistema de reservas */
+
+/* Fechas ocupadas - destacadas visualmente */
+.react-datepicker__day--highlighted-custom-1 {
+  background-color: #fecaca !important;
+  color: #991b1b !important;
+  border-radius: 50%;
+}
+
+/* Estilo para fechas ocupadas por habitación */
+.react-datepicker__day.bg-red-200 {
+  background-color: #fecaca !important;
+  color: #991b1b !important;
+  border-radius: 50%;
+  font-weight: bold;
+}
+
+/* Estilo para fechas ocupadas por evento */
+.react-datepicker__day--disabled {
+  opacity: 0.5;
+  text-decoration: line-through;
+  background-color: #fecaca !important;
+  color: #991b1b !important;
+}
+
+/* Mejorar visibilidad del rango seleccionado */
+.react-datepicker__day--in-selecting-range,
+.react-datepicker__day--in-range {
+  background-color: #93c5fd !important;
+  color: #1e3a8a !important;
+}
+
+/* Color de inicio y fin de rango */
+.react-datepicker__day--selecting-range-start,
+.react-datepicker__day--range-start,
+.react-datepicker__day--selecting-range-end,
+.react-datepicker__day--range-end {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border-radius: 50%;
+}
+
+/* Hover para días disponibles */
+.react-datepicker__day:hover:not(.react-datepicker__day--disabled) {
+  background-color: #dbeafe !important;
+}

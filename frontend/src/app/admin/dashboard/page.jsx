@@ -64,10 +64,9 @@ export default function AdminDashboard() {
   } = useReservation();
   
   // <<< INICIO LOG DATOS CONTEXTO DASHBOARD >>>
-  /* // <-- COMENTADO PARA EVITAR LOGS EXCESIVOS
   useEffect(() => {
     if (!reservationsLoading && (habitacionReservations?.length || eventoReservations?.length)) {
-      console.log('%c[Dashboard Context Check] Datos recibidos de useReservation:', 'color: green; font-weight: bold;', {
+      /* console.log('%c[Dashboard Context Check] Datos recibidos de useReservation:', 'color: green; font-weight: bold;', {
         habitacionReservations: habitacionReservations ? JSON.parse(JSON.stringify(habitacionReservations.slice(0,5))) : [], // Primeros 5 para inspección
         eventoReservations: eventoReservations ? JSON.parse(JSON.stringify(eventoReservations.slice(0,5))) : [], // Primeros 5
       });
@@ -80,10 +79,9 @@ export default function AdminDashboard() {
                    habitacionField: res.habitacion 
                }))
            );
-       }
+       } */
     }
   }, [habitacionReservations, eventoReservations, reservationsLoading]);
-  */ // <-- FIN COMENTADO
   // <<< FIN LOG DATOS CONTEXTO DASHBOARD >>>
   
   const router = useRouter();
@@ -857,7 +855,7 @@ export default function AdminDashboard() {
     // ---> DEBUG: Loguear el objeto reserva que se intenta renderizar
     // console.log('[RenderIndicator] Recibido:', JSON.stringify(reserva, null, 2)); // Stringify para ver bien el objeto
     // <<< INICIO LOG DETALLADO RENDER INDICATOR >>>
-    // console.log('%c[RenderIndicator] Recibido para renderizar:', 'color: magenta;', JSON.parse(JSON.stringify(reserva))); // <-- COMENTADO
+    // console.log('%c[RenderIndicator] Recibido para renderizar (calendario):', 'color: magenta;', JSON.parse(JSON.stringify(reserva))); // <-- COMENTADO AHORA
     // <<< FIN LOG DETALLADO RENDER INDICATOR >>>
     
     const idReserva = reserva._id || 'temp-' + Math.random();
@@ -873,9 +871,26 @@ export default function AdminDashboard() {
     }
     // --- 2. Mostrar Indicador de Habitación (SOLO si es de HOTEL independiente) --- <<< MODIFICACIÓN: SOLO TOOLTIP
     else if (reserva.tipo === 'habitacion' && !reserva.reservaEvento) { 
-        let letraHabitacion = reserva.habitacionDetails?.letra || reserva.habitacion?.letra || '?';
-        if (letraHabitacion === 'Sin asignar') { letraHabitacion = '?'; }
-        tooltipText = `Hab. Hotel ${letraHabitacion}: ${reserva.nombreContacto || 'Sin contacto'} - Ver en lista`;
+        // let letraHabitacion = reserva.habitacionDetails?.letra || (typeof reserva.habitacion === 'string' ? reserva.habitacion : reserva.habitacion?.letra) || '?';
+        // if (letraHabitacion === 'Sin asignar') { letraHabitacion = '?'; }
+        
+        let letraCalc = '?'; // Valor por defecto
+        const detalleLetra = reserva.habitacionDetails?.letra;
+        const reservaHabString = (typeof reserva.habitacion === 'string' && reserva.habitacion !== "Sin asignar" && reserva.habitacion !== "?") ? reserva.habitacion : null;
+        const reservaHabObjLetra = reserva.habitacion?.letra;
+
+        if (detalleLetra && detalleLetra !== '?') {
+            letraCalc = detalleLetra;
+        } else if (reservaHabString) {
+            letraCalc = reservaHabString;
+        } else if (reservaHabObjLetra && reservaHabObjLetra !== '?') {
+            letraCalc = reservaHabObjLetra;
+        }
+        // La línea original 'if (letraHabitacion === 'Sin asignar') { letraHabitacion = '?'; }' ya está cubierta.
+
+        console.log(`%c[RenderIndicator] Procesando Habitación ID: ${reserva._id || 'N/A'}, habitacionDetails.letra: ${detalleLetra}, reserva.habitacion (string): ${reservaHabString}, reserva.habitacion.letra (obj): ${reservaHabObjLetra}, LETRA CALCULADA: ${letraCalc}`, 'color: blue;');
+
+        tooltipText = `Hab. Hotel ${letraCalc}: ${reserva.nombreContacto || 'Sin contacto'} - Ver en lista`;
     }
     // --- 3. Habitaciones de Evento: No se renderizan (indicator sigue siendo null) ---
     else {
@@ -897,7 +912,24 @@ export default function AdminDashboard() {
             // Estilo Habitación Hotel
             <div className="m-0.5 flex-shrink-0 inline-block"> {/* Usar inline-block para que tome el ancho del span */} 
               <span className={`w-7 h-7 rounded ${COLORES_PASTEL_PIEDRA.letraHabitacion} flex items-center justify-center text-xs font-bold shadow border ${COLORES_PASTEL_PIEDRA.borde} hover:opacity-80 transition-opacity`}>
-                {reserva.habitacionDetails?.letra || reserva.habitacion?.letra || '?'} 
+                {/* Se necesita replicar la misma lógica de cálculo aquí o usar la variable calculada si el scope lo permite.
+                    Para simplificar y dado que la variable 'letraCalc' está en el mismo scope de la condición if/else if, 
+                    deberíamos poder usarla. Sin embargo, la variable 'letraCalc' no está disponible en este punto del JSX
+                    porque el JSX está fuera del bloque 'else if'.
+                    La forma más directa es recalcularla o asegurar que 'letraHabitacion' global al 'if/else if' se actualice.
+                    Por ahora, replicaré la lógica simplificada que debería funcionar con la corrección de datos.
+                    Lo ideal sería extraer esta lógica a una función auxiliar.
+                */}
+                {
+                  (() => {
+                    let letraPrio1 = reserva.habitacionDetails?.letra;
+                    let letraPrio2 = (typeof reserva.habitacion === 'string' && reserva.habitacion !== "Sin asignar" && reserva.habitacion !== "?") ? reserva.habitacion : reserva.habitacion?.letra;
+                    
+                    if (letraPrio1 && letraPrio1 !== '?') return letraPrio1;
+                    if (letraPrio2 && letraPrio2 !== '?') return letraPrio2;
+                    return '?';
+                  })()
+                }
               </span>
             </div>
           )}

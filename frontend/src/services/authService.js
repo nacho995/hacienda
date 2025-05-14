@@ -7,7 +7,7 @@ class AuthService {
       console.log('Intentando iniciar sesión con:', { email });
       
       // Corregir ruta añadiendo /api
-      const response = await apiClient.post('/auth/login', { email, password });
+      const response = await apiClient.post('/api/auth/login', { email, password });
       console.log('Respuesta de login exitosa:', response);
 
       if (response.success && response.token) {
@@ -57,7 +57,7 @@ class AuthService {
   async register(userData) {
     try {
       // Corregir ruta añadiendo /api
-      const response = await apiClient.post('/auth/register', userData);
+      const response = await apiClient.post('/api/auth/register', userData);
       return response;
     } catch (error) {
       console.error('Error al registrar usuario:', error.message || error);
@@ -77,7 +77,7 @@ class AuthService {
       
       try {
         // Corregir ruta añadiendo /api
-        await apiClient.get('/auth/logout');
+        await apiClient.get('/api/auth/logout');
       } catch (error) {
         console.error('Error al cerrar sesión en el servidor:', error.message || error);
       }
@@ -161,7 +161,7 @@ class AuthService {
       
       try {
         // Corregir ruta añadiendo /api
-        const response = await apiClient.get('/auth/me', { signal: controller.signal });
+        const response = await apiClient.get('/api/auth/me', { signal: controller.signal });
         clearTimeout(timeoutId);
         
         if (response.success && response.data) {
@@ -205,7 +205,7 @@ class AuthService {
       console.log('Solicitando restablecimiento de contraseña para:', email);
       
       // Corregir ruta añadiendo /api
-      const response = await apiClient.post('/auth/password/forgot', { email });
+      const response = await apiClient.post('/api/auth/password/forgot', { email });
       
       if (response.success) {
         return {
@@ -233,7 +233,7 @@ class AuthService {
       console.log('Restableciendo contraseña con token');
       
       // Corregir ruta añadiendo /api
-      const response = await apiClient.put(`/auth/password/reset/${token}`, { password });
+      const response = await apiClient.put(`/api/auth/password/reset/${token}`, { password });
       
       if (response.success) {
         return {

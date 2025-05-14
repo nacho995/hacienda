@@ -1,0 +1,22 @@
+{
+  "name": "Hacienda San Carlos Borromeo",
+  "short_name": "Hacienda SCB",
+  "description": "Bodas y eventos exclusivos en una hacienda colonial en México",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#E6DCC6",
+  "theme_color": "#A5856A",
+  "display": "standalone",
+  "orientation": "portrait"
+}

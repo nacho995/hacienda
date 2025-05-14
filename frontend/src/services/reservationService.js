@@ -27,7 +27,7 @@ export const getHabitacionReservations = async (filtro = {}) => {
     // Añadir un parámetro para indicar que solo queremos reservas del modelo ReservaHabitacion
     params.append('soloReservaHabitacion', 'true');
     
-    const url = `/reservas/habitaciones${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `/api/reservas/habitaciones${params.toString() ? '?' + params.toString() : ''}`;
     console.log('URL de petición habitaciones:', url);
     
     // Obtener SOLO las reservas de habitaciones del modelo ReservaHabitacion
@@ -81,7 +81,7 @@ export const getHabitacionReservations = async (filtro = {}) => {
 
 export const getHabitacionReservation = async (id) => {
   try {
-    const response = await apiClient.get(`/reservas/habitaciones/${id}`);
+    const response = await apiClient.get(`/api/reservas/habitaciones/${id}`);
     
     // Procesar la respuesta para asegurar que tipoHabitacion y habitacion estén en el formato correcto
     if (response && response.data) {
@@ -196,7 +196,7 @@ export const createHabitacionReservation = async (reservationData) => {
       // Si tiene un eventoId, es una reserva asociada a un evento existente
       if (reservationData.eventoId) {
         // Agregar la habitación a un evento existente
-        const response = await apiClient.post(`/reservas/eventos/${reservationData.eventoId}/habitaciones`, {
+        const response = await apiClient.post(`/api/reservas/eventos/${reservationData.eventoId}/habitaciones`, {
           tipoHabitacion: tipoHabitacion,
           habitacion: reservationData.habitacion || reservationData.nombre || 'Sin asignar',
           fechaEntrada: fechaEntrada,
@@ -232,14 +232,25 @@ export const createHabitacionReservation = async (reservationData) => {
       }
     } else {
       // Es una reserva de hotel independiente - asegurar que todos los campos tengan valores predeterminados
-      console.log('Creando reserva de hotel independiente con datos:', reservationData);
-      
+      console.log('Creando reserva de hotel independiente con datos (originales):', reservationData);
+
+      // --- INICIO DE MODIFICACIÓN PROVISIONAL ---
+      let tipoHabitacionModificado = tipoHabitacion; 
+      if (reservationData.tipoHabitacion === 'Estándar') {
+        tipoHabitacionModificado = 'Habitación Doble'; 
+        console.warn('Parche aplicado: tipoHabitacion cambiado de "Estándar" a "Habitación Doble"');
+      } else if (reservationData.tipoHabitacion === 'standard') { 
+        tipoHabitacionModificado = 'Habitación Doble'; 
+        console.warn('Parche aplicado: tipoHabitacion cambiado de "standard" (default) a "Habitación Doble"');
+      }
+      // --- FIN DE MODIFICACIÓN PROVISIONAL ---
+
       const requestData = {
-        tipoHabitacion: tipoHabitacion,
+        // tipoHabitacion: tipoHabitacion, // Ya no se usa el original directamente
         habitacion: reservationData.habitacionLetra || reservationData.habitacion || reservationData.nombre || 'Sin asignar',
         fechaEntrada: fechaEntrada,
         fechaSalida: fechaSalida,
-        precio: reservationData.precioTotal || reservationData.precio || 0,
+        // precio: reservationData.precioTotal || reservationData.precio || 0, // Eliminado
         precioPorNoche: reservationData.precioPorNoche || 0,
         numeroHabitaciones: reservationData.numeroHabitaciones || 1,
         numHuespedes: reservationData.numHuespedes || 2,
@@ -250,17 +261,26 @@ export const createHabitacionReservation = async (reservationData) => {
         peticionesEspeciales: reservationData.peticionesEspeciales || '',
         estadoReserva: reservationData.estadoReserva || 'pendiente',
         origen: reservationData.origen || 'web',
-        huespedPrincipal: reservationData.huespedPrincipal || null
+        huespedPrincipal: reservationData.huespedPrincipal || null,
+        tipoHabitacion: tipoHabitacionModificado 
       };
       
+      // Eliminar el campo precio explícitamente si existe en requestData
+      // Esta fue una de las líneas problemáticas, asegúrate que el if y delete estén correctos
+      if ('precio' in requestData) { 
+        delete requestData.precio;
+        console.warn('Parche aplicado: Se eliminó el campo \'precio\' de requestData para que el backend lo calcule.');
+      }
+
       // Asegurarse de que no se envían campos undefined que puedan causar problemas
-      Object.keys(requestData).forEach(key => {
+      // Aquí es donde el linter marcaba el error, asegúrate que la siguiente línea sea el Object.keys
+      Object.keys(requestData).forEach(key => { // <--- Esta línea debe seguir fluidamente
         if (requestData[key] === undefined) {
           delete requestData[key];
         }
       });
 
-      const response = await apiClient.post('/reservas/habitaciones', requestData);
+      const response = await apiClient.post('/api/reservas/habitaciones', requestData);
       return response;
     }
   } catch (error) {
@@ -279,7 +299,7 @@ export const createHabitacionReservation = async (reservationData) => {
 
 export const updateHabitacionReservation = async (id, data) => {
   try {
-    const response = await apiClient.put(`/reservas/habitaciones/${id}`, data);
+    const response = await apiClient.put(`/api/reservas/habitaciones/${id}`, data);
     return response;
   } catch (error) {
     console.error(`Error al actualizar reserva de habitación ${id}:`, error.response?.data?.message || error.message);
@@ -295,7 +315,7 @@ export const assignHabitacionReservation = async (id, usuarioId) => {
     // console.log("Detalles obtenidos antes de asignar:", detalles.data);
 
     // La llamada PUT para asignar - ¡AÑADIR /api!
-    const response = await apiClient.post(`/reservas/habitaciones/${id}/assign`, { usuarioId });
+    const response = await apiClient.post(`/api/reservas/habitaciones/${id}/assign`, { usuarioId });
     console.log(`Respuesta de asignación para habitación ${id}:`, response);
     return response;
   } catch (error) {
@@ -337,7 +357,7 @@ export const getEventoReservations = async (filtro = {}) => {
     
     params.append('soloReservaEvento', 'true');
     
-    const url = `/reservas/eventos${params.toString() ? '?' + params.toString() : ''}`;
+    const url = `/api/reservas/eventos${params.toString() ? '?' + params.toString() : ''}`;
     console.log('URL de petición eventos:', url);
     
     const response = await apiClient.get(url);
@@ -387,7 +407,7 @@ export const getEventoReservations = async (filtro = {}) => {
 
 export const getEventoReservation = async (id) => {
   try {
-    const response = await apiClient.get(`/reservas/eventos/${id}`);
+    const response = await apiClient.get(`/api/reservas/eventos/${id}`);
     
     // Procesar la respuesta para asegurar que las habitaciones tengan los nombres correctos
     if (response && response.data) {
@@ -429,21 +449,16 @@ export const getEventoReservation = async (id) => {
 };
 
 export const createEventoReservation = async (reservaData) => {
+  console.log('>>> Intentando crear reserva de evento con datos:', reservaData);
   try {
-    // Validar datos requeridos
-    if (!reservaData.tipo_evento || !reservaData.fecha || !reservaData.nombre_contacto || !reservaData.email_contacto) {
-      throw new Error('Faltan datos requeridos para crear la reserva');
-    }
-
-    console.log('Creando reserva de evento con datos:', reservaData);
-
-    const response = await apiClient.post('/reservas/eventos', reservaData);
-
-    if (!response) {
+    // Asegúrate de que la URL incluya el prefijo /api
+    const response = await apiClient.post('/api/reservas/eventos', reservaData);
+    console.log('>>> Respuesta de crear reserva de evento:', response);
+    if (response && response.success) {
+      return response;
+    } else {
       throw new Error('No se recibió respuesta del servidor');
     }
-
-    return response;
   } catch (error) {
     console.error('Error al crear la reserva de evento:', error);
     throw error;
@@ -452,7 +467,7 @@ export const createEventoReservation = async (reservaData) => {
 
 export const updateEventoReservation = async (id, data) => {
   try {
-    const response = await apiClient.put(`/reservas/eventos/${id}`, data);
+    const response = await apiClient.put(`/api/reservas/eventos/${id}`, data);
     return response;
   } catch (error) {
     console.error(`Error al actualizar reserva de evento ${id}:`, error.response?.data?.message || error.message);
@@ -462,7 +477,7 @@ export const updateEventoReservation = async (id, data) => {
 
 export const assignEventoReservation = async (id, usuarioId) => {
   try {
-    const response = await apiClient.post(`/reservas/eventos/${id}/assign`, { usuarioId });
+    const response = await apiClient.post(`/api/reservas/eventos/${id}/assign`, { usuarioId });
     return response;
   } catch (error) {
     console.error(`Error al asignar reserva de evento ${id}:`, error.response?.data?.message || error.message);
@@ -475,7 +490,7 @@ export const assignEventoReservation = async (id, usuarioId) => {
 export const getEventoOccupiedDates = async (params = {}) => {
   try {
     const queryParams = new URLSearchParams(params).toString();
-    const response = await apiClient.get(`/reservas/eventos/occupied-dates${queryParams ? '?' + queryParams : ''}`);
+    const response = await apiClient.get(`/api/reservas/eventos/occupied-dates${queryParams ? '?' + queryParams : ''}`);
     return response;
   } catch (error) {
     console.error('Error fetching occupied dates for eventos:', error);
@@ -601,7 +616,7 @@ export const checkHabitacionAvailability = async (availabilityData) => {
 export const getAllReservationsForDashboard = async () => {
   // console.log('[DashboardService] Obteniendo TODAS las reservas...');
   try {
-    const response = await apiClient.get('/reservas/dashboard-data');
+    const response = await apiClient.get('/api/reservas');
     // console.log('[DashboardService] Respuesta recibida:', response);
 
     let allReservations = [];
@@ -692,7 +707,7 @@ export const getAllReservationsForDashboard = async () => {
 export const getHabitacionOccupiedDates = async (params = {}) => {
   try {
     const queryParams = new URLSearchParams(params).toString();
-    const response = await apiClient.get(`/reservas/habitaciones/occupied-dates${queryParams ? '?' + queryParams : ''}`);
+    const response = await apiClient.get(`/api/reservas/habitaciones/occupied-dates${queryParams ? '?' + queryParams : ''}`);
     return response;
   } catch (error) {
     console.error('Error en servicio getHabitacionOccupiedDates, relanzando:', error);
@@ -704,7 +719,7 @@ export const getHabitacionOccupiedDates = async (params = {}) => {
 export const getAllHabitacionOccupiedDates = async (params = {}) => {
   try {
     const queryParams = new URLSearchParams(params).toString();
-    const response = await apiClient.get(`/reservas/habitaciones/all-occupied-dates${queryParams ? '?' + queryParams : ''}`);
+    const response = await apiClient.get(`/api/reservas/habitaciones/all-occupied-dates${queryParams ? '?' + queryParams : ''}`);
     return response;
   } catch (error) {
     console.error('Error en servicio getAllHabitacionOccupiedDates:', error);
@@ -716,7 +731,7 @@ export const getAllHabitacionOccupiedDates = async (params = {}) => {
 // Eliminar reservas
 export const deleteHabitacionReservation = async (id) => {
   try {
-    const response = await apiClient.delete(`/reservas/habitaciones/${id}`);
+    const response = await apiClient.delete(`/api/reservas/habitaciones/${id}`);
     console.log(`Reserva de habitación ${id} eliminada:`, response);
     return response;
   } catch (error) {
@@ -736,7 +751,7 @@ export const deleteEventoReservation = async (id) => {
     }
     
     // Obtener el evento primero para comprobar si tiene habitaciones asociadas
-    const eventoResponse = await apiClient.get(`/reservas/eventos/${id}`);
+    const eventoResponse = await apiClient.get(`/api/reservas/eventos/${id}`);
     const evento = eventoResponse?.data || {};
     
     if (!evento) {
@@ -754,7 +769,7 @@ export const deleteEventoReservation = async (id) => {
     }
     
     // Solicitar la eliminación del evento al servidor
-    const response = await apiClient.delete(`/reservas/eventos/${id}`);
+    const response = await apiClient.delete(`/api/reservas/eventos/${id}`);
     
     // Incluir información adicional en la respuesta
     return {
@@ -773,7 +788,7 @@ export const deleteEventoReservation = async (id) => {
 export const unassignHabitacionReservation = async (id) => {
   console.log(`Iniciando desasignación de habitación ${id}`);
   try {
-    const response = await apiClient.post(`/reservas/habitaciones/${id}/unassign`, {});
+    const response = await apiClient.post(`/api/reservas/habitaciones/${id}/unassign`, {});
     console.log(`Respuesta de desasignación para habitación ${id}:`, response);
     return response;
   } catch (error) {
@@ -796,7 +811,7 @@ export const unassignEventoReservation = async (reservationId) => {
   }
   console.log(`[Service] Desasignando admin para evento ${reservationId}`);
   try {
-    const response = await apiClient.post(`/reservas/eventos/${reservationId}/unassign`, {});
+    const response = await apiClient.post(`/api/reservas/eventos/${reservationId}/unassign`, {});
     console.log(`[Service] Respuesta desasignar evento ${reservationId}:`, response);
     return response;
   } catch (error) {
@@ -870,7 +885,7 @@ export const getEventoHabitaciones = async (eventoId) => {
     return { success: false, data: null, message: 'ID de evento no proporcionado' };
   }
   try {
-    const response = await apiClient.get(`/reservas/eventos/${eventoId}/habitaciones`);
+    const response = await apiClient.get(`/api/reservas/eventos/${eventoId}/habitaciones`);
     
     if (response && response.success && Array.isArray(response.data?.habitaciones)) {
       console.log(`Habitaciones obtenidas para evento ${eventoId}:`, response.data.habitaciones.length);
@@ -901,183 +916,12 @@ export const updateReservaHabitacionHuespedes = async (reservaHabitacionId, data
   }
   
   try {
-    const response = await apiClient.put(`/reservas/habitaciones/${reservaHabitacionId}/huespedes`, data);
-    console.log(`Respuesta al actualizar huéspedes de ${reservaHabitacionId}:`, response);
+    const response = await apiClient.put(`/api/reservas/habitaciones/${reservaHabitacionId}/huespedes`, data);
+    console.log(`Respuesta de actualización de huéspedes para reserva de habitación ${reservaHabitacionId}:`, response);
     return response;
   } catch (error) {
-    console.error(`Error al actualizar huéspedes para reserva ${reservaHabitacionId}:`, error.response || error);
-    return { 
-      success: false, 
-      message: error.response?.data?.message || 'Error al actualizar los huéspedes'
-    };
-  }
-};
-
-// Función para obtener los servicios contratados de un evento
-export const getEventoServicios = async (eventoId) => {
-  if (!eventoId) {
-    return { success: false, message: 'ID de evento no proporcionado' };
-  }
-  try {
-    const response = await apiClient.get(`/reservas/eventos/${eventoId}/servicios`);
-    return response;
-  } catch (error) {
-    console.error(`Error al obtener servicios para evento ${eventoId}:`, error.response || error);
-    return { 
-      success: false, 
-      data: [],
-      message: error.response?.data?.message || 'Error al obtener servicios del evento'
-    };
-  }
-};
-
-// Función para añadir un servicio a un evento
-export const addEventoServicio = async (eventoId, servicioData) => {
-  if (!eventoId || !servicioData?.servicioId) {
-    return { success: false, message: 'ID de evento o servicio no proporcionado' };
-  }
-  try {
-    const response = await apiClient.post(`/reservas/eventos/${eventoId}/servicios`, servicioData);
-    return response;
-  } catch (error) {
-    console.error(`Error al añadir servicio ${servicioData.servicioId} al evento ${eventoId}:`, error.response || error);
-    return { 
-      success: false, 
-      message: error.response?.data?.message || 'Error al añadir servicio al evento'
-    };
-  }
-};
-
-// Función para eliminar un servicio de un evento
-export const removeEventoServicio = async (eventoId, servicioId) => {
-  if (!eventoId || !servicioId) {
-    return { success: false, message: 'ID de evento o servicio no proporcionado' };
-  }
-  try {
-    const response = await apiClient.delete(`/reservas/eventos/${eventoId}/servicios/${servicioId}`);
-    return response;
-  } catch (error) {
-    console.error(`Error al eliminar servicio ${servicioId} del evento ${eventoId}:`, error.response || error);
-    return { 
-      success: false, 
-      message: error.response?.data?.message || 'Error al eliminar servicio del evento'
-    };
-  }
-};
-
-// --- NUEVA: Asignar reserva de evento al admin actual --- 
-export const asignarEventoAdmin = async (id, adminId) => {
-  if (!id) return { success: false, message: 'ID de evento no válido' };
-  if (!adminId) return { success: false, message: 'ID de administrador no proporcionado' };
-  try {
-    const response = await apiClient.post(`/reservas/eventos/${id}/asignar-admin`, { adminId });
-    return response;
-  } catch (error) {
-    console.error(`Error al asignar evento ${id} al admin ${adminId}:`, error.response || error);
-    return { success: false, message: error.response?.data?.message || 'Error al asignar el evento' };
-  }
-};
-
-// --- NUEVA: Asignar reserva de habitación al admin actual --- 
-export const asignarHabitacionAdmin = async (id) => {
-  if (!id) return { success: false, message: 'ID de habitación no válido' };
-  try {
-    const response = await apiClient.post(`/reservas/habitaciones/${id}/asignar-admin`);
-    return response;
-  } catch (error) {
-    console.error(`Error al asignar habitación ${id} al admin:`, error.response || error);
-    return { success: false, message: error.response?.data?.message || 'Error al asignar la habitación' };
-  }
-};
-
-/**
- * @deprecated Usar verificarDisponibilidadHabitacion() de disponibilidadService.js
- * Verifica la disponibilidad de múltiples habitaciones en rangos de fechas específicos.
- */
-export const verificarDisponibilidadHabitaciones = async (data) => {
-  try {
-    console.log('[verificarDisponibilidadHabitaciones] Verificando:', data);
-    const response = await apiClient.post('/reservas/habitaciones/verificar-disponibilidad', data);
-    console.log('[verificarDisponibilidadHabitaciones] Respuesta API:', response);
-    return response;
-  } catch (error) {
-    console.error('[verificarDisponibilidadHabitaciones] Error en la llamada API:', error.response || error);
-    if (error.response && error.response.status === 409) {
-      return {
-        success: true,
-        disponibles: false,
-        message: error.response.data?.message || 'Conflicto de disponibilidad detectado.',
-        habitacionesOcupadas: error.response.data?.habitacionesOcupadas || []
-      };
-    }
-    return {
-      success: false,
-      disponibles: false,
-      message: error.response?.data?.message || 'Error al verificar la disponibilidad'
-    };
-  }
-};
-
-/**
- * @deprecated Usar obtenerFechasOcupadas() de disponibilidadService.js
- * Obtiene las fechas ocupadas para una habitación específica.
- */
-export const getFechasOcupadasPorHabitacion = async (habitacionLetra, fechaInicio, fechaFin) => {
-  try {
-    const response = await apiClient.get(`/reservas/habitaciones/ocupadas/${habitacionLetra}?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
-    return response;
-  } catch (error) {
-    console.error('Error fetching occupied dates for room:', error);
-    return [];
-  }
-};
-
-/**
- * @deprecated Usar obtenerTodasLasReservas() de disponibilidadService.js
- * Obtiene las fechas con eventos en un rango específico.
- */
-export const getFechasEventosEnRango = async (fechaInicio, fechaFin) => {
-  try {
-    const response = await apiClient.get(`/reservas/eventos/rango-fechas?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
-    return response;
-  } catch (error) {
-    console.error('Error fetching event dates:', error);
-    return []; 
-  }
-};
-
-/**
- * @deprecated Usar obtenerTodasLasReservas() de disponibilidadService.js
- * Obtiene todas las fechas ocupadas (de habitaciones y eventos) en un rango específico.
- */
-export const getFechasOcupadasGlobales = async (fechaInicio, fechaFin) => {
-  try {
-    const response = await apiClient.get(`/reservas/global/fechas-ocupadas?fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`);
-    return response;
-  } catch (error) {
-    console.error('Error fetching global occupied dates:', error);
-    return [];
-  }
-};
-
-// --- Selección de Método de Pago (NUEVA) ---
-export const seleccionarMetodoPago = async (id, metodo) => {
-  if (!id || !metodo) {
-    console.error('seleccionarMetodoPago: Se requiere ID de reserva y método de pago.');
-    return { success: false, message: 'Datos incompletos para seleccionar método de pago.' };
-  }
-  try {
-    console.log(`>>> Servicio: Intentando seleccionar método ${metodo} para reserva ${id}`);
-    const response = await apiClient.post(`/reservas/${id}/seleccionar-metodo-pago`, { metodoPago: metodo });
-    console.log(`>>> Servicio: Respuesta de seleccionar método pago:`, response);
-    return response || { success: false, message: 'No se recibió respuesta del servidor.' };
-  } catch (error) {
-    console.error(`Error en servicio seleccionarMetodoPago para reserva ${id}:`, error.response?.data || error.message || error);
-    return {
-      success: false,
-      message: error.response?.data?.message || `Error al seleccionar método de pago ${metodo}.`,
-      error: error
-    };
+    console.error(`Error al actualizar huéspedes para reserva de habitación ${reservaHabitacionId}:`, error.response?.data?.message || error.message);
+    throw error;
   }
 };
 
@@ -1089,7 +933,7 @@ export const createHabitacionPaymentIntent = async (id) => {
   }
   try {
     console.log(`>>> Servicio: Intentando crear PaymentIntent para reserva habitación ${id}`);
-    const response = await apiClient.post(`/reservas/habitaciones/${id}/create-payment-intent`);
+    const response = await apiClient.post(`/api/reservas/habitaciones/${id}/create-payment-intent`);
     console.log(`>>> Servicio: Respuesta de crear PaymentIntent habitación:`, response);
     return response || { success: false, message: 'No se recibió respuesta del servidor.' };
   } catch (error) {
@@ -1115,7 +959,7 @@ export const seleccionarMetodoPagoHabitacion = async (id, metodo) => {
   }
   try {
     console.log(`>>> Servicio: Actualizando método ${metodo} para reserva habitación ${id}`);
-    const response = await apiClient.post(`/reservas/habitaciones/${id}/seleccionar-metodo-pago`, { metodoPago: metodo });
+    const response = await apiClient.post(`/api/reservas/habitaciones/${id}/seleccionar-metodo-pago`, { metodoPago: metodo });
     console.log(`>>> Servicio: Respuesta de seleccionar método pago habitación:`, response);
     return response || { success: false, message: 'No se recibió respuesta.' };
   } catch (error) {
@@ -1136,7 +980,7 @@ export const createEventoPaymentIntent = async (id) => {
     return { success: false, message: 'ID de reserva no proporcionado' };
   }
   try {
-    const response = await apiClient.post(`/reservas/eventos/${id}/create-payment-intent`);
+    const response = await apiClient.post(`/api/reservas/eventos/${id}/create-payment-intent`);
     console.log(`Respuesta de createEventoPaymentIntent para ${id}:`, response);
     return response;
   } catch (error) {
@@ -1148,11 +992,38 @@ export const createEventoPaymentIntent = async (id) => {
   }
 };
 
+// *** NUEVA FUNCIÓN para seleccionar Método de Pago para EVENTOS ***
+export const seleccionarMetodoPagoEvento = async (id, metodo) => {
+  if (!id || !metodo) {
+    console.error('seleccionarMetodoPagoEvento: Se requiere ID de reserva y método.');
+    return { success: false, message: 'Datos incompletos para seleccionar método de pago del evento.' };
+  }
+  // No se debería llamar para 'tarjeta' si el pago se maneja con PaymentIntent
+  if (metodo === 'tarjeta') {
+     console.warn('seleccionarMetodoPagoEvento: El método "tarjeta" usualmente se maneja vía Payment Intent y no debería requerir esta llamada directa para cambiar el método.');
+     // Considera si quieres permitirlo o devolver un error/advertencia específica.
+     // Por ahora, se permite continuar, pero es un caso a revisar según el flujo de Stripe.
+  }
+  try {
+    console.log(`>>> Servicio: Actualizando método ${metodo} para reserva de evento ${id}`);
+    // El backend espera el método en el campo `metodo` según el controlador `seleccionarMetodoPagoEvento`
+    const response = await apiClient.put(`/api/reservas/eventos/${id}/seleccionar-pago`, { metodo });
+    console.log(`>>> Servicio: Respuesta de seleccionar método pago evento:`, response);
+    return response || { success: false, message: 'No se recibió respuesta del servidor al seleccionar método de pago para el evento.' };
+  } catch (error) {
+    console.error(`Error en servicio seleccionarMetodoPagoEvento para reserva ${id}, método ${metodo}:`, error.response?.data || error.message || error);
+    return {
+      success: false,
+      message: error.response?.data?.message || `Error al seleccionar método de pago "${metodo}" para el evento.`,
+      error: error
+    };
+  }
+};
+// *** FIN NUEVA FUNCIÓN para seleccionar Método de Pago para EVENTOS ***
+
 export default {
-  getFechasOcupadasPorHabitacion,
-  getFechasEventosEnRango,
-  getFechasOcupadasGlobales,
   createHabitacionPaymentIntent,
   seleccionarMetodoPagoHabitacion,
-  createEventoPaymentIntent
-}; 
+  createEventoPaymentIntent,
+  seleccionarMetodoPagoEvento
+};

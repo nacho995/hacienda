@@ -13,6 +13,7 @@ const confirmacionTemplate = require('../emails/confirmacionReserva');
 const confirmacionAdminTemplate = require('../emails/confirmacionAdmin');
 const notificacionGestionAdmin = require('../emails/notificacionGestionAdmin');
 const generarNumeroConfirmacion = require('../utils/confirmNumGen');
+const TipoHabitacion = require('../models/TipoHabitacion');
 // Posiblemente otros modelos/utils como Usuario, Servicio si los usas en otros controladores aquí...
 
 // Controlador para obtener todas las reservas de evento
@@ -143,24 +144,34 @@ const createEvento = asyncHandler(async (req, res, next) => { // Renombrado de c
 
       let referenciasHabitaciones = [];
       if (modo_gestion_habitaciones === 'hacienda') {
-        const habitacionesEstandar = await Habitacion.find({ estado: 'Disponible' }).limit(14).select('letra tipo capacidad precioPorNoche _id').session(session);
+        const habitacionesEstandar = await Habitacion.find({ estado: 'Disponible' }).limit(14).select('letra tipoHabitacion capacidad precioPorNoche _id').session(session);
         if (habitacionesEstandar.length < 14) console.warn(`[Transacción] Se esperaban 14 hab, se encontraron ${habitacionesEstandar.length}`);
         
         for (const habInfo of habitacionesEstandar) {
           const letraHab = habInfo?.letra;
-          if (!habInfo || !habInfo._id) { // Validar que habInfo y su _id existan
+          if (!habInfo || !habInfo._id) { 
             console.error('[Transacción][HaciendaMode] habInfo inválido o sin _id:', habInfo);
             throw new ErrorResponse('Error interno procesando habitaciones estándar.', 500);
           }
-          const habitacionId = habInfo._id; // Usar el ObjectId directamente
+          const habitacionId = habInfo._id;
+
+          // --- INICIO MODIFICACIÓN PROPUESTA ---
+          // El campo 'habInfo.tipoHabitacion' ya debería ser el ObjectId de TipoHabitacion
+          const tipoHabitacionRefId = habInfo?.tipoHabitacion;
+
+          if (!tipoHabitacionRefId || !mongoose.Types.ObjectId.isValid(tipoHabitacionRefId)) {
+            console.error(`[Backend CreateEvento] La habitación física con letra '${letraHab}' (ID: ${habitacionId}) no tiene un campo 'tipoHabitacion' válido o es un ObjectId inválido. Valor: ${tipoHabitacionRefId}`);
+            throw new ErrorResponse(`La habitación física '${letraHab}' no tiene una referencia válida a TipoHabitacion. No se puede crear la reserva de habitación.`, 400);
+          }
+          // --- FIN MODIFICACIÓN PROPUESTA ---
 
           const entrada = new Date(fechaEvento); const salida = new Date(entrada); salida.setDate(entrada.getDate() + 1);
           const reservaHabitacionData = {
             tipoReserva: 'evento',
             reservaEvento: reservaCreada._id,
-            habitacion: habitacionId, // <<< USAR ObjectId de la habitación >>>
-            letraHabitacion: letraHab || null, // Mantener la letra para referencia rápida si existe
-            tipoHabitacion: habInfo?.tipo || 'Estándar',
+            habitacion: habitacionId, 
+            letraHabitacion: letraHab || null, 
+            tipoHabitacion: tipoHabitacionRefId, // <<< USAR ObjectId DEL TipoHabitacion ENCONTRADO
             categoriaHabitacion: (habInfo?.capacidad <= 2) ? 'sencilla' : 'doble',
             precio: habInfo?.precioPorNoche || 0,
             numHuespedes: habInfo?.capacidad || 2,
@@ -906,21 +917,47 @@ El equipo de Hacienda Los Conejos`
  * @route   GET /api/public/reservas/fechas-ocupadas-eventos
  * @access  Public
  */
+/**
+ * @desc    Obtener todos los rangos de fechas ocupadas por eventos (PÚBLICO)
+ * @route   GET /api/reservas/eventos/public/fechas-ocupadas-eventos
+ * @access  Public
+ */
 const getPublicOccupiedEventDates = asyncHandler(async (req, res, next) => {
+  console.log('[DEBUG] Iniciando getPublicOccupiedEventDates');
+  
   // Estados considerados activos para bloquear fechas públicamente
   const activeStates = ['pendiente', 'confirmada', 'pago_parcial']; 
+  console.log('[DEBUG] Buscando eventos con estados:', activeStates);
 
+  // Verificar primero si hay eventos en el sistema
+  const totalEventos = await ReservaEvento.countDocuments();
+  console.log(`[DEBUG] Total de eventos en la base de datos: ${totalEventos}`);
+
+  // Buscar todos los eventos activos
   const eventos = await ReservaEvento.find({
     estadoReserva: { $in: activeStates }
-  }).select('fecha fechaFin'); // Seleccionar solo las fechas
+  }).select('fecha fechaFin estadoReserva tipoEvento');
 
-  const dateRanges = eventos.map(evento => ({
+  console.log(`[DEBUG] Eventos encontrados (${eventos.length}):`, 
+    eventos.map(evento => ({
+      fecha: evento.fecha,
+      fechaFin: evento.fechaFin,
+      estado: evento.estadoReserva,
+      tipoEvento: evento.tipoEvento
+    }))
+  );
+
+  const dateRanges = eventos.map(evento => {
     // Usar fechaFin si existe, si no, la fecha de inicio es también el fin
-    inicio: evento.fecha, 
-    fin: evento.fechaFin || evento.fecha 
-  }));
+    const inicio = evento.fecha;
+    const fin = evento.fechaFin || evento.fecha;
+    return {
+      inicio,
+      fin 
+    };
+  });
 
-  // console.log("[Backend] Fechas Ocupadas (Eventos Públicos):", dateRanges); // <-- LOG AÑADIDO
+  console.log(`[DEBUG] Rangos de fechas ocupadas por eventos (${dateRanges.length}):`, dateRanges);
   res.status(200).json(dateRanges); // Devolver directamente el array de rangos
 });
 

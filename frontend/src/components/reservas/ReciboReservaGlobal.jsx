@@ -9,7 +9,8 @@ import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const ReciboReservaGlobal = () => {
-  const { formData } = useReservation();
+  // Obtener tanto formData como la función resetForm del contexto
+  const { formData, resetForm } = useReservation();
   const [isMinimized, setIsMinimized] = useState(true);
   const [subtotal, setSubtotal] = useState({ base: 0, servicios: 0, habitaciones: 0, total: 0 });
   const [shouldPulse, setShouldPulse] = useState(false);
@@ -17,7 +18,60 @@ const ReciboReservaGlobal = () => {
   const [detalleHabitaciones, setDetalleHabitaciones] = useState(false);
   const [detalleServicios, setDetalleServicios] = useState(false);
   const [modalDetalle, setModalDetalle] = useState(null); // 'habitaciones' o 'servicios'
+  const [formResetDetected, setFormResetDetected] = useState(false);
+  
+  // Función para reiniciar todos los contadores del panel
+  const resetPanelContadores = () => {
+    // Reiniciar todos los contadores y estados
+    setSubtotal({ base: 0, servicios: 0, habitaciones: 0, total: 0 });
+    setDetalleHabitaciones(false);
+    setDetalleServicios(false);
+    setModalDetalle(null);
+    setIsMinimized(true);
+    setShouldPulse(false);
+  };
 
+  // Efecto para reiniciar los contadores cuando no hay datos seleccionados
+  useEffect(() => {
+    // Verificar si el formulario está vacío o reiniciado
+    const isFormEmpty = (
+      // No hay tipo de evento seleccionado
+      !formData.selectedTipoEvento &&
+      // No hay habitaciones seleccionadas
+      (!formData.habitacionesSeleccionadas || formData.habitacionesSeleccionadas.length === 0) &&
+      // No hay servicios seleccionados 
+      (!formData.serviciosSeleccionados || formData.serviciosSeleccionados.length === 0)
+    );
+
+    // Si el formulario está vacío y hay algo en el contador, resetear
+    if (isFormEmpty && (subtotal.total > 0 || subtotal.base > 0 || subtotal.habitaciones > 0 || subtotal.servicios > 0)) {
+      console.log('Formulario vacío detectado - Reseteando panel de recibo');
+      resetPanelContadores();
+    }
+
+    // Mostrar una notificación en la consola para debugging (se puede eliminar luego)
+    if (subtotal.total > 0 && isFormEmpty) {
+      console.log('ATENCIÓN: Inconsistencia detectada - formulario vacío pero subtotal > 0');
+    }
+  }, [formData, subtotal]);
+
+  // Monitorear la función resetForm para detectar reinicios explícitos
+  useEffect(() => {
+    // Crear una función para escuchar el evento personalizado de reset
+    const handleFormReset = () => {
+      console.log('Evento de reseteo del formulario detectado');
+      resetPanelContadores();
+    };
+
+    // Añadir evento de escucha customizado para reseteo
+    window.addEventListener('formularioResetEvent', handleFormReset);
+    
+    // Limpiar al desmontar
+    return () => {
+      window.removeEventListener('formularioResetEvent', handleFormReset);
+    };
+  }, []);
+  
   useEffect(() => {
     calcularSubtotal();
     

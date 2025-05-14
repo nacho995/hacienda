@@ -16,11 +16,10 @@ let cacheDisponibilidad = {
 export const obtenerTodasLasReservas = async () => {
   console.log('[disponibilidadService] Intentando obtener fechas de reservas (público)... ');
   try {
-    // Llamar a los NUEVOS endpoints PÚBLICOS 
-    // *** CORRIGIENDO RUTA ***
+    // Llamar a los NUEVOS endpoints PÚBLICOS con las rutas correctas
     const [respHabPublic, respEvPublic] = await Promise.all([
-      apiClient.get('/reservas/habitaciones/public/fechas-ocupadas-habitaciones'), 
-      apiClient.get('/reservas/eventos/public/fechas-ocupadas-eventos')    
+      apiClient.get('/api/reservas/habitaciones/public/fechas-ocupadas-habitaciones'), 
+      apiClient.get('/api/reservas/eventos/public/fechas-ocupadas-eventos')    
     ]);
     
     // <-- LOG AÑADIDO para ver respuestas crudas
@@ -28,9 +27,9 @@ export const obtenerTodasLasReservas = async () => {
     console.log('[disponibilidadService] Respuesta cruda Eventos:', respEvPublic);
 
     // El formato esperado de los endpoints públicos es directamente el array de rangos.
-    // *** CORRECCIÓN: Usar la respuesta directamente, no .data ***
-    const reservasHabitacion = respHabPublic || []; // <-- CORREGIDO
-    const reservasEvento = respEvPublic || [];       // <-- CORREGIDO
+    // *** CORRECCIÓN: Extraer correctamente los datos de la respuesta ***
+    const reservasHabitacion = Array.isArray(respHabPublic) ? respHabPublic : (respHabPublic?.data || []);
+    const reservasEvento = Array.isArray(respEvPublic) ? respEvPublic : (respEvPublic?.data || []);
     
     // <-- LOG AÑADIDO para ver datos extraídos
     console.log('[disponibilidadService] Datos extraídos Habitaciones:', reservasHabitacion);
@@ -214,118 +213,123 @@ const hayOverlap = (inicio1, fin1, inicio2, fin2) => {
 export const obtenerFechasBloqueadasGlobales = async () => {
   console.log('[disponibilidadService] Iniciando obtenerFechasBloqueadasGlobales...');
   try {
-    const response = await apiClient.get('/reservas/habitaciones/fechas-ocupadas-global');
+    const response = await apiClient.get('/api/reservas/habitaciones/fechas-ocupadas-global');
     // console.log('[disponibilidadService] Respuesta de obtenerFechasBloqueadasGlobales:', response);
     if (response && response.success && Array.isArray(response.data)) {
-      // Extraer el array de rangos de fechas de la respuesta
-      // Ajusta .data según la estructura real devuelta por tu API y el interceptor de apiClient
       const allBlockedRanges = response.data;
 
-      // **IMPORTANTE:** Convertir las fechas de string (si vienen como string) a objetos Date
       const rangesWithDates = allBlockedRanges.map(range => {
         if (!range || !range.inicio || !range.fin) {
           console.warn("[disponibilidadService] Rango inválido recibido del backend:", range);
-          return null; // Filtrar rangos inválidos
+          return null;
         }
         const inicioDate = new Date(range.inicio);
         const finDate = new Date(range.fin);
 
-        // Verificar si las fechas son válidas después de la conversión
         if (!isValid(inicioDate) || !isValid(finDate)) {
            console.warn("[disponibilidadService] Fechas inválidas en rango recibido:", range);
            return null;
         }
         
         return {
-          ...range, // Mantener otras props como 'tipo'
+          ...range,
           inicio: inicioDate,
           fin: finDate
         };
-      }).filter(Boolean); // Eliminar nulos
+      }).filter(Boolean);
 
       console.log('[disponibilidadService] Rangos bloqueados procesados (con Dates):', rangesWithDates);
       return rangesWithDates;
+    } else {
+      // Si la respuesta no tiene el formato esperado pero no es un error HTTP
+      console.warn('[disponibilidadService] Respuesta inesperada de fechas-ocupadas-global:', response);
+      return []; // Devolver array vacío
     }
   } catch (error) {
-    // El interceptor de apiClient ya debería haber logueado detalles
     console.error('[disponibilidadService] Error en obtenerFechasBloqueadasGlobales:', error.message || error);
-    // Devolver vacío para que el calendario no se rompa, aunque mostrará todo disponible
-    return []; 
+    return []; // Devolver array vacío en caso de error
   }
+  // Por si acaso, aunque la lógica anterior debería cubrirlo.
+  return [];
 }; 
-
-// *** NUEVA: Obtiene fechas ocupadas SOLO para una habitación específica ***
-export const obtenerFechasOcupadasParaHabitacionEspecifica = async (habitacionId) => {
-  if (!habitacionId) {
-    console.warn('[disponibilidadService] Se requiere habitacionId para obtener fechas específicas.');
-    return []; // Devuelve array vacío si no hay ID
-  }
-  console.log(`[disponibilidadService] Obteniendo fechas específicas para habitación: ${habitacionId}`);
-  try {
-    const response = await apiClient.get(`/reservas/habitaciones/${habitacionId}/fechas-ocupadas`);
-    const rangesRaw = response || [];
-    // Añadir tipo 'habitacion'
-    const rangesTyped = rangesRaw.map(range => ({ ...range, tipo: 'habitacion' }));
-    console.log(`[disponibilidadService] Respuesta Tipada fechas específicas Hab. ${habitacionId}:`, rangesTyped);
-    return rangesTyped;
-  } catch (error) {
-    console.error(`Error al obtener fechas ocupadas para habitación ${habitacionId}:`, error);
-    toast.error(`No se pudo cargar la disponibilidad detallada para la habitación.`);
-    return []; // Devuelve array vacío en caso de error
-  }
-};
 
 // *** NUEVA: Obtiene fechas ocupadas GLOBALES solo de Eventos ***
 export const obtenerFechasOcupadasEventosGlobales = async () => {
   console.log('[disponibilidadService] Iniciando obtenerFechasOcupadasEventosGlobales...');
   try {
-    const response = await apiClient.get('/reservas/eventos/public/fechas-ocupadas-eventos');
-    console.log('[disponibilidadService][EventosGlobales] Respuesta API recibida:', response);
-
-    const eventRanges = (response?.success ? response.data : response) || [];
-
+    const response = await apiClient.get('/api/reservas/eventos/public/fechas-ocupadas-eventos');
+    // Asumiendo que la respuesta directa es el array de rangos
+    const eventRanges = Array.isArray(response) ? response : (response?.data || []);
+    
     const rangesWithDates = eventRanges.map(range => {
       if (!range || !range.inicio || !range.fin) {
-        console.warn("[disponibilidadService] Rango inválido recibido del backend:", range);
+        console.warn("[disponibilidadService] Rango de evento inválido recibido:", range);
         return null;
       }
       const inicioDate = new Date(range.inicio);
       const finDate = new Date(range.fin);
 
       if (!isValid(inicioDate) || !isValid(finDate)) {
-         console.warn("[disponibilidadService] Fechas inválidas en rango recibido:", range);
+         console.warn("[disponibilidadService] Fechas inválidas en rango de evento:", range);
          return null;
       }
       
-      // Añadir el campo 'tipo' explícitamente
       return {
         ...range,
         inicio: inicioDate,
         fin: finDate,
-        tipo: 'evento' // <-- AÑADIR TIPO
+        tipo: 'evento' // Añadir tipo explícitamente si no viene
       };
     }).filter(Boolean);
 
-    console.log('[disponibilidadService][EventosGlobales] Rangos de fechas de eventos procesados (con tipo):', rangesWithDates);
+    console.log('[disponibilidadService][EventosGlobales] Rangos de fechas de eventos procesados:', rangesWithDates);
     return rangesWithDates;
 
   } catch (error) {
     console.error('Error al obtener fechas ocupadas globales de eventos:', error);
+    toast.error('Error al cargar fechas de eventos.');
     return [];
   }
 };
 
-// Función para obtener fechas ocupadas para UNA habitación (DEPRECADA o REVISAR)
-// Comentada porque `obtenerFechasOcupadasParaHabitacionEspecifica` la reemplaza.
-/*
-export const obtenerFechasOcupadas = async (roomId) => {
+// *** NUEVA: Obtiene fechas ocupadas SOLO para una habitación específica ***
+export const obtenerFechasOcupadasParaHabitacionEspecifica = async (habitacionId) => {
+  if (!habitacionId) {
+    console.warn('[disponibilidadService] Se requiere habitacionId para obtener fechas específicas.');
+    return [];
+  }
+  console.log(`[disponibilidadService] Obteniendo fechas específicas para habitación: ${habitacionId}`);
   try {
-    const response = await apiClient.get(`/api/reservas/disponibilidad/${roomId}`); 
-    return response.data?.fechasOcupadas || [];
+    const response = await apiClient.get(`/api/reservas/habitaciones/${habitacionId}/fechas-ocupadas`);
+    // Asumiendo que la respuesta directa es el array de rangos
+    const rangesRaw = Array.isArray(response) ? response : (response?.data || []);
+    
+    const rangesTyped = rangesRaw.map(range => {
+      if (!range || !range.inicio || !range.fin) {
+        console.warn('[disponibilidadService] Rango de habitación inválido:', range);
+        return null;
+      }
+      const inicio = new Date(range.inicio);
+      const fin = new Date(range.fin);
+      
+      if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+        console.warn('[disponibilidadService] Rango con fechas inválidas para habitación:', range);
+        return null;
+      }
+      
+      return {
+        inicio,
+        fin,
+        tipo: 'habitacion', 
+        habitacionId 
+      };
+    }).filter(Boolean); 
+    
+    console.log(`[disponibilidadService] ${rangesTyped.length} fechas procesadas para Hab. ${habitacionId}`);
+    return rangesTyped;
   } catch (error) {
-    console.error(`Error al obtener fechas ocupadas para la habitación ${roomId}:`, error);
-    toast.error('Error al cargar disponibilidad detallada.');
+    console.error(`Error al obtener fechas ocupadas para habitación ${habitacionId}:`, error);
+    toast.error(`No se pudo cargar la disponibilidad detallada para la habitación ${habitacionId}.`);
     return [];
   }
 };
-*/

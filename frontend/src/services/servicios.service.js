@@ -6,7 +6,7 @@ import apiClient from './apiClient';
  */
 export const getAllServicios = async () => {
   try {
-    const response = await apiClient.get('/servicios');
+    const response = await apiClient.get('/api/servicios');
     console.log('Respuesta API /servicios:', response); // Log para depurar
 
     // El interceptor de apiClient usualmente ya devuelve { success, data } o lanza error
@@ -47,7 +47,7 @@ export const getAllServicios = async () => {
  */
 export const getServicioById = async (id) => {
   try {
-    const response = await apiClient.get(`/servicios/${id}`);
+    const response = await apiClient.get(`/api/servicios/${id}`);
     if (response && typeof response.success === 'boolean') {
       return response; // Asumiendo que apiClient devuelve { success, data: objeto }
     }
@@ -70,7 +70,7 @@ export const getServicioById = async (id) => {
  */
 export const getServiciosPorEvento = async (tipoEvento) => {
   try {
-    const response = await apiClient.get(`/servicios/por-evento/${tipoEvento}`);
+    const response = await apiClient.get(`/api/servicios/por-evento/${tipoEvento}`);
      if (response && typeof response.success === 'boolean') {
         if (!Array.isArray(response.data)) {
           console.warn('La propiedad data no es un array en la respuesta de /servicios/por-evento:', response);

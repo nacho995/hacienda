@@ -64,7 +64,9 @@ export const ReservationProvider = ({ children }) => {
   }, []);
 
   const resetForm = useCallback(() => {
-    // console.log("[ReservationContext] Reseteando formData");
+    console.log("[ReservationContext] Reseteando formData");
+    
+    // Resetear todos los datos del formulario
     setFormData({
       tipoEvento: null,
       fechaInicio: null,
@@ -75,12 +77,21 @@ export const ReservationProvider = ({ children }) => {
       modoReserva: null,
       datosContacto: null,
       pasoActual: 1,
+      selectedTipoEvento: null, // Asegurar que este valor también se resetea
       gestionHacienda: {
         habitacionesAsignadas: [],
         serviciosAsignados: [],
         estadoGestion: 'pendiente'
       }
     });
+    
+    // Disparar un evento global que informe a todos los componentes del reseteo
+    // Esto permite que componentes como ReciboReservaGlobal puedan escucharlo y actuar
+    const resetEvent = new Event('formularioResetEvent');
+    window.dispatchEvent(resetEvent);
+    
+    // Eliminar los datos guardados en localStorage para asegurar un reset completo
+    localStorage.removeItem('reservaFormData');
   }, []);
 
   // Normalizar IDs para evitar problemas de comparación

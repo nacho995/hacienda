@@ -14,6 +14,9 @@ import { obtenerFechasOcupadas, verificarDisponibilidadHabitacion, obtenerTodasL
 import { useAuth } from '@/context/AuthContext';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
+// Importar estilos personalizados para el DatePicker
+import "./BookingCalendar.css";
+import "./MarkerCalendar.css"; // Nuevo archivo de estilos para marcadores
 import { registerLocale, setDefaultLocale } from 'react-datepicker';
 import es from 'date-fns/locale/es';
 import { isSameDay, startOfDay, endOfDay, isValid, isWithinInterval, subDays, addDays } from 'date-fns';
@@ -93,98 +96,148 @@ function BookingFormSection({
   // *** NUEVO ESTADO para guardar detalles de la reserva confirmada ***
   const [reservaConfirmadaDetalles, setReservaConfirmadaDetalles] = useState(null); 
 
-  // --- Helper para deshabilitar fechas en DatePicker ---
+  // --- Helper para detectar si una fecha está ocupada en una habitación ---
   const isDateDisabledForRoom = useCallback((date, roomLetra) => {
+    // Evitar errores con fechas inválidas
+    if (!date) return false;
+    
+    const currentDate = startOfDay(new Date(date)); // Convertir a fecha y normalizar
     const today = startOfDay(new Date());
-    const currentDate = startOfDay(date);
 
     // Deshabilitar fechas pasadas
     if (currentDate < today) {
       return true;
     }
     
-    // Obtener los rangos ocupados para esta habitación específica
+    // Obtener los rangos ocupados para esta habitación
     const ranges = occupiedDateRangesPerRoom[roomLetra] || [];
     
-    // Verificar si la fecha cae dentro de ALGUNO de los rangos ocupados
-    return ranges.some(range => {
-      // Ya deberíamos tener Dates validados y normalizados en el estado
-      if (!range || !range.inicio || !range.fin) return false;
-      // No necesitamos re-validar aquí si confiamos en fetchFechasSoloHabitacion
-      // const start = range.inicio;
-      // const end = range.fin; 
+    // Verificar si la fecha está dentro de algún rango de reserva
+    for (const range of ranges) {
+      if (!range || !range.inicio || !range.fin || !range.tipo) {
+        continue;
+      }
       
-      // Usar isWithinInterval
-      return isWithinInterval(currentDate, { start: range.inicio, end: range.fin });
-    });
-  }, [occupiedDateRangesPerRoom]); // Dependencia del estado que contiene los rangos
+      const processedRangeStart = new Date(range.inicio);
+      const processedRangeEnd = new Date(range.fin);
+      
+      if (isNaN(processedRangeStart.getTime()) || isNaN(processedRangeEnd.getTime())) {
+        continue;
+      }
+      
+      const comparisonStartDay = startOfDay(processedRangeStart);
+      const comparisonEndDay = startOfDay(processedRangeEnd);
+      
+      if (range.tipo === 'evento') {
+        if (currentDate >= comparisonStartDay && currentDate <= comparisonEndDay) {
+          return true; 
+        }
+      } else if (range.tipo === 'habitacion') {
+        // Log específico para depurar rangos de tipo 'habitacion'
+        /* console.log(
+          `%c[DEBUG HABITACION] Hab: ${roomLetra}, FechaEval: ${currentDate.toLocaleDateString()}`,
+          'color: magenta; font-weight: bold;',
+          {
+            currentDate: currentDate,
+            comparisonStartDay: comparisonStartDay,
+            comparisonEndDay: comparisonEndDay,
+            rangeOriginal: range,
+            condicion: `${currentDate.getTime()} >= ${comparisonStartDay.getTime()} && ${currentDate.getTime()} < ${comparisonEndDay.getTime()}`,
+            resultadoCondicion: currentDate >= comparisonStartDay && currentDate < comparisonEndDay
+          }
+        ); */
+
+        if (currentDate >= comparisonStartDay && currentDate < comparisonEndDay) {
+          return true; 
+        }
+      }
+    }
+    
+    return false;
+  }, [occupiedDateRangesPerRoom]); // Dependencia: estado de rangos ocupados
 
   // --- Fetch de Fechas Ocupadas (ACTUALIZADO Y SIMPLIFICADO) ---
 
   // Fetch fechas ocupadas ESPECÍFICAS de cada habitación seleccionada (incluye eventos)
   const fetchFechasSoloHabitacion = useCallback(async (roomId) => {
     if (!roomId) return;
-    console.log(`%c[${roomId}] Iniciando fetchFechasSoloHabitacion...`, 'color: blue; font-weight: bold;');
+    
+    setOccupiedDateRangesPerRoom(prev => ({ ...prev, [roomId]: [] }));
+    
+    console.log(`%c[${roomId}] [FETCH] Iniciando carga de fechas ocupadas...`, 'color: blue; font-weight: bold; background: yellow; padding: 3px;');
     setLoadingFechasHabitacion(prev => ({ ...prev, [roomId]: true }));
+    
     try {
-        // 1. Obtener fechas de eventos GLOBALES
-        console.log(`[${roomId}] Llamando a obtenerFechasOcupadasEventosGlobales...`);
-        const eventosGlobalesTyped = await obtenerFechasOcupadasEventosGlobales();
-        console.log(`[${roomId}] Eventos Globales recibidos:`, JSON.stringify(eventosGlobalesTyped)); // Log como string para ver formato
-
-        // 2. Obtener fechas de reserva específicas para ESTA habitación
-        console.log(`[${roomId}] Llamando a obtenerFechasOcupadasParaHabitacionEspecifica(${roomId})...`);
-        const reservasHabitacionTyped = await obtenerFechasOcupadasParaHabitacionEspecifica(roomId);
-        console.log(`[${roomId}] Reservas Habitación específicas recibidas:`, JSON.stringify(reservasHabitacionTyped)); // Log como string
-
-        // 3. Combinar ambos arrays tipados
-        const combinedRangesTyped = [...eventosGlobalesTyped, ...reservasHabitacionTyped];
-        console.log(`[${roomId}] Rangos Combinados (antes de buffer):`, JSON.stringify(combinedRangesTyped));
-
-        // 4. VALIDAR, APLICAR BUFFER CONDICIONAL y almacenar los rangos
-        const validRanges = combinedRangesTyped
-            .map(range => {
-                if (!range || !range.inicio || !range.fin || !range.tipo) return null; 
-                
-                let inicioOriginal = new Date(range.inicio);
-                let finOriginal = new Date(range.fin);
-                
-                if (isNaN(inicioOriginal.getTime()) || isNaN(finOriginal.getTime())) {
-                    console.warn(`[${roomId}] Rango inválido recibido:`, range);
-                    return null;
-                }
-                if (inicioOriginal > finOriginal) {
-                   console.warn(`[${roomId}] Rango con inicio > fin recibido:`, range);
-                   return null;
-                }
-
-                let finalInicio = inicioOriginal;
-                let finalFin = finOriginal;
-
-                // Aplicar BUFFER solo si es tipo 'evento'
-                if (range.tipo === 'evento') {
-                   finalInicio = subDays(inicioOriginal, 1);
-                   finalFin = addDays(finOriginal, 1);
-                   // console.log(`[${roomId}] Aplicando buffer a evento: ${range.inicio} -> ${finalInicio}, ${range.fin} -> ${finalFin}`); // Log opcional de buffer
-                }
-                
-                return { 
-                    inicio: startOfDay(finalInicio),
-                    fin: endOfDay(finalFin),
-                    tipo: range.tipo
-                }; 
-            })
+        const eventosGlobalesRaw = await obtenerFechasOcupadasEventosGlobales();
+        const reservasHabitacionRaw = await obtenerFechasOcupadasParaHabitacionEspecifica(roomId);
+        
+        const procesarRango = (range, source) => {
+            if (!range || !range.inicio || !range.fin) {
+                return null;
+            }
+            
+            const inicio = new Date(range.inicio);
+            const fin = new Date(range.fin);
+            
+            if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
+                return null;
+            }
+            
+            const tipo = range.tipo || (source === 'eventos' ? 'evento' : 'habitacion');
+            
+            let fechaInicio = inicio;
+            let fechaFin = fin;
+            
+            if (tipo === 'evento') {
+                fechaInicio = subDays(inicio, 1);
+                fechaFin = addDays(fin, 1);
+            }
+            
+            return {
+                inicio: startOfDay(fechaInicio),
+                fin: endOfDay(fechaFin),
+                tipo: tipo,
+                habitacion: roomId,
+                source: source
+            };
+        };
+        
+        const eventosProc = eventosGlobalesRaw
+            .map(e => procesarRango(e, 'eventos'))
             .filter(Boolean);
+            
+        const reservasProc = reservasHabitacionRaw
+            .map(r => procesarRango(r, 'reservas'))
+            .filter(Boolean);
+        
+        const todosRangos = [...eventosProc, ...reservasProc];
 
-        // 5. Guardar el array de RANGOS válidos y combinados en el estado
-        console.log(`%c[${roomId}] Rangos Ocupados FINALES (con Buffer aplicado a eventos) Guardados:`, 'color: green; font-weight: bold;', validRanges); 
-        setOccupiedDateRangesPerRoom(prev => ({ 
+        // Log para depurar los rangos combinados para esta habitación
+        console.log(
+            `%c[DEBUG RANGOS] Hab: ${roomId}, Todos los Rangos Procesados: (${todosRangos.length})`,
+            'color: darkcyan; font-weight: bold; background: #e0f7fa; padding: 2px;',
+            JSON.parse(JSON.stringify(todosRangos)) // Clonar para mejor inspección en consola
+        );
+        
+        // Ordenar los rangos para asegurar una key estable en el DatePicker
+        todosRangos.sort((a, b) => {
+          const startDiff = a.inicio.getTime() - b.inicio.getTime();
+          if (startDiff !== 0) return startDiff;
+          const endDiff = a.fin.getTime() - b.fin.getTime();
+          if (endDiff !== 0) return endDiff;
+          // Si las fechas son iguales, podemos ordenar por tipo o source para más estabilidad
+          if (a.tipo < b.tipo) return -1;
+          if (a.tipo > b.tipo) return 1;
+          return 0;
+        });
+        
+        setOccupiedDateRangesPerRoom(prev => ({
             ...prev, 
-            [roomId]: validRanges || [] 
+            [roomId]: todosRangos
         }));
 
     } catch (error) {
-        console.error(`Error fetching combined occupied dates for room ${roomId}:`, error);
+        console.error(`[${roomId}] ERROR cargando fechas ocupadas:`, error);
         setOccupiedDateRangesPerRoom(prev => ({ ...prev, [roomId]: [] }));
     } finally {
         setLoadingFechasHabitacion(prev => ({ ...prev, [roomId]: false }));
@@ -200,10 +253,9 @@ function BookingFormSection({
     selectedRooms.forEach(room => {
       if (room && room.letra) {
         const roomLetra = room.letra;
-        // Solo recargar si no existen datos de rangos para esa letra
-        if (!occupiedDateRangesPerRoom.hasOwnProperty(roomLetra)) { 
-          fetchFechasSoloHabitacion(roomLetra);
-        }
+        // Siempre recargar las fechas para asegurar datos frescos
+        console.log(`Forzando carga de fechas ocupadas para habitación ${roomLetra}`);
+        fetchFechasSoloHabitacion(roomLetra);
         currentRoomLetras.add(roomLetra);
       }
     });
@@ -295,6 +347,7 @@ function BookingFormSection({
       
     setIsFormValid(isValid);
     return isValid;
+
   };
   
   // Recalcular precio y validar cuando cambian datos clave
@@ -350,20 +403,20 @@ function BookingFormSection({
       ...prev,
       [roomLetra]: currentFechas
     }));
+
   };
 
   // Manejador cambio método pago (sin cambios)
   const handleMetodoPagoChange = (e) => {
-      setMetodoPago(e.target.value);
-      setMostrarPago(true); 
-      setMostrarFormularioTarjeta(e.target.value === 'tarjeta');
-      // Validar formulario de nuevo
-      validateForm(formData, fechasPorHabitacion); 
+    setMetodoPago(e.target.value);
+    setMostrarPago(true); 
+    setMostrarFormularioTarjeta(e.target.value === 'tarjeta');
+    // Validar formulario de nuevo
+    validateForm(formData, fechasPorHabitacion); 
   };
   
   // Manejador input tarjeta (sin cambios)
   const handleCardInputChange = (e) => {
-    // ... (lógica existente)
     const { name, value } = e.target;
     setDatosTarjeta(prev => ({ ...prev, [name]: value }));
   };
@@ -471,9 +524,6 @@ function BookingFormSection({
             response = await createMultipleReservaciones(formattedReservations);
         }
 
-        // <<< LOG: VER RESPUESTA/ERROR RECIBIDO DEL SERVICIO >>>
-        console.log('Respuesta/Error recibido del servicio:', response);
-
         // *** MANEJO DE RESPUESTA DIRECTA ***
         if (response && response.success === true && response.data) {
             // ÉXITO
@@ -575,11 +625,12 @@ function BookingFormSection({
                          <div className="flex flex-col sm:flex-row gap-4">
                               <div className="flex-shrink-0 w-full sm:w-40 h-32 relative rounded overflow-hidden">
                                 {room.letra ? (
-                                  <Image 
-                                    src={getHabitacionImage(room.letra)} 
-                                    alt={`Habitación ${room.letra}`} 
-                                    layout="fill" 
-                                    objectFit="cover" 
+                                  <Image
+                                    src={getHabitacionImage(room.letra)}
+                                    alt={`Habitación ${room.letra}`}
+                                    fill={true}
+                                    style={{ objectFit: 'cover' }}
+                                    sizes="(max-width: 639px) 100vw, 160px"
                                   />
                                 ) : (
                                    <div className="bg-gray-200 h-full flex items-center justify-center">
@@ -594,55 +645,79 @@ function BookingFormSection({
                                  <div className="flex items-center text-sm text-gray-600 mb-1">
                                    <FaUserFriends className="mr-2 text-[var(--color-primary)]"/> Capacidad: {room.capacidad || 'N/A'} personas
                                  </div>
-                                  <div className="flex items-center text-sm text-gray-600 mb-3">
-                                    <FaBed className="mr-2 text-[#8A6E52]"/> Habitación {room.tipo || 'Estándar'}
-                                  </div>
-
-                                {/* DatePicker específico para esta habitación */}
-                                <div className="mb-3">
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Fechas de Estancia (Habitación {room.letra})
-                                  </label>
-                                  <DatePicker
-                                    selected={fechasPorHabitacion[room.letra]?.fechaEntrada}
-                                    onChange={(dates) => handleFechasHabitacionChange(room.letra, dates)}
-                                    startDate={fechasPorHabitacion[room.letra]?.fechaEntrada}
-                                    endDate={fechasPorHabitacion[room.letra]?.fechaSalida}
-                                    minDate={new Date()} // No permitir fechas pasadas
-                                    filterDate={date => !isDateDisabledForRoom(date, room.letra)}
-                                    selectsRange
-                                    inline={false} // O true si prefieres mostrarlo siempre
-                                    monthsShown={2} // Mostrar dos meses
-                                    locale="es"
-                                    dateFormat="dd/MM/yyyy"
-                                    placeholderText="Selecciona Check-in y Check-out"
-                                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                                    calendarClassName="custom-datepicker-calendar" // Clase para estilos personalizados
-                                    wrapperClassName="w-full" 
-                                    // *** Lógica de filtrado de fechas ***
-                                    dayClassName={date => {
-                                      const isRoomOccupied = (occupiedDateRangesPerRoom[room.letra] || []).some(range => 
-                                        date >= range.inicio && date <= range.fin
-                                      );
+                                 <div className="flex items-center text-sm text-gray-600 mb-3">
+                                    <FaBed className="mr-2 text-[#8A6E52]"/> Tipo: {room.tipo || 'Estándar'}
+                                 </div>
+                                  {/* DatePicker para esta habitación */}
+                                  <div className="mb-3">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                      Fechas de Estancia (Habitación {room.letra})
+                                    </label>
+                                    
+                                    <DatePicker
+                                      key={`${room.letra}-${JSON.stringify(occupiedDateRangesPerRoom[room.letra] || [])}-${loadingFechasHabitacion[room.letra]}`}
+                                      selected={fechasPorHabitacion[room.letra]?.fechaEntrada}
+                                      onChange={(dates) => handleFechasHabitacionChange(room.letra, dates)}
+                                      startDate={fechasPorHabitacion[room.letra]?.fechaEntrada}
+                                      endDate={fechasPorHabitacion[room.letra]?.fechaSalida}
+                                      minDate={new Date()} // No permitir fechas pasadas
+                                      selectsRange
+                                      inline={true} // Mostrar el calendario completo directamente
+                                      monthsShown={2} // Mostrar dos meses
+                                      locale="es"
+                                      dateFormat="dd/MM/yyyy"
+                                      placeholderText="Selecciona Check-in y Check-out"
+                                      className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                      calendarClassName="custom-datepicker-calendar" // Clase para estilos personalizados
+                                      wrapperClassName="w-full"
                                       
-                                      if (isRoomOccupied) return 'react-datepicker__day--disabled room-occupied-visual'; // Clase específica si habitación ocupada
-                                      return undefined; // Día normal
-                                    }}
-                                    // Mostrar indicador de carga mientras se obtienen fechas
-                                    isLoading={loadingFechasHabitacion[room.letra]} 
-                                  />
+                                      // Implementación mejorada para mostrar marcadores de habitaciones ocupadas
+                                      renderDayContents={(day, date) => {
+                                        // Verificar si la fecha está ocupada
+                                        const dateObj = new Date(date);
+                                        const isOccupied = isDateDisabledForRoom(dateObj, room.letra);
+                                        
+                                        // Determinar clases para días ocupados
+                                        let dayClass = "";
+                                        if (isOccupied) {
+                                          dayClass = `day-occupied day-occupied-hab-${room.letra}`;
+                                        }
+                                        
+                                        return (
+                                          <div 
+                                            className={`day-container ${dayClass}`}
+                                            data-room={room.letra}
+                                            data-date={dateObj.toISOString().split('T')[0]}
+                                          >
+                                            {day}
+                                            {isOccupied && (
+                                              <div className="absolute top-0 right-0 w-3 h-3 -mt-1 -mr-1">
+                                                <div className="absolute w-3 h-3 bg-red-500 rounded-full animate-ping opacity-75"></div>
+                                                <div className="relative w-3 h-3 bg-red-600 rounded-full"></div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      }}
+                                      
+                                      // Deshabilitar fechas ocupadas
+                                      filterDate={date => !isDateDisabledForRoom(date, room.letra)}
+                                      
+                                      // Mostrar indicador de carga mientras se obtienen fechas
+                                      isLoading={loadingFechasHabitacion[room.letra]}
+                                   />
                                    {loadingFechasHabitacion[room.letra] && (
-                                      <div className="text-xs text-gray-500 mt-1 flex items-center">
-                                         <FaSpinner className="animate-spin mr-1" /> Verificando disponibilidad...
-                                      </div>
+                                     <div className="text-xs text-gray-500 mt-1 flex items-center">
+                                       <FaSpinner className="animate-spin mr-1" /> Verificando disponibilidad...
+                                     </div>
                                    )}
-                                </div>
+                                 </div>
                               </div>
-                           </div>
-                      </motion.div>
-                    ))}
-                </div>
-                {/* --- FIN SECCIÓN DE HABITACIONES --- */}
+                             </div>
+                           </motion.div>
+                     ))}
+                 </div>
+                 {/* --- FIN SECCIÓN DE HABITACIONES --- */}
 
                 {/* --- NUEVO CONTENEDOR HORIZONTAL PARA DETALLES, PAGO Y RESUMEN --- */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">

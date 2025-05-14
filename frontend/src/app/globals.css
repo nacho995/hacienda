@@ -362,3 +362,101 @@
   /* Asegura que las celdas individuales no sobreescriban el fondo */
   background: transparent;
 } 
+
+/* --- Estilos para el DatePicker y fechas ocupadas --- */
+/* Estilo base para días deshabilitados */
+.react-datepicker__day--disabled {
+  background-color: rgba(255, 0, 0, 0.1) !important; 
+  color: #999 !important;
+  text-decoration: line-through !important;
+  pointer-events: none !important;
+  opacity: 0.8 !important;
+  border: 1px solid rgba(255, 0, 0, 0.2) !important;
+  cursor: not-allowed !important;
+}
+
+/* Estilo mejorado para días ocupados */
+.room-occupied-visual {
+  background-color: #fecaca !important;
+  color: #991b1b !important;
+  text-decoration: line-through !important;
+  position: relative !important;
+  border: 1px solid #ef4444 !important;
+  font-weight: bold !important;
+}
+
+.room-occupied-visual::after {
+  content: "\D7"; /* Unicode X mark */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: bold;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+/* Nuevo estilo para días resaltados como ocupados */
+.react-datepicker__day--highlighted-custom-1 {
+  background-color: rgba(255, 0, 0, 0.2) !important;
+  color: #666 !important;
+  position: relative !important;
+  text-decoration: line-through !important;
+  font-weight: bold !important;
+  border: 1px solid rgba(255, 0, 0, 0.3) !important;
+}
+
+/* Añadir una X en las fechas ocupadas */
+.react-datepicker__day--highlighted-custom-1::after {
+  content: '\2715'; /* Símbolo X */
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  font-size: 0.9em !important;
+  color: rgba(255, 0, 0, 0.8) !important;
+  z-index: 1 !important;
+}
+
+/* Mantener el estilo original para clase usada anteriormente (compatibilidad) */
+.room-occupied-visual {
+  background-color: rgba(255, 0, 0, 0.25) !important;
+  color: #666 !important;
+  font-weight: bold !important;
+  position: relative !important;
+  text-decoration: line-through !important;
+}
+
+.room-occupied-visual::after {
+  content: '\2715'; /* Añade una X encima de las fechas ocupadas */
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  font-size: 0.8em !important;
+  color: rgba(255, 0, 0, 0.7) !important;
+}
+
+/* Mejorar la visibilidad de los rangos seleccionados */
+.react-datepicker__day--in-range,
+.react-datepicker__day--in-selecting-range {
+  background-color: var(--color-primary) !important;
+  color: white !important;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--range-start,
+.react-datepicker__day--range-end {
+  background-color: var(--color-primary-dark) !important;
+  color: white !important;
+  font-weight: bold !important;
+}
+
+/* Estilo para el calendario completo */
+.custom-datepicker-calendar {
+  font-family: var(--font-body) !important;
+  border: 1px solid var(--color-primary-light) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+  padding: 10px !important;
+}

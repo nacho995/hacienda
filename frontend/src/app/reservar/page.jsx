@@ -10,7 +10,7 @@ import { useReservation } from '@/context/ReservationContext';
 import { getTiposEvento } from '@/services/tiposEvento.service';
 import { 
     createEventoReservation, 
-    seleccionarMetodoPago,
+    seleccionarMetodoPagoEvento,
     createEventoPaymentIntent
 } from '@/services/reservationService'; 
 import { obtenerFechasBloqueadasGlobales } from '@/services/disponibilidadService';
@@ -413,7 +413,27 @@ const ReservaWizard = () => {
         telefono_contacto: formData.datosContacto?.telefono,
         mensaje: formData.datosContacto?.mensaje,
         modo_gestion_habitaciones: formData.modoGestionHabitaciones,
-        habitaciones: formData.modoGestionHabitaciones === 'usuario' ? formData.habitacionesSeleccionadas : undefined,
+        habitaciones: formData.modoGestionHabitaciones === 'usuario' 
+          ? formData.habitacionesSeleccionadas?.map(hab => ({
+              // Campos que el backend espera para crear una ReservaHabitacion asociada a un evento
+              tipoHabitacion: hab.id, // Este es el ObjectId del TipoHabitacion
+              habitacion: hab.letra || hab.nombre, // Letra o nombre de la habitación específica
+              // Las fechas de la reserva de habitación serán las mismas que las del evento en este contexto
+              fechaEntrada: fechaISO, 
+              fechaSalida: formData.fechaFin ? new Date(formData.fechaFin).toISOString().split('T')[0] : fechaISO, // Asegurar fechaFin
+              // Si tienes un precio específico por habitación seleccionada, úsalo.
+              // Sino, el backend podría calcularlo o podrías omitirlo si no es mandatorio aquí.
+              precio: hab.precio, 
+              // Campos del contacto principal del evento, se podrían replicar o dejar que el backend los asocie
+              nombreContacto: formData.datosContacto?.nombre,
+              apellidosContacto: formData.datosContacto?.apellidos,
+              emailContacto: formData.datosContacto?.email,
+              telefonoContacto: formData.datosContacto?.telefono,
+              estadoReserva: 'pendiente', // Estado inicial para la reserva de habitación
+              // Otros campos que pudieras tener en tu `ReservaHabitacion` y que sean relevantes aquí
+              // numHuespedes: hab.capacidad, // Podrías usar la capacidad por defecto
+            }))
+          : undefined,
         modo_gestion_servicios: formData.modoGestionServicios,
         serviciosContratados: formData.modoGestionServicios === 'usuario' ? formData.serviciosSeleccionados?.map(s => s._id) : undefined,
         _serviciosCompletosParaPrecio: formData.modoGestionServicios === 'usuario' ? formData.serviciosSeleccionados : undefined,
@@ -532,69 +552,11 @@ const ReservaWizard = () => {
         );
       
       case 3:
-        // --- Paso 3: Gestión de habitaciones MODIFICADO ---
         return (
-          <div>
-            {!formData.modoGestionHabitaciones ? (
-              // Mostrar selección de modo si aún no se ha elegido
-              <div className="max-w-2xl mx-auto">
-                <h3 className="text-xl font-semibold text-[#5D4B3A] mb-4">¿Cómo desea gestionar las habitaciones?</h3>
-                <p className="text-[#8A6E52] mb-6 italic">Elija quién se encargará de la asignación de habitaciones.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  {/* Opción 1: Gestión por el Organizador */}
-                  <div
-                    onClick={() => handleModoHabitacionesSelectDirect('usuario')}
-                    className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-primary)]/50 bg-white/80 backdrop-blur-sm shadow-md"
-                  >
-                    <div className="flex items-center mb-4">
-                       <div className="w-16 h-16 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mr-4">
-                          <FaUsers className="w-8 h-8 text-[var(--color-primary)]" />
-                       </div>
-                       <div>
-                          <h4 className="text-lg font-semibold">Gestionar yo mismo</h4>
-                          <p className="text-sm text-gray-500">Asignaré las habitaciones a mis huéspedes</p>
-                       </div>
-                    </div>
-                    <div className="text-sm text-gray-500 italic mt-2">
-                       Ideal si ya sabe quién se alojará en cada habitación.
-                    </div>
-                  </div>
-                  {/* Opción 2: Gestión por la Hacienda */}
-                  <div
-                    onClick={() => handleModoHabitacionesSelectDirect('hacienda')}
-                    className="p-6 rounded-2xl cursor-pointer transition-all duration-300 border-2 border-gray-200 hover:border-[var(--color-accent)]/50 bg-white/80 backdrop-blur-sm shadow-md"
-                  >
-                     <div className="flex items-center mb-4">
-                       <div className="w-16 h-16 rounded-full bg-[var(--color-accent)]/10 flex items-center justify-center mr-4">
-                          <FaUserCog className="w-8 h-8 text-[var(--color-accent)]" />
-                       </div>
-                       <div>
-                          <h4 className="text-lg font-semibold">Que gestione la Hacienda</h4>
-                          <p className="text-sm text-gray-500">El personal asignará las habitaciones</p>
-                       </div>
-                    </div>
-                     <div className="text-sm text-gray-500 italic mt-2">
-                        Nos pondremos en contacto para los detalles de los huéspedes.
-                     </div>
-                  </div>
-                </div>
-              </div>
-            ) : formData.modoGestionHabitaciones === 'usuario' ? (
-              // Mostrar componente de gestión si se eligió 'usuario'
-              <ModoGestionHabitaciones
-                numeroHabitaciones={formData.numeroHabitaciones}
-              />
-            ) : (
-              // Mostrar mensaje si se eligió 'hacienda' (el paso ya avanzó)
-               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                 <FaInfoCircle className="text-blue-500 text-2xl mx-auto mb-2" />
-                 <p className="text-blue-700">
-                   Ha seleccionado que la Hacienda gestione las habitaciones.
-                   Continuando al siguiente paso...
-                 </p>
-               </div>
-            )}
-          </div>
+          <ModoGestionHabitaciones 
+            numeroHabitaciones={formData.numeroHabitaciones || 7}
+            onModeSelect={handleNextStep}
+          />
         );
         
       case 4:
@@ -1016,7 +978,7 @@ const ReservaWizard = () => {
 
             try {
               // Llamar al servicio para seleccionar el método (AHORA PÚBLICO)
-              const response = await seleccionarMetodoPago(createdReservationId, metodo);
+              const response = await seleccionarMetodoPagoEvento(createdReservationId, metodo);
               if(initialToastId) toast.dismiss(initialToastId);
 
               if (response.success) {

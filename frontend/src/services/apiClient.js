@@ -13,12 +13,11 @@ if (!RAW_BACKEND_URL) {
   // throw new Error("La variable de entorno NEXT_PUBLIC_API_URL es obligatoria y no está definida.");
 }
 
-// Asegúrate de que la URL base para Axios termine en /api
-// Si RAW_BACKEND_URL es "http://dominio.com", BASE_URL será "http://dominio.com/api"
-// Si RAW_BACKEND_URL es "http://dominio.com/", BASE_URL también será "http://dominio.com/api"
-const BASE_URL = `${RAW_BACKEND_URL.replace(/\/$/, '')}/api`;
+// Utilizar la URL base sin añadir '/api' ya que las rutas en la aplicación ya lo incluyen
+const BASE_URL = RAW_BACKEND_URL.replace(/\/$/, ''); // Eliminar cualquier / final
 
-console.log('API Base URL configurada para Axios:', BASE_URL); // Log para verificar
+console.log('API Base URL configurada para Axios:', BASE_URL);
+console.warn('IMPORTANTE: Las rutas en los componentes deben incluir "/api" ya que no se añade automáticamente.');
 
 // Crear instancia de axios con configuración base
 const apiClient = axios.create({
@@ -62,14 +61,14 @@ const safelyDecodeToken = (token) => {
 // Determinar si la ruta es pública (no requiere autenticación)
 const isPublicRoute = (url) => {
   const publicRoutes = [
-    '/auth/login',
-    '/auth/register',
-    '/auth/password-reset',
-    '/auth/verify-email',
-    '/eventos/disponibilidad',
-    '/reservas/eventos/disponibilidad',
-    '/servicios',
-    '/servicios/por-evento'
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/password-reset',
+    '/api/auth/verify-email',
+    '/api/eventos/disponibilidad',
+    '/api/reservas/eventos/disponibilidad',
+    '/api/servicios',
+    '/api/servicios/por-evento'
   ];
   
   return publicRoutes.some(route => url.includes(route));

@@ -38,6 +38,6 @@ router.route('/:id')
 // --- Base Routes for / --- (Mounted at /api/reservas/habitaciones)
 router.route('/')
   .get(protectRoute, authorize('admin', 'recepcionista'), reservaHabitacionController.getAllReservasHabitacion)
-  .post(protectRoute, reservaHabitacionController.createReservaHabitacion);
+  .post(reservaHabitacionController.createReservaHabitacion);
 
 module.exports = router; 

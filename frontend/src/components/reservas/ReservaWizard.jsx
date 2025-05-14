@@ -1,38 +1,89 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useReservation } from '@/context/ReservationContext';
 import { useRouter } from 'next/navigation';
-import ModoSeleccionReserva from './ModoSeleccionReserva';
 import ModoSeleccionEvento from './ModoSeleccionEvento';
+import EventDateSelector from './EventDateSelector';
 import ModoGestionServicios from './ModoGestionServicios';
 import EventoMapaHabitacionesNuevo from './EventoMapaHabitacionesNuevo';
-import EventDateSelector from './EventDateSelector';
-// El componente PrecioSubtotalFloating ha sido reemplazado por ReciboReservaGlobal a nivel global
-import ResumenReserva from './ResumenReserva';
+import ContactoForm from './ContactoForm';
+import ReservacionResumen from './ReservacionResumen';
 import { toast } from 'sonner';
 import { crearReservaEvento } from '@/services/reservas.service';
-import { crearReservaHacienda } from '@/services/gestionHacienda.service';
 
 const ReservaWizard = () => {
   const router = useRouter();
   const { formData, updateFormSection, resetForm } = useReservation();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [selectedRooms, setSelectedRooms] = useState([]);
+  const [selectedServices, setSelectedServices] = useState([]);
+  
+  // Referencias para el scroll
+  const wizardContainerRef = useRef(null);
+  const stepContentRef = useRef(null);
 
   // Definir los pasos del wizard
   const steps = [
     { id: 1, title: 'Tipo de Evento' },
     { id: 2, title: 'Fecha' },
-    { id: 3, title: 'Modo de Reserva' },
+    { id: 3, title: 'Habitaciones' },
     { id: 4, title: 'Servicios' },
-    { id: 5, title: 'Habitaciones' },
+    { id: 5, title: 'Contacto' },
     { id: 6, title: 'Confirmación' }
   ];
-
+  
+  // Método simple para hacer scroll a un elemento por ID
+  const scrollToElement = (id) => {
+    try {
+      // Usar window.location.hash para aprovechar la navegación nativa del navegador
+      // Esto funciona como una ancla HTML tradicional
+      window.location.hash = id;
+      
+      // También aplicamos un pequeño offset usando scrollBy para ajustar la posición
+      setTimeout(() => {
+        window.scrollBy(0, -100); // Desplazamiento hacia arriba para ver bien el encabezado
+      }, 100);
+    } catch (error) {
+      console.error('Error al intentar hacer scroll:', error);
+    }
+  };
+  
+  // Efecto para asegurar el scroll al cambiar de paso
+  useEffect(() => {
+    // Hacer scroll al paso actual usando el ID "wizard-step-{n}"
+    const stepId = `wizard-step-${currentStep}`;
+    scrollToElement(stepId);
+  }, [currentStep]);
+  
+  // Manejadores de eventos para los pasos del wizard
   const handleEventTypeSelect = (tipo) => {
-    console.log('Tipo de evento seleccionado:', tipo);
-    updateFormSection('selectedTipoEvento', tipo);
+    updateFormSection('tipoEvento', tipo);
+  };
+  
+  const handleDateSelect = (fecha) => {
+    updateFormSection('fecha', fecha);
+  };
+  
+  const handleRoomSelect = (rooms) => {
+    setSelectedRooms(rooms);
+    updateFormSection('habitaciones', rooms);
+  };
+  
+  const handleServiceSelect = (services) => {
+    setSelectedServices(services);
+    updateFormSection('servicios', services);
+  };
+  
+  const handleContactDataChange = (data) => {
+    updateFormSection('contacto', data);
+  };
+  
+  const handlePrevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
   };
 
   const handleNextStep = async () => {
@@ -49,10 +100,9 @@ const ReservaWizard = () => {
   };
 
   const validateStep = (step) => {
-    console.log(`[validateStep] Validando paso ${step} con formData:`, formData); // Log para depurar
     switch (step) {
       case 1:
-        if (!formData.selectedTipoEvento) {
+        if (!formData.tipoEvento) {
           toast.error('Seleccione un tipo de evento');
           return false;
         }
@@ -64,94 +114,47 @@ const ReservaWizard = () => {
         }
         break;
       case 3:
-        if (!formData.modoReserva) {
-          toast.error('Seleccione un modo de reserva');
-          return false;
-        }
+        // La selección de habitaciones es opcional
         break;
       case 4:
-        if (!Array.isArray(formData.serviciosSeleccionados) || formData.serviciosSeleccionados.length === 0) {
-          toast.error('Seleccione al menos un servicio');
+        // La selección de servicios es opcional
+        break;
+      case 5:
+        if (!formData.contacto || !formData.contacto.nombre || !formData.contacto.email || !formData.contacto.telefono) {
+          toast.error('Todos los datos de contacto son obligatorios');
           return false;
         }
-        break;
-      default:
         break;
     }
     return true;
   };
-
-  const handlePrevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
+  
+  // Handle form submission
   const handleSubmit = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      let response;
-
-      // Extraer solo los IDs de los servicios seleccionados
-      const serviciosIds = formData.serviciosSeleccionados?.map(s => s._id).filter(id => id) || [];
-      // Crear una copia para el cálculo de precio (con todos los datos)
-      const serviciosCompletos = formData.serviciosSeleccionados || [];
-
-      const dataToSend = {
+      // Crear objeto con todos los datos del formulario
+      const reservaData = {
         ...formData,
-        tipo_evento: formData.selectedTipoEvento?.titulo,
-        serviciosContratados: serviciosIds, // Enviar array de IDs con la clave correcta
-        selectedTipoEvento: undefined, // Eliminamos el objeto completo si no se necesita en el backend
-        // Pasar los servicios completos por separado si el backend los necesita para calcular precio
-        _serviciosCompletosParaPrecio: serviciosCompletos 
+        habitaciones: selectedRooms,
+        servicios: selectedServices
       };
-      console.log("Datos a enviar (handleSubmit):", dataToSend); // Log para verificar
-
-      if (formData.modoReserva === 'hacienda') {
-        response = await crearReservaHacienda({
-          ...dataToSend,
-          estado: 'pendiente_gestion'
-        });
-      } else {
-        response = await crearReservaEvento(dataToSend);
-      }
-
+      
+      const response = await crearReservaEvento(reservaData);
+      
       if (response.success) {
-        // Mostrar mensaje de éxito específico según el modo
-        if (formData.modoReserva === 'hacienda') {
-          toast.success('Reserva creada con éxito', {
-            description: 'Recibirá un correo con los detalles y nuestro equipo se pondrá en contacto con usted pronto.'
-          });
-        } else {
-          toast.success('Reserva creada con éxito', {
-            description: 'Se ha enviado un correo de confirmación con los detalles de su reserva.'
-          });
-        }
+        toast.success('¡Reserva creada con éxito!');
+        resetForm(); // Resetear el formulario después de enviar
         
-        // --- Resetear estado y localStorage ANTES de redirigir ---
-        resetForm(); 
-        localStorage.removeItem('reservaFormData'); // Limpieza explícita
-        console.log('Formulario reseteado y localStorage limpiado.'); // Log para confirmar
-        // ---------------------------------------------------------
-
-        // Redirigir a la página de confirmación
-        const reservaId = response.data?.id || response.data?.reserva?._id;
-        if (reservaId) {
-            router.push(`/reservar/confirmacion?id=${reservaId}`);
-        } else {
-            // Manejar caso donde no hay ID (poco probable si success es true)
-            console.error('No se encontró ID en la respuesta exitosa', response.data);
-            toast.warning('Reserva creada, pero hubo un problema al redirigir.');
-            router.push('/'); // Redirigir a inicio como fallback
-        }
-
+        // Redirección a página de confirmación o agradecimiento
+        router.push('/reserva/confirmacion');
       } else {
         toast.error('Error al crear la reserva', {
-          description: response.message
+          description: response.message || 'Por favor, intente nuevamente'
         });
       }
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error al procesar la reserva:', error);
       toast.error('Error inesperado', {
         description: 'Ocurrió un error al procesar la reserva'
       });
@@ -159,51 +162,18 @@ const ReservaWizard = () => {
       setLoading(false);
     }
   };
-
-  const renderStep = () => {
-    switch (currentStep) {
-      case 1:
-        return <ModoSeleccionEvento 
-                 selectedEventType={formData.selectedTipoEvento} 
-                 onEventTypeSelect={handleEventTypeSelect} 
-               />;
-      case 2:
-        return <EventDateSelector />;
-      case 3:
-        return <ModoSeleccionReserva />;
-      case 4:
-        return (
-          <ModoGestionServicios 
-            tipoEvento={formData.selectedTipoEvento}
-            onServicesSelect={(servicios) => updateFormSection('serviciosSeleccionados', servicios)}
-          />
-        );
-      case 5:
-        return (
-          <EventoMapaHabitacionesNuevo 
-            eventDate={formData.fecha}
-          />
-        );
-      case 6:
-        return <ResumenReserva onConfirm={handleSubmit} loading={loading} />;
-      default:
-        return null;
-    }
-  };
-
+  
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 relative">
-      {/* El componente de Subtotal Flotante ahora está a nivel global */}
-      {/* Progress bar */}
+    <div id="reserva-wizard-container" ref={wizardContainerRef} className="max-w-7xl mx-auto px-4 py-8 relative">
+      {/* Barra de progreso */}
       <div className="mb-8">
         <div className="flex justify-between">
           {steps.map((step) => (
             <div
               key={step.id}
-              className={`flex-1 ${
-                step.id < currentStep
-                  ? 'bg-[var(--color-primary)]'
-                  : step.id === currentStep
+              className={`flex-1 ${step.id < currentStep
+                ? 'bg-[var(--color-primary)]'
+                : step.id === currentStep
                   ? 'bg-[var(--color-primary)]/60'
                   : 'bg-gray-200'
               } h-2 rounded-full mx-1 transition-all duration-300`}
@@ -214,9 +184,7 @@ const ReservaWizard = () => {
           {steps.map((step) => (
             <div
               key={step.id}
-              className={`text-sm ${
-                step.id <= currentStep ? 'text-[var(--color-primary)]' : 'text-gray-400'
-              }`}
+              className={`text-sm ${step.id <= currentStep ? 'text-[var(--color-primary)]' : 'text-gray-400'}`}
             >
               {step.title}
             </div>
@@ -224,10 +192,72 @@ const ReservaWizard = () => {
         </div>
       </div>
 
-      {/* Current step content */}
-      <div className="mb-8">{renderStep()}</div>
+      {/* Contenido del paso actual */}
+      {currentStep === 1 && (
+        <div id="wizard-step-1" className="mb-8" ref={stepContentRef}>
+          <h3 className="text-2xl font-semibold mb-6">Selecciona el tipo de evento</h3>
+          <ModoSeleccionEvento
+            onEventTypeSelect={handleEventTypeSelect}
+            selectedEventType={formData.tipoEvento}
+          />
+        </div>
+      )}
 
-      {/* Navigation buttons */}
+      {currentStep === 2 && (
+        <div id="wizard-step-2" className="mb-8" ref={stepContentRef}>
+          <h3 className="text-2xl font-semibold mb-6">Selecciona la fecha de tu evento</h3>
+          <EventDateSelector 
+            onDateSelect={handleDateSelect} 
+            selectedDate={formData.fecha}
+            selectedEventType={formData.tipoEvento}
+          />
+        </div>
+      )}
+
+      {currentStep === 3 && (
+        <div id="wizard-step-3" className="mb-8" ref={stepContentRef}>
+          <h3 className="text-2xl font-semibold mb-6">Selecciona las habitaciones</h3>
+          <EventoMapaHabitacionesNuevo
+            onRoomSelect={handleRoomSelect}
+            date={formData.fecha}
+            selectedRooms={selectedRooms}
+          />
+        </div>
+      )}
+
+      {currentStep === 4 && (
+        <div id="wizard-step-4" className="mb-8" ref={stepContentRef}>
+          <h3 className="text-2xl font-semibold mb-6">Selecciona servicios adicionales</h3>
+          <ModoGestionServicios
+            onServiceSelect={handleServiceSelect}
+            selectedServices={selectedServices}
+            eventType={formData.tipoEvento}
+          />
+        </div>
+      )}
+
+      {currentStep === 5 && (
+        <div id="wizard-step-5" className="mb-8" ref={stepContentRef}>
+          <h3 className="text-2xl font-semibold mb-6">Datos de contacto</h3>
+          <ContactoForm
+            userData={formData.contacto}
+            onUserDataChange={handleContactDataChange}
+          />
+        </div>
+      )}
+
+      {currentStep === 6 && (
+        <div id="wizard-step-6" className="mb-8" ref={stepContentRef}>
+          <h3 className="text-2xl font-semibold mb-6">Confirma tu reserva</h3>
+          <ReservacionResumen
+            formData={formData}
+            habitaciones={selectedRooms}
+            servicios={selectedServices}
+          />
+        </div>
+      )}
+
+      {/* Botones de navegación */}
       <div className="flex justify-between mt-8">
         <button
           onClick={handlePrevStep}

@@ -912,93 +912,75 @@ const verificarDisponibilidadRango = asyncHandler(async (req, res, next) => {
  * @access  Public
  */
 const getGlobalOccupiedDates = asyncHandler(async (req, res, next) => {
-  const { fechaInicio, fechaFin } = req.query;
-  let dateFilter = {}; // Filtro vacío por defecto (devuelve todo)
+  try {
+    // 1. Obtener fechas de Reservas de Eventos ACTIVAS
+    const activeEventStates = ['confirmada', 'pagada', 'pendiente_pago']; // Estados que bloquean
+    const eventos = await ReservaEvento.find({
+      estadoReserva: { $in: activeEventStates } 
+    }).select('fecha fechaFin nombreEvento'); // <--- CAMBIO: 'fecha' es fechaInicio para eventos, mantener fechaFin
 
-  // Si se proporcionan fechas, construir el filtro y validar
-  if (fechaInicio && fechaFin) {
-    const inicio = new Date(fechaInicio);
-    inicio.setUTCHours(0, 0, 0, 0);
-    const fin = new Date(fechaFin);
-    fin.setUTCHours(23, 59, 59, 999);
+    const eventDates = eventos.map(evento => {
+      if (!evento.fecha) { 
+          console.warn('[Backend getGlobalOccupiedDates] Evento sin fecha de inicio:', evento._id, evento.nombreEvento);
+          return null;
+      }
+      
+      // 'fecha' es el inicio del evento.
+      const inicioEvento = new Date(evento.fecha);
+      // Si fechaFin no existe o es inválida, el evento dura solo el día de 'fecha'
+      // Asegurarse de que fechaFin, si existe, también se convierta a Date.
+      const finEvento = evento.fechaFin && !isNaN(new Date(evento.fechaFin).getTime()) 
+                        ? new Date(evento.fechaFin) 
+                        : new Date(evento.fecha); // Si no hay fechaFin, el evento dura un día.
 
-    if (isNaN(inicio.getTime()) || isNaN(fin.getTime())) {
-      return next(new ErrorResponse('Formato de fecha inválido', 400));
-    }
+      return {
+        inicio: inicioEvento.toISOString(), 
+        fin: finEvento.toISOString(),     
+        tipo: 'evento',
+        // nombre: evento.nombreEvento // Para depurar, opcional
+      };
+    }).filter(Boolean); 
 
-    // Filtro para reservas que solapan con el rango
-    dateFilter = {
-      $or: [
-        { fechaEntrada: { $lte: fin, $gte: inicio } }, // Entrada en el rango (para habitaciones)
-        { fecha: { $lte: fin, $gte: inicio } },        // Fecha en el rango (para eventos)
-        { fechaSalida: { $gte: inicio, $lte: fin } }, // Salida en el rango (para habitaciones)
-        { $and: [{ fechaEntrada: { $lt: inicio } }, { fechaSalida: { $gt: fin } }] } // Reserva de hab. abarca todo el rango
-      ]
-    };
-    
-    // Filtro específico para eventos (simplificado si solo usamos 'fecha')
-    // dateFilterEvent = { fecha: { $gte: inicio, $lte: fin } }; // No es necesario si usamos el $or general
+    // 2. Obtener fechas de Reservas de Habitaciones ACTIVAS
+    const activeRoomStates = ['confirmada', 'pendiente_pago', 'check_in', 'pago_parcial', 'pendiente']; 
+    const habitacionesReservadas = await ReservaHabitacion.find({
+      estadoReserva: { $in: activeRoomStates }
+    }).select('fechaEntrada fechaSalida tipoReserva'); // <--- Correcto: fechaEntrada, fechaSalida
 
-  } else {
-    // console.log('[getGlobalOccupiedDates] No se proporcionaron fechas, buscando todas las reservas activas.');
-  }
+    const roomDates = habitacionesReservadas.map(reserva => {
+      if (!reserva.fechaEntrada || !reserva.fechaSalida) { 
+          console.warn('[Backend getGlobalOccupiedDates] Reserva de habitación sin fechas completas:', reserva._id);
+          return null;
+      }
+      return {
+        inicio: new Date(reserva.fechaEntrada).toISOString(), 
+        fin: new Date(reserva.fechaSalida).toISOString(),   
+        tipo: reserva.tipoReserva === 'evento' ? 'habitacion-asociada-evento' : 'habitacion-individual'
+      };
+    }).filter(Boolean); 
 
-  const allOccupiedRanges = [];
+    // 3. Combinar ambas listas de fechas
+    const allOccupiedDates = [...eventDates, ...roomDates];
 
-  // 1. Obtener rangos de ReservaHabitacion activas (con filtro de fecha si aplica)
-  const reservasHabitacion = await ReservaHabitacion.find({
-    ...dateFilter, // Aplicar filtro de fecha (o {}) si no hay fechas
-    estadoReserva: { $in: ['confirmada', 'pendiente_pago', 'check_in', 'pago_parcial'] } // Estados activos
-  }).select('fechaEntrada fechaSalida tipoReserva');
+    // console.log(`[Backend getGlobalOccupiedDates] Enviando ${allOccupiedDates.length} rangos globales.`);
+    // Descomenta la siguiente línea para ver en detalle los datos enviados:
+    // console.log('[Backend getGlobalOccupiedDates] Datos Combinados:', JSON.stringify(allOccupiedDates, null, 2));
 
-  reservasHabitacion.forEach(reserva => {
-    allOccupiedRanges.push({ 
-        inicio: new Date(reserva.fechaEntrada),
-        fin: new Date(reserva.fechaSalida),
-        tipo: reserva.tipoReserva || 'habitacion' // Añadir tipo si es útil
+    res.status(200).json({
+        success: true,
+        count: allOccupiedDates.length,
+        data: allOccupiedDates 
     });
-  });
 
-  // 2. Obtener rangos de ReservaEvento activas (con filtro de fecha si aplica)
-  // Necesitamos filtrar por fecha y fechaFin si existe, o solo fecha si no.
-  // El filtro `$or` anterior ya debería cubrir eventos si usamos `fecha`.
-  // Si los eventos pueden tener `fechaFin`, el filtro debe ser más complejo.
-  // Por ahora, asumimos que `fecha` es el día principal del evento.
-  const eventos = await ReservaEvento.find({
-    ...(fechaInicio && fechaFin ? { fecha: { $gte: inicio, $lte: fin } } : {}), // Filtro de fecha de evento si hay rango
-    estadoReserva: { $in: ['pendiente', 'confirmada', 'pago_parcial'] } // Estados activos
-  }).select('fecha fechaFin'); // Seleccionar ambas fechas
-
-  eventos.forEach(evento => {
-    // Los eventos bloquean desde 1 día antes hasta 1 día después
-    const inicioEvento = new Date(evento.fecha); 
-    // Usar fechaFin si existe, si no, usar fecha. Asegurarse de que sea un Date válido.
-    const finEvento = evento.fechaFin ? new Date(evento.fechaFin) : new Date(evento.fecha); 
-    
-    if (!isNaN(inicioEvento.getTime()) && !isNaN(finEvento.getTime())) {
-        // OJO: La lógica anterior del frontend aplicaba buffer, ¿lo mantenemos aquí?
-        // Si el frontend espera el buffer, lo aplicamos aquí.
-        // Si no, devolvemos las fechas exactas.
-        // Aplicando buffer como en el frontend anterior:
-        const inicioBloqueo = new Date(inicioEvento.getUTCFullYear(), inicioEvento.getUTCMonth(), inicioEvento.getUTCDate() - 1);
-        const finBloqueo = new Date(finEvento.getUTCFullYear(), finEvento.getUTCMonth(), finEvento.getUTCDate() + 1);
-        
-        allOccupiedRanges.push({ 
-            inicio: inicioBloqueo,
-            fin: finBloqueo,
-            tipo: 'evento-buffer'
-        });
-    }
-  });
-
-  // Opcional: Fusionar rangos solapados aquí si se desea una lista más limpia
-  // ... (lógica de fusión de rangos omitida por simplicidad) ...
-
-  res.status(200).json({
-    success: true,
-    count: allOccupiedRanges.length,
-    data: allOccupiedRanges, // Devolver array de objetos { inicio: Date, fin: Date, tipo: String }
-  });
+  } catch (error) {
+    console.error('[Backend getGlobalOccupiedDates] Error obteniendo fechas ocupadas globales:', error);
+    res.status(500).json({ 
+        success: false, 
+        message: 'Error interno del servidor al obtener fechas ocupadas globales.', 
+        error: error.message, 
+        data: [] 
+    });
+  }
 });
 
 /**
@@ -1515,30 +1497,78 @@ const getPublicOccupiedRoomDates = asyncHandler(async (req, res, next) => {
 
 // *** NUEVO Controlador: Obtener rangos de fechas ocupadas para UNA habitación específica ***
 const getOccupiedDatesForRoomById = asyncHandler(async (req, res, next) => {
-  const { habitacionId } = req.params;
+  const { habitacionId } = req.params; // Esto es la LETRA de la habitación, ej: "G"
+  
+  // console.log(`[DEBUG] getOccupiedDatesForRoomById llamado con habitacionLetra: ${habitacionId}`);
   
   if (!habitacionId) {
-    return next(new ErrorResponse('Se requiere el ID de la habitación', 400));
+    return next(new ErrorResponse('Se requiere la letra de la habitación', 400));
   }
 
   // Estados considerados activos para bloquear fechas
-  const activeStates = ['confirmada', 'pendiente_pago', 'check_in', 'pago_parcial']; 
+  const activeStates = ['confirmada', 'pendiente_pago', 'check_in', 'pago_parcial', 'pendiente']; // <-- AÑADIDO 'pendiente'
+  // console.log('[DEBUG] Buscando reservas con estados:', activeStates);
+  
+  let reservas = [];
+  try {
+    // 1. Encontrar la habitación por su letra para obtener su ObjectId
+    const habitacionDoc = await Habitacion.findOne({ letra: habitacionId }).select('_id').lean(); // Añadido .lean() para objeto plano
+    
+    // LOG 1: Verificar si se encontró la habitación...
+    if (!habitacionDoc) {
+      // ...
+      return res.status(200).json([]); 
+    }
+    console.log(`%c[BACKEND DETAIL] Habitación encontrada para letra '${habitacionId}': ObjectId STR = ${habitacionDoc._id.toString()}`, 'color: green; font-weight: bold;');
+    
+    const habitacionObjectIdForQuery = new mongoose.Types.ObjectId(habitacionDoc._id.toString());
+    console.log(`%c[BACKEND DETAIL] habitacionObjectIdForQuery (tipo: ${typeof habitacionObjectIdForQuery}, valor: ${habitacionObjectIdForQuery.toString()})`, 'color: purple; font-weight: bold;');
 
-  // Buscar reservas ACTIVAS solo para la habitación especificada
-  const reservas = await ReservaHabitacion.find({
-    "habitacion._id": habitacionId, // Asumiendo que habitacion es un objeto con _id
-    estadoReserva: { $in: activeStates }
-  }).select('fechaEntrada fechaSalida'); // Seleccionar solo las fechas
+    // ***** INICIO PRUEBA DE LECTURA DIRECTA POR _ID ***** <--- DEBE ESTAR AQUÍ
+    if (habitacionId === 'G') { 
+      const specificReservaId = '67f8f790b6c8b32832a9bc4f';
+      try {
+        const testReserva = await ReservaHabitacion.findById(specificReservaId);
+        console.log(
+          `%c[BACKEND DEBUG TEST BY ID] Reserva '${specificReservaId}' (Esperada para G en Abril):`,
+          'color: orange; font-weight: bold;',
+          testReserva ? JSON.parse(JSON.stringify(testReserva)) : null
+        );
+        if (testReserva) {
+            console.log(`%c[BACKEND DEBUG TEST BY ID] Estado de la reserva de Abril (G): ${testReserva.estadoReserva}, ID Habitación en reserva: ${testReserva.habitacion.toString()}`, 'color: orange; font-weight: bold;');
+        } else {
+            console.log(`%c[BACKEND DEBUG TEST BY ID] La reserva con ID '${specificReservaId}' NO FUE ENCONTRADA.`, 'color: red; font-weight: bold;');
+        }
+      } catch (err) {
+        console.error(`%c[BACKEND DEBUG TEST BY ID] Error buscando reserva '${specificReservaId}':`, 'color: red; font-weight: bold;', err);
+      }
+    }
+    // ***** FIN PRUEBA DE LECTURA DIRECTA POR _ID *****
 
-  const dateRanges = reservas.map(reserva => ({
-    inicio: reserva.fechaEntrada,
-    fin: reserva.fechaSalida
-  }));
+    const rawReservas = await ReservaHabitacion.find({ // <--- LA CONSULTA PROBLEMÁTICA
+      habitacion: habitacionObjectIdForQuery, 
+      estadoReserva: { $in: activeStates }
+    });
 
-  // Log para depuración
-  // console.log(`[Backend] Fechas Ocupadas (Habitación Específica: ${habitacionId}):`, dateRanges);
+    console.log(`%c[BACKEND DETAIL] RAW Reservas encontradas para ObjectId '${habitacionObjectIdForQuery.toString()}' (${rawReservas.length}):`, 'color: green; font-weight: bold;', JSON.parse(JSON.stringify(rawReservas)));
 
-  res.status(200).json(dateRanges); // Devolver directamente el array de rangos
+    // Mapear a partir de rawReservas...
+    const dateRanges = rawReservas.map(reserva => ({
+      inicio: reserva.fechaEntrada,
+      fin: reserva.fechaSalida
+      // tipo: 'habitacion' // El frontend ya añade esto si es necesario
+    }));
+
+    // LOG DETALLADO ANTES DE ENVIAR RESPUESTA...
+    console.log(`%c[BACKEND RESPONSE] Endpoint: /api/reservas/habitaciones/${habitacionId}/fechas-ocupadas`, 'color: blue; font-weight: bold;');
+    console.log(`%c[BACKEND RESPONSE] Enviando ${dateRanges.length} rangos:`, 'color: blue;', JSON.parse(JSON.stringify(dateRanges)));
+
+    res.status(200).json(dateRanges); // Devolver directamente el array de rangos
+  } catch (error) {
+    // console.error('[ERROR] Error al buscar reservas de habitación:', error);
+    // Considerar enviar un error 500 si la consulta a la BD falla
+    return next(new ErrorResponse('Error interno del servidor al buscar fechas ocupadas.', 500));
+  }
 });
 
 // @desc    Obtener todas las reservas de habitación (con filtros opcionales para admin)

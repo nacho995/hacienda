@@ -23,6 +23,7 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const contactoRoutes = require('./routes/contacto.routes');
 const publicRoutes = require('./routes/public.routes');
 const reservaHabitacionRoutes = require('./routes/reservaHabitacion.routes.js');
+const reservaEventoRoutes = require('./routes/reservaEvento.routes.js');
 
 // Importar controlador de webhook
 const { handleStripeWebhook } = require('./controllers/webhook.controller');
@@ -115,6 +116,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/tipos-evento', tipoEventoRoutes);
 app.use('/api/reservas/habitaciones', reservaHabitacionRoutes);
+app.use('/api/reservas/eventos', reservaEventoRoutes);
 app.use('/api/reservas', reservaRoutes);
 app.use('/api/habitaciones', habitacionRoutes);
 app.use('/api/tipos-habitacion', tipoHabitacionRoutes);

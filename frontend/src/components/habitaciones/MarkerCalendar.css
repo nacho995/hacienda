@@ -1,0 +1,59 @@
+/* Estilos especiales para marcar fechas ocupadas en el calendario */
+
+/* Días ocupados - estilo base */
+.day-occupied {
+  background-color: #fee2e2 !important; /* Fondo rojo claro */
+  color: #b91c1c !important; /* Texto rojo oscuro */
+  box-shadow: inset 0 0 0 2px #f87171 !important; /* Borde interior rojo */
+  font-weight: bold !important;
+  text-decoration: line-through !important;
+  opacity: 0.9 !important;
+  position: relative !important;
+}
+
+/* Añadir el marcador de habitación */
+.day-occupied::after {
+  content: attr(data-room);
+  position: absolute;
+  top: 0;
+  right: 1px;
+  font-size: 9px;
+  font-weight: bold;
+  color: #991b1b;
+  background-color: rgba(255, 255, 255, 0.6);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* Estilo específico para días ocupados por habitación */
+.day-occupied-hab-K::after { content: "K"; }
+.day-occupied-hab-L::after { content: "L"; }
+.day-occupied-hab-F::after { content: "F"; }
+.day-occupied-hab-J::after { content: "J"; }
+.day-occupied-hab-G::after { content: "G"; }
+.day-occupied-hab-H::after { content: "H"; }
+.day-occupied-hab-I::after { content: "I"; }
+
+/* Mejorar el contraste de la selección */
+.react-datepicker__day--selected,
+.react-datepicker__day--in-selecting-range,
+.react-datepicker__day--in-range {
+  background-color: #3b82f6 !important; /* Azul más visible */
+  color: white !important;
+  box-shadow: inset 0 0 0 1px #2563eb !important;
+}
+
+/* Día actual */
+.react-datepicker__day--today {
+  font-weight: bold;
+  box-shadow: inset 0 0 0 1px #3b82f6 !important;
+}
+
+/* Aumentar el tamaño general de los días */
+.react-datepicker__day {
+  margin: 0.2rem !important;
+  padding: 0.1rem !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  line-height: 1.8rem !important;
+}
