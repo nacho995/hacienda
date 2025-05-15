@@ -68,7 +68,10 @@ const isPublicRoute = (url) => {
     '/api/eventos/disponibilidad',
     '/api/reservas/eventos/disponibilidad',
     '/api/servicios',
-    '/api/servicios/por-evento'
+    '/api/servicios/por-evento',
+    '/api/tipos-habitacion',
+    '/api/reviews/approved',
+    '/api/habitaciones'
   ];
   
   return publicRoutes.some(route => url.includes(route));
@@ -253,4 +256,4 @@ apiClient.interceptors.response.use(
   }
 );
 
-export default apiClient; 
+export default apiClient;
