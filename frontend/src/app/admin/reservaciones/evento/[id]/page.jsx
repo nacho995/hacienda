@@ -8,7 +8,7 @@ import {
   deleteEventoReservation, 
   getEventoHabitaciones,
   updateReservaHabitacionHuespedes,
-  asignarEventoAdmin
+  assignEventoReservation
 } from '@/services/reservationService';
 import apiClient from '@/services/apiClient';
 import { FaArrowLeft, FaSpinner, FaCalendarAlt, FaUserFriends, FaGlassCheers, FaMoneyBillWave, FaEnvelope, FaPhone, FaClock, FaUtensils, FaBed, FaSave, FaPlus, FaTrash, FaUserShield } from 'react-icons/fa';
@@ -270,39 +270,40 @@ export default function EventoReservationDetail({ params }) {
   };
   
   const handleAsignarAdmin = async (adminId) => {
-    if (!adminId) {
-      toast.warning("Por favor, seleccione un administrador.");
+    if (!adminId || !reservation) {
+      toast.info('Seleccione un administrador y asegúrese de que la reserva esté cargada.');
       return;
     }
-    if (!reservation || !reservation._id) {
-      toast.error("No se pudo obtener el ID de la reserva actual.");
+    if (reservation.asignadoA && reservation.asignadoA._id === adminId) {
+      toast.info('Este evento ya está asignado a este administrador.');
       return;
     }
-    
-    setIsAsignandoAdmin(true);
-    try {
-      console.log(`>>> Componente: Intentando asignar evento ${reservation._id} a admin ${adminId}`);
-      const response = await asignarEventoAdmin(reservation._id, adminId); 
-      
-      console.log('<<< Componente: Respuesta de asignación:', response);
-      
-      if (response && response.success) {
-        toast.success('Evento asignado correctamente al administrador.');
-        const adminAsignado = usuariosAdmin.find(u => u._id === adminId);
-        setReservation(prev => ({
-          ...prev,
-          asignadoA: adminAsignado || { _id: adminId }
-        }));
-        setShowAsignarAdminModal(false);
-      } else {
-        toast.error(response?.message || 'Error al asignar el administrador.');
-      }
-    } catch (error) {
-      console.error('>>> Componente: Error CATCH en handleAsignarAdmin:', error);
-      toast.error(error?.message || 'Error inesperado al asignar administrador.');
-    } finally {
-      setIsAsignandoAdmin(false);
-    }
+
+    setModalConfig({
+      title: 'Asignar Administrador',
+      message: `¿Está seguro de que desea asignar este evento al administrador seleccionado? El administrador actual (si existe) será reemplazado.`,
+      onConfirm: async () => {
+        setIsAsignandoAdmin(true);
+        try {
+          const response = await assignEventoReservation(reservation._id, adminId);
+          if (response.success && response.data) {
+            setReservation(response.data);
+            toast.success('Evento asignado correctamente al administrador.');
+          } else {
+            toast.error(response.message || 'Error al asignar el evento.');
+          }
+        } catch (error) {
+          console.error("Error al asignar admin:", error);
+          toast.error(error.message || 'Error de conexión al asignar administrador.');
+        } finally {
+          setIsAsignandoAdmin(false);
+          setShowAsignarAdminModal(false);
+        }
+      },
+      iconType: 'info',
+      confirmText: 'Sí, Asignar'
+    });
+    setShowAsignarAdminModal(true);
   };
   
   if (loading) {

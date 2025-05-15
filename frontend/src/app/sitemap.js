@@ -1,5 +1,3 @@
-"use client";
-
 export default async function sitemap() {
   const baseUrl = 'https://www.hdasancarlosborromeo.com';
   

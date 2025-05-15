@@ -728,9 +728,9 @@ module.exports = function({
             </div>
             <div class="footer-content">
               <p class="footer-logo">Hacienda San Carlos Borromeo</p>
-              <p class="footer-info">Email: eventos@haciendasancarlos.com</p>
-              <p class="footer-info">Teléfono: 735 1556114 / 5529199212</p>
-              <p class="footer-info">Hacienda San Carlos - Todos los derechos reservados &copy; ${new Date().getFullYear()}</p>
+              <p class="footer-info">Email: <a href="mailto:hdasancarlos@gmail.com" class="link">hdasancarlos@gmail.com</a></p>
+              <p class="footer-info">Teléfono: +52 735 155 6114 / +52 55 2919 9212</p>
+              <p class="footer-info">Dirección: San Carlos, Morelos (Dirección completa pendiente)</p>
               <p class="footer-text">Síguenos en nuestras redes:</p>
               <p class="social-links">
                 <a href="https://www.facebook.com/HaciendaSanCarlos" class="social-link">Facebook</a> |

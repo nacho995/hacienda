@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FaInstagram, FaFacebookF, FaPinterestP, FaTwitter, FaMapMarkerAlt, FaPhone, FaEnvelope, FaHeart, FaChevronRight } from 'react-icons/fa';
+import { FaInstagram, FaFacebookF, FaPinterestP, FaTwitter, FaMapMarkerAlt, FaPhone, FaEnvelope, FaHeart, FaChevronRight, FaPhoneAlt } from 'react-icons/fa';
 
 export default function Footer() {
   const [isVisible, setIsVisible] = useState(false);
@@ -65,11 +65,9 @@ export default function Footer() {
                 </div>
               </div>
               
-              <div className="flex items-center space-x-4 group">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-lg ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
-                  <FaPhone className="text-white text-sm" />
-                </div>
-                <p className="text-white/90 font-medium group-hover:translate-x-1 transition-transform duration-300">735 1556114 / 5529199212</p>
+              <div className="flex items-center gap-3 group">
+                <FaPhoneAlt className="text-[var(--color-primary)] text-xl group-hover:scale-110 transition-transform" />
+                <p className="text-white/90 font-medium group-hover:translate-x-1 transition-transform duration-300">+52 735 155 6114 / +52 55 2919 9212</p>
               </div>
               
               <div className="flex items-center space-x-4 group">

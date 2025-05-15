@@ -214,8 +214,9 @@ export default function ContactForm() {
                 <FaPhoneAlt />
               </div>
               <div>
-                <p className="font-medium text-lg text-[var(--color-accent)]">Teléfono</p>
-                <p className="mt-1 text-gray-600">735 1556114 / 5529199212</p>
+                <h3 className="text-lg font-semibold text-[var(--color-accent)] flex items-center"><FaPhoneAlt className="mr-2" /> Llámanos Directamente</h3>
+                <p className="mt-1 text-gray-600">+52 735 155 6114 / +52 55 2919 9212</p>
+                <p className="mt-1 text-xs text-gray-500">Horario de atención: Lunes a Viernes, 9am - 6pm</p>
               </div>
             </motion.li>
             

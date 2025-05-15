@@ -44,10 +44,10 @@ export default function FAQSection() {
               ¿Tienes más preguntas? No dudes en contactarnos
             </p>
             <a 
-              href="mailto:reservaciones@haciendasancarlos.com"
+              href="mailto:hdasancarlos@gmail.com"
               className="text-[var(--color-primary)] hover:underline font-medium"
             >
-              reservaciones@haciendasancarlos.com
+              hdasancarlos@gmail.com
             </a>
           </div>
         </div>

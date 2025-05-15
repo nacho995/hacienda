@@ -165,8 +165,8 @@ export default function TerminosPage() {
               </p>
               
               <ul>
-                <li>Email: info@haciendasancarlos.com</li>
-                <li>Teléfono: 735 1556114 / 5529199212</li>
+                <li>Email: <a href="mailto:hdasancarlos@gmail.com" className="text-[var(--color-primary)] hover:underline">hdasancarlos@gmail.com</a></li>
+                <li>Teléfono: +52 735 155 6114 / +52 55 2919 9212</li>
                 <li>Dirección: carretera federal Cuernavaca Cuautla km32. Localidad Los Arcos, Yautepec, Morelos</li>
               </ul>
               
