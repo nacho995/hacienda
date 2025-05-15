@@ -52,11 +52,11 @@ export default function Navbar() {
           <div className="flex items-center space-x-6 text-white/80 text-xs tracking-wider">
             <div className="flex items-center space-x-2">
               <FaPhoneAlt className="h-3 w-3 text-[var(--color-primary)]" />
-              <span>+52 (777) 123-4567</span>
+              <span>735 1556114 / 5529199212</span>
             </div>
             <div className="flex items-center space-x-2">
               <FaRegEnvelope className="h-3 w-3 text-[var(--color-primary)]" />
-              <span>info@haciendasancarlos.com</span>
+              <span>hdasancarlos@gmail.com</span>
             </div>
           </div>
           <div className="flex items-center space-x-4 text-white/80 text-xs">
@@ -529,11 +529,11 @@ export default function Navbar() {
             <div className="mt-12 flex flex-col items-center space-y-4 text-white">
               <div className="flex items-center space-x-2">
                 <FaPhoneAlt className="h-4 w-4 text-white" />
-                <span className="font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">+52 (777) 123-4567</span>
+                <span className="font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">735 1556114 / 5529199212</span>
               </div>
               <div className="flex items-center space-x-2">
                 <FaRegEnvelope className="h-4 w-4 text-white" />
-                <span className="font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">info@haciendasancarlos.com</span>
+                <span className="font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">hdasancarlos@gmail.com</span>
               </div>
             </div>
           </div>

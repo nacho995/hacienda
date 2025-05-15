@@ -92,7 +92,7 @@ export default function ContactForm() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 segundos de timeout
       
-      const response = await fetch(`${API_URL}/contacto`, {
+      const response = await fetch(`${API_URL}/api/contacto`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,8 +215,7 @@ export default function ContactForm() {
               </div>
               <div>
                 <p className="font-medium text-lg text-[var(--color-accent)]">Teléfono</p>
-                <p className="mt-1 text-gray-600">735 1556114</p>
-                <p className="text-gray-600">5529199212</p>
+                <p className="mt-1 text-gray-600">735 1556114 / 5529199212</p>
               </div>
             </motion.li>
             
@@ -226,8 +225,7 @@ export default function ContactForm() {
               </div>
               <div>
                 <p className="font-medium text-lg text-[var(--color-accent)]">Email</p>
-                <p className="mt-1 text-gray-600">eventos@haciendasancarlos.com</p>
-                <p className="text-gray-600">info@haciendasancarlos.com</p>
+                <p className="mt-1 text-gray-600">hdasancarlos@gmail.com</p>
               </div>
             </motion.li>
             

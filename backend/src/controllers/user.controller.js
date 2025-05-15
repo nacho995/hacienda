@@ -105,11 +105,19 @@ exports.updateUser = async (req, res) => {
       Object.entries(allowedFields).filter(([_, v]) => v !== undefined)
     );
     
-    // Si el usuario es admin, permitir actualizar el rol
-    if (req.user.role === 'admin' && req.body.role) {
-      fieldsToUpdate.role = req.body.role;
+    // Si el usuario es admin, permitir actualizar el rol y el estado de confirmación
+    if (req.user.role === 'admin') {
+      if (req.body.role !== undefined) {
+        fieldsToUpdate.role = req.body.role;
+      }
+      if (req.body.confirmado !== undefined) {
+        fieldsToUpdate.confirmado = req.body.confirmado;
+      }
     }
     
+    // Log para ver qué campos se van a actualizar
+    console.log(`[updateUser] Intentando actualizar usuario ${req.params.id} con los siguientes campos:`, fieldsToUpdate);
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       fieldsToUpdate,
@@ -131,11 +139,14 @@ exports.updateUser = async (req, res) => {
       data: user
     });
   } catch (error) {
-    console.error('Error al actualizar usuario:', error);
+    console.error(`[updateUser] Error al actualizar usuario ${req.params.id}:`, error); // Loguea el objeto error completo
     res.status(500).json({
       success: false,
       message: 'Error al actualizar usuario',
-      error: error.message
+      errorName: error.name, // Añadir nombre del error
+      errorMessageFromError: error.message, // Mensaje directo del error
+      // Si es un error de validación de Mongoose, error.errors contendrá detalles
+      validationErrors: error.errors || null 
     });
   }
 };

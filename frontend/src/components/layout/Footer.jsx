@@ -76,7 +76,7 @@ export default function Footer() {
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-dark)] flex items-center justify-center shadow-lg ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300">
                   <FaEnvelope className="text-white text-sm" />
                 </div>
-                <p className="text-white/90 font-medium group-hover:translate-x-1 transition-transform duration-300">info@haciendasancarlos.com</p>
+                <p className="text-white/90 font-medium group-hover:translate-x-1 transition-transform duration-300">hdasancarlos@gmail.com</p>
               </div>
             </div>
             

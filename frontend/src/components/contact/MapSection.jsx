@@ -57,15 +57,15 @@ export default function MapSection() {
             
             <div className="flex flex-col md:flex-row items-center justify-center gap-6">
               <Link 
-                href="tel:+527771234567" 
+                href="tel:7351556114" 
                 className="px-8 py-4 bg-[var(--color-brown-medium)] text-black font-bold flex items-center justify-center gap-3 hover:bg-[var(--color-brown-dark)] transition-colors duration-300 min-w-[240px]"
               >
                 <FaPhoneAlt className="text-black" />
-                <span>+52 (777) 123-4567</span>
+                <span>735 1556114</span>
               </Link>
               
               <Link 
-                href="https://wa.me/527771234567"
+                href="https://wa.me/527351556114"
                 className="px-8 py-4 border-2 border-[var(--color-brown-medium)] text-black font-bold flex items-center justify-center gap-3 hover:bg-[var(--color-brown-light-5)] transition-colors duration-300 min-w-[240px]"
               >
                 <FaWhatsapp className="text-black" />
