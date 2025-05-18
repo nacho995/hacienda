@@ -1,0 +1,86 @@
+.cookie-banner {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 320px; /* Un poco más ancho para el texto */
+    padding: 20px;
+    background-color: var(--color-cream-light, #FFFAF0); /* Fondo crema elegante */
+    border: 1px solid var(--color-primary-20, rgba(209, 181, 155, 0.2)); /* Borde sutil marrón pastel */
+    border-radius: 8px; /* Bordes un poco más redondeados */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1); /* Sombra un poco más pronunciada pero suave */
+    z-index: 1000;
+    font-family: var(--font-body, 'Montserrat', sans-serif); /* Fuente Montserrat */
+    font-size: 14px;
+    color: var(--color-brown-text, #8A6E52); /* Color de texto marrón pastel */
+    display: none; /* Oculto por defecto, se mostrará con JS */
+}
+
+.cookie-banner.show {
+    display: block;
+    animation: fadeInBanner 0.5s ease-out forwards; /* Animación de entrada */
+}
+
+.cookie-banner p {
+    margin: 0 0 15px 0; /* Más espacio debajo del párrafo */
+    line-height: 1.5;
+}
+
+.cookie-banner a {
+    color: var(--color-primary-dark, #A5856A); /* Color de enlace marrón oscuro */
+    text-decoration: underline;
+    font-weight: 500; /* Un poco más de peso */
+}
+
+.cookie-banner a:hover {
+    color: var(--color-primary, #D1B59B);
+}
+
+.cookie-banner-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px; /* Un poco más de separación entre botones */
+}
+
+.cookie-banner button {
+    padding: 10px 18px; /* Botones un poco más grandes */
+    border: none;
+    border-radius: 6px; /* Bordes redondeados para botones */
+    cursor: pointer;
+    font-family: var(--font-body, 'Montserrat', sans-serif);
+    font-weight: 600; /* Texto de botón en negrita */
+    font-size: 13px;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+#accept-cookies {
+    background-color: var(--color-primary, #D1B59B);
+    color: var(--color-accent, #0F0F0F); /* Texto oscuro para contraste */
+}
+
+#accept-cookies:hover {
+    background-color: var(--color-primary-dark, #A5856A);
+}
+
+#decline-cookies {
+    background-color: transparent;
+    color: var(--color-primary-dark, #A5856A);
+    border: 1px solid var(--color-primary, #D1B59B);
+}
+
+#decline-cookies:hover {
+    background-color: var(--color-primary-light, #E6DCC6);
+    color: var(--color-accent, #0F0F0F);
+    border-color: var(--color-primary-light, #E6DCC6);
+}
+
+/* Animación para el banner */
+@keyframes fadeInBanner {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+} 

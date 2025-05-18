@@ -4,6 +4,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { ReservationProvider } from '../context/ReservationContext';
 import AnimatedBackground from '../components/layout/AnimatedBackground';
 import { Toaster } from 'sonner';
+import CookieBanner from '../../cookie_banner/CookieBanner';
 
 // Componente de Breadcrumbs dinámica con soporte para SEO
 const BreadcrumbsWrapper = dynamic(() => import('../components/layout/Breadcrumbs'), { ssr: true });
@@ -82,6 +83,7 @@ export default function RootLayout({ children }) {
             <BreadcrumbsWrapper />
             {children}
             <Toaster richColors position="bottom-right" />
+            <CookieBanner />
           </ReservationProvider>
         </AuthProvider>
       </body>
